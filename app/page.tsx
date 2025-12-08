@@ -23,7 +23,7 @@ import {
 
 // --- Headless Components & Sections ---
 
-const FadeIn = ({ children, delay = 0, className = "" }) => (
+const FadeIn = ({ children, delay = 0, className = "" }: { children: React.ReactNode, delay?: number, className?: string }) => (
   <motion.div
     initial={{ opacity: 0, y: 20 }}
     whileInView={{ opacity: 1, y: 0 }}
