@@ -67,6 +67,10 @@ const mockPayrolls: Payroll[] = [
   },
 ]
 
+import { message } from "antd"
+
+// ... imports
+
 export default function PayrollPage() {
   const router = useRouter()
   const [payrolls, setPayrolls] = useState<Payroll[]>([])
@@ -94,12 +98,13 @@ export default function PayrollPage() {
           : p,
       ),
     )
-    alert("Payroll processed and marked as paid!")
+    message.success("Payroll processed and marked as paid!")
   }
 
   const handleDeletePayroll = (id: string) => {
     if (confirm("Are you sure you want to delete this payroll record?")) {
       setPayrolls((prev) => prev.filter((p) => p.id !== id))
+      message.success("Payroll record deleted")
     }
   }
 

@@ -1,5 +1,8 @@
 "use client"
 
+import { Table, Button, Tag, Space, Tooltip } from 'antd';
+import type { ColumnsType } from 'antd/es/table';
+import { CloseOutlined } from '@ant-design/icons';
 import type { LeaveRequest } from "@/types"
 import { formatDate } from "@/lib/utils"
 
@@ -9,63 +12,98 @@ interface LeaveTableProps {
   showActions?: boolean
 }
 
-const statusColors = {
-  pending: "bg-amber-100 text-amber-800",
-  approved: "bg-green-100 text-green-800",
-  rejected: "bg-red-100 text-red-800",
-  cancelled: "bg-gray-100 text-gray-800",
-}
-
 export function LeaveTable({ leaves, onCancel, showActions = true }: LeaveTableProps) {
+  const columns: ColumnsType<LeaveRequest> = [
+    {
+      title: 'Employee',
+      dataIndex: 'employeeName',
+      key: 'employeeName',
+    },
+    {
+      title: 'Leave Type',
+      dataIndex: 'leaveType',
+      key: 'leaveType',
+      render: (text) => <span className="capitalize">{text}</span>,
+      filters: [
+        { text: 'Annual', value: 'annual' },
+        { text: 'Sick', value: 'sick' },
+        { text: 'Personal', value: 'personal' },
+        { text: 'Maternity', value: 'maternity' },
+        { text: 'Sabbatical', value: 'sabbatical' },
+      ],
+      onFilter: (value: any, record) => record.leaveType === value,
+    },
+    {
+      title: 'From',
+      dataIndex: 'startDate',
+      key: 'startDate',
+      render: (date) => formatDate(date),
+      sorter: (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime(),
+    },
+    {
+      title: 'To',
+      dataIndex: 'endDate',
+      key: 'endDate',
+      render: (date) => formatDate(date),
+    },
+    {
+      title: 'Days',
+      dataIndex: 'duration',
+      key: 'duration',
+    },
+    {
+      title: 'Status',
+      dataIndex: 'status',
+      key: 'status',
+      render: (status) => {
+        let color = 'default';
+        if (status === 'approved') color = 'success';
+        if (status === 'pending') color = 'warning';
+        if (status === 'rejected') color = 'error';
+        if (status === 'cancelled') color = 'default';
+        
+        return (
+          <Tag color={color} className="capitalize">
+            {status}
+          </Tag>
+        );
+      },
+    },
+  ];
+
+  if (showActions) {
+    columns.push({
+      title: 'Actions',
+      key: 'actions',
+      align: 'center',
+      render: (_, record) => (
+        <Space size="small">
+          {record.status === 'pending' && (
+            <Tooltip title="Cancel Request">
+              <Button
+                type="text"
+                danger
+                icon={<CloseOutlined />}
+                onClick={() => onCancel(record.id)}
+              >
+                Cancel
+              </Button>
+            </Tooltip>
+          )}
+        </Space>
+      ),
+    });
+  }
+
   return (
     <div className="bg-white rounded-lg shadow overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-200">
-            <tr>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Employee</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Leave Type</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">From</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">To</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Days</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Status</th>
-              {showActions && <th className="px-6 py-3 text-center text-sm font-semibold text-gray-700">Actions</th>}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
-            {leaves.map((leave) => (
-              <tr key={leave.id} className="hover:bg-gray-50 transition">
-                <td className="px-6 py-4">
-                  <div className="font-medium text-gray-900">{leave.employeeName}</div>
-                </td>
-                <td className="px-6 py-4 text-sm text-gray-600 capitalize">{leave.leaveType}</td>
-                <td className="px-6 py-4 text-sm text-gray-600">{formatDate(leave.startDate)}</td>
-                <td className="px-6 py-4 text-sm text-gray-600">{formatDate(leave.endDate)}</td>
-                <td className="px-6 py-4 text-sm font-medium text-gray-900">{leave.duration}</td>
-                <td className="px-6 py-4">
-                  <span
-                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusColors[leave.status]}`}
-                  >
-                    {leave.status}
-                  </span>
-                </td>
-                {showActions && (
-                  <td className="px-6 py-4 text-center">
-                    {leave.status === "pending" && (
-                      <button
-                        onClick={() => onCancel(leave.id)}
-                        className="text-red-600 hover:text-red-800 text-sm font-medium"
-                      >
-                        Cancel
-                      </button>
-                    )}
-                  </td>
-                )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <Table
+        columns={columns}
+        dataSource={leaves}
+        rowKey="id"
+        pagination={{ pageSize: 10 }}
+        scroll={{ x: 800 }}
+      />
     </div>
   )
 }

@@ -84,9 +84,12 @@ const mockEnrollments: TrainingEnrollment[] = [
   },
 ]
 
+import { Tabs, message } from 'antd';
+
+// ... (keep logic up to imports)
+
 export default function TrainingPage() {
   const router = useRouter()
-  const [selectedTab, setSelectedTab] = useState<"available" | "my-trainings">("available")
   const [selectedTraining, setSelectedTraining] = useState<Training | null>(null)
   const { trainings, enrollments, setTrainings, setEnrollments, enrollEmployee } = useTrainingStore()
 
@@ -110,7 +113,7 @@ export default function TrainingPage() {
     }
     enrollEmployee(newEnrollment)
     setSelectedTraining(null)
-    alert("Successfully enrolled in training!")
+    message.success("Successfully enrolled in training!")
   }
 
   const trainingMap = trainings.reduce(
@@ -122,55 +125,43 @@ export default function TrainingPage() {
   )
 
   const myEnrollments = enrollments.filter((e) => e.employeeId === "current-user")
+  
+  const items = [
+    {
+      key: 'available',
+      label: 'Available Trainings',
+      children: <TrainingList trainings={trainings} onSelect={setSelectedTraining} onEnroll={handleEnroll} />
+    },
+    {
+      key: 'my-trainings',
+      label: 'My Trainings',
+      children: (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2">
+              <TrainingList
+                trainings={trainings.filter((t) => myEnrollments.some((e) => e.trainingId === t.id))}
+                onSelect={setSelectedTraining}
+              />
+            </div>
+            <div>
+              <ProgressCard enrollments={myEnrollments} trainingMap={trainingMap} />
+            </div>
+          </div>
+      )
+    }
+  ];
 
   return (
     <div>
       <MainNav />
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
         <div>
-          <h1 className="text-4xl font-bold text-gray-900">Training & Development</h1>
-          <p className="text-gray-600 mt-1">Enhance your skills with our training programs</p>
+          <h1 className="text-4xl font-extrabold text-slate-900 mb-2 tracking-tight">Training & Development</h1>
+          <p className="text-slate-500 text-lg">Enhance your skills with our training programs</p>
         </div>
 
-        <div className="bg-white rounded-lg shadow mb-6 mt-8">
-          <div className="flex border-b border-gray-200">
-            {[
-              { id: "available", label: "Available Trainings" },
-              { id: "my-trainings", label: "My Trainings" },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setSelectedTab(tab.id as any)}
-                className={`flex-1 px-6 py-4 text-center font-medium transition ${
-                  selectedTab === tab.id
-                    ? "text-blue-600 border-b-2 border-blue-600"
-                    : "text-gray-600 hover:text-gray-900"
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          <div className="p-6">
-            {selectedTab === "available" && (
-              <TrainingList trainings={trainings} onSelect={setSelectedTraining} onEnroll={handleEnroll} />
-            )}
-
-            {selectedTab === "my-trainings" && (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2">
-                  <TrainingList
-                    trainings={trainings.filter((t) => myEnrollments.some((e) => e.trainingId === t.id))}
-                    onSelect={setSelectedTraining}
-                  />
-                </div>
-                <div>
-                  <ProgressCard enrollments={myEnrollments} trainingMap={trainingMap} />
-                </div>
-              </div>
-            )}
-          </div>
+        <div className="bg-white rounded-xl shadow-sm border border-slate-100 mb-6 mt-8 p-6">
+           <Tabs defaultActiveKey="available" items={items} />
         </div>
 
         {selectedTraining && (

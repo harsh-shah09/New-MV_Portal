@@ -1,5 +1,6 @@
-"use client"
-
+import { Table, Button, Tag, Tooltip } from 'antd';
+import type { ColumnsType } from 'antd/es/table';
+import { DownloadOutlined } from '@ant-design/icons';
 import type { NDA } from "@/types"
 import { formatDate } from "@/lib/utils"
 
@@ -8,54 +9,71 @@ interface NDATableProps {
   onDownload: (nda: NDA) => void
 }
 
-const statusColors = {
-  pending: "bg-amber-100 text-amber-800",
-  signed: "bg-green-100 text-green-800",
-  expired: "bg-red-100 text-red-800",
-}
-
 export function NDATable({ ndas, onDownload }: NDATableProps) {
+  const columns: ColumnsType<NDA> = [
+    {
+      title: 'Employee',
+      dataIndex: 'employeeName',
+      key: 'employeeName',
+      render: (text) => <span className="font-medium">{text}</span>,
+    },
+    {
+      title: 'Signed Date',
+      dataIndex: 'signDate',
+      key: 'signDate',
+      render: (date) => date ? formatDate(date) : '-',
+    },
+    {
+      title: 'Expiry Date',
+      dataIndex: 'expiryDate',
+      key: 'expiryDate',
+      render: (date) => formatDate(date),
+    },
+    {
+      title: 'Status',
+      dataIndex: 'status',
+      key: 'status',
+      render: (status) => {
+        let color = 'default';
+        if (status === 'signed') color = 'success';
+        if (status === 'pending') color = 'warning';
+        if (status === 'expired') color = 'error';
+        return <Tag color={color} className="capitalize">{status}</Tag>;
+      },
+      filters: [
+        { text: 'Signed', value: 'signed' },
+        { text: 'Pending', value: 'pending' },
+        { text: 'Expired', value: 'expired' },
+      ],
+      onFilter: (value: any, record) => record.status === value,
+    },
+    {
+      title: 'Actions',
+      key: 'actions',
+      align: 'center',
+      render: (_, record) => (
+         <Tooltip title="Download NDA">
+            <Button 
+                type="text" 
+                icon={<DownloadOutlined className="text-blue-600"/>} 
+                onClick={() => onDownload(record)}
+            >
+                Download
+            </Button>
+         </Tooltip>
+      ),
+    },
+  ];
+
   return (
     <div className="bg-white rounded-lg shadow overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-200">
-            <tr>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Employee</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Signed Date</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Expiry Date</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Status</th>
-              <th className="px-6 py-3 text-center text-sm font-semibold text-gray-700">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
-            {ndas.map((nda) => (
-              <tr key={nda.id} className="hover:bg-gray-50 transition">
-                <td className="px-6 py-4">
-                  <p className="font-medium text-gray-900">{nda.employeeName}</p>
-                </td>
-                <td className="px-6 py-4 text-sm text-gray-600">{formatDate(nda.signDate)}</td>
-                <td className="px-6 py-4 text-sm text-gray-600">{formatDate(nda.expiryDate)}</td>
-                <td className="px-6 py-4">
-                  <span
-                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusColors[nda.status]}`}
-                  >
-                    {nda.status}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-center">
-                  <button
-                    onClick={() => onDownload(nda)}
-                    className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                  >
-                    Download
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <Table 
+        columns={columns} 
+        dataSource={ndas} 
+        rowKey="id"
+        pagination={{ pageSize: 10 }}
+        scroll={{ x: 800 }}
+      />
     </div>
   )
 }

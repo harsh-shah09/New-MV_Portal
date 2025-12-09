@@ -22,7 +22,6 @@ export function EmployeeForm({ employee, onSubmit, onCancel }: EmployeeFormProps
   const initialValues = employee ? {
     ...employee,
     joinDate: employee.joinDate ? dayjs(employee.joinDate) : undefined,
-    // Flatten nested objects for Form initialValues if needed, or keeping structure if Form supports it (Antd Form supports nested paths)
   } : {
     status: "active",
     joinDate: dayjs(),
@@ -35,13 +34,9 @@ export function EmployeeForm({ employee, onSubmit, onCancel }: EmployeeFormProps
       ...values,
       id: employee?.id || Math.random().toString(36).substr(2, 9),
       joinDate: values.joinDate ? values.joinDate.format("YYYY-MM-DD") : undefined,
-      // Ensure nested objects are handled if not using dot notation in names
-      // Antd Form handles nested names like ['personalDetails', 'address'] automatically
     }
 
     if(values.documents) {
-        // Handle mock document transformation if strictly needed by types, 
-        // but for now we pass what we have or adapt
          formattedData.documents = values.documents.fileList ? values.documents.fileList.map((f: any) => ({
              id: f.uid,
              name: f.name,
@@ -53,6 +48,7 @@ export function EmployeeForm({ employee, onSubmit, onCancel }: EmployeeFormProps
     }
 
     onSubmit(formattedData)
+    message.success(employee ? "Employee updated successfully!" : "Employee created successfully!")
   }
 
   const items = [
@@ -191,16 +187,18 @@ export function EmployeeForm({ employee, onSubmit, onCancel }: EmployeeFormProps
         layout="vertical"
         initialValues={initialValues}
         onFinish={handleFinish}
-        className="mt-4"
+        className="flex flex-col h-[70vh]"
       >
-        <Tabs
-          activeKey={activeTab}
-          onChange={setActiveTab}
-          items={items}
-          className="mb-6"
-        />
+        <div className="flex-1 overflow-y-auto px-1">
+            <Tabs
+            activeKey={activeTab}
+            onChange={setActiveTab}
+            items={items}
+            className="mb-6"
+            />
+        </div>
         
-        <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+        <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 bg-white z-10">
            <Button onClick={onCancel}>Cancel</Button>
            <Button type="primary" htmlType="submit">
              {employee ? "Update Employee" : "Create Employee"}

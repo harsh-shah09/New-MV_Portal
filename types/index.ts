@@ -124,6 +124,7 @@ export interface NDATemplate {
 }
 
 export interface Asset {
+  currentValue: any
   id: string
   assetTag: string
   name: string
@@ -137,7 +138,8 @@ export interface Asset {
   assignedTo?: string
   assignmentDate?: string
   condition?: "new" | "good" | "fair" | "poor"
-  history?: AssetHistory[]
+  history?: AssetHistory[],
+  type : "laptop" | "mobile" | "headset" | "id_card" | "monitor" | "furniture" | "other"
 }
 
 export interface AssetHistory {

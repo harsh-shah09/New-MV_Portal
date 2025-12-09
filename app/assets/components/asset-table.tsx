@@ -1,5 +1,8 @@
 "use client"
 
+import { Table, Button, Tag, Space, Tooltip } from 'antd';
+import type { ColumnsType } from 'antd/es/table';
+import { EyeOutlined, EditOutlined, DeleteOutlined, UserAddOutlined } from '@ant-design/icons';
 import type { Asset } from "@/types"
 
 interface AssetTableProps {
@@ -9,75 +12,107 @@ interface AssetTableProps {
   onDelete: (id: string) => void
 }
 
-const statusColors = {
-  available: "bg-green-100 text-green-800",
-  assigned: "bg-blue-100 text-blue-800",
-  damaged: "bg-red-100 text-red-800",
-  retired: "bg-gray-100 text-gray-800",
-}
-
 export function AssetTable({ assets, onAssign, onEdit, onDelete }: AssetTableProps) {
+  const columns: ColumnsType<Asset> = [
+    {
+      title: 'Asset Tag',
+      dataIndex: 'assetTag',
+      key: 'assetTag',
+      render: (text) => <span className="font-medium">{text}</span>,
+    },
+    {
+      title: 'Name',
+      dataIndex: 'name',
+      key: 'name',
+    },
+    {
+      title: 'Type',
+      dataIndex: 'type',
+      key: 'type',
+      render: (text) => <span className="capitalize">{text}</span>,
+      filters: [
+        { text: 'Laptop', value: 'laptop' },
+        { text: 'Phone', value: 'phone' },
+        { text: 'Monitor', value: 'monitor' },
+        { text: 'Tablet', value: 'tablet' },
+      ],
+      onFilter: (value: any, record) => record.type === value,
+    },
+    {
+      title: 'Current Value',
+      dataIndex: 'currentValue',
+      key: 'currentValue',
+      render: (value) => `$${Number(value).toLocaleString()}`,
+      sorter: (a, b) => a.currentValue - b.currentValue,
+    },
+    {
+      title: 'Assigned To',
+      dataIndex: 'assignedTo',
+      key: 'assignedTo',
+      render: (text) => text || <span className="text-gray-400">-</span>,
+    },
+    {
+      title: 'Status',
+      dataIndex: 'status',
+      key: 'status',
+      render: (status) => {
+        let color = 'default';
+        if (status === 'available') color = 'success';
+        if (status === 'assigned') color = 'blue';
+        if (status === 'in_repair') color = 'warning';
+        if (status === 'broken' || status === 'lost' || status === 'damaged') color = 'error';
+        
+        return (
+          <Tag color={color} className="capitalize">
+            {status ? status.replace('_', ' ') : 'Unknown'}
+          </Tag>
+        );
+      },
+    },
+    {
+      title: 'Actions',
+      key: 'actions',
+      align: 'center',
+      render: (_, record) => (
+        <Space size="small">
+          {record.status === 'available' && (
+            <Tooltip title="Assign Asset">
+              <Button
+                type="text"
+                icon={<UserAddOutlined className="text-blue-600" />}
+                onClick={() => onAssign(record)}
+              />
+            </Tooltip>
+          )}
+          <Tooltip title="Edit">
+            <Button
+              type="text"
+              icon={<EditOutlined className="text-green-600" />}
+              onClick={() => onEdit(record)}
+            />
+          </Tooltip>
+          <Tooltip title="Delete">
+            <Button
+              type="text"
+              danger
+              icon={<DeleteOutlined />}
+              onClick={() => onDelete(record.id)}
+            />
+          </Tooltip>
+        </Space>
+      ),
+    },
+  ];
+
   return (
     <div className="bg-white rounded-lg shadow overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-200">
-            <tr>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Asset Tag</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Name</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Type</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Value</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Assigned To</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Status</th>
-              <th className="px-6 py-3 text-center text-sm font-semibold text-gray-700">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
-            {assets.map((asset) => (
-              <tr key={asset.id} className="hover:bg-gray-50 transition">
-                <td className="px-6 py-4">
-                  <p className="font-medium text-gray-900">{asset.assetTag}</p>
-                </td>
-                <td className="px-6 py-4 text-sm text-gray-600">{asset.name}</td>
-                <td className="px-6 py-4 text-sm text-gray-600 capitalize">{asset.type}</td>
-                <td className="px-6 py-4 text-sm font-medium text-gray-900">${asset.currentValue.toLocaleString()}</td>
-                <td className="px-6 py-4 text-sm text-gray-600">{asset.assignedTo || "-"}</td>
-                <td className="px-6 py-4">
-                  <span
-                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusColors[asset.status]}`}
-                  >
-                    {asset.status}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-center">
-                  <div className="flex justify-center gap-2 flex-wrap">
-                    {asset.status === "available" && (
-                      <button
-                        onClick={() => onAssign(asset)}
-                        className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                      >
-                        Assign
-                      </button>
-                    )}
-                    <button
-                      onClick={() => onEdit(asset)}
-                      className="text-green-600 hover:text-green-800 text-sm font-medium"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => onDelete(asset.id)}
-                      className="text-red-600 hover:text-red-800 text-sm font-medium"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <Table
+        columns={columns}
+        dataSource={assets}
+        rowKey="id"
+        pagination={{ pageSize: 10 }}
+        scroll={{ x: 900 }}
+      />
     </div>
   )
 }
