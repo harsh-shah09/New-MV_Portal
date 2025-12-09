@@ -33,17 +33,22 @@ export function MainNav() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-8">
-              <Link href="/" className="flex items-center gap-2 font-bold text-xl hover:opacity-90 transition-opacity">
-                <Image 
-                  src="/mv_logo.png" 
-                  alt="MV Portal" 
-                  width={40} 
-                  height={40} 
-                  className="w-16 h-16 object-contain drop-shadow-md"
-                />
-                <span className="bg-gradient-to-r from-white to-blue-100 bg-clip-text text-transparent font-extrabold tracking-tight">
-                  Portal
-                </span>
+              <Link href="/" className="flex items-center gap-3 font-bold text-xl hover:opacity-90 transition-opacity group">
+                <div className="bg-white/10 p-1.5 rounded-lg backdrop-blur-sm group-hover:bg-white/20 transition-colors">
+                  <Image 
+                    src="/mv_logo.png" 
+                    alt="MV Portal" 
+                    width={48} 
+                    height={48} 
+                    className="w-10 h-10 object-contain drop-shadow-md"
+                  />
+                </div>
+                <div className="flex flex-col">
+                  <span className="bg-gradient-to-r from-white to-blue-50 bg-clip-text text-transparent font-extrabold tracking-tight text-lg leading-none">
+                    MV Portal
+                  </span>
+                  <span className="text-[10px] text-blue-100 font-medium tracking-wider uppercase opacity-80 leading-none mt-0.5">HR Management</span>
+                </div>
               </Link>
               <div className="hidden lg:flex gap-1">
                 {navItems.map((item) => (

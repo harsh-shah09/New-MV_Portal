@@ -1,7 +1,8 @@
-"use client"
-
-import type React from "react"
 import { useState } from "react"
+import { Modal, Form, Input, Select, DatePicker, Upload, Button, Tabs, message } from "antd"
+import { UploadOutlined, InboxOutlined } from "@ant-design/icons"
+import type { UploadFile } from "antd/es/upload/interface"
+import dayjs from "dayjs"
 import type { Employee } from "@/types"
 
 interface EmployeeFormProps {
@@ -10,189 +11,202 @@ interface EmployeeFormProps {
   onCancel: () => void
 }
 
+const { Option } = Select
+const { Dragger } = Upload
+
 export function EmployeeForm({ employee, onSubmit, onCancel }: EmployeeFormProps) {
-  const [formData, setFormData] = useState<Partial<Employee>>(
-    employee || {
-      firstName: "",
-      lastName: "",
-      email: "",
-      phone: "",
-      department: "",
-      position: "",
-      joinDate: new Date().toISOString().split("T")[0],
-      status: "active",
-      salary: 0,
-    },
-  )
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }))
+  const [form] = Form.useForm()
+  const [activeTab, setActiveTab] = useState("basic")
+  
+  // Initialize form values
+  const initialValues = employee ? {
+    ...employee,
+    joinDate: employee.joinDate ? dayjs(employee.joinDate) : undefined,
+    // Flatten nested objects for Form initialValues if needed, or keeping structure if Form supports it (Antd Form supports nested paths)
+  } : {
+    status: "active",
+    joinDate: dayjs(),
+    documents: [] as UploadFile[],
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    onSubmit({
-      ...formData,
+  const handleFinish = (values: any) => {
+    // Transform values back to expected format
+    const formattedData: Employee = {
+      ...values,
       id: employee?.id || Math.random().toString(36).substr(2, 9),
-    } as Employee)
+      joinDate: values.joinDate ? values.joinDate.format("YYYY-MM-DD") : undefined,
+      // Ensure nested objects are handled if not using dot notation in names
+      // Antd Form handles nested names like ['personalDetails', 'address'] automatically
+    }
+
+    if(values.documents) {
+        // Handle mock document transformation if strictly needed by types, 
+        // but for now we pass what we have or adapt
+         formattedData.documents = values.documents.fileList ? values.documents.fileList.map((f: any) => ({
+             id: f.uid,
+             name: f.name,
+             type: 'other',
+             url: f.url || '', // Mock
+             uploadDate: new Date().toISOString().split('T')[0],
+             verified: false
+         })) : []
+    }
+
+    onSubmit(formattedData)
   }
+
+  const items = [
+    {
+      key: "basic",
+      label: "Basic Info",
+      children: (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Form.Item name="firstName" label="First Name" rules={[{ required: true, message: 'Required' }]}>
+            <Input placeholder="John" />
+          </Form.Item>
+          <Form.Item name="lastName" label="Last Name" rules={[{ required: true, message: 'Required' }]}>
+             <Input placeholder="Doe" />
+          </Form.Item>
+          <Form.Item name="email" label="Email" rules={[{ required: true, type: 'email' }]}>
+             <Input placeholder="john@company.com" />
+          </Form.Item>
+          <Form.Item name="phone" label="Phone" rules={[{ required: true }]}>
+             <Input placeholder="+1-555-0101" />
+          </Form.Item>
+          <Form.Item name="department" label="Department" rules={[{ required: true }]}>
+            <Select placeholder="Select Department">
+              <Option value="Engineering">Engineering</Option>
+              <Option value="Sales">Sales</Option>
+              <Option value="HR">HR</Option>
+              <Option value="Marketing">Marketing</Option>
+              <Option value="Finance">Finance</Option>
+            </Select>
+          </Form.Item>
+          <Form.Item name="position" label="Position" rules={[{ required: true }]}>
+             <Input placeholder="Senior Developer" />
+          </Form.Item>
+          <Form.Item name="joinDate" label="Join Date" rules={[{ required: true }]}>
+             <DatePicker className="w-full" format="YYYY-MM-DD" />
+          </Form.Item>
+          <Form.Item name="salary" label="Salary" rules={[{ required: true }]}>
+             <Input type="number" prefix="$" placeholder="120000" />
+          </Form.Item>
+          <Form.Item name="status" label="Status" className="md:col-span-2">
+            <Select>
+              <Option value="active">Active</Option>
+              <Option value="intern">Intern</Option>
+              <Option value="on_notice">On Notice</Option>
+              <Option value="resigned">Resigned</Option>
+              <Option value="terminated">Terminated</Option>
+            </Select>
+          </Form.Item>
+        </div>
+      ),
+    },
+    {
+      key: "personal",
+      label: "Personal Details",
+      children: (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+           <Form.Item name={['personalDetails', 'address']} label="Address">
+             <Input placeholder="123 Main St" />
+           </Form.Item>
+           <Form.Item name={['personalDetails', 'city']} label="City">
+             <Input placeholder="New York" />
+           </Form.Item>
+           <Form.Item name={['personalDetails', 'state']} label="State">
+             <Input placeholder="NY" />
+           </Form.Item>
+           <Form.Item name={['personalDetails', 'zipCode']} label="Zip Code">
+             <Input placeholder="10001" />
+           </Form.Item>
+           <Form.Item name={['personalDetails', 'nationality']} label="Nationality">
+             <Input placeholder="American" />
+           </Form.Item>
+           <Form.Item name={['personalDetails', 'emergencyContact']} label="Emergency Contact">
+             <Input placeholder="Name" />
+           </Form.Item>
+           <Form.Item name={['personalDetails', 'emergencyPhone']} label="Emergency Phone">
+             <Input placeholder="+1..." />
+           </Form.Item>
+        </div>
+      ),
+    },
+    {
+      key: "bank",
+      label: "Bank Details",
+      children: (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+           <Form.Item name={['bankDetails', 'accountHolderName']} label="Account Holder">
+             <Input />
+           </Form.Item>
+           <Form.Item name={['bankDetails', 'bankName']} label="Bank Name">
+             <Input />
+           </Form.Item>
+           <Form.Item name={['bankDetails', 'accountNumber']} label="Account Number">
+             <Input />
+           </Form.Item>
+           <Form.Item name={['bankDetails', 'ifscCode']} label="IFSC / Routing">
+             <Input />
+           </Form.Item>
+        </div>
+      ),
+    },
+    {
+       key: "documents",
+       label: "Documents",
+       children: (
+         <div className="space-y-4">
+            <Form.Item name="documents" valuePropName="fileList" getValueFromEvent={(e: any) => {
+                if (Array.isArray(e)) return e;
+                return e && e.fileList;
+            }}>
+              <Dragger name="files" multiple={true} action="" beforeUpload={() => false}>
+                <p className="ant-upload-drag-icon">
+                  <InboxOutlined />
+                </p>
+                <p className="ant-upload-text">Click or drag file to this area to upload</p>
+                <p className="ant-upload-hint">
+                  Support for a single or bulk upload. Strict prohibit from uploading company data or other band files
+                </p>
+              </Dragger>
+            </Form.Item>
+         </div>
+       )
+    }
+  ]
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
-          <h2 className="text-2xl font-bold text-gray-900">{employee ? "Edit Employee" : "Add New Employee"}</h2>
-          <button onClick={onCancel} className="text-gray-500 hover:text-gray-700">
-            ✕
-          </button>
+    <Modal
+      title={employee ? "Edit Employee" : "Add New Employee"}
+      open={true}
+      onCancel={onCancel}
+      footer={null}
+      width={800}
+      centered
+      className="employee-modal"
+    >
+      <Form
+        form={form}
+        layout="vertical"
+        initialValues={initialValues}
+        onFinish={handleFinish}
+        className="mt-4"
+      >
+        <Tabs
+          activeKey={activeTab}
+          onChange={setActiveTab}
+          items={items}
+          className="mb-6"
+        />
+        
+        <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+           <Button onClick={onCancel}>Cancel</Button>
+           <Button type="primary" htmlType="submit">
+             {employee ? "Update Employee" : "Create Employee"}
+           </Button>
         </div>
-
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
-              <input
-                type="text"
-                name="firstName"
-                value={formData.firstName}
-                onChange={handleChange}
-                required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                placeholder="John"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
-              <input
-                type="text"
-                name="lastName"
-                value={formData.lastName}
-                onChange={handleChange}
-                required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                placeholder="Doe"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-              <input
-                type="email"
-                name="email"
-                value={formData.email}
-                onChange={handleChange}
-                required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                placeholder="john@company.com"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-              <input
-                type="tel"
-                name="phone"
-                value={formData.phone}
-                onChange={handleChange}
-                required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                placeholder="+1-555-0101"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Department</label>
-              <select
-                name="department"
-                value={formData.department}
-                onChange={handleChange}
-                required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-              >
-                <option value="">Select Department</option>
-                <option value="Engineering">Engineering</option>
-                <option value="Sales">Sales</option>
-                <option value="HR">HR</option>
-                <option value="Marketing">Marketing</option>
-                <option value="Finance">Finance</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Position</label>
-              <input
-                type="text"
-                name="position"
-                value={formData.position}
-                onChange={handleChange}
-                required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                placeholder="Senior Developer"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Join Date</label>
-              <input
-                type="date"
-                name="joinDate"
-                value={formData.joinDate}
-                onChange={handleChange}
-                required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Salary</label>
-              <input
-                type="number"
-                name="salary"
-                value={formData.salary}
-                onChange={handleChange}
-                required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                placeholder="120000"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-              <select
-                name="status"
-                value={formData.status}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-              >
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-                <option value="on_leave">On Leave</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
-            <button
-              type="button"
-              onClick={onCancel}
-              className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition"
-            >
-              {employee ? "Update" : "Create"} Employee
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+      </Form>
+    </Modal>
   )
 }

@@ -16,17 +16,36 @@ export interface Employee {
   department: string
   position: string
   joinDate: string
-  status: "active" | "inactive" | "on_leave"
+  status: "active" | "intern" | "on_notice" | "resigned" | "terminated"
   salary: number
   manager?: string
-  bankAccountNumber?: string
-  bankName?: string
+  bankDetails?: BankDetails
   personalDetails?: PersonalDetails
+  documents?: EmployeeDocument[]
   ndaStatus?: "pending" | "signed" | "rejected"
+}
+
+export interface BankDetails {
+  accountHolderName: string
+  bankName: string
+  accountNumber: string
+  ifscCode: string
+  branchName?: string
+}
+
+export interface EmployeeDocument {
+  id: string
+  name: string
+  type: "id_proof" | "address_proof" | "resume" | "contract" | "other"
+  url: string
+  uploadDate: string
+  verified: boolean
 }
 
 export interface PersonalDetails {
   dateOfBirth?: string
+  gender?: "male" | "female" | "other"
+  maritalStatus?: "single" | "married" | "divorced" | "widowed"
   address?: string
   city?: string
   state?: string
@@ -34,13 +53,14 @@ export interface PersonalDetails {
   nationality?: string
   emergencyContact?: string
   emergencyPhone?: string
+  bloodGroup?: string
 }
 
 export interface LeaveRequest {
   id: string
   employeeId: string
   employeeName: string
-  leaveType: "annual" | "sick" | "personal" | "maternity" | "sabbatical"
+  leaveType: "casual" | "sick" | "earned" | "unpaid"
   startDate: string
   endDate: string
   duration: number
@@ -52,7 +72,7 @@ export interface LeaveRequest {
 
 export interface LeavePolicy {
   id: string
-  leaveType: string
+  leaveType: "casual" | "sick" | "earned" | "unpaid"
   annualDays: number
   carryForwardDays: number
   minAdvanceNotice: number
@@ -87,25 +107,46 @@ export interface NDA {
   id: string
   employeeId: string
   employeeName: string
-  signDate: string
-  expiryDate: string
+  templateId: string
+  signDate?: string
+  expiryDate?: string
   status: "pending" | "signed" | "expired"
-  documentUrl: string
+  documentUrl?: string
+  generatedContent?: string
+}
+
+export interface NDATemplate {
+  id: string
+  name: string
+  content: string
+  type: "offer_letter" | "experience_letter" | "contract" | "other"
+  createdAt: string
 }
 
 export interface Asset {
   id: string
   assetTag: string
   name: string
-  type: "laptop" | "phone" | "tablet" | "monitor" | "other"
-  category: string
+  serialNumber: string
+  category: "laptop" | "mobile" | "headset" | "id_card" | "monitor" | "furniture" | "other"
   purchaseDate: string
-  purchasePrice: number
-  currentValue: number
-  status: "available" | "assigned" | "damaged" | "retired"
+  purchaseCost: number
+  vendor: string
+  warrantyExpiry?: string
+  status: "available" | "assigned" | "in_repair" | "under_maintenance" | "lost" | "stolen" | "disposed"
   assignedTo?: string
   assignmentDate?: string
-  depreciationRate: number
+  condition?: "new" | "good" | "fair" | "poor"
+  history?: AssetHistory[]
+}
+
+export interface AssetHistory {
+  id: string
+  assetId: string
+  action: "allocation" | "reassignment" | "repair" | "return" | "disposal"
+  date: string
+  userId: string
+  notes?: string
 }
 
 export interface Payroll {

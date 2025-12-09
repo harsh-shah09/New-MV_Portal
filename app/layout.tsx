@@ -29,6 +29,10 @@ export const metadata: Metadata = {
   },
 }
 
+import AntdStyledRegistry from '@/components/AntdStyledRegistry';
+
+// ...
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -37,7 +41,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`font-sans antialiased`}>
-        {children}
+        <AntdStyledRegistry>{children}</AntdStyledRegistry>
         <Analytics />
       </body>
     </html>
