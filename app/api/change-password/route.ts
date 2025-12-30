@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSalesforceConnection } from '@/lib/salesforce';
-import crypto from 'crypto';
+import crypto, { hash } from 'crypto';
+import { hashPassword} from '@/lib/auth';
 
 interface EmployeeRecord {
   Id: string;
@@ -82,10 +83,7 @@ export async function POST(req: Request) {
     }
 
     // Encrypt password (using SHA-256 for simplicity as requested)
-    const hashedPassword = crypto
-      .createHash('sha256')
-      .update(password)
-      .digest('hex');
+    const hashedPassword = await hashPassword(password)
 
     // Update the password in Salesforce and set Pass_Reset_Active__c to true
     await conn.sobject('Employee__c').update({
