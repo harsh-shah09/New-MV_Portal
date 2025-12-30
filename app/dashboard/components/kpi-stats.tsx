@@ -1,4 +1,4 @@
-import { ArrowUpRight, ArrowDownRight, LucideIcon } from "lucide-react"
+import { ArrowUpRight, ArrowDownRight } from "lucide-react"
 
 interface KPICard {
   title: string

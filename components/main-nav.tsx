@@ -5,7 +5,7 @@ import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { LayoutDashboard, Users, CalendarDays, BookOpen, Banknote, Tag, FileCheck, Calendar } from "lucide-react"
-
+import {logout} from "@/lib/auth"
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/employees", label: "Employees", icon: Users },
@@ -22,8 +22,7 @@ export function MainNav() {
   const router = useRouter()
 
   const handleLogout = () => {
-    localStorage.removeItem("authToken")
-    localStorage.removeItem("userRole")
+    logout()
     router.push("/auth/login")
   }
 

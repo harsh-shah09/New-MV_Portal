@@ -1,60 +1,53 @@
-interface LoginCredentials {
-  email: string
-  password: string
+'use server';
+import { SignJWT } from "jose";
+import { cookies } from "next/headers";
+import crypto from "crypto";
+import { key, verifyToken, SessionPayload } from "./auth-utils";
+
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || "default_encryption_key_change_me";
+
+export { verifyToken, type SessionPayload };
+
+export async function encrypt(payload: SessionPayload) {
+  return new SignJWT(payload)
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime('24h')
+    .sign(key)
 }
 
-interface AuthResponse {
-  success: boolean
-  token?: string
-  user?: {
-    id: string
-    name: string
-    email: string
-    role: string
-  }
-  error?: string
+export async function createSession(payload: SessionPayload) {
+  const expires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 1 day session
+  const session = await encrypt(payload);
+
+  const cookieStore = await cookies();
+  cookieStore.set("session", session, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    expires,
+    sameSite: "lax",
+    path: "/",
+  });
 }
 
-export async function login(credentials: LoginCredentials): Promise<AuthResponse> {
-  // Mock authentication - replace with real auth logic
-  if (credentials.email && credentials.password) {
-    const token = btoa(credentials.email)
-    localStorage.setItem("authToken", token)
-    localStorage.setItem("userRole", "admin")
+export async function verifySession() {
+  const cookieStore = await cookies();
+  const session = cookieStore.get("session")?.value;
 
-    return {
-      success: true,
-      token,
-      user: {
-        id: "1",
-        name: "John Doe",
-        email: credentials.email,
-        role: "admin",
-      },
-    }
-  }
-  return { success: false, error: "Invalid credentials" }
+  if (!session) return null;
+  return verifyToken(session);
 }
 
-export function logout(): void {
-  localStorage.removeItem("authToken")
-  localStorage.removeItem("userRole")
+export async function logout() {
+  const cookieStore = await cookies();
+  cookieStore.delete("session");
 }
 
-export function getAuthToken(): string | null {
-  if (typeof window !== "undefined") {
-    return localStorage.getItem("authToken")
-  }
-  return null
+export async function hashPassword(password: string): Promise<string> {
+  // Using HMAC-SHA256 as implied by "stored in hashes using ENCRYPTION_KEY"
+  const hmac = crypto.createHmac("sha256", ENCRYPTION_KEY);
+  hmac.update(password);
+  return hmac.digest("hex");
 }
 
-export function isAuthenticated(): boolean {
-  return getAuthToken() !== null
-}
 
-export function getUserRole(): string {
-  if (typeof window !== "undefined") {
-    return localStorage.getItem("userRole") || "employee"
-  }
-  return "employee"
-}

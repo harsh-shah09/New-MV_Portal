@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { MainNav } from "@/components/main-nav"
-import { getAuthToken } from "@/lib/auth"
 import { TrainingList } from "./components/training-list"
 import { TrainingDetail } from "./components/training-detail"
 import { ProgressCard } from "./components/progress-card"
@@ -92,16 +91,6 @@ export default function TrainingPage() {
   const router = useRouter()
   const [selectedTraining, setSelectedTraining] = useState<Training | null>(null)
   const { trainings, enrollments, setTrainings, setEnrollments, enrollEmployee } = useTrainingStore()
-
-  useEffect(() => {
-    if (!getAuthToken()) {
-      router.push("/auth/login")
-    }
-    if (trainings.length === 0) {
-      setTrainings(mockTrainings)
-      setEnrollments(mockEnrollments)
-    }
-  }, [router, trainings.length, setTrainings, setEnrollments])
 
   const handleEnroll = (trainingId: string) => {
     const newEnrollment: TrainingEnrollment = {

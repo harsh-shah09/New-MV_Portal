@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { MainNav } from "@/components/main-nav"
-import { getAuthToken } from "@/lib/auth"
 import { AssetTable } from "./components/asset-table"
 import { AssetAssignForm } from "./components/asset-assign-form"
 import { AssetForm } from "./components/asset-form"
@@ -56,13 +55,6 @@ export default function AssetsPage() {
   const [showAssetForm, setShowAssetForm] = useState(false)
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null)
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null)
-
-  useEffect(() => {
-    if (!getAuthToken()) {
-      router.push("/auth/login")
-    }
-    setAssets(mockAssets)
-  }, [router])
 
   const handleAssign = (asset: Asset) => {
     setSelectedAsset(asset)

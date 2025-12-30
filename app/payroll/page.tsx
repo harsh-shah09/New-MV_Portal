@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { MainNav } from "@/components/main-nav"
-import { getAuthToken } from "@/lib/auth"
 import { SalaryCalculator } from "./components/salary-calculator"
 import { PayrollTable } from "./components/payroll-table"
 import { BankFileGenerator } from "./components/bank-file-generator"
@@ -75,17 +74,6 @@ export default function PayrollPage() {
   const router = useRouter()
   const [payrolls, setPayrolls] = useState<Payroll[]>([])
   const { setPayrolls: setStorePayrolls } = usePayrollStore()
-
-  useEffect(() => {
-    if (!getAuthToken()) {
-      router.push("/auth/login")
-    }
-    if (payrolls.length === 0) {
-      setPayrolls(mockPayrolls)
-      setStorePayrolls(mockPayrolls)
-    }
-  }, [router, payrolls.length, setStorePayrolls])
-
   const handleProcessPayroll = (id: string) => {
     setPayrolls((prev) =>
       prev.map((p) =>

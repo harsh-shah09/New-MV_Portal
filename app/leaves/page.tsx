@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { MainNav } from "@/components/main-nav"
-import { getAuthToken } from "@/lib/auth"
 import { LeaveRequestForm } from "./components/leave-request-form"
 import { LeaveTable } from "./components/leave-table"
 import { LeavePolicyCard } from "./components/leave-policy-card"
@@ -80,16 +79,6 @@ export default function LeavesPage() {
   const [selectedApproval, setSelectedApproval] = useState<LeaveRequest | null>(null)
 
   const { leaves, pendingApprovals, setLeaves, setPendingApprovals, addLeave, updateLeave } = useLeaveStore()
-
-  useEffect(() => {
-    if (!getAuthToken()) {
-      router.push("/auth/login")
-    }
-    if (leaves.length === 0) {
-      setLeaves(mockLeaves)
-      setPendingApprovals(mockLeaves.filter((l) => l.status === "pending"))
-    }
-  }, [router, leaves.length, setLeaves, setPendingApprovals])
 
   const handleSubmitRequest = (data: Partial<LeaveRequest>) => {
     const newLeave: LeaveRequest = {

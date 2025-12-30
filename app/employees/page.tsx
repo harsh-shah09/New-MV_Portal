@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { MainNav } from "@/components/main-nav"
-import { getAuthToken } from "@/lib/auth"
 import { EmployeeForm } from "./components/employee-form"
 import { EmployeeTable } from "./components/employee-table"
 import { EmployeeFilters } from "./components/employee-filters"
@@ -60,15 +59,6 @@ export default function EmployeesPage() {
   const [status, setStatus] = useState("")
 
   const { employees, setEmployees, addEmployee, updateEmployee, deleteEmployee } = useEmployeeStore()
-
-  useEffect(() => {
-    if (!getAuthToken()) {
-      router.push("/auth/login")
-    }
-    if (employees.length === 0) {
-      setEmployees(mockEmployees)
-    }
-  }, [router, employees.length, setEmployees])
 
   const filteredEmployees = employees.filter((emp) => {
     const matchesSearch =

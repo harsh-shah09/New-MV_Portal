@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { MainNav } from "@/components/main-nav"
-import { getAuthToken } from "@/lib/auth"
 import { NDATable } from "./components/nda-table"
 import type { NDA } from "@/types"
 
@@ -57,13 +56,7 @@ export default function NDAPage() {
   const [ndas, setNDAs] = useState<NDA[]>([])
   const [activeTab, setActiveTab] = useState<string>("all")
 
-  useEffect(() => {
-    if (!getAuthToken()) {
-      router.push("/auth/login")
-    }
-    setNDAs(mockNDAs)
-  }, [router])
-
+ 
   const getFilteredNDAs = (status: string) => {
       if (status === 'all') return ndas;
       return ndas.filter(n => n.status === status);
