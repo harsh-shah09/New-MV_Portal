@@ -31,6 +31,7 @@ export const metadata: Metadata = {
 
 import AntdStyledRegistry from '@/components/AntdStyledRegistry';
 import Providers from './providers';
+import { AppLayout } from '@/components/app-layout';
 
 // ...
 
@@ -43,7 +44,9 @@ export default function RootLayout({
     <html lang="en">
       <body className={`font-sans antialiased`}>
         <AntdStyledRegistry>
-          <Providers>{children}</Providers>
+          <Providers>
+            <AppLayout>{children}</AppLayout>
+          </Providers>
         </AntdStyledRegistry>
         <Analytics />
       </body>

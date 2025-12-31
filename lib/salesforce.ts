@@ -19,9 +19,6 @@ export const getSalesforceConnection = async () => {
   // 1. Return in-memory connection if active
   if (connection) {
       try {
-           // Optional: Validate connection is still alive if needed, but usually we trust memory for short lived functions
-           // Or we can rely on downstream 401s to retry. 
-           // For now, let's keep it simple: if memory, return.
            return connection;
       } catch(e) {
           connection = null;
@@ -33,10 +30,13 @@ export const getSalesforceConnection = async () => {
   try {
     const getCmd = new GetCommand({
       TableName: TABLE_NAME,
-      Key: { id: TOKEN_ID },
+      Key: {
+          Employee_Id: TOKEN_ID,
+          SortKey: "TOKEN"
+        }
     });
     const data = await db.send(getCmd);
-    
+    console.log('Dyanmo data',data)
     if (data.Item) {
       const stored = data.Item as StoredToken;
       // Initialize connection with stored token
@@ -78,14 +78,15 @@ export const getSalesforceConnection = async () => {
   // 4. Store new token in DynamoDB
   try {
     const putCmd = new PutCommand({
-      TableName: TABLE_NAME,
-      Item: {
-        id: TOKEN_ID,
-        access_token: conn.accessToken,
-        instance_url: conn.instanceUrl,
-        updated_time: new Date().toISOString()
-      }
-    });
+    TableName: TABLE_NAME,
+    Item: {
+      Employee_Id: TOKEN_ID,
+      SortKey: "TOKEN",
+      access_token: conn.accessToken,
+      instance_url: conn.instanceUrl,
+      updated_time: new Date().toISOString()
+    }
+  });
     await db.send(putCmd);
     console.log('Salesforce token updated in DynamoDB');
   } catch (error) {
@@ -103,12 +104,20 @@ export interface Employee {
   Email__c?: string;
   Password__c?: string; // Stored hash
   Name: string;
+  Contact__r?: {
+      FirstName?: string;
+      LastName?: string;
+      Email?: string;
+      Employee_Role__c?: string;
+      [key: string]: any;
+  }
 }
 export interface DashboardData {
     kpiStats: any[],
     recentActivities: any[],
     statsOverview: any[],
 }
+
 export const findEmployee = async (identifier: string): Promise<Employee | null> => {
   const conn = await getSalesforceConnection();
   if(!conn) return null;
@@ -117,10 +126,20 @@ export const findEmployee = async (identifier: string): Promise<Employee | null>
   const isEmail = identifier.includes('@');
   // Be careful with SOQL injection in real apps. 
   const escapedIdentifier = identifier.replace(/'/g, "\\'"); 
-  const result = await conn.query(`SELECT Id, Name , Contact__r.Email, Password__c FROM Employee__c WHERE ${isEmail ? 'Contact__r.Email' : 'Name'} = '${escapedIdentifier}' LIMIT 1`);
+  const result = await conn.query(`SELECT Id, Name , Contact__r.Email, Password__c, Contact__r.Employee_Role__c FROM Employee__c WHERE ${isEmail ? 'Contact__r.Email' : 'Name'} = '${escapedIdentifier}' LIMIT 1`);
 
   if (result.records.length === 0) return null; 
   return result.records[0] as unknown as Employee;
+};
+
+export const getAllEmployees = async (): Promise<any[]> => {
+  const conn = await getSalesforceConnection();
+  if (!conn) return [];
+
+  const query = `SELECT Id, Joining_Date__c, Base_Salary__c, Status__c, Salary_CTC__c, Profile_Photo__c,Contact__r.Id, Contact__r.FirstName, Contact__r.LastName, Contact__r.Email, Contact__r.Phone, Contact__r.Birthdate, Contact__r.Gender__c, Contact__r.MailingAddress, Contact__r.Emergency_Contact_Name__c, Contact__r.Emergency_Contact_Number__c, Contact__r.Emergency_Contact_Relation__c, Contact__r.Experience__c, Contact__r.Department__c, Contact__r.Employee_Role__c, Contact__r.Employee_Title__c FROM Employee__c`;
+
+  const result = await conn.query(query);
+  return result.records;
 };
 
 export const getDashboardData = async (): Promise<DashboardData> => {
@@ -176,4 +195,111 @@ export const getDashboardData = async (): Promise<DashboardData> => {
     ],
     recentActivities: [],
   };
+};
+
+
+export const getEmployeeById = async (id: string): Promise<any | null> => {
+    const conn = await getSalesforceConnection();
+    if (!conn) return null;
+
+    // 1. Fetch Employee + Contact Details
+    // We select ID and Contact__c to know which contact to update/query if needed, though Contact__r.* gives us the data.
+    const empQuery = `
+      SELECT Id, Name, Contact__c, Joining_Date__c, Base_Salary__c, Salary_CTC__c, Status__c, Profile_Photo__c, Team_Lead__c, Password__c,
+             Contact__r.Id, Contact__r.FirstName, Contact__r.LastName, Contact__r.Email, Contact__r.Phone, Contact__r.Birthdate, 
+             Contact__r.Gender__c, Contact__r.MailingAddress, Contact__r.Emergency_Contact_Name__c, 
+             Contact__r.Emergency_Contact_Number__c, Contact__r.Emergency_Contact_Relation__c, 
+             Contact__r.Experience__c, Contact__r.Department__c, Contact__r.Employee_Role__c, Contact__r.Employee_Title__c
+      FROM Employee__c 
+      WHERE Id = '${id}'
+      LIMIT 1
+    `;
+    const empResult = await conn.query(empQuery);
+    if (empResult.records.length === 0) return null;
+
+    const empRecord: any = empResult.records[0];
+
+    // 2. Fetch Bank Details
+    // Assuming 'Bank_Detail__c' has a lookup 'Employee__c'
+    const bankQuery = `
+      SELECT Id, Name, Bank_Branch_Name__c, Bank_Account_Number__c, IFSC__c, Primary_Account__c
+      FROM Bank_Detail__c
+      WHERE Employee__c = '${id}'
+    `;
+    const bankResult = await conn.query(bankQuery);
+
+    // 3. Fetch Documents
+    const docQuery = `
+      SELECT Id, Document_Type__c, Document_Category__c, File_URL__c, Status__c
+      FROM Document__c
+      WHERE Employee__c = '${id}'
+    `;
+    const docResult = await conn.query(docQuery);
+
+    // Map to a clean structure
+    return {
+        ...empRecord, // Contains top-level Employee__c fields
+        // Flatten Contact__r slightly or keep it nested, frontend expects specific structure
+        contact: empRecord.Contact__r,
+        bankDetails: bankResult.records,
+        documents: docResult.records
+    };
+};
+
+export const updateEmployee = async (id: string, contactId: string, data: any) => {
+    const conn = await getSalesforceConnection();
+    if (!conn) throw new Error("No Salesforce connection");
+
+    // Separate records for Employee__c and Contact
+    const employeeFields = [
+        "Joining_Date__c", "Base_Salary__c", "Salary_CTC__c", "Status__c", "Profile_Photo__c", "Team_Lead__c"
+    ];
+    const contactFields = [
+        "FirstName", "LastName", "Email", "Phone", "Birthdate", "Gender__c", "MailingCity", "MailingStreet", "MailingCountry", "MailingPostalCode", // Address breakdown if needed or MailingAddress composite
+        "Emergency_Contact_Name__c", "Emergency_Contact_Number__c", "Emergency_Contact_Relation__c", 
+        "Experience__c", "Department__c", "Employee_Role__c", "Employee_Title__c"
+    ];
+
+    const empUpdate: any = { Id: id };
+    const contactUpdate: any = { Id: contactId };
+    let hasEmpUpdate = false;
+    let hasContactUpdate = false;
+
+    for (const [key, value] of Object.entries(data)) {
+        if (employeeFields.includes(key)) {
+            empUpdate[key] = value;
+            hasEmpUpdate = true;
+        } else if (contactFields.includes(key) || key === 'MailingAddress') { 
+             // Address is special, often readonly as composite, need to update individual components if passed, 
+             // or if 'data' keys are flat like 'MailingCity'.
+             // For now assume data keys match Salesforce API names.
+            contactUpdate[key] = value;
+            hasContactUpdate = true;
+        }
+    }
+
+    if (hasEmpUpdate) {
+        await conn.sobject("Employee__c").update(empUpdate);
+    }
+    if (hasContactUpdate) {
+        await conn.sobject("Contact").update(contactUpdate);
+    }
+};
+
+export const createDocumentRecord = async (docData: any) => {
+    const conn = await getSalesforceConnection();
+    if (!conn) throw new Error("No Salesforce connection");
+    return await conn.sobject("Document__c").create(docData);
+};
+
+export const createBankDetail = async (bankData: any) => {
+    const conn = await getSalesforceConnection();
+    if (!conn) throw new Error("No Salesforce connection");
+    return await conn.sobject("Bank_Detail__c").create(bankData);
+};
+
+export const updateBankDetail = async (bankData: any) => {
+    const conn = await getSalesforceConnection();
+    if (!conn) throw new Error("No Salesforce connection");
+    return await conn.sobject("Bank_Detail__c").update(bankData);
 };

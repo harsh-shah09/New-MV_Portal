@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Relieving Letter</title>
+
+  <style>
+    body {
+      font-family: Calibri, Arial, sans-serif;
+      font-size: 11pt;
+      color: #000;
+      background: #ffffff;
+      margin: 0;
+      padding: 72px;
+      line-height: 1.4;
+    }
+
+    .right {
+      text-align: right;
+    }
+
+    .center {
+      text-align: center;
+    }
+
+    .bold {
+      font-weight: 700;
+    }
+
+    .underline {
+      text-decoration: underline;
+    }
+
+    .highlight {
+      font-weight: 700;
+    }
+
+    h1 {
+      font-size: 16pt;
+      margin: 20px 0 10px;
+    }
+
+    p {
+      margin: 10px 0;
+      text-align: justify;
+    }
+
+    ol {
+      margin-left: 30px;
+    }
+
+    li {
+      margin-bottom: 10px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+
+    table, td {
+      border: 1px solid #000;
+    }
+
+    td {
+      padding: 8px;
+      vertical-align: top;
+    }
+
+    .section-title {
+      font-weight: 700;
+      text-decoration: underline;
+      margin-top: 15px;
+    }
+
+    .signature {
+      margin-top: 30px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <p class="right">Register Number</p>
+
+  <p class="center bold" style="font-size:16pt;">Personal and Confidential</p>
+
+  <p>
+    {{employee address}}<br>
+    Date:
+  </p>
+
+  <p class="bold">
+    RE: Relieving of Employment of <span class="highlight">{{employee_name}}</span>
+  </p>
+
+  <p>
+    Dear <span class="highlight">{{employee_name}}</span>,
+  </p>
+
+  <p>
+    I write on behalf of MV Clouds Private Limited ("the Company" or "MV Clouds")
+    to confirm the Company's decision to relieve your employment.
+  </p>
+
+  <p>
+    Your last day of service with the Company will be
+    <span class="highlight">{{relieving_date}}</span>.
+  </p>
+
+  <p class="section-title">Expense Reimbursement</p>
+
+  <p>
+    Provided you submit any expense reports and receipts within 15 days of the
+    Relieving Date, you will be reimbursed for any expenses incurred by you in
+    the performance of your duties up to the Relieving Date within 15 days of
+    the Company receiving the approved expense reports with the receipts.
+  </p>
+
+  <p class="section-title">Company Property (including Work Product)</p>
+
+  <p>
+    All Company equipment including, but not limited to, computers and peripherals,
+    etc. as well as all Company property and work product must be returned to
+    MV Clouds no later than <span class="highlight">{{relieving_date}}</span> to:
+  </p>
+
+  <p>
+    Human Resources<br>
+    MV Clouds Private Limited<br>
+    D-404, Fourth Floor, The First Synthesis,<br>
+    Behind Keshav Baugh Party Plot,<br>
+    Ahmedabad, Gujarat – 380015, India
+  </p>
+
+  <p>
+    “Property” includes, but is not limited to:
+  </p>
+
+  <ol>
+    <li>
+      Internal memoranda, computer equipment (including software), training
+      materials, books, and all other like property including copies containing
+      Confidential Information or Intellectual Property.
+    </li>
+    <li>
+      Papers, drawings, pen drives, laptops, keys, ID cards, customer lists,
+      recordings, documents, prototypes, and models belonging to the Company.
+    </li>
+    <li>
+      Any tangible expression of Confidential Information including photographs,
+      plans, notes, computer programs, and samples.
+    </li>
+  </ol>
+
+  <p>
+    “Work Product” means intellectual property created or developed by the
+    employee during employment using company resources or confidential information.
+  </p>
+
+  <p class="section-title">Email</p>
+
+  <p>
+    To protect all company confidential and proprietary information, your email
+    will be deactivated as of <span class="highlight">{{relieving_date}}</span>.
+  </p>
+
+  <p class="section-title">Confidentiality and Non-Disparagement Obligations</p>
+
+  <p>
+    Your confidentiality obligations towards MV Clouds remain intact even after
+    you exit the organization. Confidential information must not be shared with
+    any third party or retained on personal devices.
+  </p>
+
+  <p>
+    You shall not take any action that could reasonably be expected to adversely
+    affect the reputation of the Company or its affiliates.
+  </p>
+
+  <p class="section-title">References</p>
+
+  <p>
+    It is the Company's reference policy to provide only dates of employment
+    and last position held unless written authorization is provided.
+  </p>
+
+  <p>Sincerely,</p>
+
+  <p class="bold">Dharmik Shah</p>
+
+  <p class="section-title">Employee Acknowledgement</p>
+
+  <p>
+    I have read and understood the content of this letter and confirm that I do
+    not retain any confidential information belonging to MV Clouds. I understand
+    my obligations and acknowledge that legal action may be taken in case of
+    violation.
+  </p>
+
+  <table>
+    <tr>
+      <td class="bold center">Personal Information as on the Last Day of Employment</td>
+    </tr>
+    <tr>
+      <td>Employee ID: <span class="highlight">{{employee_Id}}</span></td>
+    </tr>
+    <tr>
+      <td>Duration of Employment: <span class="highlight">{{employment_duration}}</span></td>
+    </tr>
+    <tr>
+      <td>Ending Job Title: <span class="highlight">{{job_title}}</span></td>
+    </tr>
+    <tr>
+      <td>Personal Email: <span class="highlight">{{personal_email}}</span></td>
+    </tr>
+    <tr>
+      <td>Mailing Address: <span class="highlight">{{mailing_address}}</span></td>
+    </tr>
+    <tr>
+      <td>Mobile Phone: <span class="highlight">{{mobile}}</span></td>
+    </tr>
+  </table>
+
+  <p class="signature">
+    Employee Signature: _________________________________<br><br>
+    Date: _________________________________
+  </p>
+
+</body>
+</html>

@@ -1,0 +1,31 @@
+
+import { NextResponse } from 'next/server';
+import { verifySession } from '@/lib/auth';
+import { getEmployeeById } from '@/lib/salesforce';
+
+export async function GET() {
+  try {
+    const session = await verifySession();
+    if (!session || !session.recordId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const employee = await getEmployeeById(session.recordId);
+    if (!employee) {
+        return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    return NextResponse.json({ 
+        id: employee.Id,
+        firstName: employee.contact?.FirstName,
+        lastName: employee.contact?.LastName,
+        email: employee.contact?.Email,
+        role: employee.contact?.Employee_Role__c,
+        profilePhoto: employee.Profile_Photo__c
+    });
+
+  } catch (error) {
+    console.error('Error fetching current user:', error);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+  }
+}

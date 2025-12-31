@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Offer Letter</title>
+
+    <style>
+        body {
+            font-family: Calibri, Arial, sans-serif;
+            background-color: #f2f2f2;
+            margin: 0;
+            padding: 40px;
+        }
+
+        .page {
+            max-width: 800px;
+            margin: auto;
+            background: #ffffff;
+            padding: 72px;
+            border: 1px solid #ccc;
+        }
+
+        p {
+            font-size: 11pt;
+            margin: 6px 0;
+            line-height: 1.15;
+        }
+
+        .right {
+            text-align: right;
+        }
+
+        .center {
+            text-align: center;
+        }
+
+        .title {
+            font-size: 13pt;
+            font-weight: bold;
+        }
+
+        .highlight {
+            font-weight: bold;
+        }
+
+        ol {
+            margin-left: 36px;
+        }
+
+        ol li {
+            font-size: 11pt;
+            margin: 6px 0;
+        }
+
+        .indent {
+            margin-left: 72px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="page">
+
+    <p class="right">Register No.: {{register_no}}</p>
+
+    <p class="center title">Offer Letter</p>
+
+    <p>Date: {{date}}</p>
+
+    <p>Dear <span class="highlight">{{employee_name}}</span>,</p>
+
+    <p>
+        Congratulations and welcome to MV Clouds Pvt Ltd. We are pleased to offer and
+        appoint you to the role of {{position_title}}. You will be required to join MV Clouds
+        from {{joining_date}}. We hope we have a long journey
+        and grow together.
+    </p>
+
+    <p>
+        Listed below are some terms and conditions to be met for your onboarding. If any
+        terms and conditions are not met, then the offer made to you will not be valid.
+    </p>
+
+    <ol>
+        <li>
+            You will be on a contract period for the first 6 months. You will be confirmed
+            as an employee post the duration of 6 months based on your performance.
+        </li>
+        <li>
+            As an employee, your notice period for resignation will be 90 days. Failure to
+            do so will be dealt with on a case by case basis.
+        </li>
+        <li>
+            By signing this offer letter, you confirm that all details provided by you to
+            the Company in your resume and/or communicated otherwise are correct.
+        </li>
+        <li>
+            You will have to provide relevant supporting documents (salary slips,
+            experience letter, certificates, etc.) as evidence for the information shared
+            by you while joining the Company.
+        </li>
+        <li>
+            Your fixed salary will be Rs. {{salary_per_month}} /- per month.
+        </li>
+        <li>
+            Your annual CTC will be Rs. {{CTC}} /-.
+        </li>
+        <li>
+            You will have to bring the following documents upon joining the Company:
+        </li>
+    </ol>
+
+    <ol class="indent">
+        <li>
+            Originals and photocopies of all certificates &amp; mark sheets in support of
+            your experience, education, qualifications, identity, and age.
+        </li>
+        <li>
+            Original and photocopy of Permanent Account Number (PAN), Aadhar, Passport,
+            and Salary certificates/slips.
+        </li>
+        <li>
+            2 latest passport-size photographs.
+        </li>
+        <li>
+            Any other related documents as in point 4.
+        </li>
+    </ol>
+
+    <p>
+        For any further clarifications or discussions, please feel free to contact us.
+    </p>
+
+    <p>Regards,</p>
+
+    <p>
+        Dharmik Shah &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Employee<br>
+        <span class="highlight">CEO and Co-founder</span>, <span class="highlight">MV Clouds Pvt. Ltd.</span>
+    </p>
+
+</div>
+
+</body>
+</html>

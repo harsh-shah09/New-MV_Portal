@@ -60,12 +60,13 @@ export interface LeaveRequest {
   id: string
   employeeId: string
   employeeName: string
-  leaveType: "casual" | "sick" | "earned" | "unpaid"
+  leaveType: string
+  leaveCategory?: string
   startDate: string
   endDate: string
   duration: number
-  reason: string
-  status: "pending" | "approved" | "rejected" | "cancelled"
+  reason?: string
+  status: "pending" | "approved" | "rejected" | "cancelled" | "applied" | "withdrawn"
   approvedBy?: string
   approvalDate?: string
 }

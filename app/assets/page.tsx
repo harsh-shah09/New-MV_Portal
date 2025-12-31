@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { MainNav } from "@/components/main-nav"
+
 import { AssetTable } from "./components/asset-table"
 import { AssetAssignForm } from "./components/asset-assign-form"
 import { AssetForm } from "./components/asset-form"
@@ -102,7 +102,7 @@ export default function AssetsPage() {
 
   return (
     <div className="min-h-screen bg-slate-50/50">
-      <MainNav />
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
         <div className="flex justify-between items-center mb-8">
           <div>

@@ -2,7 +2,7 @@
 
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { MainNav } from "@/components/main-nav"
+
 import { KPIStats } from "./components/kpi-stats"
 import { ChartSection } from "./components/chart-section"
 import { RecentActivities } from "./components/recent-activities"
@@ -50,7 +50,7 @@ export default function DashboardPage() {
   if(isLoading || isFetching) return <div>Loading...</div>
   return (
     <div className="min-h-screen bg-slate-50/50">
-      <MainNav />
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
         <div className="mb-10">
           <h1 className="text-4xl font-extrabold text-slate-900 mb-2 tracking-tight">Dashboard Overview</h1>

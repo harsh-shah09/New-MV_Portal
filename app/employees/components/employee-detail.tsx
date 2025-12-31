@@ -8,7 +8,7 @@ import { formatDate } from "@/lib/utils"
 interface EmployeeDetailProps {
   employee: Employee
   onClose: () => void
-  onEdit: (employee: Employee) => void
+  onEdit?: (employee: Employee) => void
 }
 
 export function EmployeeDetail({ employee, onClose, onEdit }: EmployeeDetailProps) {
@@ -135,12 +135,15 @@ export function EmployeeDetail({ employee, onClose, onEdit }: EmployeeDetailProp
           >
             Close
           </button>
-          <button
+          
+          {onEdit && (
+            <button
             onClick={() => onEdit(employee)}
             className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition"
           >
             Edit Profile
           </button>
+          )}
         </div>
       </div>
     </div>

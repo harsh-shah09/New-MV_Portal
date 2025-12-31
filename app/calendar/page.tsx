@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Calendar, Badge, Card, List, Tag, Spin, Modal } from "antd"
 import type { Dayjs } from "dayjs"
 import dayjs from "dayjs"
-import { MainNav } from "@/components/main-nav"
+
 import type { CalendarEvent } from "@/types"
 
 // Dummy API simulation
@@ -103,7 +103,7 @@ export default function CalendarPage() {
 
   return (
     <div className="min-h-screen bg-slate-50/50">
-      <MainNav />
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
         <div className="flex justify-between items-center mb-8">
           <div>

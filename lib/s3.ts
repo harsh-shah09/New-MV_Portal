@@ -1,0 +1,34 @@
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+
+const s3Client = new S3Client({
+  region: process.env.AWS_REGION || "us-east-1",
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID || "",
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || "",
+  },
+});
+
+export const uploadFileToS3 = async (
+  fileBuffer: Buffer,
+  fileName: string,
+  contentType: string
+): Promise<string> => {
+  const bucketName = process.env.S3_BUCKET_NAME;
+  if (!bucketName) throw new Error("S3_BUCKET_NAME is not defined");
+
+  const key = `uploads/${Date.now()}-${fileName}`;
+
+  const command = new PutObjectCommand({
+    Bucket: bucketName,
+    Key: key,
+    Body: fileBuffer,
+    ContentType: contentType,
+    // ACL: "public-read", // Optional: depending on bucket settings
+  });
+
+  await s3Client.send(command);
+
+  // Construct public URL (assuming public bucket or cloudfront, or just standard s3 url)
+  // For now, standard S3 URL
+  return `https://${bucketName}.s3.${process.env.AWS_REGION || "us-east-1"}.amazonaws.com/${key}`;
+};

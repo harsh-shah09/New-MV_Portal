@@ -1,109 +1,284 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
-import { MainNav } from "@/components/main-nav"
-import { NDATable } from "./components/nda-table"
-import type { NDA } from "@/types"
+import { useState, useEffect, useRef } from "react"
+import { useQuery } from "@tanstack/react-query"
+import { Select, Button, Spin, message, Card, Tabs, Empty } from "antd"
+import { Download, FileText, User, Search, Printer, FileCheck } from "lucide-react"
+import Image from "next/image"
 
-const mockNDAs: NDA[] = [
-  {
-    id: "1",
-    employeeId: "1",
-    employeeName: "John Doe",
-    templateId: "T-001",
-    signDate: "2021-03-15",
-    expiryDate: "2026-03-15",
-    status: "signed",
-    documentUrl: "https://example.com/nda/1.pdf",
-  },
-  {
-    id: "2",
-    employeeId: "2",
-    employeeName: "Jane Smith",
-    templateId: "T-001",
-    signDate: "2020-06-20",
-    expiryDate: "2025-06-20",
-    status: "signed",
-    documentUrl: "https://example.com/nda/2.pdf",
-  },
-  {
-    id: "3",
-    employeeId: "3",
-    employeeName: "Mike Johnson",
-    templateId: "T-002",
-    signDate: "2022-01-10",
-    expiryDate: "2027-01-10",
-    status: "signed",
-    documentUrl: "https://example.com/nda/3.pdf",
-  },
-  {
-    id: "4",
-    employeeId: "4",
-    employeeName: "Sarah Williams",
-    templateId: "T-002",
-    signDate: "",
-    expiryDate: "2025-01-01",
-    status: "pending",
-    documentUrl: "https://example.com/nda/4.pdf",
-  },
-]
+// Dynamically import html2pdf to avoid SSR issues
+// Dynamically import html2pdf to avoid SSR issues
+const generatePDF = async (elementId: string, fileName: string) => {
+    try {
+        const html2pdfModule = await import('html2pdf.js');
+        const html2pdf = html2pdfModule.default || html2pdfModule;
+        
+        const element = document.getElementById(elementId);
+        if (!element) {
+            message.error("Preview content not found");
+            return;
+        }
 
-import { Tabs, message } from 'antd';
+        const opt = {
+            margin: 0.5,
+            filename: fileName,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, useCORS: true },
+            jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' as const }
+        };
+
+        (html2pdf as any)().set(opt).from(element).save();
+    } catch (error) {
+        console.error("PDF Generation Error", error);
+        message.error("Failed to generate PDF");
+    }
+}
 
 export default function NDAPage() {
-  const router = useRouter()
-  const [ndas, setNDAs] = useState<NDA[]>([])
-  const [activeTab, setActiveTab] = useState<string>("all")
+  const [selectedEmpId, setSelectedEmpId] = useState<string | null>(null)
+  const [selectedTemplateFile, setSelectedTemplateFile] = useState<string | null>(null) // Filename
+  const [templateContent, setTemplateContent] = useState<string>("")
+  const [previewContent, setPreviewContent] = useState<string>("")
+  const [loadingTemplate, setLoadingTemplate] = useState(false)
 
- 
-  const getFilteredNDAs = (status: string) => {
-      if (status === 'all') return ndas;
-      return ndas.filter(n => n.status === status);
+  // Fetch Employees
+  const { data: employees, isLoading: loadingEmployees } = useQuery({
+      queryKey: ['employees'],
+      queryFn: async () => {
+          const res = await fetch('/api/employees');
+          if (!res.ok) throw new Error("Failed to fetch employees");
+          return res.json();
+      }
+  })
+
+  // Fetch Templates List
+  const { data: templates, isLoading: loadingTemplates } = useQuery({
+      queryKey: ['templates'],
+      queryFn: async () => {
+          const res = await fetch('/api/templates');
+          if (!res.ok) throw new Error("Failed to fetch templates");
+          return res.json();
+      }
+  })
+
+  // Set default template if available
+  useEffect(() => {
+    if (templates && templates.length > 0 && !selectedTemplateFile) {
+        setSelectedTemplateFile(templates[0].id);
+    }
+  }, [templates, selectedTemplateFile]);
+
+  // Fetch Template Content
+  useEffect(() => {
+      const fetchTemplate = async () => {
+          if (!selectedTemplateFile) return;
+          setLoadingTemplate(true)
+          try {
+              const res = await fetch(`/templates/${selectedTemplateFile}`);
+              const text = await res.text();
+              setTemplateContent(text);
+          } catch (e) {
+              message.error("Failed to load template");
+          } finally {
+              setLoadingTemplate(false)
+          }
+      }
+      fetchTemplate();
+  }, [selectedTemplateFile])
+
+  // Handle Employee Selection & Preview Generation
+  useEffect(() => {
+      if (!selectedEmpId || !employees || !templateContent) {
+          setPreviewContent("");
+          return;
+      }
+      
+      const emp = employees.find((e: any) => e.Id === selectedEmpId);
+      if (emp) {
+          const contact = emp.Contact__r || {};
+          const address = contact.MailingAddress || {};
+          
+          let html = templateContent;
+          
+          // Helper to safe replace
+          const replace = (key: string, value: any) => {
+              const regex = new RegExp(`{{${key}}}`, 'g');
+              html = html.replace(regex, value || `<span style="color:red; background:#fee; padding: 0 4px; border-radius: 4px;">[${key} Missing]</span>`);
+          }
+
+          replace('FirstName', contact.FirstName);
+          replace('LastName', contact.LastName);
+          replace('Employee_Role__c', contact.Employee_Role__c);
+          replace('Department__c', contact.Department__c);
+          replace('Joining_Date__c', emp.Joining_Date__c);
+          replace('Base_Salary__c', emp.Base_Salary__c);
+          replace('Salary_CTC__c', emp.Salary_CTC__c);
+          replace('CurrentDate', new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }));
+          
+          // Address handling (Salesforce Composite Field)
+          replace('MailingStreet', address.street || address.MailingStreet);
+          replace('MailingCity', address.city || address.MailingCity);
+          replace('MailingState', address.state || address.MailingState);
+          replace('MailingPostalCode', address.postalCode || address.MailingPostalCode);
+          replace('MailingCountry', address.country || address.MailingCountry);
+
+          setPreviewContent(html);
+      }
+  }, [selectedEmpId, employees, templateContent])
+
+  const handleDownload = () => {
+      if (!selectedEmpId) return;
+      const emp = employees.find((e: any) => e.Id === selectedEmpId);
+      const name = emp ? `${emp.Contact__r?.FirstName}_${emp.Contact__r?.LastName}` : "Employee";
+      const tmplName = selectedTemplateFile?.replace('.html', '') || 'Doc';
+      generatePDF('nda-preview-content', `${tmplName}_${name}.pdf`);
   }
 
-  const handleDownload = (nda: NDA) => {
-    console.log("[v0] Downloading NDA for", nda.employeeName)
-    message.success(`Downloading NDA for ${nda.employeeName}`)
-  }
-
-  const pendingCount = ndas.filter((n) => n.status === "pending").length
-  const signedCount = ndas.filter((n) => n.status === "signed").length
-  const expiredCount = ndas.filter((n) => n.status === "expired").length
-
-  const items = [
-    { key: 'all', label: 'All NDAs', children: <NDATable ndas={getFilteredNDAs('all')} onDownload={handleDownload} /> },
-    { key: 'pending', label: `Pending (${pendingCount})`, children: <NDATable ndas={getFilteredNDAs('pending')} onDownload={handleDownload} /> },
-    { key: 'signed', label: `Signed (${signedCount})`, children: <NDATable ndas={getFilteredNDAs('signed')} onDownload={handleDownload} /> },
-    { key: 'expired', label: `Expired (${expiredCount})`, children: <NDATable ndas={getFilteredNDAs('expired')} onDownload={handleDownload} /> },
-  ];
+  const selectedEmployee = employees?.find((e: any) => e.Id === selectedEmpId);
+  const selectedTemplateName = templates?.find((t: any) => t.id === selectedTemplateFile)?.name || 'Select Template';
 
   return (
-    <div>
-      <MainNav />
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-        <div>
-          <h1 className="text-4xl font-extrabold text-slate-900 mb-2 tracking-tight">NDA Management</h1>
-          <p className="text-slate-500 text-lg">Manage employee NDAs and confidentiality agreements</p>
+    <div className="min-h-screen bg-slate-50 p-6 lg:p-10 flex flex-col">
+      <div className="max-w-7xl mx-auto w-full space-y-6 flex-1 flex flex-col">
+        
+        {/* Header */}
+        <div className="shrink-0 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+                <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Document Manager</h1>
+                <p className="text-slate-500">Generate, preview, and download agreements and letters.</p>
+            </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8 mb-8">
-          <div className="bg-white rounded-xl shadow-sm p-6 border border-slate-100">
-            <div className="text-sm font-medium text-slate-500 mb-2">Pending Signatures</div>
-            <div className="text-3xl font-bold text-amber-600">{pendingCount}</div>
-          </div>
-          <div className="bg-white rounded-xl shadow-sm p-6 border border-slate-100">
-            <div className="text-sm font-medium text-slate-500 mb-2">Signed</div>
-            <div className="text-3xl font-bold text-emerald-600">{signedCount}</div>
-          </div>
-          <div className="bg-white rounded-xl shadow-sm p-6 border border-slate-100">
-            <div className="text-sm font-medium text-slate-500 mb-2">Expired</div>
-            <div className="text-3xl font-bold text-rose-600">{expiredCount}</div>
-          </div>
-        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 flex-1">
+            
+            {/* Left Sidebar: Controls */}
+            <div className="lg:col-span-4 space-y-6 h-fit sticky top-6">
+                
+                {/* Employee Selector Card */}
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 transition-all hover:shadow-md">
+                    <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                        <User className="w-5 h-5 text-blue-500" /> Select Employee
+                    </h2>
+                    
+                    {loadingEmployees ? (
+                        <div className="flex justify-center py-4"><Spin /></div>
+                    ) : (
+                        <Select
+                            className="w-full"
+                            showSearch
+                            placeholder="Search employee..."
+                            optionFilterProp="children"
+                            onChange={setSelectedEmpId}
+                            loading={loadingEmployees}
+                            filterOption={(input, option: any) =>
+                                (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                            }
+                            options={employees?.map((emp: any) => ({
+                                value: emp.Id,
+                                label: `${emp.Contact__r?.FirstName} ${emp.Contact__r?.LastName} (${emp.Contact__r?.Employee_Role__c || 'No Role'})`
+                            }))}
+                        />
+                    )}
 
-        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
-            <Tabs defaultActiveKey="all" items={items} onChange={setActiveTab} />
+                    {selectedEmployee && (
+                         <div className="mt-6 p-4 bg-gradient-to-br from-blue-50 to-indigo-50/50 rounded-xl border border-blue-100 shadow-sm animate-in fade-in slide-in-from-top-2">
+                             <div className="flex items-start gap-4">
+                                 <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-lg shrink-0 border-2 border-white shadow-sm">
+                                     {selectedEmployee.Contact__r?.FirstName?.[0]}
+                                 </div>
+                                 <div className="flex-1 min-w-0">
+                                     <h3 className="font-bold text-slate-800 truncate text-base">{selectedEmployee.Contact__r?.FirstName} {selectedEmployee.Contact__r?.LastName}</h3>
+                                     <p className="text-xs text-slate-500 truncate mb-2">{selectedEmployee.Contact__r?.Email}</p>
+                                     
+                                     <div className="flex flex-col gap-1.5 mt-2 pt-2 border-t border-blue-100/50">
+                                         <div className="flex justify-between items-center text-xs group">
+                                             <span className="text-slate-500 font-medium">Role</span>
+                                             <span className="font-semibold text-slate-700 bg-white px-2 py-0.5 rounded border border-blue-50 group-hover:border-blue-100 transition-colors">
+                                                {selectedEmployee.Contact__r?.Employee_Role__c || '-'}
+                                             </span>
+                                         </div>
+                                         <div className="flex justify-between items-center text-xs group">
+                                             <span className="text-slate-500 font-medium">Department</span>
+                                             <span className="font-semibold text-slate-700 bg-white px-2 py-0.5 rounded border border-blue-50 group-hover:border-blue-100 transition-colors">
+                                                {selectedEmployee.Contact__r?.Department__c || '-'}
+                                             </span>
+                                         </div>
+                                     </div>
+                                 </div>
+                             </div>
+                         </div>
+                    )}
+                </div>
+
+                {/* Template Selector */}
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 transition-all hover:shadow-md">
+                    <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                        <FileText className="w-5 h-5 text-purple-500" /> Select Template
+                    </h2>
+                    
+                    {loadingTemplates ? (
+                         <div className="flex justify-center py-4"><Spin /></div>
+                    ) : (
+                        <div className="space-y-3">
+                            <Select
+                                className="w-full"
+                                placeholder="Choose a template..."
+                                value={selectedTemplateFile}
+                                onChange={setSelectedTemplateFile}
+                                options={templates?.map((t: any) => ({
+                                    value: t.id,
+                                    label: t.name
+                                }))}
+                            />
+                            
+                            {selectedTemplateFile && (
+                                <div className="p-3 border rounded-xl bg-purple-50/30 flex items-center gap-3 border-purple-200 animate-in fade-in slide-in-from-left-2">
+                                    <FileCheck className="w-5 h-5 text-purple-600" />
+                                    <div className="flex-1">
+                                        <p className="text-sm font-semibold text-purple-900">{selectedTemplateName}</p>
+                                        <p className="text-xs text-purple-500">HTML Template</p>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+
+                {/* Actions */}
+                <Button 
+                    type="primary" 
+                    size="large" 
+                    icon={<Download className="w-4 h-4" />} 
+                    className="w-full h-12 rounded-xl text-base font-semibold shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40 transition-all active:scale-[0.98]"
+                    disabled={!previewContent}
+                    onClick={handleDownload}
+                    loading={loadingTemplate}
+                >
+                   {loadingTemplate ? 'Loading Template...' : 'Download PDF'}
+                </Button>
+
+            </div>
+
+            {/* Right Main: Preview */}
+            <div className="lg:col-span-8 flex flex-col h-[calc(100vh-140px)] sticky top-6">
+                <div className="bg-slate-200 rounded-2xl p-4 lg:p-8 flex-1 overflow-auto shadow-inner border border-slate-300 relative group">
+                    {previewContent ? (
+                        <div className="w-full max-w-[210mm] min-h-[297mm] bg-white shadow-2xl animate-in zoom-in-95 duration-500 origin-top flex flex-col mx-auto transition-transform">
+                             {/* Print Header/Toolbar could go here */}
+                             <div id="nda-preview-content" 
+                                  className="p-[10mm] sm:p-[10mm] md:p-[15mm] text-slate-900 text-sm md:text-base leading-relaxed flex-1 font-serif"
+                                  dangerouslySetInnerHTML={{ __html: previewContent }} 
+                             />
+                        </div>
+                    ) : (
+                        <div className="h-full flex flex-col items-center justify-center text-slate-400 opacity-60">
+                            <FileText className="w-24 h-24 mb-4 stroke-1" />
+                            <p className="text-lg font-medium">Select an employee & template to preview</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+
         </div>
       </div>
     </div>

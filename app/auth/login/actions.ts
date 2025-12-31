@@ -49,9 +49,10 @@ export async function loginAction(
     // Create session
     await createSession({
       employeeId: employee.Employee_ID__c || '', // Ensure session ID is Employee_ID__c
-      email: employee.Email__c,
+      email: employee.Email__c || employee.Contact__r?.Email,
       recordId: employee.Id,
-      name: employee.Name
+      name: employee.Name,
+      role: employee.Contact__r?.Employee_Role__c || 'Employee'
     });
 
     return { success: true };

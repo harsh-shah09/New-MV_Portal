@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { MainNav } from "@/components/main-nav"
+
 import { TrainingList } from "./components/training-list"
 import { TrainingDetail } from "./components/training-detail"
 import { ProgressCard } from "./components/progress-card"
@@ -142,7 +142,7 @@ export default function TrainingPage() {
 
   return (
     <div>
-      <MainNav />
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
         <div>
           <h1 className="text-4xl font-extrabold text-slate-900 mb-2 tracking-tight">Training & Development</h1>

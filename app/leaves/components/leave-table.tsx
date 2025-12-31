@@ -9,10 +9,11 @@ import { formatDate } from "@/lib/utils"
 interface LeaveTableProps {
   leaves: LeaveRequest[]
   onCancel: (id: string) => void
+  onWithdraw?: (id: string) => void
   showActions?: boolean
 }
 
-export function LeaveTable({ leaves, onCancel, showActions = true }: LeaveTableProps) {
+export function LeaveTable({ leaves, onCancel, onWithdraw, showActions = true }: LeaveTableProps) {
   const columns: ColumnsType<LeaveRequest> = [
     {
       title: 'Employee',
@@ -23,15 +24,20 @@ export function LeaveTable({ leaves, onCancel, showActions = true }: LeaveTableP
       title: 'Leave Type',
       dataIndex: 'leaveType',
       key: 'leaveType',
-      render: (text) => <span className="capitalize">{text}</span>,
+      render: (text, record) => {
+        const displayText = record.leaveCategory === 'Extra Day Pay' ? 'Extra Day Pay' : text;
+        return <span className="capitalize">{displayText || 'N/A'}</span>;
+      },
       filters: [
-        { text: 'Annual', value: 'annual' },
-        { text: 'Sick', value: 'sick' },
-        { text: 'Personal', value: 'personal' },
-        { text: 'Maternity', value: 'maternity' },
-        { text: 'Sabbatical', value: 'sabbatical' },
+        { text: 'Planned Leave', value: 'Planned Leave' },
+        { text: 'Sick Leave', value: 'Sick Leave' },
+        { text: 'Emergency Leave', value: 'Emergency Leave' },
+        { text: 'Extra Day Pay', value: 'Extra Day Pay' },
       ],
-      onFilter: (value: any, record) => record.leaveType === value,
+      onFilter: (value: any, record) => {
+        const displayText = record.leaveCategory === 'Extra Day Pay' ? 'Extra Day Pay' : record.leaveType;
+        return displayText === value;
+      },
     },
     {
       title: 'From',
@@ -78,7 +84,7 @@ export function LeaveTable({ leaves, onCancel, showActions = true }: LeaveTableP
       align: 'center',
       render: (_, record) => (
         <Space size="small">
-          {record.status === 'pending' && (
+          {record.status === 'applied' && (
             <Tooltip title="Cancel Request">
               <Button
                 type="text"
@@ -87,6 +93,18 @@ export function LeaveTable({ leaves, onCancel, showActions = true }: LeaveTableP
                 onClick={() => onCancel(record.id)}
               >
                 Cancel
+              </Button>
+            </Tooltip>
+          )}
+          {record.status === 'approved' && onWithdraw && (
+            <Tooltip title="Withdraw Request">
+              <Button
+                type="text"
+                danger
+                icon={<CloseOutlined />}
+                onClick={() => onWithdraw(record.id)}
+              >
+                Withdraw
               </Button>
             </Tooltip>
           )}

@@ -5,132 +5,145 @@ import { useRouter } from "next/navigation"
 import { MainNav } from "@/components/main-nav"
 import { LeaveRequestForm } from "./components/leave-request-form"
 import { LeaveTable } from "./components/leave-table"
-import { LeavePolicyCard } from "./components/leave-policy-card"
-import { ApprovalPanel } from "./components/approval-panel"
 import { useLeaveStore } from "@/store/leaveStore"
 import type { LeaveRequest } from "@/types"
-
-const mockLeaves: LeaveRequest[] = [
-  {
-    id: "1",
-    employeeId: "1",
-    employeeName: "John Doe",
-    leaveType: "casual",
-    startDate: "2024-07-15",
-    endDate: "2024-07-22",
-    duration: 8,
-    reason: "Vacation",
-    status: "pending",
-  },
-  {
-    id: "2",
-    employeeId: "2",
-    employeeName: "Jane Smith",
-    leaveType: "sick",
-    startDate: "2024-07-10",
-    endDate: "2024-07-12",
-    duration: 3,
-    reason: "Medical appointment",
-    status: "approved",
-    approvedBy: "Manager",
-    approvalDate: "2024-07-09",
-  },
-  {
-    id: "3",
-    employeeId: "3",
-    employeeName: "Mike Johnson",
-    leaveType: "earned",
-    startDate: "2024-08-01",
-    endDate: "2024-08-03",
-    duration: 3,
-    reason: "Personal matter",
-    status: "pending",
-  },
-]
-
-const policies = [
-  {
-    id: "1",
-    leaveType: "Annual Leave",
-    annualDays: 20,
-    carryForwardDays: 5,
-    minAdvanceNotice: 5,
-  },
-  {
-    id: "2",
-    leaveType: "Sick Leave",
-    annualDays: 10,
-    carryForwardDays: 0,
-    minAdvanceNotice: 1,
-  },
-  {
-    id: "3",
-    leaveType: "unpaid",
-    annualDays: 5,
-    carryForwardDays: 0,
-    minAdvanceNotice: 3,
-  },
-]
+import { useQuery } from "@tanstack/react-query"
 
 export default function LeavesPage() {
   const router = useRouter()
   const [showForm, setShowForm] = useState(false)
-  const [selectedTab, setSelectedTab] = useState<"my-requests" | "approvals" | "policies">("my-requests")
-  const [selectedApproval, setSelectedApproval] = useState<LeaveRequest | null>(null)
+  const [selectedTab, setSelectedTab] = useState<"my-requests" | "approvals">("my-requests")
+  const [currentUser, setCurrentUser] = useState<{ employeeId: string; email?: string; recordId: string } | null>(null)
 
-  const { leaves, pendingApprovals, setLeaves, setPendingApprovals, addLeave, updateLeave } = useLeaveStore()
+  const { leaves, pendingApprovals, setLeaves, setPendingApprovals, updateLeave } = useLeaveStore()
 
-  const handleSubmitRequest = (data: Partial<LeaveRequest>) => {
-    const newLeave: LeaveRequest = {
-      id: Math.random().toString(36).substr(2, 9),
-      employeeId: "current-user",
-      employeeName: "Current Employee",
-      leaveType: data.leaveType || "casual",
-      startDate: data.startDate || "",
-      endDate: data.endDate || "",
-      duration: data.duration || 0,
-      reason: data.reason || "",
-      status: "pending",
+  // Fetch current user and their leaves
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ["leave-management"],
+    queryFn: () => fetch("/api/leave-management").then((res) => {
+      if (!res.ok) {
+        if (res.status === 401) {
+          router.push("/auth/login")
+          throw new Error("Unauthorized")
+        }
+        throw new Error("Failed to fetch leave data")
+      }
+      return res.json()
+    }),
+  })
+
+  useEffect(() => {
+    if (data) {
+      setCurrentUser(data.currentUser)
+      setLeaves(data.leaves || [])
+      setPendingApprovals(data.pendingApprovals || [])
     }
-    addLeave(newLeave)
-    setShowForm(false)
-  }
+  }, [data, setLeaves, setPendingApprovals])
 
-  const handleApprove = (leaveId: string) => {
-    const leave = leaves.find((l) => l.id === leaveId)
-    if (leave) {
-      updateLeave({
-        ...leave,
-        status: "approved",
-        approvedBy: "Manager",
-        approvalDate: new Date().toISOString().split("T")[0],
+  const handleSubmitRequest = async (data: Partial<LeaveRequest>) => {
+    try {
+      const response = await fetch("/api/leave-management", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
       })
-      setPendingApprovals(pendingApprovals.filter((l) => l.id !== leaveId))
-      setSelectedApproval(null)
+
+      if (!response.ok) {
+        const error = await response.json()
+        alert(error.error || "Failed to submit leave request")
+        return
+      }
+
+      const result = await response.json()
+      
+      // Refetch the leaves to get the updated list
+      refetch()
+      
+      setShowForm(false)
+      alert("Leave request submitted successfully!")
+    } catch (error) {
+      console.error("Error submitting leave request:", error)
+      alert("Failed to submit leave request")
     }
   }
 
-  const handleReject = (leaveId: string, reason: string) => {
-    const leave = leaves.find((l) => l.id === leaveId)
-    if (leave) {
-      updateLeave({
-        ...leave,
-        status: "rejected",
-        approvedBy: `Rejected by Manager: ${reason}`,
-      })
-      setPendingApprovals(pendingApprovals.filter((l) => l.id !== leaveId))
-      setSelectedApproval(null)
-    }
-  }
-
-  const handleCancel = (leaveId: string) => {
+  const handleCancel = async (leaveId: string) => {
     const leave = leaves.find((l) => l.id === leaveId)
     if (leave && confirm("Cancel this leave request?")) {
-      updateLeave({
-        ...leave,
-        status: "cancelled",
-      })
+      try {
+        const response = await fetch("/api/leave-management", {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            leaveId,
+            action: "cancel",
+          }),
+        })
+
+        if (!response.ok) {
+          const error = await response.json()
+          alert(error.error || "Failed to cancel leave")
+          return
+        }
+
+        // Update local state
+        updateLeave({
+          ...leave,
+          status: "cancelled",
+        })
+      } catch (error) {
+        console.error("Error cancelling leave:", error)
+        alert("Failed to cancel leave")
+      }
     }
+  }
+
+  const handleWithdraw = async (leaveId: string) => {
+    const leave = leaves.find((l) => l.id === leaveId)
+    if (leave && confirm("Withdraw this approved leave?")) {
+      try {
+        const response = await fetch("/api/leave-management", {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            leaveId,
+            action: "withdraw",
+          }),
+        })
+
+        if (!response.ok) {
+          const error = await response.json()
+          alert(error.error || "Failed to withdraw leave")
+          return
+        }
+
+        // Update local state
+        updateLeave({
+          ...leave,
+          status: "withdrawn",
+        })
+      } catch (error) {
+        console.error("Error withdrawing leave:", error)
+        alert("Failed to withdraw leave")
+      }
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div>
+        <MainNav />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="text-center">Loading...</div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -152,30 +165,33 @@ export default function LeavesPage() {
 
         <div className="bg-white rounded-lg shadow mb-6">
           <div className="flex border-b border-gray-200">
-            {[
-              { id: "my-requests", label: "My Requests" },
-              { id: "approvals", label: "Approvals" },
-              { id: "policies", label: "Leave Policies" },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setSelectedTab(tab.id as any)}
-                className={`flex-1 px-6 py-4 text-center font-medium transition ${
-                  selectedTab === tab.id
-                    ? "text-blue-600 border-b-2 border-blue-600"
-                    : "text-gray-600 hover:text-gray-900"
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
+            <button
+              onClick={() => setSelectedTab("my-requests")}
+              className={`flex-1 px-6 py-4 text-center font-medium transition ${
+                selectedTab === "my-requests"
+                  ? "text-blue-600 border-b-2 border-blue-600"
+                  : "text-gray-600 hover:text-gray-900"
+              }`}
+            >
+              My Requests
+            </button>
+            <button
+              onClick={() => setSelectedTab("approvals")}
+              className={`flex-1 px-6 py-4 text-center font-medium transition ${
+                selectedTab === "approvals"
+                  ? "text-blue-600 border-b-2 border-blue-600"
+                  : "text-gray-600 hover:text-gray-900"
+              }`}
+            >
+              Approvals
+            </button>
           </div>
 
           <div className="p-6">
             {selectedTab === "my-requests" && (
               <div>
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">My Leave Requests</h2>
-                <LeaveTable leaves={leaves} onCancel={handleCancel} />
+                <LeaveTable leaves={leaves} onCancel={handleCancel} onWithdraw={handleWithdraw} />
               </div>
             )}
 
@@ -183,51 +199,10 @@ export default function LeavesPage() {
               <div>
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">Pending Approvals</h2>
                 {pendingApprovals.length > 0 ? (
-                  <div className="space-y-6">
-                    {!selectedApproval ? (
-                      <div className="bg-gray-50 rounded-lg p-4">
-                        <div className="space-y-2">
-                          {pendingApprovals.map((leave) => (
-                            <button
-                              key={leave.id}
-                              onClick={() => setSelectedApproval(leave)}
-                              className="w-full text-left p-4 bg-white rounded-lg border border-gray-200 hover:border-blue-500 hover:bg-blue-50 transition"
-                            >
-                              <div className="flex justify-between items-start">
-                                <div>
-                                  <p className="font-medium text-gray-900">{leave.employeeName}</p>
-                                  <p className="text-sm text-gray-600 capitalize">
-                                    {leave.leaveType} - {leave.duration} days
-                                  </p>
-                                </div>
-                                <span className="text-blue-600 text-sm font-medium">Review →</span>
-                              </div>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    ) : (
-                      <div>
-                        <button
-                          onClick={() => setSelectedApproval(null)}
-                          className="text-blue-600 hover:text-blue-800 text-sm font-medium mb-4"
-                        >
-                          ← Back to List
-                        </button>
-                        <ApprovalPanel leave={selectedApproval} onApprove={handleApprove} onReject={handleReject} />
-                      </div>
-                    )}
-                  </div>
+                  <div className="text-center py-8 text-gray-600">Approval functionality coming soon</div>
                 ) : (
                   <div className="text-center py-8 text-gray-600">No pending approvals</div>
                 )}
-              </div>
-            )}
-
-            {selectedTab === "policies" && (
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">Leave Policies</h2>
-                <LeavePolicyCard policies={policies as any} />
               </div>
             )}
           </div>
@@ -237,7 +212,7 @@ export default function LeavesPage() {
           <LeaveRequestForm
             onSubmit={handleSubmitRequest}
             onCancel={() => setShowForm(false)}
-            employeeName="Current Employee"
+            employeeName={currentUser?.email || "Current Employee"}
           />
         )}
       </div>
