@@ -23,7 +23,7 @@ import {
   Building2,
   CheckCircle2
 } from "lucide-react"
-import { message, Spin } from "antd"
+import { message, Spin, Select } from "antd"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { cn } from "@/lib/utils"
 import { Field } from "./field-component"
@@ -47,6 +47,23 @@ export function EmployeeProfileView({ employeeId }: ViewProps) {
       return res.json()
     }
   })
+
+    // Fetch all employees for Team Lead dropdown
+    const { data: employeesList, isLoading: loadingEmployeesList } = useQuery({
+        queryKey: ['employeesList'],
+        queryFn: async () => {
+            const res = await fetch('/api/employees')
+            if (!res.ok) throw new Error('Failed to fetch employees')
+            return res.json()
+        }
+    })
+
+    // Resolve a readable name for the stored Team Lead id (fallbacks to relationship or lookup in employeesList)
+    const teamLeadName = employee?.Team_Lead__r?.Name || (
+        employeesList?.find((e: any) => e.Id === employee?.Team_Lead__c)
+            ? `${employeesList.find((e: any) => e.Id === employee?.Team_Lead__c).Contact__r?.FirstName || ''} ${employeesList.find((e: any) => e.Id === employee?.Team_Lead__c).Contact__r?.LastName || ''}`.trim()
+            : null
+    )
 
   // --- Mutations ---
   const updateMutation = useMutation({
@@ -93,38 +110,39 @@ export function EmployeeProfileView({ employeeId }: ViewProps) {
   // --- Handlers ---
   const [formData, setFormData] = useState<any>({})
 
-  const handleEditToggle = () => {
-    if (isEditing) {
-       // Cancel
-       setIsEditing(false)
-       setFormData({})
-    } else {
-       // Start Edit - Flatten data for form
-       setFormData({
-         FirstName: employee.contact?.FirstName,
-         LastName: employee.contact?.LastName,
-         Email: employee.contact?.Email,
-         Phone: employee.contact?.Phone,
-         Birthdate: employee.contact?.Birthdate,
-         Gender__c: employee.contact?.Gender__c,
-         MailingStreet: employee.contact?.MailingStreet,
-         MailingCity: employee.contact?.MailingCity,
-         MailingState: employee.contact?.MailingState,
-         MailingPostalCode: employee.contact?.MailingPostalCode,
-         MailingCountry: employee.contact?.MailingCountry,
-         Emergency_Contact_Name__c: employee.contact?.Emergency_Contact_Name__c,
-         Emergency_Contact_Number__c: employee.contact?.Emergency_Contact_Number__c,
-         Experience__c: employee.contact?.Experience__c,
-         Department__c: employee.contact?.Department__c,
-         Employee_Role__c: employee.contact?.Employee_Role__c,
-         Employee_Title__c: employee.contact?.Employee_Title__c,
-         Joining_Date__c: employee.Joining_Date__c,
-         Base_Salary__c: employee.Base_Salary__c,
-         Salary_CTC__c: employee.Salary_CTC__c
-       })
-       setIsEditing(true)
+    const handleEditToggle = () => {
+        if (isEditing) {
+             // Cancel
+             setIsEditing(false)
+             setFormData({})
+        } else {
+             // Start Edit - Flatten data for form
+             setFormData({
+                 FirstName: employee.contact?.FirstName,
+                 LastName: employee.contact?.LastName,
+                 Email: employee.contact?.Email,
+                 Phone: employee.contact?.Phone,
+                 Birthdate: employee.contact?.Birthdate,
+                 Gender__c: employee.contact?.Gender__c,
+                 MailingStreet: employee.contact?.MailingStreet,
+                 MailingCity: employee.contact?.MailingCity,
+                 MailingState: employee.contact?.MailingState,
+                 MailingPostalCode: employee.contact?.MailingPostalCode,
+                 MailingCountry: employee.contact?.MailingCountry,
+                 Emergency_Contact_Name__c: employee.contact?.Emergency_Contact_Name__c,
+                 Emergency_Contact_Number__c: employee.contact?.Emergency_Contact_Number__c,
+                 Experience__c: employee.contact?.Experience__c,
+                 Department__c: employee.contact?.Department__c,
+                 Employee_Role__c: employee.contact?.Employee_Role__c,
+                 Employee_Title__c: employee.contact?.Employee_Title__c,
+                 Team_Lead__c: employee.Team_Lead__c,
+                 Joining_Date__c: employee.Joining_Date__c,
+                 Base_Salary__c: employee.Base_Salary__c,
+                 Salary_CTC__c: employee.Salary_CTC__c
+             })
+             setIsEditing(true)
+        }
     }
-  }
 
   const handleSave = () => {
       updateMutation.mutate(formData)
@@ -408,7 +426,28 @@ export function EmployeeProfileView({ employeeId }: ViewProps) {
                                           <Field label="Job Title" value={employee.contact?.Employee_Title__c} fieldKey="Employee_Title__c" isEditing={isEditing} formData={formData} setFormData={setFormData} />
                                           <Field label="Joining Date" value={employee.Joining_Date__c} fieldKey="Joining_Date__c" type="date" isEditing={isEditing} formData={formData} setFormData={setFormData} />
                                           <Field label="Total Experience" value={employee.contact?.Experience__c} fieldKey="Experience__c" isEditing={isEditing} formData={formData} setFormData={setFormData} />
-                                          <Field label="Manager / Team Lead" value={employee.Team_Lead__c} fieldKey="Team_Lead__c" isEditing={isEditing} formData={formData} setFormData={setFormData} />
+                                          <div className="space-y-1 flex flex-col">
+                                              <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">Manager / Team Lead</label>
+                                              {isEditing ? (
+                                                  loadingEmployeesList ? (
+                                                      <div className="py-2"><Spin /></div>
+                                                  ) : (
+                                                      <Select
+                                                          showSearch
+                                                          placeholder="Select Manager"
+                                                          value={formData.Team_Lead__c !== undefined ? formData.Team_Lead__c : employee.Team_Lead__c}
+                                                          onChange={(val: any) => setFormData({ ...formData, Team_Lead__c: val })}
+                                                          options={employeesList?.filter((e: any) => e.Id !== employeeId).map((e: any) => ({
+                                                              value: e.Id,
+                                                              label: `${e.contact?.FirstName || e.Contact__r?.FirstName || ''} ${e.contact?.LastName || e.Contact__r?.LastName || ''}`.trim()
+                                                          }))}
+                                                          allowClear
+                                                      />
+                                                  )
+                                              ) : (
+                                                  <p className="font-medium text-slate-800 text-sm break-words">{teamLeadName || employee.Team_Lead__c || <span className="text-slate-400 italic">Not set</span>}</p>
+                                              )}
+                                          </div>
                                       </div>
                                   </div>
 
