@@ -85,7 +85,7 @@ export async function forgotPasswordAction(identifier: string) {
     try {
         await conn.sobject("Employee__c").update({
             Id: employee.Id,
-            Pass_Reset_Active__c: false
+            Pass_Reset_Active__c: true
         });
     } catch (dbError) {
         console.error("Salesforce update error:", dbError);
@@ -123,7 +123,7 @@ export async function forgotPasswordAction(identifier: string) {
                 <p>Hello <strong>${employee.Name}</strong>,</p>
                 <p>A password reset has been requested for your account.</p>
                 <p>Please click the button below to reset your password:</p>
-                <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/auth/reset-password?id=${employee.Id}" style="display: inline-block; background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Reset Password</a>
+                <a href="${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/auth/change-password?id=${employee.Id}" style="display: inline-block; background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Reset Password</a>
                 <p>If you did not request this, please ignore this email.</p>
             </div>
             `
