@@ -86,13 +86,11 @@ export default function PayrollPage() {
           : p,
       ),
     )
-    message.success("Payroll processed and marked as paid!")
   }
 
   const handleDeletePayroll = (id: string) => {
     if (confirm("Are you sure you want to delete this payroll record?")) {
       setPayrolls((prev) => prev.filter((p) => p.id !== id))
-      message.success("Payroll record deleted")
     }
   }
 

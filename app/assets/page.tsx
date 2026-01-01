@@ -78,7 +78,6 @@ export default function AssetsPage() {
       )
       setShowAssignForm(false)
       setSelectedAsset(null)
-      message.success("Asset assigned successfully!")
     }
   }
 
@@ -96,7 +95,6 @@ export default function AssetsPage() {
   const handleDelete = (id: string) => {
     if (confirm("Are you sure you want to delete this asset?")) {
       setAssets((prev) => prev.filter((a) => a.id !== id))
-      message.success("Asset deleted")
     }
   }
 

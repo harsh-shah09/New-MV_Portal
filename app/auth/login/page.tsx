@@ -1,24 +1,49 @@
 "use client"
 
-import { useActionState } from "react"
-import { loginAction } from "./actions"
-import { useEffect, useState } from "react"
+import { loginAction, forgotPasswordAction } from "./actions"
+import { useEffect, useState, useActionState } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
 import { motion } from "framer-motion"
-import { Mail, Lock, ArrowRight, Loader2 } from "lucide-react"
+import { Mail, Lock, ArrowRight, Loader2, CheckCircle2 } from "lucide-react"
 
 export default function LoginPage() {
   const [state, action, pending] = useActionState(loginAction, {})
   const router = useRouter()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [resetStatus, setResetStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null)
+  const [isResetting, setIsResetting] = useState(false)
 
   useEffect(() => {
     if (state.success) {
       router.push("/dashboard")
     }
   }, [state.success, router])
+
+  const handleForgotPassword = async (e: React.MouseEvent) => {
+    e.preventDefault()
+    setResetStatus(null)
+    
+    if (!email) {
+        setResetStatus({ type: 'error', message: "Please enter your Email or Employee ID first" })
+        return
+    }
+
+    setIsResetting(true)
+    try {
+        const result = await forgotPasswordAction(email)
+        if (result.success) {
+            setResetStatus({ type: 'success', message: result.message || "Reset link sent successfully" })
+        } else {
+            setResetStatus({ type: 'error', message: result.error || "Failed to send reset link" })
+        }
+    } catch (err) {
+        setResetStatus({ type: 'error', message: "An unexpected error occurred" })
+    } finally {
+        setIsResetting(false)
+    }
+  }
 
   return (
     <div className="min-h-screen w-full flex overflow-hidden bg-slate-50">
@@ -92,6 +117,25 @@ export default function LoginPage() {
                         </motion.div>
                     )}
 
+                    {resetStatus && (
+                         <motion.div 
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className={`px-4 py-3 rounded-xl text-sm flex items-center gap-2 border ${
+                                resetStatus.type === 'success' 
+                                    ? 'bg-green-50 border-green-100 text-green-600' 
+                                    : 'bg-red-50 border-red-100 text-red-600'
+                            }`}
+                        >
+                            {resetStatus.type === 'success' ? (
+                                <CheckCircle2 className="w-4 h-4" />
+                            ) : (
+                                <svg className="w-4 h-4 fill-current" viewBox="0 0 20 20"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"/></svg>
+                            )}
+                            {resetStatus.message}
+                        </motion.div>
+                    )}
+
                     <div className="space-y-2">
                         <label className="text-sm font-semibold text-slate-700 ml-1">Email / Employee ID</label>
                         <div className="relative group">
@@ -111,7 +155,15 @@ export default function LoginPage() {
                     <div className="space-y-2">
                         <div className="flex justify-between ml-1">
                             <label className="text-sm font-semibold text-slate-700">Password</label>
-                            <a href="#" className="text-xs font-semibold text-blue-600 hover:text-blue-700 hover:underline">Forgot password?</a>
+                            <button 
+                                onClick={handleForgotPassword}
+                                disabled={isResetting}
+                                type="button" 
+                                className="text-xs font-semibold text-blue-600 hover:text-blue-700 hover:underline disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                            >
+                                {isResetting && <Loader2 className="w-3 h-3 animate-spin" />}
+                                Forgot password?
+                            </button>
                         </div>
                         <div className="relative group">
                             <Lock className="absolute left-4 top-3.5 w-5 h-5 text-slate-400 group-focus-within:text-blue-500 transition-colors" />

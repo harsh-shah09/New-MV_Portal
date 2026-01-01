@@ -4,38 +4,12 @@ import { useState, useEffect, useRef } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { Select, Button, Spin, message, Card, Tabs, Empty } from "antd"
 import { Download, FileText, User, Search, Printer, FileCheck } from "lucide-react"
-import Image from "next/image"
-
-// Dynamically import html2pdf to avoid SSR issues
-// Dynamically import html2pdf to avoid SSR issues
-const generatePDF = async (elementId: string, fileName: string) => {
-    try {
-        const html2pdfModule = await import('html2pdf.js');
-        const html2pdf = html2pdfModule.default || html2pdfModule;
-        
-        const element = document.getElementById(elementId);
-        if (!element) {
-            message.error("Preview content not found");
-            return;
-        }
-
-        const opt = {
-            margin: 0.5,
-            filename: fileName,
-            image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2, useCORS: true },
-            jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' as const }
-        };
-
-        (html2pdf as any)().set(opt).from(element).save();
-    } catch (error) {
-        console.error("PDF Generation Error", error);
-        message.error("Failed to generate PDF");
-    }
-}
+import { jsPDF } from "jspdf";
+import html2canvas from 'html2canvas-pro'
 
 export default function NDAPage() {
   const [selectedEmpId, setSelectedEmpId] = useState<string | null>(null)
+    const [selectedPartitionKey, setSelectedPartitionKey] = useState<string | null>(null)
   const [selectedTemplateFile, setSelectedTemplateFile] = useState<string | null>(null) // Filename
   const [templateContent, setTemplateContent] = useState<string>("")
   const [previewContent, setPreviewContent] = useState<string>("")
@@ -95,6 +69,9 @@ export default function NDAPage() {
       
       const emp = employees.find((e: any) => e.Id === selectedEmpId);
       if (emp) {
+          // store partition key / Employee Id for display and templates
+          const pk = emp.Employee_Id || emp.PartitionKey || emp.EmployeeId || emp.Id || null;
+          setSelectedPartitionKey(pk);
           const contact = emp.Contact__r || {};
           const address = contact.MailingAddress || {};
           
@@ -110,6 +87,10 @@ export default function NDAPage() {
           replace('LastName', contact.LastName);
           replace('Employee_Role__c', contact.Employee_Role__c);
           replace('Department__c', contact.Department__c);
+          // expose partition / employee id into templates
+          replace('Employee_Id', emp.Employee_Id || emp.PartitionKey || emp.Id);
+          replace('EmployeeId', emp.Employee_Id || emp.PartitionKey || emp.Id);
+          replace('PartitionKey', emp.Employee_Id || emp.PartitionKey || emp.Id);
           replace('Joining_Date__c', emp.Joining_Date__c);
           replace('Base_Salary__c', emp.Base_Salary__c);
           replace('Salary_CTC__c', emp.Salary_CTC__c);
@@ -132,6 +113,27 @@ export default function NDAPage() {
       const name = emp ? `${emp.Contact__r?.FirstName}_${emp.Contact__r?.LastName}` : "Employee";
       const tmplName = selectedTemplateFile?.replace('.html', '') || 'Doc';
       generatePDF('nda-preview-content', `${tmplName}_${name}.pdf`);
+  }
+
+  // Generate PDF for a DOM element. Clone node and inline computed colors to avoid lab()/color() formats
+  const generatePDF = async (elementId: string, fileName: string) => {
+      try {
+          const element = document.getElementById(elementId) as HTMLElement;
+          if (!element) throw new Error('Element not found');
+
+          const canvas = await html2canvas(element, { scale: Math.max(2, window.devicePixelRatio || 1), useCORS: true, allowTaint: true });
+          const imgData = canvas.toDataURL('image/png', 1.0);
+          const pdf = new jsPDF({ unit: 'pt', format: 'a4', compress: true });
+          const pdfWidth = pdf.internal.pageSize.getWidth();
+          const imgWidth = canvas.width;
+          const imgHeight = canvas.height;
+          const pdfHeight = (imgHeight * pdfWidth) / imgWidth;
+          pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+          pdf.save(fileName);
+      } catch (err) {
+          console.error('PDF Generation Error', err);
+          message.error('Failed to generate PDF');
+      }
   }
 
   const selectedEmployee = employees?.find((e: any) => e.Id === selectedEmpId);
@@ -168,7 +170,16 @@ export default function NDAPage() {
                             showSearch
                             placeholder="Search employee..."
                             optionFilterProp="children"
-                            onChange={setSelectedEmpId}
+                            onChange={(value: any) => {
+                                setSelectedEmpId(value);
+                                if (!value) {
+                                    setSelectedPartitionKey(null);
+                                    return;
+                                }
+                                const emp = employees?.find((e: any) => e.Id === value);
+                                const pk = emp?.PartitionKey || emp?.Employee_Id || emp?.EmployeeId || null;
+                                setSelectedPartitionKey(pk);
+                            }}
                             loading={loadingEmployees}
                             filterOption={(input, option: any) =>
                                 (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
@@ -201,6 +212,12 @@ export default function NDAPage() {
                                              <span className="text-slate-500 font-medium">Department</span>
                                              <span className="font-semibold text-slate-700 bg-white px-2 py-0.5 rounded border border-blue-50 group-hover:border-blue-100 transition-colors">
                                                 {selectedEmployee.Contact__r?.Department__c || '-'}
+                                             </span>
+                                         </div>
+                                         <div className="flex justify-between items-center text-xs group">
+                                             <span className="text-slate-500 font-medium">Employee Id</span>
+                                             <span className="font-semibold text-slate-700 bg-white px-2 py-0.5 rounded border border-blue-50 group-hover:border-blue-100 transition-colors">
+                                                {selectedPartitionKey || selectedEmployee.PartitionKey || selectedEmployee.Employee_Id || '-'}
                                              </span>
                                          </div>
                                      </div>
@@ -284,3 +301,5 @@ export default function NDAPage() {
     </div>
   )
 }
+
+

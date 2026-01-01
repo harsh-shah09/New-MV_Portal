@@ -62,12 +62,11 @@ export default function EmployeesClient({ role }: EmployeesClientProps) {
   });
 
 
-  const filteredEmployees = useMemo(()=> {
-    return employees.filter((emp) => {
+  const filteredEmployees = employees.filter((emp) => {
     const matchesSearch =
-      emp.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      emp.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      emp.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      emp.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      emp.lastName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      emp.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (emp.phone && emp.phone.includes(searchTerm))
 
     const matchesDepartment = !department || emp.department === department
@@ -75,7 +74,6 @@ export default function EmployeesClient({ role }: EmployeesClientProps) {
 
     return matchesSearch && matchesDepartment && matchesStatus
   })
-  } ,[searchTerm] )
 
   const handleAddEmployee = (data: Employee) => {
     // In a real app, this should call API

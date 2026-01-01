@@ -48,7 +48,6 @@ export function EmployeeForm({ employee, onSubmit, onCancel }: EmployeeFormProps
     }
 
     onSubmit(formattedData)
-    message.success(employee ? "Employee updated successfully!" : "Employee created successfully!")
   }
 
   const items = [

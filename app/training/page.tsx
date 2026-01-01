@@ -102,7 +102,6 @@ export default function TrainingPage() {
     }
     enrollEmployee(newEnrollment)
     setSelectedTraining(null)
-    message.success("Successfully enrolled in training!")
   }
 
   const trainingMap = trainings.reduce(

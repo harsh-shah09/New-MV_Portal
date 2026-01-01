@@ -34,7 +34,6 @@ export function AssetForm({ asset, onSubmit, onCancel }: AssetFormProps) {
         id: asset?.id // Pass existing ID if editing
     }
     onSubmit(formattedData)
-    message.success(asset ? "Asset updated successfully!" : "Asset created successfully!")
   }
 
   return (
