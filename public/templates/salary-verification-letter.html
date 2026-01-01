@@ -5,123 +5,169 @@
     <title>Employment & Salary Verification Letter</title>
 
     <style>
-        body {
+        .esv-wrapper {
             font-family: Arial, Helvetica, sans-serif;
             background-color: #f2f2f2;
             margin: 0;
             padding: 40px;
+            display: flex;
+            justify-content: center;
+            box-sizing: border-box;
         }
 
-        .page {
+        .esv-page {
+            width: 100%;
             max-width: 800px;
-            margin: auto;
             background: #ffffff;
             padding: 70px;
-            border: 1px solid #ccc;
+            box-sizing: border-box;
         }
 
-        p {
+        .esv-text {
             font-size: 14px;
             line-height: 1.6;
             margin: 10px 0;
+            text-align: left;
         }
 
-        .header {
+        .esv-header {
             display: flex;
             justify-content: space-between;
             font-size: 14px;
         }
 
-        .center {
+        .esv-center {
             text-align: center;
         }
 
-        .title {
+        .esv-title {
             font-size: 22px;
             font-weight: bold;
             text-decoration: underline;
             margin: 40px 0;
         }
 
-        .highlight {
-            padding: 2px 4px;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 30px 0;
-        }
-
-        table, th, td {
-            border: 1px solid #000;
-        }
-
-        th, td {
-            padding: 10px;
-            text-align: center;
-            font-size: 14px;
-        }
-
-        th {
+        .esv-bold {
             font-weight: bold;
         }
 
-        .signature {
+        .esv-table {
+            width: 100%;
+            margin: 30px 0;
+            border: 1px solid #000;
+            box-sizing: border-box;
+        }
+
+        .esv-row {
+            display: flex;
+            border-bottom: 1px solid #000;
+        }
+
+        .esv-row:last-child {
+            border-bottom: none;
+        }
+
+        .esv-cell {
+            flex: 1;
+            padding: 10px;
+            font-size: 14px;
+            text-align: center;
+            box-sizing: border-box;
+        }
+
+        .esv-cell + .esv-cell {
+            border-left: 1px solid #000;
+        }
+
+        .esv-signature {
             margin-top: 50px;
+        }
+
+        @media print {
+            .esv-wrapper {
+                background: none;
+                padding: 0;
+            }
+
+            .esv-page {
+                border: none;
+                max-width: 100%;
+            }
         }
     </style>
 </head>
-<body>
 
-<div class="page">
+<div class="esv-wrapper">
+    <div class="esv-page">
 
-    <div class="header">
-        <p>Date:</p>
-        <p>Register No.:</p>
+        <div class="esv-header">
+            <div>Date:</div>
+            <div>Register No.:</div>
+        </div>
+
+        <div class="esv-center esv-title">
+            To Whom It May Concern
+        </div>
+
+        <div class="esv-text">
+            This letter confirms that
+            <span class="esv-bold">{{employee_name}}</span>
+            is employed at
+            <span class="esv-bold">MV Clouds Private Limited</span>
+            as a full-time
+            <span class="esv-bold">Salesforce Developer</span>.
+            He has been a dedicated and valued member of our team.
+        </div>
+
+        <div class="esv-text">
+            For verification purposes, we hereby provide the details of his salary for
+            the last six months as follows:
+        </div>
+
+        <div class="esv-table">
+            <div class="esv-row esv-bold">
+                <div class="esv-cell">Month</div>
+                <div class="esv-cell">Salary</div>
+            </div>
+
+            <div class="esv-row">
+                <div class="esv-cell"></div>
+                <div class="esv-cell"></div>
+            </div>
+            <div class="esv-row">
+                <div class="esv-cell"></div>
+                <div class="esv-cell"></div>
+            </div>
+            <div class="esv-row">
+                <div class="esv-cell"></div>
+                <div class="esv-cell"></div>
+            </div>
+            <div class="esv-row">
+                <div class="esv-cell"></div>
+                <div class="esv-cell"></div>
+            </div>
+            <div class="esv-row">
+                <div class="esv-cell"></div>
+                <div class="esv-cell"></div>
+            </div>
+            <div class="esv-row">
+                <div class="esv-cell"></div>
+                <div class="esv-cell"></div>
+            </div>
+        </div>
+
+        <div class="esv-signature">
+            <div class="esv-text">Sincerely,</div>
+
+            <div class="esv-text esv-bold">
+                Dharmik Shah
+            </div>
+
+            <div class="esv-text">
+                MV Clouds Private Limited
+            </div>
+        </div>
+
     </div>
-
-    <p class="center title">To Whom It May Concern</p>
-
-    <p>
-        This letter confirms that <span class="highlight">{{employee_name}}</span> is
-        employed at <strong>MV Clouds Private Limited</strong> as a full-time
-        <strong>Salesforce Developer</strong>. He has been a dedicated and valued
-        member of our team.
-    </p>
-
-    <p>
-        For verification purposes, we hereby provide the details of his salary for
-        the last six months as follows:
-    </p>
-
-    <table>
-        <thead>
-            <tr>
-                <th>Month</th>
-                <th>Salary</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr><td></td><td></td></tr>
-            <tr><td></td><td></td></tr>
-            <tr><td></td><td></td></tr>
-            <tr><td></td><td></td></tr>
-            <tr><td></td><td></td></tr>
-            <tr><td></td><td></td></tr>
-        </tbody>
-    </table>
-
-    <p class="signature">
-        Sincerely,
-    </p>
-
-    <p>
-        <strong>Dharmik Shah</strong><br>
-        MV Clouds Private Limited
-    </p>
-
 </div>
-
-</body>
 </html>

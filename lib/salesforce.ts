@@ -126,7 +126,7 @@ export const findEmployee = async (identifier: string): Promise<Employee | null>
   const isEmail = identifier.includes('@');
   // Be careful with SOQL injection in real apps. 
   const escapedIdentifier = identifier.replace(/'/g, "\\'"); 
-  const result = await conn.query(`SELECT Id, Name , Contact__r.Email, Password__c, Contact__r.Employee_Role__c FROM Employee__c WHERE ${isEmail ? 'Contact__r.Email' : 'Name'} = '${escapedIdentifier}' LIMIT 1`);
+  const result = await conn.query(`SELECT Id, Name , Contact__r.Email, Password__c, Contact__r.Employee_Role__c, Contact__r.Title__c FROM Employee__c WHERE ${isEmail ? 'Contact__r.Email' : 'Name'} = '${escapedIdentifier}' LIMIT 1`);
 
   if (result.records.length === 0) return null; 
   return result.records[0] as unknown as Employee;

@@ -21,9 +21,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Invalid session" }, { status: 401 });
     }
 
-    const { employeeId, email, recordId, name } = payload;
+    const { employeeId, email, recordId, name, role, title } = payload;
     console.log("Payload:", payload);
-    console.log("Authenticated user:", employeeId || name, email, recordId);
+    console.log("Authenticated user:", employeeId || name, email, recordId, "Role:", role, "Title:", title);
 
     // Use name as fallback if employeeId is not present
     const currentEmployeeId = employeeId || name || recordId;
@@ -66,15 +66,97 @@ export async function GET(request: NextRequest) {
       reason : '',
     }));
 
-    // For now, pending approvals would be managed differently (manager view)
-    // This endpoint is for the current employee's leaves only
-    const pendingApprovals: LeaveRequest[] = [];
+    // Fetch pending approvals if user is HR or Team Lead
+    let pendingApprovals: LeaveRequest[] = [];
+    
+    if (role === 'HR') {
+      const pendingLeaveRecords = await conn.query<any>(`
+        SELECT 
+          Id, 
+          Employee__c,
+          Employee__r.Contact__r.Name,
+          Leave_Type__c,
+          Leave_Category__c,
+          Start_Date__c,
+          End_Date__c,
+          Total_Days__c,
+          Status__c,
+          Approved_Date__c,
+          TL_Approval__c,
+          HR_Approval__c
+        FROM Leave__c
+        WHERE Status__c = 'Applied'
+        ORDER BY Start_Date__c ASC
+      `);
+
+      console.log("Fetched pending approvals for HR:", pendingLeaveRecords);
+      
+      pendingApprovals = pendingLeaveRecords.records.map((record: any) => ({
+        id: record.Id,
+        employeeId: record.Employee__c,
+        employeeName: record.Employee__r?.Contact__r?.Name || "Unknown",
+        leaveType: record.Leave_Category__c === 'Extra Day Pay' ? 'Extra Day Pay' : (record.Leave_Type__c || ""),
+        leaveCategory: record.Leave_Category__c,
+        startDate: record.Start_Date__c || "",
+        endDate: record.End_Date__c || "",
+        duration: record.Total_Days__c || 0,
+        status: record.Status__c?.toLowerCase() || "pending",
+        approvedBy: record.Approved_By__c,
+        approvalDate: record.Approved_Date__c,
+        reason: '',
+        tlApproved: record.TL_Approval__c,
+        hrApproval: record.HR_Approval__c,
+      }));
+    } else if (role === 'Developer' && title === 'Team Lead') {
+      // Fetch leaves for employees managed by this Team Lead
+      const pendingLeaveRecords = await conn.query<any>(`
+        SELECT 
+          Id, 
+          Employee__c,
+          Employee__r.Contact__r.Name,
+          Employee__r.Team_Lead__r.Name,
+          Leave_Type__c,
+          Leave_Category__c,
+          Start_Date__c,
+          End_Date__c,
+          Total_Days__c,
+          Status__c,
+          Approved_Date__c,
+          TL_Approval__c,
+          HR_Approval__c
+        FROM Leave__c
+        WHERE Employee__r.Team_Lead__r.Name = '${name}'
+        AND Status__c = 'Applied'
+        ORDER BY Start_Date__c ASC
+      `);
+
+      console.log("Fetched pending approvals for Team Lead:", pendingLeaveRecords);
+      
+      pendingApprovals = pendingLeaveRecords.records.map((record: any) => ({
+        id: record.Id,
+        employeeId: record.Employee__c,
+        employeeName: record.Employee__r?.Contact__r?.Name || "Unknown",
+        leaveType: record.Leave_Category__c === 'Extra Day Pay' ? 'Extra Day Pay' : (record.Leave_Type__c || ""),
+        leaveCategory: record.Leave_Category__c,
+        startDate: record.Start_Date__c || "",
+        endDate: record.End_Date__c || "",
+        duration: record.Total_Days__c || 0,
+        status: record.Status__c?.toLowerCase() || "pending",
+        approvedBy: record.Approved_By__c,
+        approvalDate: record.Approved_Date__c,
+        reason: '',
+        tlApproved: record.TL_Approval__c,
+        hrApproval: record.HR_Approval__c,
+      }));
+    }
 
     return NextResponse.json({
       currentUser: {
         employeeId: currentEmployeeId,
         email,
         recordId,
+        role,
+        title,
       },
       leaves,
       pendingApprovals,
@@ -117,7 +199,8 @@ export async function POST(request: NextRequest) {
       duration, 
       totalDeduction,
       session: sessionValue,
-      extraDayReason 
+      extraDayReason,
+      onePlusTwoApplied
     } = body;
 
     // Validate required fields
@@ -136,6 +219,7 @@ export async function POST(request: NextRequest) {
       Total_Days_After_Rule__c: totalDeduction || duration || 0,
       Session__c: sessionValue,
       Status__c: 'Applied',
+      OnePlusTwo_Rule__c: onePlusTwoApplied ? true : false,
     };
 
     // Add fields based on leave category
@@ -260,6 +344,90 @@ export async function PATCH(request: NextRequest) {
       });
 
       return NextResponse.json({ success: true, message: "Leave withdrawn successfully" });
+    }
+
+    // Handle approve action (HR or Team Lead)
+    if (action === "approve") {
+      const { role, title } = payload;
+      
+      // Check if user is HR or Team Lead
+      const isHR = role === 'HR';
+      const isTeamLead = role === 'Developer' && title === 'Team Lead';
+      console.log("Approval attempt by:", role, title, "isHR:", isHR, "isTeamLead:", isTeamLead);
+      
+      if (!isHR && !isTeamLead) {
+        return NextResponse.json({ error: "Only HR or Team Lead can approve leaves" }, { status: 403 });
+      }
+
+      const leaveRecord = await conn.query<any>(`
+        SELECT Id, Status__c
+        FROM Leave__c
+        WHERE Id = '${leaveId}'
+        LIMIT 1
+      `);
+
+      if (leaveRecord.records.length === 0) {
+        return NextResponse.json({ error: "Leave not found" }, { status: 404 });
+      }
+
+      // Update approval based on role
+      const updateData: any = {
+        Id: leaveId,
+      };
+
+      if (isHR) {
+        updateData.HR_Approval__c = 'Approved';
+        updateData.Approved_Date__c = new Date().toISOString();
+      } else if (isTeamLead) {
+        updateData.TL_Approval__c = 'Approved';
+      }
+
+      await conn.sobject('Leave__c').update(updateData);
+
+      return NextResponse.json({ success: true, message: "Leave approved successfully" });
+    }
+
+    // Handle reject action (HR or Team Lead)
+    if (action === "reject") {
+      const { role, title } = payload;
+      const { reason } = body;
+      
+      // Check if user is HR or Team Lead
+      const isHR = role === 'HR';
+      const isTeamLead = role === 'Developer' && title === 'Team Lead';
+      
+      if (!isHR && !isTeamLead) {
+        return NextResponse.json({ error: "Only HR or Team Lead can reject leaves" }, { status: 403 });
+      }
+
+      const leaveRecord = await conn.query<any>(`
+        SELECT Id, Status__c
+        FROM Leave__c
+        WHERE Id = '${leaveId}'
+        LIMIT 1
+      `);
+
+      if (leaveRecord.records.length === 0) {
+        return NextResponse.json({ error: "Leave not found" }, { status: 404 });
+      }
+
+      // Update rejection based on role
+      const updateData: any = {
+        Id: leaveId,
+        Status__c: 'Rejected',
+      };
+
+      if (isHR) {
+        updateData.HR_Approval__c = 'Rejected';
+        updateData.Cancellation_Reason_HR__c = reason || '';
+      } else if (isTeamLead) {
+        updateData.TL_Approval__c = 'Rejected';
+        updateData.Cancellation_Reason_TL__c = reason || '';
+      }
+
+      await conn.sobject('Leave__c').update(updateData);
+
+      return NextResponse.json({ success: true, message: "Leave rejected successfully" });
     }
 
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });

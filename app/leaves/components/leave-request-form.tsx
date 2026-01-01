@@ -55,10 +55,11 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
     const leaveType = values.leaveType
     const today = dayjs()
     let totalDeduction = duration
+    let penaltyDays = 0
     
     // Check if it's a planned leave and calculate penalties day by day
     if (leaveType === 'Planned Leave' && startDate && endDate) {
-      let penaltyDays = 0
+      
       let daysWithPenalty = 0
       
       // Calculate penalty for each day of leave
@@ -99,6 +100,7 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
       duration,
       totalDeduction,
       status: "pending",
+      onePlusTwoApplied: penaltyDays > 0 ? true : false,
     })
     message.success("Leave request submitted successfully!")
   }

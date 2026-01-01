@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Internship Certificate</title>
+
+    <style>
+        .ic-wrapper {
+            font-family: Calibri, Arial, sans-serif;
+            background-color: #f2f2f2;
+            margin: 0;
+            padding: 40px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .ic-page {
+            width: 100%;
+            max-width: 800px;
+            background-color: #ffffff;
+            padding: 72px;
+            box-sizing: border-box;
+        }
+
+        .ic-text {
+            font-size: 13pt;
+            line-height: 1.15;
+            margin: 6px 0;
+            color: #000;
+            text-align: left;
+        }
+
+        .ic-right {
+            text-align: right;
+        }
+
+        .ic-center {
+            text-align: center;
+        }
+
+        .ic-bold {
+            font-weight: bold;
+        }
+
+        .ic-underline {
+            text-decoration: underline;
+        }
+
+        .ic-spacer {
+            height: 18px;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .ic-wrapper {
+                padding: 32px;
+            }
+
+            .ic-page {
+                padding: 48px;
+            }
+        }
+
+        /* Print */
+        @media print {
+            .ic-wrapper {
+                background: none;
+                padding: 0;
+            }
+
+            .ic-page {
+                border: none;
+                max-width: 100%;
+            }
+        }
+    </style>
+</head>
+
+<div class="ic-wrapper">
+    <div class="ic-page">
+
+        <div class="ic-text ic-right">
+            Register No.: {{register_no}}
+        </div>
+
+        <div class="ic-text">
+            Date: {{current_date}}
+        </div>
+
+        <div class="ic-spacer"></div>
+
+        <div class="ic-text ic-center ic-underline ic-bold">
+            TO WHOMSOEVER IT MAY CONCERN
+        </div>
+
+        <div class="ic-spacer"></div>
+
+        <div class="ic-text">
+            We hereby confirm that
+            <span class="ic-bold">{{employee_name}} {{enrollment_no}}</span>
+            is joining our company on
+            <span class="ic-bold">{{joining_date}},</span>
+            to
+            <span class="ic-bold">{{end_date}},</span>
+            as an {{position_title}}. He/she will be working on {{technology_stack}}.
+        </div>
+
+        <div class="ic-spacer"></div>
+
+        <div class="ic-text">
+            Best regards,
+        </div>
+
+        <div class="ic-spacer"></div>
+        <div class="ic-spacer"></div>
+
+        <div class="ic-text">
+            Dharmik Shah
+        </div>
+
+    </div>
+</div>
+</html>

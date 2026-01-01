@@ -69,6 +69,8 @@ export interface LeaveRequest {
   status: "pending" | "approved" | "rejected" | "cancelled" | "applied" | "withdrawn"
   approvedBy?: string
   approvalDate?: string
+  tlApproved?: string
+  hrApproval?: string
 }
 
 export interface LeavePolicy {

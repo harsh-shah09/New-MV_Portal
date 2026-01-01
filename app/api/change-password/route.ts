@@ -43,9 +43,9 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'Employee not found' }, { status: 404 });
     }
 
-    // If Pass_Reset_Active__c is true, it means it's ALREADY active/used/expired (based on user requirement)
+    // If Pass_Reset_Active__c is false, it means it's ALREADY active/used/expired (based on user requirement)
     return NextResponse.json({ 
-      expired: employee.Pass_Reset_Active__c === true 
+      expired: employee.Pass_Reset_Active__c === false 
     });
 
   } catch (error: any) {
@@ -75,7 +75,7 @@ export async function POST(req: Request) {
       );
     }
 
-    if (employee.Pass_Reset_Active__c === true) {
+    if (employee.Pass_Reset_Active__c === false) {
       return NextResponse.json(
         { error: 'Password is changed once! Link is expired' },
         { status: 400 }
@@ -85,11 +85,11 @@ export async function POST(req: Request) {
     // Encrypt password (using SHA-256 for simplicity as requested)
     const hashedPassword = await hashPassword(password)
 
-    // Update the password in Salesforce and set Pass_Reset_Active__c to true
+    // Update the password in Salesforce and set Pass_Reset_Active__c to false
     await conn.sobject('Employee__c').update({
       Id: employee.Id,
       Password__c: hashedPassword,
-      Pass_Reset_Active__c: true,
+      Pass_Reset_Active__c: false,
     });
 
     return NextResponse.json({ success: true });

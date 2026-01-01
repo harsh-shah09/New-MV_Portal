@@ -5,140 +5,196 @@
     <title>Offer Letter</title>
 
     <style>
-        body {
+        .ol-wrapper {
             font-family: Calibri, Arial, sans-serif;
             background-color: #f2f2f2;
             margin: 0;
             padding: 40px;
+            display: flex;
+            justify-content: center;
         }
 
-        .page {
+        .ol-page {
+            width: 100%;
             max-width: 800px;
-            margin: auto;
             background: #ffffff;
             padding: 72px;
             border: 1px solid #ccc;
+            box-sizing: border-box;
         }
 
-        p {
+        .ol-text {
+            font-size: 11pt;
+            margin: 6px 0;
+            line-height: 1.15;
+            text-align: left;
+        }
+
+        .ol-right {
+            text-align: right;
+        }
+
+        .ol-center {
+            text-align: center;
+        }
+
+        .ol-title {
+            font-size: 13pt;
+            font-weight: bold;
+        }
+
+        .ol-highlight {
+            font-weight: bold;
+        }
+
+        .ol-list {
+            margin-left: 36px;
+            margin-top: 6px;
+        }
+
+        .ol-list-item {
             font-size: 11pt;
             margin: 6px 0;
             line-height: 1.15;
         }
 
-        .right {
-            text-align: right;
-        }
-
-        .center {
-            text-align: center;
-        }
-
-        .title {
-            font-size: 13pt;
-            font-weight: bold;
-        }
-
-        .highlight {
-            font-weight: bold;
-        }
-
-        ol {
-            margin-left: 36px;
-        }
-
-        ol li {
-            font-size: 11pt;
-            margin: 6px 0;
-        }
-
-        .indent {
+        .ol-indent {
             margin-left: 72px;
+        }
+
+        .ol-spacer {
+            height: 12px;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .ol-wrapper {
+                padding: 32px;
+            }
+
+            .ol-page {
+                padding: 48px;
+            }
+        }
+
+        /* Print */
+        @media print {
+            .ol-wrapper {
+                background: none;
+                padding: 0;
+            }
+
+            .ol-page {
+                border: none;
+                max-width: 100%;
+            }
         }
     </style>
 </head>
-<body>
 
-<div class="page">
+<div class="ol-wrapper">
+    <div class="ol-page">
 
-    <p class="right">Register No.: {{register_no}}</p>
+        <div class="ol-text ol-right">
+            Register No.: {{register_no}}
+        </div>
 
-    <p class="center title">Offer Letter</p>
+        <div class="ol-text ol-center ol-title">
+            Offer Letter
+        </div>
 
-    <p>Date: {{date}}</p>
+        <div class="ol-text">
+            Date: {{date}}
+        </div>
 
-    <p>Dear <span class="highlight">{{employee_name}}</span>,</p>
+        <div class="ol-text">
+            Dear <span class="ol-highlight">{{employee_name}}</span>,
+        </div>
 
-    <p>
-        Congratulations and welcome to MV Clouds Pvt Ltd. We are pleased to offer and
-        appoint you to the role of {{position_title}}. You will be required to join MV Clouds
-        from {{joining_date}}. We hope we have a long journey
-        and grow together.
-    </p>
+        <div class="ol-text">
+            Congratulations and welcome to MV Clouds Pvt Ltd. We are pleased to offer and
+            appoint you to the role of {{position_title}}. You will be required to join MV Clouds
+            from {{joining_date}}. We hope we have a long journey
+            and grow together.
+        </div>
 
-    <p>
-        Listed below are some terms and conditions to be met for your onboarding. If any
-        terms and conditions are not met, then the offer made to you will not be valid.
-    </p>
+        <div class="ol-text">
+            Listed below are some terms and conditions to be met for your onboarding. If any
+            terms and conditions are not met, then the offer made to you will not be valid.
+        </div>
 
-    <ol>
-        <li>
-            You will be on a contract period for the first 6 months. You will be confirmed
-            as an employee post the duration of 6 months based on your performance.
-        </li>
-        <li>
-            As an employee, your notice period for resignation will be 90 days. Failure to
-            do so will be dealt with on a case by case basis.
-        </li>
-        <li>
-            By signing this offer letter, you confirm that all details provided by you to
-            the Company in your resume and/or communicated otherwise are correct.
-        </li>
-        <li>
-            You will have to provide relevant supporting documents (salary slips,
-            experience letter, certificates, etc.) as evidence for the information shared
-            by you while joining the Company.
-        </li>
-        <li>
-            Your fixed salary will be Rs. {{salary_per_month}} /- per month.
-        </li>
-        <li>
-            Your annual CTC will be Rs. {{CTC}} /-.
-        </li>
-        <li>
-            You will have to bring the following documents upon joining the Company:
-        </li>
-    </ol>
+        <div class="ol-list">
+            <div class="ol-list-item">
+                1. You will be on a contract period for the first 6 months. You will be confirmed
+                as an employee post the duration of 6 months based on your performance.
+            </div>
 
-    <ol class="indent">
-        <li>
-            Originals and photocopies of all certificates &amp; mark sheets in support of
-            your experience, education, qualifications, identity, and age.
-        </li>
-        <li>
-            Original and photocopy of Permanent Account Number (PAN), Aadhar, Passport,
-            and Salary certificates/slips.
-        </li>
-        <li>
-            2 latest passport-size photographs.
-        </li>
-        <li>
-            Any other related documents as in point 4.
-        </li>
-    </ol>
+            <div class="ol-list-item">
+                2. As an employee, your notice period for resignation will be 90 days. Failure to
+                do so will be dealt with on a case by case basis.
+            </div>
 
-    <p>
-        For any further clarifications or discussions, please feel free to contact us.
-    </p>
+            <div class="ol-list-item">
+                3. By signing this offer letter, you confirm that all details provided by you to
+                the Company in your resume and/or communicated otherwise are correct.
+            </div>
 
-    <p>Regards,</p>
+            <div class="ol-list-item">
+                4. You will have to provide relevant supporting documents (salary slips,
+                experience letter, certificates, etc.) as evidence for the information shared
+                by you while joining the Company.
+            </div>
 
-    <p>
-        Dharmik Shah &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Employee<br>
-        <span class="highlight">CEO and Co-founder</span>, <span class="highlight">MV Clouds Pvt. Ltd.</span>
-    </p>
+            <div class="ol-list-item">
+                5. Your fixed salary will be Rs. {{salary_per_month}} /- per month.
+            </div>
 
+            <div class="ol-list-item">
+                6. Your annual CTC will be Rs. {{CTC}} /-.
+            </div>
+
+            <div class="ol-list-item">
+                7. You will have to bring the following documents upon joining the Company:
+            </div>
+        </div>
+
+        <div class="ol-list ol-indent">
+            <div class="ol-list-item">
+                1. Originals and photocopies of all certificates &amp; mark sheets in support of
+                your experience, education, qualifications, identity, and age.
+            </div>
+
+            <div class="ol-list-item">
+                2. Original and photocopy of Permanent Account Number (PAN), Aadhar, Passport,
+                and Salary certificates/slips.
+            </div>
+
+            <div class="ol-list-item">
+                3. 2 latest passport-size photographs.
+            </div>
+
+            <div class="ol-list-item">
+                4. Any other related documents as in point 4.
+            </div>
+        </div>
+
+        <div class="ol-text">
+            For any further clarifications or discussions, please feel free to contact us.
+        </div>
+
+        <div class="ol-text">
+            Regards,
+        </div>
+
+        <div class="ol-text">
+            Dharmik Shah
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+            Employee
+            <br>
+            <span class="ol-highlight">CEO and Co-founder</span>,
+            <span class="ol-highlight">MV Clouds Pvt. Ltd.</span>
+        </div>
+
+    </div>
 </div>
-
-</body>
 </html>

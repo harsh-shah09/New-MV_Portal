@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6,83 +5,127 @@
     <title>Experience Letter</title>
 
     <style>
-        body {
+        .exp-wrapper {
             font-family: Calibri, Arial, sans-serif;
             background-color: #f2f2f2;
             margin: 0;
             padding: 40px;
+            display: flex;
+            justify-content: center;
         }
 
-        .page {
+        .exp-page {
+            width: 100%;
             max-width: 800px;
-            margin: auto;
             background-color: #ffffff;
             padding: 72px;
-            border: 1px solid #ccc;
+            box-sizing: border-box;
         }
 
-        p {
+        .exp-text {
             font-size: 12pt;
             line-height: 1.15;
             margin: 6px 0;
             color: #000;
+            text-align: left;
         }
 
-        .right {
+        .exp-right {
             text-align: right;
         }
 
-        .center {
+        .exp-center {
             text-align: center;
         }
 
-        .title {
+        .exp-title {
             font-size: 15pt;
             font-weight: bold;
             text-decoration: underline;
         }
 
-        .bold {
+        .exp-bold {
             font-weight: bold;
+        }
+
+        .exp-spacer {
+            height: 12px;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .exp-wrapper {
+                padding: 48px;
+            }
+
+            .exp-page {
+                padding: 32px;
+            }
+        }
+
+        /* Print */
+        @media print {
+            .exp-wrapper {
+                background: none;
+                padding: 0;
+            }
+
+            .exp-page {
+                border: none;
+                padding: 72px;
+                max-width: 100%;
+            }
         }
     </style>
 </head>
-<body>
 
-<div class="page">
+<div class="exp-wrapper">
+    <div class="exp-page">
 
-    <p class="right">Register No.: {{register_no}}</p>
+        <div class="exp-text exp-right">
+            Register No.: {{register_no}}
+        </div>
 
-    <p>&nbsp;</p>
+        <div class="exp-spacer"></div>
 
-    <p class="center title">Experience Letter</p>
+        <div class="exp-text exp-center exp-title">
+            Experience Letter
+        </div>
 
-    <p>&nbsp;</p>
+        <div class="exp-spacer"></div>
 
-    <p>
-        This is to certify that <span class="bold">{{employee_name}}</span> was associated with
-        <span class="bold">MV Clouds Private Limited</span> as {{position_title}} from
-        {{joining_date}} to {{end_date}}. He/she has proven his/her abilities during his/her
-        tenure by working extremely hard and being dedicated to our company. He/she has
-        been relieved from MV Clouds duties since {{date_when_leaved}}
-    </p>
+        <div class="exp-text">
+            This is to certify that
+            <span class="exp-bold">{{employee_name}}</span>
+            was associated with
+            <span class="exp-bold">MV Clouds Private Limited</span>
+            as {{position_title}} from
+            {{joining_date}} to {{end_date}}.
+            He/she has proven his/her abilities during his/her tenure by working
+            extremely hard and being dedicated to our company.
+            He/she has been relieved from MV Clouds duties since
+            {{date_when_leaved}}
+        </div>
 
-    <p>&nbsp;</p>
+        <div class="exp-spacer"></div>
 
-    <p>
-        We really appreciate your contribution to MV Clouds Private Limited and wish
-        you well in your future endeavours!
-    </p>
+        <div class="exp-text">
+            We really appreciate your contribution to MV Clouds Private Limited
+            and wish you well in your future endeavours!
+        </div>
 
-    <p>&nbsp;</p>
+        <div class="exp-spacer"></div>
 
-    <p>Regards,</p>
+        <div class="exp-text">
+            Regards,
+        </div>
 
-    <p>&nbsp;</p>
+        <div class="exp-spacer"></div>
 
-    <p>Dharmik Shah</p>
+        <div class="exp-text">
+            Dharmik Shah
+        </div>
 
+    </div>
 </div>
-
-</body>
 </html>
