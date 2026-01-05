@@ -92,6 +92,8 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
         }
       }
     }
+
+    console.log("Submitting leave request:", { ...values, duration, totalDeduction, penaltyDays })
     
     onSubmit({
       ...values,
@@ -102,7 +104,6 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
       status: "pending",
       onePlusTwoApplied: penaltyDays > 0 ? true : false,
     })
-    message.success("Leave request submitted successfully!")
   }
 
   return (
@@ -121,7 +122,7 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
         onValuesChange={onValuesChange}
         initialValues={{
             leaveCategory: '',
-            leaveType: 'planned',
+            leaveType: 'Planned Leave',
             session: 'Full Day',
             startDate: dayjs().add(1, 'day'),
             endDate: dayjs().add(1, 'day')

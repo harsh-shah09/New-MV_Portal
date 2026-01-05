@@ -41,32 +41,66 @@ export default function LeavesPage() {
   }, [data, setLeaves, setPendingApprovals])
 
   const handleSubmitRequest = async (data: Partial<LeaveRequest>) => {
-    try {
-      const response = await fetch("/api/leave-management", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(data),
-      })
+    const submit = async (payload: Partial<LeaveRequest>, confirmedRules = false): Promise<void> => {
+      try {
+        console.log("Submitting leave request data:", payload, "confirmedRules:", confirmedRules)
+        const response = await fetch("/api/leave-management", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ ...payload, confirmedRules }),
+        })
 
-      if (!response.ok) {
-        const error = await response.json()
-        alert(error.error || "Failed to submit leave request")
-        return
+        const result = await response.json()
+
+        if (response.status === 409 && result?.requiresConfirmation) {
+          const details = result.details || {}
+          const confirmMessage =
+            `Please confirm the revised leave calculation before submitting:\n\n` +
+            `Requested leave days: ${payload.duration ?? "-"}\n` +
+            `Leave span (calendar): ${details.rangeLeaveDays ?? "-"}\n` +
+            `Sandwich extra days: ${details.sandwichExtra ?? 0}\n` +
+            `One+Two extra days: ${details.onePlusTwoExtra ?? 0}\n` +
+            `Total after rules: ${details.finalTotalAfterRules ?? "-"}\n\n` +
+            `Sandwich applied: ${details.sandwichApplied ? "Yes" : "No"}\n` +
+            `One+Two applied: ${details.onePlusTwoRuleApplied ? "Yes" : "No"}`
+
+          if (confirm(confirmMessage)) {
+            await submit(payload, true)
+          }
+          return
+        }
+
+        if (!response.ok) {
+          alert(result?.error || "Failed to submit leave request")
+          return
+        }
+
+        // Refetch the leaves to get the updated list
+        refetch()
+
+        setShowForm(false)
+
+        if (result?.totals) {
+          const t = result.totals
+          alert(
+            `Leave submitted successfully.\n\n` +
+            `Leave span (calendar): ${t.rangeLeaveDays}\n` +
+            `Sandwich extra days: ${t.sandwichExtra}\n` +
+            `One+Two extra days: ${t.onePlusTwoExtra}\n` +
+            `Total after rules: ${t.finalTotalAfterRules}`
+          )
+        } else {
+          alert("Leave request submitted successfully!")
+        }
+      } catch (error) {
+        console.error("Error submitting leave request:", error)
+        alert("Failed to submit leave request")
       }
-
-      const result = await response.json()
-      
-      // Refetch the leaves to get the updated list
-      refetch()
-      
-      setShowForm(false)
-      alert("Leave request submitted successfully!")
-    } catch (error) {
-      console.error("Error submitting leave request:", error)
-      alert("Failed to submit leave request")
     }
+
+    await submit(data)
   }
 
   const handleCancel = async (leaveId: string) => {
@@ -224,21 +258,19 @@ export default function LeavesPage() {
           <div className="flex border-b border-gray-200">
             <button
               onClick={() => setSelectedTab("my-requests")}
-              className={`flex-1 px-6 py-4 text-center font-medium transition ${
-                selectedTab === "my-requests"
-                  ? "text-blue-600 border-b-2 border-blue-600"
-                  : "text-gray-600 hover:text-gray-900"
-              }`}
+              className={`flex-1 px-6 py-4 text-center font-medium transition ${selectedTab === "my-requests"
+                ? "text-blue-600 border-b-2 border-blue-600"
+                : "text-gray-600 hover:text-gray-900"
+                }`}
             >
               My Requests
             </button>
             <button
               onClick={() => setSelectedTab("approvals")}
-              className={`flex-1 px-6 py-4 text-center font-medium transition ${
-                selectedTab === "approvals"
-                  ? "text-blue-600 border-b-2 border-blue-600"
-                  : "text-gray-600 hover:text-gray-900"
-              }`}
+              className={`flex-1 px-6 py-4 text-center font-medium transition ${selectedTab === "approvals"
+                ? "text-blue-600 border-b-2 border-blue-600"
+                : "text-gray-600 hover:text-gray-900"
+                }`}
             >
               Approvals
             </button>
@@ -257,7 +289,7 @@ export default function LeavesPage() {
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">Pending Approvals</h2>
                 {(currentUser?.role === 'HR' || (currentUser?.role === 'Developer' && currentUser?.title === 'Team Lead')) ? (
                   pendingApprovals.length > 0 ? (
-                    <div className="space-y-5">
+                    <div className="space-y-4">
                       {pendingApprovals.map((leave) => {
                         console.log("Pending Approval Leave:", leave)
                         const isTeamLead = currentUser?.role === 'Developer' && currentUser?.title === 'Team Lead'
@@ -269,146 +301,108 @@ export default function LeavesPage() {
                         const alreadyActioned = isTeamLead ? (tlApproved || tlRejected) : (hrApproved || hrRejected)
 
                         return (
-                          <div key={leave.id} className="relative overflow-hidden bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 border-l-[6px] border-l-indigo-500">
-                            {/* Decorative gradient overlay */}
-                            <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-purple-200/30 via-pink-200/20 to-transparent rounded-full blur-3xl -z-10" />
-                            
-                            <div className="p-6">
-                              {/* Header with Avatar */}
-                              <div className="flex items-start justify-between mb-5">
-                                <div className="flex items-center gap-4">
-                                  <div className="w-14 h-14 rounded-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-xl shadow-lg ring-4 ring-purple-100">
+                          <div key={leave.id} className="bg-gradient-to-r from-slate-50 to-blue-50 border border-gray-200 rounded-lg hover:border-blue-300 hover:shadow-md transition-all">
+                            <div className="p-5">
+                              {/* Header */}
+                              <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-semibold text-sm">
                                     {leave.employeeName.charAt(0).toUpperCase()}
                                   </div>
-                                  <div>
-                                    <h3 className="text-xl font-bold text-gray-900">{leave.employeeName}</h3>
-                                    <p className="text-xs text-gray-500 font-medium mt-0.5">ID: {leave.employeeId}</p>
+                                  <div> 
+                                    <h3 className="text-base font-semibold text-gray-900">{leave.employeeName}</h3>
+                                    <p className="text-xs text-gray-500">ID: {leave.employeeId}</p>
                                   </div>
+                                  <span className="px-4 py-2 rounded-full text-xs font-medium bg-amber-100 text-amber-700 border border-amber-200">
+                                    {leave.status.charAt(0).toUpperCase() + leave.status.slice(1)}
+                                  </span>
                                 </div>
-                                <span className="inline-flex items-center px-4 py-1.5 rounded-full text-xs font-bold bg-gradient-to-r from-amber-400 to-orange-400 text-white shadow-md uppercase tracking-wide">
-                                  {leave.status}
-                                </span>
-                              </div>
 
-                              {/* Colorful Info Cards */}
-                              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-                                <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-4 border-l-4 border-blue-500 shadow-sm">
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <span className="text-blue-600 text-lg">📋</span>
-                                    <label className="text-[10px] font-bold text-blue-900 uppercase tracking-wider">Type</label>
+                                {/* Action Buttons */}
+                                {!alreadyActioned ? (
+                                  <div className="flex gap-3">
+                                    <button
+                                      onClick={() => handleApprove(leave.id)}
+                                      className="flex-1 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
+                                    >
+                                      Approve
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        const reason = prompt("Enter reason for rejection:");
+                                        if (reason) handleReject(leave.id, reason);
+                                      }}
+                                      className="flex-1 bg-white hover:bg-gray-50 text-red-600 px-4 py-2 rounded-md text-sm font-medium border border-red-200 transition-colors"
+                                    >
+                                      Reject
+                                    </button>
                                   </div>
-                                  <p className="text-sm font-bold text-blue-900 truncate capitalize">{leave.leaveType || leave.leaveCategory}</p>
-                                </div>
-                                <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-4 border-l-4 border-purple-500 shadow-sm">
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <span className="text-purple-600 text-lg">⏱️</span>
-                                    <label className="text-[10px] font-bold text-purple-900 uppercase tracking-wider">Duration</label>
-                                  </div>
-                                  <p className="text-sm font-bold text-purple-900">{leave.duration} {leave.duration === 1 ? 'Day' : 'Days'}</p>
-                                </div>
-                                <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-xl p-4 border-l-4 border-emerald-500 shadow-sm">
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <span className="text-emerald-600 text-lg">📅</span>
-                                    <label className="text-[10px] font-bold text-emerald-900 uppercase tracking-wider">Start</label>
-                                  </div>
-                                  <p className="text-sm font-bold text-emerald-900">{new Date(leave.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
-                                </div>
-                                <div className="bg-gradient-to-br from-rose-50 to-rose-100 rounded-xl p-4 border-l-4 border-rose-500 shadow-sm">
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <span className="text-rose-600 text-lg">🏁</span>
-                                    <label className="text-[10px] font-bold text-rose-900 uppercase tracking-wider">End</label>
-                                  </div>
-                                  <p className="text-sm font-bold text-rose-900">{new Date(leave.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
-                                </div>
-                              </div>
-
-                              {/* Approval Status Timeline */}
-                              {(leave.tlApproved || leave.hrApproval) && (
-                                <div className="mb-5 p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl border border-gray-200">
-                                  <p className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-3 flex items-center gap-2">
-                                    <span className="text-base">🔄</span> Approval Status
-                                  </p>
-                                  <div className="flex items-center gap-3">
-                                    {leave.tlApproved && (
-                                      <div className={`flex-1 flex items-center gap-2 px-4 py-2.5 rounded-lg shadow-sm ${
-                                        leave.tlApproved === 'Approved' 
-                                          ? 'bg-gradient-to-r from-green-400 to-emerald-500 text-white' 
-                                          : 'bg-gradient-to-r from-red-400 to-rose-500 text-white'
-                                      }`}>
-                                        <span className="text-xl">{leave.tlApproved === 'Approved' ? '✓' : '✗'}</span>
-                                        <div className="flex-1">
-                                          <p className="text-xs font-bold uppercase tracking-wide">Team Lead</p>
-                                          <p className="text-xs font-semibold opacity-90">{leave.tlApproved}</p>
-                                        </div>
-                                      </div>
-                                    )}
-                                    {leave.tlApproved && leave.hrApproval && (
-                                      <div className="w-8 h-0.5 bg-gradient-to-r from-gray-300 to-gray-400" />
-                                    )}
-                                    {leave.hrApproval && (
-                                      <div className={`flex-1 flex items-center gap-2 px-4 py-2.5 rounded-lg shadow-sm ${
-                                        leave.hrApproval === 'Approved' 
-                                          ? 'bg-gradient-to-r from-green-400 to-emerald-500 text-white' 
-                                          : 'bg-gradient-to-r from-red-400 to-rose-500 text-white'
-                                      }`}>
-                                        <span className="text-xl">{leave.hrApproval === 'Approved' ? '✓' : '✗'}</span>
-                                        <div className="flex-1">
-                                          <p className="text-xs font-bold uppercase tracking-wide">HR</p>
-                                          <p className="text-xs font-semibold opacity-90">{leave.hrApproval}</p>
-                                        </div>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* Action Buttons */}
-                              {!alreadyActioned ? (
-                                <div className="flex gap-3">
-                                  <button
-                                    onClick={() => handleApprove(leave.id)}
-                                    className="flex-1 bg-gradient-to-r from-green-500 via-emerald-500 to-teal-500 hover:from-green-600 hover:via-emerald-600 hover:to-teal-600 text-white px-6 py-3.5 rounded-xl font-bold transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 flex items-center justify-center gap-2"
-                                  >
-                                    <span className="text-xl">✓</span>
-                                    <span>Approve</span>
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      const reason = prompt("Enter reason for rejection:");
-                                      if (reason) handleReject(leave.id, reason);
-                                    }}
-                                    className="flex-1 bg-gradient-to-r from-red-500 via-rose-500 to-pink-500 hover:from-red-600 hover:via-rose-600 hover:to-pink-600 text-white px-6 py-3.5 rounded-xl font-bold transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 flex items-center justify-center gap-2"
-                                  >
-                                    <span className="text-xl">✗</span>
-                                    <span>Reject</span>
-                                  </button>
-                                </div>
-                              ) : (
-                                <div className={`rounded-xl p-4 text-center shadow-sm ${
-                                  (tlApproved || hrApproved)
-                                    ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200'
-                                    : 'bg-gradient-to-r from-red-50 to-rose-50 border-2 border-red-200'
-                                }`}>
-                                  <p className={`text-sm font-bold ${
-                                    (tlApproved || hrApproved) ? 'text-green-800' : 'text-red-800'
-                                  }`}>
-                                    {isTeamLead 
-                                      ? `✓ You have ${tlApproved ? 'approved' : 'rejected'} this request. Awaiting HR review.` 
-                                      : `✓ You have ${hrApproved ? 'approved' : 'rejected'} this leave request.`
+                                ) : (
+                                  <div className={`rounded-md p-3 text-center text-sm ${(tlApproved || hrApproved)
+                                    ? 'bg-green-50 text-green-700'
+                                    : 'bg-red-50 text-red-700'
+                                    }`}>
+                                    {isTeamLead
+                                      ? `You have ${tlApproved ? 'approved' : 'rejected'} this request. Awaiting HR review.`
+                                      : `You have ${hrApproved ? 'approved' : 'rejected'} this leave request.`
                                     }
-                                  </p>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Details Grid */}
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                                <div className="bg-white/70 rounded-md p-3 border border-gray-100">
+                                  <p className="text-xs text-gray-500 mb-1">Leave Type</p>
+                                  <p className="text-sm font-medium text-gray-900 capitalize">{leave.leaveType || leave.leaveCategory}</p>
+                                </div>
+                                <div className="bg-white/70 rounded-md p-3 border border-gray-100">
+                                  <p className="text-xs text-gray-500 mb-1">Duration</p>
+                                  <p className="text-sm font-medium text-gray-900">{leave.duration} {leave.duration === 1 ? 'Day' : 'Days'}</p>
+                                </div>
+                                <div className="bg-white/70 rounded-md p-3 border border-gray-100">
+                                  <p className="text-xs text-gray-500 mb-1">Start Date</p>
+                                  <p className="text-sm font-medium text-gray-900">{new Date(leave.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                                </div>
+                                <div className="bg-white/70 rounded-md p-3 border border-gray-100">
+                                  <p className="text-xs text-gray-500 mb-1">End Date</p>
+                                  <p className="text-sm font-medium text-gray-900">{new Date(leave.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                                </div>
+                              </div>
+
+                              {/* Approval Status */}
+                              {(leave.tlApproved || leave.hrApproval) && (
+                                <div className="flex items-center gap-4 mb-4 text-sm bg-white/70 rounded-md p-3 border border-gray-100">
+                                  {leave.tlApproved && (
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-gray-500">Team Lead:</span>
+                                      <span className={`font-medium px-2 py-0.5 rounded ${leave.tlApproved === 'Approved' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                        {leave.tlApproved}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {leave.hrApproval && (
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-gray-500">HR:</span>
+                                      <span className={`font-medium px-2 py-0.5 rounded ${leave.hrApproval === 'Approved' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                        {leave.hrApproval}
+                                      </span>
+                                    </div>
+                                  )}
                                 </div>
                               )}
+
+
                             </div>
                           </div>
                         )
                       })}
                     </div>
                   ) : (
-                    <div className="text-center py-8 text-gray-600">No pending approvals</div>
+                    <div className="text-center py-8 text-gray-500">No pending approvals</div>
                   )
                 ) : (
-                  <div className="text-center py-8 text-gray-600">Only HR and Team Leads can view pending approvals</div>
+                  <div className="text-center py-8 text-gray-500">Only HR and Team Leads can view pending approvals</div>
                 )}
               </div>
             )}

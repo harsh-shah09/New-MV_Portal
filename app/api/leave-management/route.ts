@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import dayjs from "dayjs";
 import { verifyToken } from "@/lib/auth-utils";
 import { getSalesforceConnection } from "@/lib/salesforce";
 import type { LeaveRequest } from "@/types";
@@ -200,8 +201,10 @@ export async function POST(request: NextRequest) {
       totalDeduction,
       session: sessionValue,
       extraDayReason,
-      onePlusTwoApplied
+      onePlusTwoApplied,
+      confirmedRules
     } = body;
+    const rulesAlreadyConfirmed = confirmedRules === true;
 
     // Validate required fields
     if (!leaveCategory || !startDate || !endDate || !sessionValue) {
@@ -210,24 +213,150 @@ export async function POST(request: NextRequest) {
 
     const conn = await getSalesforceConnection();
 
+    // --- Sandwich Rule Calculation ---
+    // Fetch holidays from custom setting Holidays_List__c
+    const holidayQuery = await conn.query<any>(
+      "SELECT Name, Date__c, Day__c, Year__c FROM Holidays_List__c"
+    );
+    console.log("Fetched holidays:", holidayQuery);
+    const holidayDates = (holidayQuery.records || [])
+      .map((h: any) => h?.Date__c)
+      .filter(Boolean)
+      .map((d: string) => dayjs(d).format("YYYY-MM-DD"));
+    const holidaySet = new Set(holidayDates);
+
+    const start = dayjs(startDate);
+    const end = dayjs(endDate);
+    if (!start.isValid() || !end.isValid() || end.isBefore(start)) {
+      return NextResponse.json({ error: "Invalid date range" }, { status: 400 });
+    }
+
+    const isWeekend = (d: dayjs.Dayjs) => {
+      const day = d.day();
+      return day === 0 || day === 6;
+    };
+    const isHoliday = (d: dayjs.Dayjs) => holidaySet.has(d.format("YYYY-MM-DD"));
+    const isNonWorking = (d: dayjs.Dayjs) => isWeekend(d) || isHoliday(d);
+
+    const baseCalendarDays = end.diff(start, "day") + 1;
+    const isHalfDay = (sessionValue === "Session-1" || sessionValue === "Session-2") && baseCalendarDays === 1;
+    const clientDuration = typeof duration === "number" ? duration : undefined;
+    const computedDuration = isHalfDay ? 0.5 : baseCalendarDays;
+    const applyRules = leaveCategory === 'loss-of-pay' && leaveType === 'Planned Leave';
+
+    let hasNonWorkingInside = false;
+    let cursor = start.clone();
+    while (cursor.isSame(end) || cursor.isBefore(end)) {
+      if (isNonWorking(cursor)) {
+        hasNonWorkingInside = true;
+        break;
+      }
+      cursor = cursor.add(1, "day");
+    }
+
+    let preSandwich = 0;
+    cursor = start.subtract(1, "day");
+    while (isNonWorking(cursor)) {
+      preSandwich += 1;
+      cursor = cursor.subtract(1, "day");
+    }
+
+    let postSandwich = 0;
+    cursor = end.add(1, "day");
+    while (isNonWorking(cursor)) {
+      postSandwich += 1;
+      cursor = cursor.add(1, "day");
+    }
+
+    const sandwichApplied = applyRules && (hasNonWorkingInside || (preSandwich > 0 && postSandwich > 0));
+    const rangeLeaveDays = sandwichApplied ? baseCalendarDays : computedDuration;
+    const sandwichExtra = sandwichApplied ? preSandwich + postSandwich : 0;
+    const totalSandwichDeduction = rangeLeaveDays + sandwichExtra;
+
+    // Server-side One+Two rule calculation (planned leave within 5 days)
+    const today = dayjs().startOf("day");
+    let onePlusTwoExtra = 0;
+    if (applyRules) {
+      let cursorPenalty = start.startOf("day");
+      const endPenalty = end.startOf("day");
+      while (cursorPenalty.isSame(endPenalty) || cursorPenalty.isBefore(endPenalty)) {
+        const daysInAdvance = cursorPenalty.diff(today, "day");
+        if (daysInAdvance < 5) {
+          onePlusTwoExtra += 2;
+        }
+        cursorPenalty = cursorPenalty.add(1, "day");
+      }
+    }
+    const onePlusTwoRuleApplied = applyRules && onePlusTwoExtra > 0;
+    const finalTotalAfterRules = totalSandwichDeduction + onePlusTwoExtra;
+
+    console.log("[Sandwich Rule] Input", {
+      startDate,
+      endDate,
+      sessionValue,
+      leaveCategory,
+      leaveType,
+      applyRules,
+      baseCalendarDays,
+      clientDuration,
+      computedDuration,
+      holidayCount: holidaySet.size,
+    });
+    console.log("[Sandwich Rule] Holidays", holidayDates);
+    console.log("[Sandwich Rule] Evaluation", {
+      hasNonWorkingInside,
+      preSandwich,
+      postSandwich,
+      sandwichApplied,
+      rangeLeaveDays,
+      sandwichExtra,
+      totalSandwichDeduction,
+      onePlusTwoExtra,
+      onePlusTwoRuleApplied,
+      finalTotalAfterRules,
+    });
+
+    if (applyRules && (sandwichApplied || onePlusTwoRuleApplied) && !rulesAlreadyConfirmed) {
+      return NextResponse.json(
+        {
+          requiresConfirmation: true,
+          message: "Additional rules applied to your leave. Please confirm.",
+          details: {
+            sandwichApplied,
+            onePlusTwoRuleApplied,
+            baseCalendarDays,
+            rangeLeaveDays,
+            sandwichExtra,
+            totalSandwichDeduction,
+            onePlusTwoExtra,
+            finalTotalAfterRules,
+          },
+        },
+        { status: 409 }
+      );
+    }
+
     // Prepare leave record based on category
     const leaveRecord: any = {
       Employee__c: recordId,
       Start_Date__c: startDate,
       End_Date__c: endDate,
-      Total_Days__c: duration || 0,
-      Total_Days_After_Rule__c: totalDeduction || duration || 0,
+      Total_Days__c: rangeLeaveDays,
+      Total_Days_After_Rule__c: finalTotalAfterRules,
       Session__c: sessionValue,
       Status__c: 'Applied',
-      OnePlusTwo_Rule__c: onePlusTwoApplied ? true : false,
+      OnePlusTwo_Rule__c: onePlusTwoRuleApplied,
+      Sandwich_Rule__c: sandwichApplied,
     };
+
+    console.log("Prepared leave record:", leaveRecord);
 
     // Add fields based on leave category
     if (leaveCategory === 'loss-of-pay') {
       if (!leaveType) {
         return NextResponse.json({ error: "Leave type is required for loss of pay" }, { status: 400 });
       }
-      leaveRecord.Leave_Type__c = mapLeaveTypeToSalesforce(leaveType);
+      leaveRecord.Leave_Type__c = leaveType;
       leaveRecord.Leave_Category__c = 'Loss of Pay';
     } else if (leaveCategory === 'extra-day-pay') {
       if (!extraDayReason) {
@@ -248,7 +377,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ 
       success: true, 
       message: "Leave request submitted successfully",
-      leaveId: result.id 
+      leaveId: result.id,
+      totals: {
+        baseCalendarDays,
+        rangeLeaveDays,
+        sandwichExtra,
+        onePlusTwoExtra,
+        finalTotalAfterRules,
+        sandwichApplied,
+        onePlusTwoRuleApplied,
+      },
     });
   } catch (error) {
     console.error("Error creating leave request:", error);
@@ -438,14 +576,4 @@ export async function PATCH(request: NextRequest) {
       { status: 500 }
     );
   }
-}
-
-// Helper function to map frontend leave types to Salesforce
-function mapLeaveTypeToSalesforce(frontendType: string): string {
-  const typeMap: Record<string, string> = {
-    "planned": "Planned Leave",
-    "sick": "Sick Leave",
-    "emergency": "Emergency Leave",
-  };
-  return typeMap[frontendType] || "Planned Leave";
 }
