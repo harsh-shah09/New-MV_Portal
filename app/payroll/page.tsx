@@ -95,7 +95,7 @@ export default function PayrollPage() {
   }
 
   const handleCalculateSalary = (breakdown: any) => {
-    console.log("[v0] Salary calculated:", breakdown)
+    console.log("Salary calculated:", breakdown)
   }
 
   const totalPayroll = payrolls.reduce((sum, p) => sum + p.netSalary, 0)

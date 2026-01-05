@@ -45,7 +45,7 @@ export default function EmployeesClient({ role }: EmployeesClientProps) {
         department: record.Contact__r?.Department__c || 'Unassigned',
         position: record.Contact__r?.Employee_Role__c || '',
         joinDate: record.Joining_Date__c || '',
-        status: record.Status__c?.toLowerCase() || 'inactive',
+        status: record.Status__c || 'inactive',
         salary: record.Base_Salary__c || 0,
         // Add other fields as needed for detail view if Employee type supports them
         // or extends the type. For now mapping core fields.
@@ -53,6 +53,10 @@ export default function EmployeesClient({ role }: EmployeesClientProps) {
         emergencyContact: record.Contact__r?.Emergency_Contact_Name__c,
         emergencyPhone: record.Contact__r?.Emergency_Contact_Number__c,
         address: record.Contact__r?.MailingAddress,
+        city : record.Contact__r.MailingCity,
+        state : record.Contact__r.MailingState || 'State',
+        zipCode : record.Contact__r.MailingPostalCode ,
+        nationality : record.Contact__r.MailingCountry,
         gender: record.Contact__r?.GenderIdentity,
         experience: record.Contact__r?.Experience__c,
         employeeId: record.Employee_ID__c,
@@ -139,7 +143,7 @@ export default function EmployeesClient({ role }: EmployeesClientProps) {
             setShowForm(true)
           } : undefined}
           onDelete={isHR ? handleDeleteEmployee : undefined}
-          onView={(emp) => router.push(`/employees/${emp.id}`)}
+          onView={isHR ? (emp) => router.push(`/employees/${emp.id}`) : undefined}
         />
 
         {showForm && isHR && (

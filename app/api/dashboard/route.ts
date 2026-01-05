@@ -33,8 +33,16 @@ export async function GET(req: NextRequest) {
         }));
 
         const kpiStats: KPIStats[] = mapStats(dashboardData?.kpiStats);
-        const recentActivities: RecentActivity[] = mapStats(dashboardData?.recentActivities);
-        const statsOverview: StatsOverview[] = mapStats(dashboardData?.statsOverview);
+        // Pass statsOverview directly as it contains structured data for charts, not just KPI cards
+        const statsOverview = dashboardData?.statsOverview;
+        const recentActivities = (dashboardData?.recentActivities || []).map((item: any, index: number) => ({
+            id: `activity-${index}`,
+            type: 'leave',
+            message: item.title,
+            timestamp: item.value,
+            icon: item.icon,
+            color: item.color
+        }));
         return NextResponse.json({ kpiStats, recentActivities, statsOverview })
     } catch (error) {
         console.error('Error fetching dashboard data:', error);

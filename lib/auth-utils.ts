@@ -3,7 +3,6 @@ import { jwtVerify } from "jose";
 export interface SessionPayload {
   employeeId: string;
   email?: string;
-  recordId: string;
   [key: string]: any;
 }
 

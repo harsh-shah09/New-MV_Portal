@@ -39,8 +39,8 @@ export function EmployeeFilters({
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
           >
             <option value="">All Departments</option>
-            <option value="Engineering">Engineering</option>
-            <option value="Sales">Sales</option>
+            <option value="IT">IT</option>
+            <option value="Admin">Admin</option>
             <option value="HR">HR</option>
             <option value="Marketing">Marketing</option>
             <option value="Finance">Finance</option>
@@ -56,8 +56,9 @@ export function EmployeeFilters({
           >
             <option value="">All Statuses</option>
             <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-            <option value="on_leave">On Leave</option>
+            <option value="On Notice">On Notice</option>
+            <option value="Resigned">Resigned</option>
+            <option value="Terminated">Terminated</option>
           </select>
         </div>
       </div>

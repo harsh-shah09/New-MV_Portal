@@ -52,7 +52,7 @@ export default function LoginPage() {
         <div className="absolute inset-0 z-0">
              <div className="absolute top-0 -left-1/4 w-full h-full bg-gradient-to-br from-cyan-500/30 to-blue-600/30 blur-[150px] animate-pulse" style={{ animationDuration: '10s' }} />
              <div className="absolute bottom-0 -right-1/4 w-full h-full bg-gradient-to-tl from-purple-500/30 to-indigo-600/30 blur-[150px] animate-pulse" style={{ animationDuration: '8s' }} />
-             <div className="absolute inset-0 bg-[url('/noise.png')] opacity-10 mix-blend-overlay"></div>
+             <div className="absolute inset-0 opacity-10 mix-blend-overlay"></div>
         </div>
 
         <div className="relative z-10 p-12 text-white max-w-xl">

@@ -408,7 +408,7 @@ export function EmployeeProfileView({ employeeId }: ViewProps) {
                                       </h2>
                                       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                                           <Field label="Contact Name" value={employee.contact?.Emergency_Contact_Name__c} fieldKey="Emergency_Contact_Name__c" isEditing={isEditing} formData={formData} setFormData={setFormData} />
-                                          <Field label="Contact Number" value={employee.contact?.Emergency_Contact_Number__c} fieldKey="Emergency_Contact_Number__c" isEditing={isEditing} formData={formData} setFormData={setFormData} />
+                                          <Field label="Contact Number" value={employee.contact?.Emergency_Contact_Number__c} fieldKey="Emergency_Contact_Number__c" isEditing={isEditing} formData={formData} setFormData={setFormData} pattern = '^(?:(?:\\+|0{0,2})91(\\s*[\\-]\\s*)?|?)?\\d{9}$' type = 'tel'  />
                                       </div>
                                   </div>
                               </div>

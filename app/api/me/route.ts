@@ -6,11 +6,11 @@ import { getEmployeeById } from '@/lib/salesforce';
 export async function GET() {
   try {
     const session = await verifySession();
-    if (!session || !session.recordId) {
+    if (!session || !session.employeeId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const employee = await getEmployeeById(session.recordId);
+    const employee = await getEmployeeById(session.employeeId);
     if (!employee) {
         return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }

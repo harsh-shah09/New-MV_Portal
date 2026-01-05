@@ -41,11 +41,12 @@ export function EmployeeDetail({ employee, onClose, onEdit }: EmployeeDetailProp
           </button>
         </div>
 
-        <div className="flex border-b border-gray-200 px-8 bg-white">
+        <div className="flex border-b border-gray-200 px-8 bg-white"   
+        onClick={(e) => setActiveTab((e.target as any).id)}>
           {tabs.map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
+              id={tab.id}
               className={`py-4 px-6 text-sm font-medium border-b-2 transition-colors ${
                 activeTab === tab.id
                   ? "border-blue-600 text-blue-600"

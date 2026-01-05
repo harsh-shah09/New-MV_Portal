@@ -70,8 +70,8 @@ export function EmployeeForm({ employee, onSubmit, onCancel }: EmployeeFormProps
           </Form.Item>
           <Form.Item name="department" label="Department" rules={[{ required: true }]}>
             <Select placeholder="Select Department">
-              <Option value="Engineering">Engineering</Option>
-              <Option value="Sales">Sales</Option>
+              <Option value="IT">IT</Option>
+              <Option value="Admin">Admin</Option>
               <Option value="HR">HR</Option>
               <Option value="Marketing">Marketing</Option>
               <Option value="Finance">Finance</Option>

@@ -49,9 +49,8 @@ export async function loginAction(
     
     // Create session
     await createSession({
-      employeeId: employee.Employee_ID__c || '', // Ensure session ID is Employee_ID__c
+      employeeId: employee.Id || '', // Ensure session ID is Employee_ID__c
       email: employee.Email__c || employee.Contact__r?.Email,
-      recordId: employee.Id,
       name: employee.Name,
       role: employee.Contact__r?.Employee_Role__c || 'Employee',
       title : employee.Contact__r?.Title__c || ''
@@ -116,7 +115,7 @@ export async function forgotPasswordAction(identifier: string) {
             from: process.env.GMAIL_USER,
             to: email,
             subject: 'Password Reset Link - MV Portal',
-            text: `Hello ${employee.Name},\n\nA password reset has been requested for your account. \n\nPlease click the link below to reset your password:\n\n${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/auth/reset-password?id=${employee.Id}\n\nIf you did not request this, please ignore this email.`,
+            text: `Hello ${employee.Name},\n\nA password reset has been requested for your account. \n\nPlease click the link below to reset your password:\n\n${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/auth/change-password?id=${employee.Id}\n\nIf you did not request this, please ignore this email.`,
             html: `
             <div style="font-family: Arial, sans-serif; color: #333;">
                 <h2>Password Reset Request</h2>

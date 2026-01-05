@@ -1,4 +1,4 @@
-import { ArrowUpRight, ArrowDownRight } from "lucide-react"
+import { ArrowUpRight, ArrowDownRight, Users, Calendar, Clock, Activity, Briefcase } from "lucide-react"
 
 interface KPICard {
   title: string
@@ -20,10 +20,23 @@ const colorClasses = {
   cyan: "text-cyan-600 bg-cyan-50 border-cyan-100",
 }
 
+const iconMap: any = {
+  Users: Users,
+  Calendar: Calendar,
+  Clock: Clock,
+  Activity: Activity,
+  Briefcase: Briefcase
+};
+
 export function KPIStats({ stats }: KPIStatsProps) {
+  if (!stats) return null;
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-      {stats.map((stat, index) => (
+      {stats.map((stat, index) => {
+        const IconComponent = typeof stat.icon === 'string' ? iconMap[stat.icon] || Users : stat.icon;
+        
+        return (
         <div key={index} className="glass-card hover:shadow-xl transition-all duration-300 rounded-2xl p-6 bg-white/70 border border-white/60">
           <div className="flex justify-between items-start mb-4">
             <div>
@@ -31,8 +44,7 @@ export function KPIStats({ stats }: KPIStatsProps) {
               <p className="text-3xl font-extrabold text-gray-800 tracking-tight">{stat.value}</p>
             </div>
             <div className={`p-3 rounded-xl border shadow-sm ${colorClasses[stat.color] || colorClasses.blue}`}>
-                {/* Check if icon is a component or string */}
-                {typeof stat.icon === 'string' ? stat.icon : <stat.icon className="w-6 h-6" />}
+                <IconComponent className="w-6 h-6" />
             </div>
           </div>
           {stat.trend !== undefined && (
@@ -42,7 +54,7 @@ export function KPIStats({ stats }: KPIStatsProps) {
             </div>
           )}
         </div>
-      ))}
+      )})}
     </div>
   )
 }

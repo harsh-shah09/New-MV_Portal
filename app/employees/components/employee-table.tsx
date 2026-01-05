@@ -10,7 +10,7 @@ interface EmployeeTableProps {
   employees: Employee[]
   onEdit?: (employee: Employee) => void
   onDelete?: (id: string) => void
-  onView: (employee: Employee) => void
+  onView?: (employee: Employee) => void
 }
 
 export function EmployeeTable({ employees, onEdit, onDelete, onView }: EmployeeTableProps) {
@@ -33,8 +33,8 @@ export function EmployeeTable({ employees, onEdit, onDelete, onView }: EmployeeT
     //   dataIndex: 'department',
     //   key: 'department',
     //   filters: [
-    //     { text: 'Engineering', value: 'Engineering' },
-    //     { text: 'Sales', value: 'Sales' },
+    //     { text: 'IT', value: 'It' },
+    //     { text: 'Admin', value: 'Admin' },
     //     { text: 'HR', value: 'HR' },
     //     { text: 'Marketing', value: 'Marketing' },
     //     { text: 'Finance', value: 'Finance' },
@@ -46,13 +46,13 @@ export function EmployeeTable({ employees, onEdit, onDelete, onView }: EmployeeT
       dataIndex: 'position',
       key: 'position',
     },
-    // {
-    //   title: 'Join Date',
-    //   dataIndex: 'joinDate',
-    //   key: 'joinDate',
-    //   render: (date) => formatDate(date),
-    //   sorter: (a, b) => new Date(a.joinDate).getTime() - new Date(b.joinDate).getTime(),
-    // },
+    {
+      title: 'Join Date',
+      dataIndex: 'joinDate',
+      key: 'joinDate',
+      render: (date) => formatDate(date),
+      sorter: (a, b) => new Date(a.joinDate).getTime() - new Date(b.joinDate).getTime(),
+    },
     // {
     //   title: 'Salary',
     //   dataIndex: 'salary',
@@ -78,19 +78,24 @@ export function EmployeeTable({ employees, onEdit, onDelete, onView }: EmployeeT
     //     );
     //   },
     // },
-    {
+    
+  ];
+  if(onView){
+    columns.push({
       title: 'Actions',
       key: 'actions',
       align: 'center',
       render: (_, record) => (
         <Space size="small">
-          <Tooltip title="View">
+          {onView && (
+            <Tooltip title="View">
             <Button
               type="text"
               icon={<EyeOutlined className="text-blue-600" />}
               onClick={() => onView(record)}
             />
           </Tooltip>
+          )}
           {onEdit && (
             <Tooltip title="Edit">
               <Button
@@ -112,9 +117,8 @@ export function EmployeeTable({ employees, onEdit, onDelete, onView }: EmployeeT
           )}
         </Space>
       ),
-    },
-  ];
-
+    })
+  }
   return (
     <div className="bg-white rounded-lg shadow overflow-hidden">
       <Table

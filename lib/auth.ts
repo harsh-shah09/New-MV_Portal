@@ -17,7 +17,7 @@ export async function encrypt(payload: SessionPayload) {
 }
 
 export async function createSession(payload: SessionPayload) {
-  const expires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 1 day session
+  const expires = new Date(Date.now() + 60 * 60 * 1000); // 1 hr session
   const session = await encrypt(payload);
 
   const cookieStore = await cookies();
@@ -27,6 +27,7 @@ export async function createSession(payload: SessionPayload) {
     expires,
     sameSite: "lax",
     path: "/",
+    maxAge : 3600
   });
 }
 

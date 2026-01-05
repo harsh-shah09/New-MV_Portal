@@ -324,7 +324,7 @@ export default function LandingPage() {
 
       {/* Why Choose Us */}
       <section className="py-24 bg-slate-900 text-white relative overflow-hidden">
-         <div className="absolute inset-0 bg-[url('/noise.png')] opacity-20 bg-repeat mix-blend-overlay"></div>
+         <div className="absolute inset-0 opacity-20 bg-repeat mix-blend-overlay"></div>
          <div className="max-w-7xl mx-auto px-4 relative z-10">
               <h2 className="text-4xl font-bold text-center mb-16">Built for Modern HR Teams.</h2>
               <div className="grid md:grid-cols-3 gap-12">

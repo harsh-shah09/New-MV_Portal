@@ -126,7 +126,7 @@ export const findEmployee = async (identifier: string): Promise<Employee | null>
   const isEmail = identifier.includes('@');
   // Be careful with SOQL injection in real apps. 
   const escapedIdentifier = identifier.replace(/'/g, "\\'"); 
-  const result = await conn.query(`SELECT Id, Name , Contact__r.Email, Password__c, Contact__r.Employee_Role__c, Contact__r.Title__c FROM Employee__c WHERE ${isEmail ? 'Contact__r.Email' : 'Name'} = '${escapedIdentifier}' LIMIT 1`);
+  const result = await conn.query(`SELECT Id, Name , Contact__r.Email, Password__c, Contact__r.Employee_Role__c, Contact__r.Title__c FROM Employee__c WHERE ${isEmail ? 'Contact__r.Email' : 'Name'} = '${identifier}' LIMIT 1`);
 
   if (result.records.length === 0) return null; 
   return result.records[0] as unknown as Employee;
@@ -136,7 +136,7 @@ export const getAllEmployees = async (): Promise<any[]> => {
   const conn = await getSalesforceConnection();
   if (!conn) return [];
 
-  const query = `SELECT Id, Joining_Date__c, Base_Salary__c, Status__c, Salary_CTC__c, Profile_Photo__c,Contact__r.Id, Contact__r.FirstName, Contact__r.LastName, Contact__r.Email, Contact__r.Phone, Contact__r.Birthdate, Contact__r.Gender__c, Contact__r.MailingAddress, Contact__r.Emergency_Contact_Name__c, Contact__r.Emergency_Contact_Number__c, Contact__r.Emergency_Contact_Relation__c, Contact__r.Experience__c, Contact__r.Department__c, Contact__r.Employee_Role__c, Contact__r.Employee_Title__c FROM Employee__c`;
+  const query = `SELECT Id, Joining_Date__c, Base_Salary__c, Status__c, Salary_CTC__c, Profile_Photo__c, Contact__r.Id, Contact__r.FirstName, Contact__r.LastName, Contact__r.Email, Contact__r.Phone, Contact__r.Birthdate, Contact__r.Gender__c, Contact__r.MailingAddress,Contact__r.MailingStreet , Contact__r.MailingCity , Contact__r.MailingState , Contact__r.MailingPostalCode , Contact__r.MailingCountry , Contact__r.Emergency_Contact_Name__c, Contact__r.Emergency_Contact_Number__c, Contact__r.Emergency_Contact_Relation__c, Contact__r.Experience__c, Contact__r.Department__c, Contact__r.Employee_Role__c, Contact__r.Employee_Title__c FROM Employee__c`;
 
   const result = await conn.query(query);
   return result.records;
@@ -150,12 +150,21 @@ export const getDashboardData = async (): Promise<DashboardData> => {
 
   let totalEmployees = 0;
 
+  // Mock budget distribution - usually this would come from a Department__c object or similar
+  const getRandomBudget = (employees: number) => {
+     const base = employees * 50000; // $50k per employee
+     const variance = Math.floor(Math.random() * 20000);
+     return base + variance;
+  };
+
   const departmentItems = employeeAgg.records
     .filter((r: any) => r.dept !== null) // ignore rollup null row in list
     .map((r: any) => ({
       label: r.dept || 'Unassigned',
       value: r.cnt,
       sublabel: 'Employees',
+      // Generate synthetic budget based on employee count
+      budget: getRandomBudget(r.cnt)
     }));
 
   // ROLLUP row (grand total) comes where dept == null
@@ -164,7 +173,7 @@ export const getDashboardData = async (): Promise<DashboardData> => {
     totalEmployees = totalRow.cnt;
   }
 
-  // 2️⃣ Active + Pending leaves in a single grouped query
+  // 2️⃣ Active + Pending leaves snapshot
   const leaveAgg = await conn.query<any>(`
     SELECT Status__c status, COUNT(Id) cnt
     FROM Leave__c
@@ -180,20 +189,71 @@ export const getDashboardData = async (): Promise<DashboardData> => {
     if (r.status === 'Applied') pendingApprovals = r.cnt;
   });
 
-  // 3️⃣ Build final object
+  // 3️⃣ Leave Request Trends (Fetch raw leaves for this year to aggregate by month in JS)
+  // SOQL grouping by calendar month can be tricky depending on API version/edition, raw fetch is safer for small datasets
+  const leaveTrendQuery = `
+    SELECT CreatedDate, Status__c 
+    FROM Leave__c 
+    WHERE CreatedDate = THIS_YEAR
+    ORDER BY CreatedDate ASC
+  `;
+  const leaveTrendsRaw = await conn.query<any>(leaveTrendQuery);
+  
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const trendsMap = new Map<string, { month: string, approved: number, pending: number, rejected: number }>();
+  
+  // Initialize current year months
+  monthNames.forEach(m => trendsMap.set(m, { month: m, approved: 0, pending: 0, rejected: 0 }));
+
+  leaveTrendsRaw.records.forEach((r: any) => {
+      const date = new Date(r.CreatedDate);
+      const month = monthNames[date.getMonth()];
+      const stat = trendsMap.get(month);
+      if (stat) {
+          if (r.Status__c === 'Approved') stat.approved++;
+          else if (r.Status__c === 'Applied' || r.Status__c === 'Pending') stat.pending++;
+          else if (r.Status__c === 'Rejected') stat.rejected++;
+      }
+  });
+  
+  // Filter to show only up to current month or just return all
+  const currentMonthIndex = new Date().getMonth();
+  const leaveTrends = Array.from(trendsMap.values()).slice(0, currentMonthIndex + 1);
+
+
+  // 4️⃣ Recent Activities (Last 5 leaves)
+  const recentLeavesQuery = `
+    SELECT Employee__r.Contact__r.Name, Status__c, CreatedDate 
+    FROM Leave__c 
+    ORDER BY CreatedDate DESC 
+    LIMIT 5
+  `;
+  const recentLeaves = await conn.query<any>(recentLeavesQuery);
+  const recentActivities = recentLeaves.records.map((r: any) => ({
+      title: `${r.Employee__r?.Contact__r?.Name || 'Employee'} - ${r.Status__c}`,
+      value: new Date(r.CreatedDate).toLocaleDateString(),
+      icon: 'Activity',
+      color: r.Status__c === 'Approved' ? 'green' : (r.Status__c === 'Rejected' ? 'red' : 'amber')
+  }));
+
+  // 5️⃣ Build final object
   return {
     kpiStats: [
-      { title: 'Total Employees', value: totalEmployees },
-      { title: 'Active Leaves', value: activeLeaves },
-      { title: 'Pending Approvals', value: pendingApprovals },
+      { title: 'Total Employees', value: totalEmployees, icon: 'Users', color: 'blue', trend: 0 },
+      { title: 'Active Leaves', value: activeLeaves, icon: 'Calendar', color: 'green', trend: 0 },
+      { title: 'Pending Approvals', value: pendingApprovals, icon: 'Clock', color: 'amber' },
     ],
     statsOverview: [
       {
         title: 'Department Summary',
         items: departmentItems,
       },
+      {
+          title: 'Leave Trends',
+          items: leaveTrends
+      }
     ],
-    recentActivities: [],
+    recentActivities: recentActivities,
   };
 };
 
@@ -208,6 +268,7 @@ export const getEmployeeById = async (id: string): Promise<any | null> => {
       SELECT Id, Name, Contact__c, Joining_Date__c, Base_Salary__c, Salary_CTC__c, Status__c, Profile_Photo__c, Team_Lead__c, Password__c,
              Contact__r.Id, Contact__r.FirstName, Contact__r.LastName, Contact__r.Email, Contact__r.Phone, Contact__r.Birthdate, 
              Contact__r.Gender__c, Contact__r.MailingAddress, Contact__r.Emergency_Contact_Name__c, 
+             Contact__r.MailingStreet , Contact__r.MailingCity , Contact__r.MailingState , Contact__r.MailingPostalCode , Contact__r.MailingCountry,
              Contact__r.Emergency_Contact_Number__c, Contact__r.Emergency_Contact_Relation__c, 
              Contact__r.Experience__c, Contact__r.Department__c, Contact__r.Employee_Role__c, Contact__r.Employee_Title__c
       FROM Employee__c 
@@ -264,7 +325,6 @@ export const updateEmployee = async (id: string, contactId: string, data: any) =
     const contactUpdate: any = { Id: contactId };
     let hasEmpUpdate = false;
     let hasContactUpdate = false;
-
     for (const [key, value] of Object.entries(data)) {
         if (employeeFields.includes(key)) {
             empUpdate[key] = value;
@@ -298,8 +358,72 @@ export const createBankDetail = async (bankData: any) => {
     return await conn.sobject("Bank_Detail__c").create(bankData);
 };
 
+
 export const updateBankDetail = async (bankData: any) => {
     const conn = await getSalesforceConnection();
     if (!conn) throw new Error("No Salesforce connection");
     return await conn.sobject("Bank_Detail__c").update(bankData);
 };
+
+// --- Notifications ---
+
+export const createNotification = async (notifData: any) => {
+    const conn = await getSalesforceConnection();
+    if (!conn) throw new Error("No Salesforce connection");
+    return await conn.sobject("MV_Notification__c").create(notifData);
+}
+
+// --- Documents ---
+
+export const getDocumentsByEmployee = async (employeeId: string) => {
+    const conn = await getSalesforceConnection();
+    if (!conn) throw new Error("No Salesforce connection");
+    const query = `
+      SELECT Id, Name, Document_Type__c, Document_Category__c, File_URL__c, Status__c, CreatedDate
+      FROM Document__c
+      WHERE Employee__c = '${employeeId}'
+      ORDER BY CreatedDate DESC
+    `;
+    const result = await conn.query(query);
+    return result.records;
+}
+
+export const getPendingDocuments = async () => {
+    const conn = await getSalesforceConnection();
+    if (!conn) throw new Error("No Salesforce connection");
+    // Fetch pending documents and include related Employee Name
+    const query = `
+      SELECT Id, Name, Document_Type__c, Document_Category__c, File_URL__c, Status__c, CreatedDate,
+             Employee__c, Employee__r.Name, Employee__r.Contact__r.Name, Employee__r.Contact__r.FirstName, Employee__r.Contact__r.LastName
+      FROM Document__c
+      WHERE Status__c = 'Pending'
+      ORDER BY CreatedDate DESC
+    `;
+    const result = await conn.query(query);
+    return result.records;
+}
+
+export const updateDocument = async (docData: any) => {
+    const conn = await getSalesforceConnection();
+    if (!conn) throw new Error("No Salesforce connection");
+    return await conn.sobject("Document__c").update(docData);
+}
+
+export const getNotifications = async (employeeId: string) => {
+    const conn = await getSalesforceConnection();
+    if (!conn) throw new Error("No Salesforce connection");
+    
+    const query = `
+      SELECT Id, Name, Message__c, Action_Required__c, Status__c, Notification_Type__c, CreatedDate, Is_Read__c,
+             Employee__c
+      FROM MV_Notification__c
+      WHERE Employee__c = '${employeeId}'
+      ORDER BY CreatedDate DESC
+      LIMIT 100
+    `;
+    console.log(query)
+    const result = await conn.query(query);
+    return result.records;
+}
+
+

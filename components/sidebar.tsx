@@ -21,21 +21,13 @@ import {
   ChevronRight,
   Menu,
   X,
-  User
+  User,
+  FileText
 } from "lucide-react"
 import { logout } from "@/lib/auth"
 import { cn } from "@/lib/utils"
 
-const navItems = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/employees", label: "Employees", icon: Users },
-  { href: "/leaves", label: "Leave", icon: CalendarDays },
-  { href: "/training", label: "Training", icon: BookOpen },
-  { href: "/payroll", label: "Payroll", icon: Banknote },
-  { href: "/assets", label: "Assets", icon: Tag },
-  { href: "/nda", label: "NDA", icon: FileCheck },
-  { href: "/calendar", label: "Calendar", icon: Calendar },
-]
+  /* Static definition removed. Dynamic navItems used below */
 
 export function Sidebar({ 
   open, 
@@ -56,6 +48,35 @@ export function Sidebar({
           return res.json();
       }
   })
+
+  const navItems = [
+    { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { href: "/employees", label: "Employees", icon: Users },
+    { href: "/leaves", label: "Leave", icon: CalendarDays },
+    { href: "/training", label: "Training", icon: BookOpen },
+    { href: "/payroll", label: "Payroll", icon: Banknote },
+    { href: "/assets", label: "Assets", icon: Tag },
+    { href: "/calendar", label: "Calendar", icon: Calendar },
+    { href: "/documents", label: "Documents", icon: FileText },
+  ];
+
+  // Add Document Manager for HR only
+  if (user?.role?.includes('HR')) {
+     navItems.push({ href: "/nda", label: "Document Manager", icon: FileCheck });
+  }
+
+  const { data: notifications } = useQuery({
+      queryKey: ['notifications'],
+      queryFn: async () => {
+           const res = await fetch('/api/notifications');
+           if (!res.ok) return [];
+           return res.json();
+      }
+  })
+  
+  const unreadCount = notifications?.filter((n: any) => !n.Is_Read__c)?.length || 0;
+  const latestNotif = notifications?.[0];
+
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 1024)
@@ -151,15 +172,24 @@ export function Sidebar({
       {/* Notifications & Profile */}
       <div className="relative z-10 p-4 border-t border-slate-100 space-y-4 bg-slate-50/50">
         {/* Notification Preview */}
-        <div className="px-3 py-3 bg-white rounded-xl border border-slate-100 shadow-sm">
+        <div 
+            onClick={() => router.push('/notifications')}
+            className="px-3 py-3 bg-white rounded-xl border border-slate-100 shadow-sm cursor-pointer hover:shadow-md hover:border-blue-100 transition-all group"
+        >
           <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2 text-xs font-medium text-slate-600">
+            <div className="flex items-center gap-2 text-xs font-medium text-slate-600 group-hover:text-blue-600 transition-colors">
               <Bell className="w-3.5 h-3.5 text-cyan-500" />
               Notifications
             </div>
-            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-cyan-100 text-cyan-700 text-[10px] font-bold">3</span>
+            {unreadCount > 0 && (
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-red-100 text-red-600 text-[10px] font-bold">
+                    {unreadCount}
+                </span>
+            )}
           </div>
-          <p className="text-[11px] text-slate-500 line-clamp-1">New leave request from Vivek</p>
+          <p className="text-[11px] text-slate-500 line-clamp-1">
+              {latestNotif ? latestNotif.Message__c : 'No new notifications'}
+          </p>
         </div>
 
         {/* Profile Card */}
@@ -170,7 +200,7 @@ export function Sidebar({
           <div className="relative h-10 w-10 shrink-0">
              <div className="relative h-full w-full rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500 overflow-hidden">
                 {user?.profilePhoto ? (
-                    <Image src={user.profilePhoto} width={40} height={40} className="w-full h-full object-cover" alt="Profile" />
+                    <Image key={user?.id} src={user.profilePhoto} width={40} height={40} className="w-full h-full object-cover" alt="Profile" />
                 ) : (
                     <User size={20} />
                 )}
@@ -178,7 +208,7 @@ export function Sidebar({
             <div className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-green-500 border-2 border-white"></div>
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-slate-800 truncate group-hover:text-cyan-600 transition-colors">
+            <p key={user?.id} className="text-sm font-semibold text-slate-800 truncate group-hover:text-cyan-600 transition-colors">
                 {user ? `${user.firstName} ${user.lastName}` : 'Loading...'}
             </p>
             <p className="text-xs text-slate-500 truncate">{user?.email || '...'}</p>

@@ -8,37 +8,18 @@ import { ChartSection } from "./components/chart-section"
 import { RecentActivities } from "./components/recent-activities"
 import { QuickActions } from "./components/quick-actions"
 import { StatsOverview } from "./components/stats-overview"
-import { Users, CalendarClock, Clock, Award, Calendar, CheckCircle, PartyPopper } from "lucide-react"
+import { DashboardSkeleton } from "./components/dashboard-skeleton"
 import { useQuery } from "@tanstack/react-query"
 
 
 export default function DashboardPage() {
   const router = useRouter()
   const { data,
-    dataUpdatedAt,
-    error,
-    errorUpdateCount,
-    errorUpdatedAt,
-    failureCount,
-    failureReason,
-    fetchStatus,
-    isError,
-    isFetched,
-    isFetchedAfterMount,
-    isFetching,
     isLoading,
-    isLoadingError,
-    isPaused,
-    isPlaceholderData,
-    isRefetchError,
-    isRefetching,
-    isStale,
-    isSuccess,
-    refetch,
-    status, } = useQuery({
+    isFetching } = useQuery({
     queryKey: ["dashboard"],
     queryFn: () => fetch("/api/dashboard").then((res) => {
-      console.log(res)
+      // console.log(res)
       return res.json()
     }),
     placeholderData: {
@@ -47,7 +28,9 @@ export default function DashboardPage() {
       statsOverview: [],
     },
   })
-  if(isLoading || isFetching) return <div>Loading...</div>
+
+  if(isLoading || isFetching) return <DashboardSkeleton />
+
   return (
     <div className="min-h-screen bg-slate-50/50">
 
@@ -71,7 +54,7 @@ export default function DashboardPage() {
             <RecentActivities activities={data?.recentActivities} />
           </div>
           <div className="lg:col-span-2">
-            <StatsOverview stats={data?.statsOverview} />
+            <StatsOverview stats={data?.statsOverview?.filter((s:any) => s.title !== 'Leave Trends')} />
           </div>
         </div>
 
