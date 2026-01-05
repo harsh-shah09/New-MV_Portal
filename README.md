@@ -1,36 +1,105 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# HRMS Portal
 
-## Getting Started
+A comprehensive Human Resource Management System (HRMS) built with Next.js, designed to streamline employee management, leave requests, document handling, and more.
 
-First, run the development server:
+## 🚀 Features
 
-```bash
-npm run dev
-# or
-yarn dev 
-# or
-pnpm dev
-# or
-bun dev
-```
+- **Dashboard**: Interactive dashboard with a modern UI and loading skeletons.
+- **Employee Management**: 
+  - Comprehensive Employee Directory.
+  - Detail views for individual employees (Profile, Bank Info, Documents).
+  - Role-based access control.
+- **Leave Management**: 
+  - Apply for leaves.
+  - HR approval workflows.
+  - Automated calendar integration (Google Calendar).
+- **Document Management**:
+  - Secure document storage.
+  - NDA management with specific access rights.
+- **Notifications**: Real-time notifications for interactions and updates.
+- **Authentication**: Secure login with password reset functionality via Email.
+- **Integrations**:
+  - **Salesforce**: For backend data management and holiday calendars.
+  - **DynamoDB**: For token storage and high-performance data handling.
+  - **Google Calendar**: For syncing leave and holiday events.
+- **Tools**: PDF generation, Rich Text Editing, and more.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🛠 Tech Stack
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- **Framework**: [Next.js](https://nextjs.org/) (App Router)
+- **Language**: TypeScript
+- **Styling**: Tailwind CSS
+- **Database / Backend**: Salesforce, AWS DynamoDB
+- **State Management**: React Context / Custom Stores
+- **Utilities**: `jspdf`, `html2canvas` for PDF generation
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 🏁 Getting Started
 
-## Learn More
+Follow these steps to set up the project locally.
 
-To learn more about Next.js, take a look at the following resources:
+### Prerequisites
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- Node.js (v18 or later recommended)
+- npm or yarn
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Installation
 
-## Deploy on Vercel
+1. **Clone the repository:**
+   ```bash
+   git clone <repository-url>
+   ```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+2. **Install dependencies:**
+   ```bash
+   npm install
+   # or
+   yarn install
+   ```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+3. **Set up Environment Variables:**
+   Create a `.env.local` file in the root directory and configure the necessary keys (Salesforce, AWS, Gmail, etc.).
+   
+   *Example variables often required:*
+   ```env
+   # Salesforce
+    SALESFORCE_LOGIN_URL=
+    SALESFORCE_USERNAME=
+    SALESFORCE_PASSWORD=
+    SALESFORCE_SECURITY_TOKEN=
+
+    # AWS (DynamoDB & S3)
+    AWS_ACCESS_KEY_ID=
+    AWS_SECRET_ACCESS_KEY=
+    AWS_REGION=
+    S3_BUCKET_NAME=
+
+    # NextAuth
+    NEXTAUTH_SECRET=
+    NEXTAUTH_URL=
+    ENCRYPTION_KEY = 
+    SESSION_SECRET =
+
+    # Notifications
+    GMAIL_USER=
+    GMAIL_APP_PASSWORD=
+   ```
+
+4. **Run the development server:**
+   ```bash
+   npm run dev
+   # or
+   yarn dev
+   ```
+
+5. **Open the app:**
+   Navigate to [http://localhost:8080](http://localhost:8080) to view the application.
+
+## 📂 Project Structure
+
+- `/app`: Main application routes and pages (Next.js App Router).
+- `/components`: Reusable UI components.
+- `/lib`: Utility functions and clients (Salesforce, AWS, etc.).
+- `/store`: State management logic.
+- `/types`: TypeScript type definitions.
+- `/public`: Static assets.
+
