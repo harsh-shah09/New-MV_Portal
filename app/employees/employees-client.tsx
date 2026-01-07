@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useQuery } from "@tanstack/react-query"
+import { Skeleton, Card, Space, Result, Button } from "antd"
 
 import { EmployeeForm } from "./components/employee-form"
 import { EmployeeTable } from "./components/employee-table"
@@ -28,7 +29,7 @@ export default function EmployeesClient({ role }: EmployeesClientProps) {
 
   const { addEmployee, updateEmployee, deleteEmployee } = useEmployeeStore()
 
-  const { data: employees = [], isLoading, isError } = useQuery({
+  const { data: employees = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['employees'],
     queryFn: async () => {
       const res = await fetch('/api/employees');
@@ -38,27 +39,27 @@ export default function EmployeesClient({ role }: EmployeesClientProps) {
       // Map Salesforce data to Employee type
       return rawData.map((record: any) => ({
         id: record.Id,
-        firstName: record.Contact__r?.FirstName || '',
-        lastName: record.Contact__r?.LastName || '',
-        email: record.Contact__r?.Email || '',
-        phone: record.Contact__r?.Phone || '',
-        department: record.Contact__r?.Department__c || 'Unassigned',
-        position: record.Contact__r?.Employee_Role__c || '',
+        firstName: record.Employee_Name__c?.split(' ')[0] || '',
+        lastName: record.Employee_Name__c?.split(' ').slice(1).join(' ') || '',
+        email: record.Employee_Email__c || '',
+        phone: record.Employee_Phone__c || '',
+        department: record.Department__c || 'Unassigned',
+        position: record.Role__c || '',
         joinDate: record.Joining_Date__c || '',
         status: record.Status__c || 'inactive',
         salary: record.Base_Salary__c || 0,
         // Add other fields as needed for detail view if Employee type supports them
         // or extends the type. For now mapping core fields.
         profilePhoto: record.Profile_Photo__c,
-        emergencyContact: record.Contact__r?.Emergency_Contact_Name__c,
-        emergencyPhone: record.Contact__r?.Emergency_Contact_Number__c,
-        address: record.Contact__r?.MailingAddress,
-        city : record.Contact__r.MailingCity,
-        state : record.Contact__r.MailingState || 'State',
-        zipCode : record.Contact__r.MailingPostalCode ,
-        nationality : record.Contact__r.MailingCountry,
-        gender: record.Contact__r?.GenderIdentity,
-        experience: record.Contact__r?.Experience__c,
+        emergencyContact: record.Emergency_Contact_Name__c,
+        emergencyPhone: record.Emergency_Contact_Number__c,
+        address: record.Employee_Address__c,
+        city : record.Employee_Address__c?.city,
+        state : record.Employee_Address__c?.state || 'State',
+        zipCode : record.Employee_Address__c?.postalCode ,
+        nationality : record.Employee_Address__c?.country,
+        gender: record.Gender__c,
+        experience: record.Experience__c,
         employeeId: record.Employee_ID__c,
         ctc: record.Salary_CTC__c,
       })) as Employee[];
@@ -74,7 +75,7 @@ export default function EmployeesClient({ role }: EmployeesClientProps) {
       (emp.phone && emp.phone.includes(searchTerm))
 
     const matchesDepartment = !department || emp.department === department
-    const matchesStatus = !status || emp.status === status
+    const matchesStatus = !status || emp.status.toLowerCase() === status
 
     return matchesSearch && matchesDepartment && matchesStatus
   })
@@ -102,28 +103,184 @@ export default function EmployeesClient({ role }: EmployeesClientProps) {
     }
   }
 
-  if (isLoading) return <div className="flex justify-center items-center h-screen">Loading...</div>
-  if (isError) return <div className="flex justify-center items-center h-screen">Error loading employees</div>
+  if (isLoading) {
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
+      {/* Header section */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 sm:mb-8">
+        <div className="space-y-3 w-full sm:w-auto">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+            <Skeleton.Input 
+              active 
+              size="large" 
+              className="w-full sm:w-[200px] lg:w-[250px]"
+              style={{ height: 40 }}
+            />
+            <Skeleton.Input 
+              active 
+              size="small" 
+              className="w-full sm:w-[150px] lg:w-[180px]"
+            />
+          </div>
+        </div>
+        <Skeleton.Button 
+          active 
+          size="large" 
+          shape="default" 
+          className="w-full sm:w-[140px] lg:w-[160px] mt-2 sm:mt-0"
+        />
+      </div>
+
+      {/* Filter section */}
+      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-6 sm:mb-8">
+        <Skeleton.Input 
+          active 
+          size="large" 
+          className="w-full sm:flex-1 lg:max-w-[300px]"
+        />
+        <div className="flex gap-3 sm:gap-4">
+          <Skeleton.Input 
+            active 
+            size="large" 
+            className="w-1/2 sm:w-[150px] lg:w-[180px]"
+          />
+          <Skeleton.Input 
+            active 
+            size="large" 
+            className="w-1/2 sm:w-[150px] lg:w-[180px]"
+          />
+        </div>
+      </div>
+
+      {/* Table skeleton */}
+      <Card className="shadow-sm border-gray-100 rounded-xl overflow-hidden">
+        <div className="divide-y divide-gray-100">
+          {[1, 2, 3, 4].map((i) => (
+            <div 
+              key={i} 
+              className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-0"
+            >
+              {/* Avatar and text info */}
+              <div className="flex items-start sm:items-center gap-3 sm:gap-4 w-full sm:flex-1">
+                <Skeleton.Avatar 
+                  active 
+                  size="large" 
+                  shape="circle" 
+                  className="flex-shrink-0"
+                />
+                <div className="space-y-2 min-w-0 flex-1">
+                  <Skeleton.Input 
+                    active 
+                    size="small" 
+                    className="w-full max-w-[140px] sm:max-w-none sm:w-[140px]"
+                  />
+                  <Skeleton.Input 
+                    active 
+                    size="small" 
+                    className="w-full max-w-[180px] sm:max-w-none sm:w-[180px]"
+                  />
+                </div>
+              </div>
+
+              {/* Additional info columns - hidden on small screens */}
+              <div className="hidden sm:block sm:flex-1 ml-4">
+                <Skeleton.Input 
+                  active 
+                  size="small" 
+                  className="w-full max-w-[120px]"
+                />
+              </div>
+              
+              <div className="hidden md:block md:flex-1 ml-4">
+                <Skeleton.Input 
+                  active 
+                  size="small" 
+                  className="w-full max-w-[100px]"
+                />
+              </div>
+
+              {/* Action buttons */}
+              <div className="flex gap-2 self-end sm:self-auto sm:ml-4">
+                <Skeleton.Button 
+                  active 
+                  size="small" 
+                  shape="circle" 
+                  className="flex-shrink-0"
+                />
+                <Skeleton.Button 
+                  active 
+                  size="small" 
+                  shape="circle" 
+                  className="flex-shrink-0"
+                />
+              </div>
+
+              {/* Mobile view for additional columns */}
+              <div className="flex gap-4 sm:hidden w-full pt-2 border-t border-gray-100 mt-2">
+                <div className="flex-1">
+                  <Skeleton.Input 
+                    active 
+                    size="small" 
+                    className="w-full"
+                  />
+                </div>
+                <div className="flex-1">
+                  <Skeleton.Input 
+                    active 
+                    size="small" 
+                    className="w-full"
+                  />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
+    </div>
+  )
+}
+
+  if (isError) {
+    return (
+      <div className="flex justify-center items-center min-h-[80vh] bg-background">
+        <Result
+          status="500"
+          title="Failed to Load Employees"
+          subTitle="We ran into an issue while fetching the employee directory. Please check your connection and try again."
+          extra={[
+            <Button type="primary" key="retry" onClick={() => refetch()} size="large">
+              Try Again
+            </Button>,
+            <Button key="home" onClick={() => router.push('/')} size="large">
+              Back to Home
+            </Button>
+          ]}
+        />
+      </div>
+    )
+  }
 
   return (
     <div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-        <div className="flex justify-between items-center mb-8">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
           <div>
-            <h1 className="text-4xl font-bold text-gray-900">Employees</h1>
-            <p className="text-gray-600 mt-1">Manage your workforce</p>
+            <h1 className="text-3xl sm:text-4xl font-bold text-foreground">Employees</h1>
+            <p className="text-muted-foreground mt-1">Manage your workforce</p>
           </div>
           {isHR && (
-            <button
+            <Button
+                type="primary"
+                size="large"
+                className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 h-10 px-6"
                 onClick={() => {
-                setEditingEmployee(undefined)
-                setShowForm(true)
+                  setEditingEmployee(undefined)
+                  setShowForm(true)
                 }}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition"
             >
                 + Add Employee
-            </button>
+            </Button>
           )}
         </div>
 

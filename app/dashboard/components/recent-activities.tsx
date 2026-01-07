@@ -98,12 +98,6 @@ export function RecentActivities({ activities }: RecentActivitiesProps) {
           );
         })}
       </motion.div>
-      
-      <div className="mt-6 pt-4 border-t border-slate-100 block text-center">
-        <button className="text-sm font-medium text-blue-600 hover:text-blue-700 hover:underline transition-all">
-          View All Activity
-        </button>
-      </div>
     </div>
   )
 }

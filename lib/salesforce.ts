@@ -36,7 +36,7 @@ export const getSalesforceConnection = async () => {
         }
     });
     const data = await db.send(getCmd);
-    console.log('Dyanmo data',data)
+    // console.log('Dyanmo data',data)
     if (data.Item) {
       const stored = data.Item as StoredToken;
       // Initialize connection with stored token
@@ -101,17 +101,28 @@ export const getSalesforceConnection = async () => {
 export interface Employee {
   Id: string;
   Employee_ID__c?: string;
-  Email__c?: string;
+  Employee_Email__c?: string;
   Password__c?: string; // Stored hash
-  Name: string;
-  Contact__r?: {
-      FirstName?: string;
-      LastName?: string;
-      Email?: string;
-      Employee_Role__c?: string;
-      [key: string]: any;
-  }
+  Employee_Name__c: string; // Replaces Name/FirstName/LastName
+  
+  // New fields directly on Employee__c
+  Department__c?: string;
+  Role__c?: string;
+  Title__c?: string;
+  Employee_Address__c?: any; // Compound address field
+  Experience__c?: number;
+  Employee_Phone__c?: string;
+  Birthdate__c?: string;
+  Emergency_Contact_Name__c?: string;
+  Emergency_Contact_Number__c?: string;
+  Emergency_Contact_Relation__c?: string;
+  Gender__c?: string;
+  Is2FAEnabled__c?: boolean;
+  
+  // Standard fields
+  Name?: string; // Standard name field often exists, but we rely on Employee_Name__c
 }
+
 export interface DashboardData {
     kpiStats: any[],
     recentActivities: any[],
@@ -122,11 +133,22 @@ export const findEmployee = async (identifier: string): Promise<Employee | null>
   const conn = await getSalesforceConnection();
   if(!conn) return null;
 
-  // Search by Employee_ID__c OR Email__c
+  // Search by Employee_ID__c OR Employee_Email__c
   const isEmail = identifier.includes('@');
   // Be careful with SOQL injection in real apps. 
-  const escapedIdentifier = identifier.replace(/'/g, "\\'"); 
-  const result = await conn.query(`SELECT Id, Name , Contact__r.Email, Password__c, Contact__r.Employee_Role__c, Contact__r.Title__c FROM Employee__c WHERE ${isEmail ? 'Contact__r.Email' : 'Name'} = '${identifier}' LIMIT 1`);
+  const escapedIdentifier = identifier.replace(/'/g, "\\'");
+  // Updated query to fetch fields from Employee__c directly
+  const query = `
+    SELECT Id, Employee_Name__c, Employee_Email__c, Password__c, Role__c, Title__c, Is2FAEnabled__c, Name 
+    FROM Employee__c 
+    WHERE ${isEmail ? 'Employee_Email__c' : 'Employee_Name__c'} = '${escapedIdentifier}' 
+    LIMIT 1
+  `;
+  // Note: Searching by 'Name' standard field might still be safer if Employee_Name__c isn't unique or standardized for login. 
+  // But user said "Employee_Name__c ... use this only". I'll try to match user intent. 
+  // If login fails, user might need to adjust valid identifiers.
+  
+  const result = await conn.query(query);
 
   if (result.records.length === 0) return null; 
   return result.records[0] as unknown as Employee;
@@ -136,7 +158,14 @@ export const getAllEmployees = async (): Promise<any[]> => {
   const conn = await getSalesforceConnection();
   if (!conn) return [];
 
-  const query = `SELECT Id, Joining_Date__c, Base_Salary__c, Status__c, Salary_CTC__c, Profile_Photo__c, Contact__r.Id, Contact__r.FirstName, Contact__r.LastName, Contact__r.Email, Contact__r.Phone, Contact__r.Birthdate, Contact__r.Gender__c, Contact__r.MailingAddress,Contact__r.MailingStreet , Contact__r.MailingCity , Contact__r.MailingState , Contact__r.MailingPostalCode , Contact__r.MailingCountry , Contact__r.Emergency_Contact_Name__c, Contact__r.Emergency_Contact_Number__c, Contact__r.Emergency_Contact_Relation__c, Contact__r.Experience__c, Contact__r.Department__c, Contact__r.Employee_Role__c, Contact__r.Employee_Title__c FROM Employee__c`;
+  const query = `
+    SELECT Id, Joining_Date__c, Base_Salary__c, Status__c, Salary_CTC__c, Profile_Photo__c, 
+           Employee_Name__c, Employee_Email__c, Employee_Phone__c, Birthdate__c, Gender__c, 
+           Employee_Address__c,
+           Emergency_Contact_Name__c, Emergency_Contact_Number__c, Emergency_Contact_Relation__c, 
+           Experience__c, Department__c, Role__c, Title__c, Employee_ID__c
+    FROM Employee__c
+  `;
 
   const result = await conn.query(query);
   return result.records;
@@ -146,11 +175,12 @@ export const getDashboardData = async (): Promise<DashboardData> => {
   const conn = await getSalesforceConnection();
 
   // 1️⃣ Employee totals + department-wise count (single query using WITH ROLLUP)
-  const employeeAgg = await conn.query<any>(`SELECT Contact__r.Department__c dept, COUNT(Id) cnt FROM Employee__c GROUP BY ROLLUP(Contact__r.Department__c)`);
+  // Updated group by Department__c on Employee__c
+  const employeeAgg = await conn.query<any>(`SELECT Department__c dept, COUNT(Id) cnt FROM Employee__c GROUP BY ROLLUP(Department__c)`);
 
   let totalEmployees = 0;
 
-  // Mock budget distribution - usually this would come from a Department__c object or similar
+  // Mock budget distribution
   const getRandomBudget = (employees: number) => {
      const base = employees * 50000; // $50k per employee
      const variance = Math.floor(Math.random() * 20000);
@@ -163,7 +193,6 @@ export const getDashboardData = async (): Promise<DashboardData> => {
       label: r.dept || 'Unassigned',
       value: r.cnt,
       sublabel: 'Employees',
-      // Generate synthetic budget based on employee count
       budget: getRandomBudget(r.cnt)
     }));
 
@@ -189,8 +218,7 @@ export const getDashboardData = async (): Promise<DashboardData> => {
     if (r.status === 'Applied') pendingApprovals = r.cnt;
   });
 
-  // 3️⃣ Leave Request Trends (Fetch raw leaves for this year to aggregate by month in JS)
-  // SOQL grouping by calendar month can be tricky depending on API version/edition, raw fetch is safer for small datasets
+  // 3️⃣ Leave Request Trends
   const leaveTrendQuery = `
     SELECT CreatedDate, Status__c 
     FROM Leave__c 
@@ -216,21 +244,20 @@ export const getDashboardData = async (): Promise<DashboardData> => {
       }
   });
   
-  // Filter to show only up to current month or just return all
   const currentMonthIndex = new Date().getMonth();
   const leaveTrends = Array.from(trendsMap.values()).slice(0, currentMonthIndex + 1);
 
 
   // 4️⃣ Recent Activities (Last 5 leaves)
   const recentLeavesQuery = `
-    SELECT Employee__r.Contact__r.Name, Status__c, CreatedDate 
+    SELECT Employee__r.Employee_Name__c, Status__c, CreatedDate 
     FROM Leave__c 
     ORDER BY CreatedDate DESC 
     LIMIT 5
   `;
   const recentLeaves = await conn.query<any>(recentLeavesQuery);
   const recentActivities = recentLeaves.records.map((r: any) => ({
-      title: `${r.Employee__r?.Contact__r?.Name || 'Employee'} - ${r.Status__c}`,
+      title: `${r.Employee__r?.Employee_Name__c || 'Employee'} - ${r.Status__c}`,
       value: new Date(r.CreatedDate).toLocaleDateString(),
       icon: 'Activity',
       color: r.Status__c === 'Approved' ? 'green' : (r.Status__c === 'Rejected' ? 'red' : 'amber')
@@ -262,15 +289,12 @@ export const getEmployeeById = async (id: string): Promise<any | null> => {
     const conn = await getSalesforceConnection();
     if (!conn) return null;
 
-    // 1. Fetch Employee + Contact Details
-    // We select ID and Contact__c to know which contact to update/query if needed, though Contact__r.* gives us the data.
+    // 1. Fetch Employee Details (All component fields directly)
     const empQuery = `
-      SELECT Id, Name, Contact__c, Joining_Date__c, Base_Salary__c, Salary_CTC__c, Status__c, Profile_Photo__c, Team_Lead__c, Password__c,
-             Contact__r.Id, Contact__r.FirstName, Contact__r.LastName, Contact__r.Email, Contact__r.Phone, Contact__r.Birthdate, 
-             Contact__r.Gender__c, Contact__r.MailingAddress, Contact__r.Emergency_Contact_Name__c, 
-             Contact__r.MailingStreet , Contact__r.MailingCity , Contact__r.MailingState , Contact__r.MailingPostalCode , Contact__r.MailingCountry,
-             Contact__r.Emergency_Contact_Number__c, Contact__r.Emergency_Contact_Relation__c, 
-             Contact__r.Experience__c, Contact__r.Department__c, Contact__r.Employee_Role__c, Contact__r.Employee_Title__c
+      SELECT Id, Employee_Id__c , Employee_Name__c, Employee_Email__c, Joining_Date__c, Base_Salary__c, Salary_CTC__c, Status__c, Profile_Photo__c, Team_Lead__c, Password__c, Is2FAEnabled__c,
+             Employee_Phone__c, Birthdate__c, Gender__c, Employee_Address__c, 
+             Emergency_Contact_Name__c, Emergency_Contact_Number__c, Emergency_Contact_Relation__c, 
+             Experience__c, Department__c, Role__c, Title__c
       FROM Employee__c 
       WHERE Id = '${id}'
       LIMIT 1
@@ -281,7 +305,6 @@ export const getEmployeeById = async (id: string): Promise<any | null> => {
     const empRecord: any = empResult.records[0];
 
     // 2. Fetch Bank Details
-    // Assuming 'Bank_Detail__c' has a lookup 'Employee__c'
     const bankQuery = `
       SELECT Id, Name, Bank_Branch_Name__c, Bank_Account_Number__c, IFSC__c, Primary_Account__c
       FROM Bank_Detail__c
@@ -299,51 +322,29 @@ export const getEmployeeById = async (id: string): Promise<any | null> => {
 
     // Map to a clean structure
     return {
-        ...empRecord, // Contains top-level Employee__c fields
-        // Flatten Contact__r slightly or keep it nested, frontend expects specific structure
-        contact: empRecord.Contact__r,
+        ...empRecord, 
+        // No more separate contact object, everything is on top level
         bankDetails: bankResult.records,
         documents: docResult.records
     };
 };
 
-export const updateEmployee = async (id: string, contactId: string, data: any) => {
+export const updateEmployee = async (id: string, data: any) => {
     const conn = await getSalesforceConnection();
     if (!conn) throw new Error("No Salesforce connection");
 
-    // Separate records for Employee__c and Contact
-    const employeeFields = [
-        "Joining_Date__c", "Base_Salary__c", "Salary_CTC__c", "Status__c", "Profile_Photo__c", "Team_Lead__c"
-    ];
-    const contactFields = [
-        "FirstName", "LastName", "Email", "Phone", "Birthdate", "Gender__c", "MailingCity", "MailingStreet", "MailingCountry", "MailingPostalCode", // Address breakdown if needed or MailingAddress composite
-        "Emergency_Contact_Name__c", "Emergency_Contact_Number__c", "Emergency_Contact_Relation__c", 
-        "Experience__c", "Department__c", "Employee_Role__c", "Employee_Title__c"
-    ];
+    // All fields are on Employee__c now.
+    // We can just filter out fields that are NOT part of the object if we want to be safe, 
+    // or assume 'data' contains valid keys.
+    // Excluding nested objects or read-only if any.
+    
+    // Safety: ensure Id is set
+    const updateData: any = { Id: id, ...data };
+    console.log('Updated data',updateData)
+    // Remove "contactId" if it was passed by legacy code
+    delete updateData.contactId;
 
-    const empUpdate: any = { Id: id };
-    const contactUpdate: any = { Id: contactId };
-    let hasEmpUpdate = false;
-    let hasContactUpdate = false;
-    for (const [key, value] of Object.entries(data)) {
-        if (employeeFields.includes(key)) {
-            empUpdate[key] = value;
-            hasEmpUpdate = true;
-        } else if (contactFields.includes(key) || key === 'MailingAddress') { 
-             // Address is special, often readonly as composite, need to update individual components if passed, 
-             // or if 'data' keys are flat like 'MailingCity'.
-             // For now assume data keys match Salesforce API names.
-            contactUpdate[key] = value;
-            hasContactUpdate = true;
-        }
-    }
-
-    if (hasEmpUpdate) {
-        await conn.sobject("Employee__c").update(empUpdate);
-    }
-    if (hasContactUpdate) {
-        await conn.sobject("Contact").update(contactUpdate);
-    }
+    await conn.sobject("Employee__c").update(updateData);
 };
 
 export const createDocumentRecord = async (docData: any) => {
@@ -391,12 +392,12 @@ export const getDocumentsByEmployee = async (employeeId: string) => {
 export const getPendingDocuments = async () => {
     const conn = await getSalesforceConnection();
     if (!conn) throw new Error("No Salesforce connection");
-    // Fetch pending documents and include related Employee Name
+    // Fetch pending and uploaded documents and include related Employee Name
     const query = `
       SELECT Id, Name, Document_Type__c, Document_Category__c, File_URL__c, Status__c, CreatedDate,
-             Employee__c, Employee__r.Name, Employee__r.Contact__r.Name, Employee__r.Contact__r.FirstName, Employee__r.Contact__r.LastName
+             Employee__c, Employee__r.Employee_Name__c
       FROM Document__c
-      WHERE Status__c = 'Pending'
+      WHERE Status__c IN ('Pending', 'Uploaded')
       ORDER BY CreatedDate DESC
     `;
     const result = await conn.query(query);
@@ -421,9 +422,68 @@ export const getNotifications = async (employeeId: string) => {
       ORDER BY CreatedDate DESC
       LIMIT 100
     `;
-    console.log(query)
+    // console.log(query)
     const result = await conn.query(query);
     return result.records;
 }
 
 
+export const updateEmployee2FAStatus = async (id: string, enabled: boolean) => {
+    const conn = await getSalesforceConnection();
+    if (!conn) throw new Error("No Salesforce connection");
+    
+    await conn.sobject("Employee__c").update({
+        Id: id,
+        Is2FAEnabled__c: enabled
+    });
+};
+
+export const saveTwoFactorSecret = async (employeeId: string, secret: string) => {
+    const putCmd = new PutCommand({
+        TableName: TABLE_NAME,
+        Item: {
+            Employee_Id: employeeId,
+            SortKey: "2FA_SECRET",
+            Secret: secret,
+            updated_time: new Date().toISOString()
+        }
+    });
+    await db.send(putCmd);
+};
+
+export const getTwoFactorSecret = async (employeeId: string) => {
+    const getCmd = new GetCommand({
+        TableName: TABLE_NAME,
+        Key: {
+            Employee_Id: employeeId,
+            SortKey: "2FA_SECRET"
+        }
+    });
+    const result = await db.send(getCmd);
+    return result.Item?.Secret;
+};
+
+export const addTrustedDevice = async (employeeId: string, deviceId: string) => {
+    const putCmd = new PutCommand({
+        TableName: TABLE_NAME,
+        Item: {
+            Employee_Id: employeeId,
+            SortKey: `TRUSTED_DEVICE#${deviceId}`,
+            Trusted: true,
+            updated_time: new Date().toISOString()
+        }
+    });
+    await db.send(putCmd);
+};
+
+export const isTrustedDevice = async (employeeId: string, deviceId: string) => {
+    const getCmd = new GetCommand({
+        TableName: TABLE_NAME,
+        Key: {
+            Employee_Id: employeeId,
+            SortKey: `TRUSTED_DEVICE#${deviceId}`
+        }
+    });
+    const result = await db.send(getCmd);
+    return !!result.Item;
+};

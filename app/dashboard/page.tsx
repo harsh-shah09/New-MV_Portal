@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 
 import { KPIStats } from "./components/kpi-stats"
@@ -10,10 +10,28 @@ import { QuickActions } from "./components/quick-actions"
 import { StatsOverview } from "./components/stats-overview"
 import { DashboardSkeleton } from "./components/dashboard-skeleton"
 import { useQuery } from "@tanstack/react-query"
+import { verifySession } from "@/lib/auth";
 
 
 export default function DashboardPage() {
   const router = useRouter()
+  const [role, setRole] = useState<string | null>(null)
+  const isHR = role === 'HR';
+   useEffect(() => {
+    let mounted = true
+    const loadSession = async () => {
+      try {
+        const session = await verifySession()
+        if (mounted) setRole(session?.role ?? null)
+      } catch (err) {
+        // session fetch failed or user not signed in
+        if (mounted) setRole(null)
+        console.error(err)
+      }
+    }
+    loadSession()
+    return () => { mounted = false }
+  }, [])
   const { data,
     isLoading,
     isFetching } = useQuery({
@@ -59,7 +77,9 @@ export default function DashboardPage() {
         </div>
 
         {/* Quick Actions */}
-        <QuickActions />
+        {isHR && (
+          <QuickActions />
+        )}
       </div>
     </div>
   )

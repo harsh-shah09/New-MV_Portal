@@ -1,5 +1,8 @@
 "use client"
 
+import { Input, Select, Card, Row, Col } from 'antd'
+import { SearchOutlined, FilterOutlined } from '@ant-design/icons'
+
 interface EmployeeFiltersProps {
   searchTerm: string
   onSearchChange: (value: string) => void
@@ -8,6 +11,8 @@ interface EmployeeFiltersProps {
   status: string
   onStatusChange: (value: string) => void
 }
+
+const { Option } = Select
 
 export function EmployeeFilters({
   searchTerm,
@@ -18,50 +23,66 @@ export function EmployeeFilters({
   onStatusChange,
 }: EmployeeFiltersProps) {
   return (
-    <div className="bg-white rounded-lg shadow p-6 mb-6">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Search</label>
-          <input
-            type="text"
-            placeholder="Name, email, or phone..."
+    <Card className="rounded-xl shadow-sm border-border bg-card text-card-foreground mb-6" bodyStyle={{ padding: '16px' }}>
+      <Row gutter={[16, 16]}>
+        <Col xs={24} md={8}>
+          <label className="block text-sm font-medium text-muted-foreground mb-1.5">
+            Search
+          </label>
+          <Input
+            prefix={<SearchOutlined className="text-muted-foreground" />}
+            placeholder="Search by name, email, or phone..."
             value={searchTerm}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+            allowClear
+            size="large"
+            className="rounded-lg"
           />
-        </div>
+        </Col>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Department</label>
-          <select
-            value={department}
-            onChange={(e) => onDepartmentChange(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+        <Col xs={24} md={8}>
+          <label className="block text-sm font-medium text-muted-foreground mb-1.5">
+            Department
+          </label>
+          <Select
+            value={department || undefined}
+            onChange={onDepartmentChange}
+            placeholder="All Departments"
+            allowClear
+            style={{ width: '100%' }}
+            size="large"
+            className="rounded-lg"
           >
-            <option value="">All Departments</option>
-            <option value="IT">IT</option>
-            <option value="Admin">Admin</option>
-            <option value="HR">HR</option>
-            <option value="Marketing">Marketing</option>
-            <option value="Finance">Finance</option>
-          </select>
-        </div>
+            <Option value="">All Departments</Option>
+            <Option value="IT">IT</Option>
+            <Option value="Admin">Admin</Option>
+            <Option value="HR">HR</Option>
+            <Option value="Marketing">Marketing</Option>
+            <Option value="Finance">Finance</Option>
+          </Select>
+        </Col>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-          <select
-            value={status}
-            onChange={(e) => onStatusChange(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+        <Col xs={24} md={8}>
+          <label className="block text-sm font-medium text-muted-foreground mb-1.5">
+            Status
+          </label>
+          <Select
+            value={status || undefined}
+            onChange={onStatusChange}
+            placeholder="All Statuses"
+            allowClear
+            style={{ width: '100%' }}
+            size="large"
+            className="rounded-lg"
           >
-            <option value="">All Statuses</option>
-            <option value="active">Active</option>
-            <option value="On Notice">On Notice</option>
-            <option value="Resigned">Resigned</option>
-            <option value="Terminated">Terminated</option>
-          </select>
-        </div>
-      </div>
-    </div>
+            <Option value="">All Statuses</Option>
+            <Option value="active">Active</Option>
+            <Option value="On Notice">On Notice</Option>
+            <Option value="Resigned">Resigned</Option>
+            <Option value="Terminated">Terminated</Option>
+          </Select>
+        </Col>
+      </Row>
+    </Card>
   )
 }

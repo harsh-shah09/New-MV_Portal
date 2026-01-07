@@ -29,7 +29,7 @@ export async function POST(req: Request) {
         // If not, we might need to rely on a specific user or skip this if no HR found.
         // We'll try to find someone with 'HR' in their role.
         if (conn) {
-             const hrQuery = `SELECT Id FROM Employee__c WHERE Contact__r.Employee_Role__c LIKE '%HR%' LIMIT 1`; 
+             const hrQuery = `SELECT Id FROM Employee__c WHERE Role__c LIKE '%HR%' LIMIT 1`; 
              const hrRes = await conn.query(hrQuery);
              const hrId = hrRes?.records[0]?.Id;
 

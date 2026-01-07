@@ -197,7 +197,7 @@ export function EmployeeForm({ employee, onSubmit, onCancel }: EmployeeFormProps
             />
         </div>
         
-        <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 bg-white z-10">
+        <div className="flex justify-end gap-3 pt-4 border-t border-border bg-card z-10">
            <Button onClick={onCancel}>Cancel</Button>
            <Button type="primary" htmlType="submit">
              {employee ? "Update Employee" : "Create Employee"}

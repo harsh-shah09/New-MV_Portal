@@ -26,14 +26,10 @@ export async function PUT(
   try {
      const { id } = await params;
     const body = await request.json();
-    const { contactId, ...data } = body;
+    const data = body;
+    delete data.contactId; // Cleanup if sent
 
-    // We expect contactId to be passed to know which Contact record to update
-    if (!contactId) { 
-        return NextResponse.json({ error: 'Contact ID is required' }, { status: 400 });
-    }
-
-    await updateEmployee(id, contactId, data);
+    await updateEmployee(id, data);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error updating employee:', error);

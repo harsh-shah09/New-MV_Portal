@@ -62,12 +62,34 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
       
       let daysWithPenalty = 0
       
+      // Helper to check if a day is a weekend
+      const isWeekend = (date: dayjs.Dayjs) => {
+        const day = date.day()
+        return day === 0 || day === 6 // Sunday or Saturday
+      }
+      
+      // Count working days backward from leave start date
+      const countWorkingDaysBackward = (fromDate: dayjs.Dayjs, targetWorkingDays: number) => {
+        let workingDaysCount = 0
+        let checkDate = today.clone()
+        
+        while (checkDate.isBefore(fromDate) && workingDaysCount < targetWorkingDays) {
+          if (!isWeekend(checkDate)) {
+            workingDaysCount++
+          }
+          checkDate = checkDate.add(1, 'day')
+        }
+        
+        return workingDaysCount
+      }
+      
       // Calculate penalty for each day of leave
       let currentDate = startDate.clone()
       while (currentDate.isBefore(endDate) || currentDate.isSame(endDate, 'day')) {
-        const daysInAdvance = currentDate.diff(today, 'day')
+        // Count only working days between today and this leave day
+        const workingDaysInAdvance = countWorkingDaysBackward(currentDate, 5)
         
-        if (daysInAdvance < 5) {
+        if (workingDaysInAdvance < 5) {
           penaltyDays += 2 // Add 2 penalty days for this leave day
           daysWithPenalty++
         }
@@ -77,19 +99,19 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
       
       if (penaltyDays > 0) {
         totalDeduction = duration + penaltyDays
-        const confirmMessage = `Warning: Planned leave must be applied at least 5 days in advance.\n\n` +
-          `Leave breakdown:\n` +
-          `- ${daysWithPenalty} day(s) applied with less than 5 days notice\n` +
-          `- ${duration - daysWithPenalty} day(s) applied with sufficient notice\n\n` +
-          `Penalty calculation:\n` +
-          `- Original leave days: ${duration}\n` +
-          `- Penalty days (${daysWithPenalty} × 2): ${penaltyDays}\n` +
-          `- Total deduction: ${totalDeduction} day(s)\n\n` +
-          `Do you want to continue?`
+        // const confirmMessage = `Warning: Planned leave must be applied at least 5 days in advance.\n\n` +
+        //   `Leave breakdown:\n` +
+        //   `- ${daysWithPenalty} day(s) applied with less than 5 days notice\n` +
+        //   `- ${duration - daysWithPenalty} day(s) applied with sufficient notice\n\n` +
+        //   `Penalty calculation:\n` +
+        //   `- Original leave days: ${duration}\n` +
+        //   `- Penalty days (${daysWithPenalty} × 2): ${penaltyDays}\n` +
+        //   `- Total deduction: ${totalDeduction} day(s)\n\n` +
+        //   `Do you want to continue?`
         
-        if (!confirm(confirmMessage)) {
-          return
-        }
+        // if (!confirm(confirmMessage)) {
+        //   return
+        // }
       }
     }
 

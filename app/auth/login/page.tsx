@@ -1,6 +1,6 @@
 "use client"
 
-import { loginAction, forgotPasswordAction } from "./actions"
+import { loginAction, forgotPasswordAction, verify2FAAndLogin } from "./actions"
 import { useEffect, useState, useActionState } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
@@ -9,17 +9,19 @@ import { Mail, Lock, ArrowRight, Loader2, CheckCircle2 } from "lucide-react"
 
 export default function LoginPage() {
   const [state, action, pending] = useActionState(loginAction, {})
+  const [verifyState, verifyAction, verifyPending] = useActionState(verify2FAAndLogin, {})
   const router = useRouter()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [otp, setOtp] = useState("")
   const [resetStatus, setResetStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null)
   const [isResetting, setIsResetting] = useState(false)
 
   useEffect(() => {
-    if (state.success) {
+    if (state.success || verifyState.success) {
       router.push("/dashboard")
     }
-  }, [state.success, router])
+  }, [state.success, verifyState.success, router])
 
   const handleForgotPassword = async (e: React.MouseEvent) => {
     e.preventDefault()
@@ -105,95 +107,151 @@ export default function LoginPage() {
                     <p className="text-slate-500">Access your employee dashboard</p>
                 </div>
 
-                <form action={action} className="space-y-6">
-                    {state.error && (
+                <form action={state.twoFactorRequired ? verifyAction : action} className="space-y-6">
+                    {(state.error || verifyState.error) && (
                         <motion.div 
                             initial={{ opacity: 0, y: -10 }}
                             animate={{ opacity: 1, y: 0 }}
                             className="bg-red-50 border border-red-100 text-red-600 px-4 py-3 rounded-xl text-sm flex items-center gap-2"
                         >
                             <svg className="w-4 h-4 fill-current" viewBox="0 0 20 20"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"/></svg>
-                            {state.error}
+                            {state.error || verifyState.error}
                         </motion.div>
                     )}
 
-                    {resetStatus && (
-                         <motion.div 
-                            initial={{ opacity: 0, y: -10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className={`px-4 py-3 rounded-xl text-sm flex items-center gap-2 border ${
-                                resetStatus.type === 'success' 
-                                    ? 'bg-green-50 border-green-100 text-green-600' 
-                                    : 'bg-red-50 border-red-100 text-red-600'
-                            }`}
-                        >
-                            {resetStatus.type === 'success' ? (
-                                <CheckCircle2 className="w-4 h-4" />
-                            ) : (
-                                <svg className="w-4 h-4 fill-current" viewBox="0 0 20 20"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"/></svg>
-                            )}
-                            {resetStatus.message}
-                        </motion.div>
+                    {state.twoFactorRequired ? (
+                         <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
+                             <input type="hidden" name="employeeId" value={state.employeeId} />
+                             
+                             <div className="text-center">
+                                 <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                                     <Lock className="w-8 h-8" />
+                                 </div>
+                                 <h3 className="text-xl font-bold text-slate-800">Two-Factor Authentication</h3>
+                                 <p className="text-slate-500 text-sm mt-2">
+                                     Enter the 6-digit code from your authenticator app for <span className="font-semibold">{state.email}</span>
+                                 </p>
+                             </div>
+
+                             <div className="space-y-2">
+                                 <label className="text-sm font-semibold text-slate-700 ml-1">Verification Code</label>
+                                 <input
+                                     name="code"
+                                     type="text"
+                                     value={otp}
+                                     onChange={(e) => {
+                                         const val = e.target.value.replace(/[^0-9]/g, '').slice(0, 6)
+                                         setOtp(val)
+                                     }}
+                                     className="w-full text-center text-3xl tracking-[0.5em] font-mono py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-medium text-slate-800 placeholder:text-slate-300"
+                                     placeholder="000000"
+                                     autoFocus
+                                     required
+                                 />
+                             </div>
+
+                             <div className="flex items-center gap-2">
+                                 <input type="checkbox" name="trustDevice" id="trustDevice" className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                                 <label htmlFor="trustDevice" className="text-sm text-slate-600 select-none cursor-pointer">Trust this device for 30 days</label>
+                             </div>
+
+                             <button
+                                 type="submit"
+                                 disabled={verifyPending || otp.length !== 6}
+                                 className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-purple-500/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2 group disabled:opacity-70 disabled:cursor-not-allowed"
+                             >
+                                 {verifyPending ? (
+                                     <Loader2 className="w-5 h-5 animate-spin" />
+                                 ) : (
+                                     <>Verify <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" /></>
+                                 )}
+                             </button>
+                             
+                             <button type="button" onClick={() => window.location.reload()} className="w-full text-sm text-slate-500 hover:text-slate-700">
+                                 Back to Login
+                             </button>
+                         </div>
+                    ) : (
+                        <>
+                             {resetStatus && (
+                                  <motion.div 
+                                     initial={{ opacity: 0, y: -10 }}
+                                     animate={{ opacity: 1, y: 0 }}
+                                     className={`px-4 py-3 rounded-xl text-sm flex items-center gap-2 border ${
+                                         resetStatus.type === 'success' 
+                                             ? 'bg-green-50 border-green-100 text-green-600' 
+                                             : 'bg-red-50 border-red-100 text-red-600'
+                                     }`}
+                                 >
+                                     {resetStatus.type === 'success' ? (
+                                         <CheckCircle2 className="w-4 h-4" />
+                                     ) : (
+                                         <svg className="w-4 h-4 fill-current" viewBox="0 0 20 20"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"/></svg>
+                                     )}
+                                     {resetStatus.message}
+                                 </motion.div>
+                             )}
+         
+                             <div className="space-y-2">
+                                 <label className="text-sm font-semibold text-slate-700 ml-1">Email / Employee ID</label>
+                                 <div className="relative group">
+                                     <Mail className="absolute left-4 top-3.5 w-5 h-5 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+                                     <input
+                                         name="identifier"
+                                         type="text"
+                                         value={email}
+                                         onChange={(e) => setEmail(e.target.value)}
+                                         className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-medium text-slate-800 placeholder:text-slate-400"
+                                         placeholder="john.doe@mvportal.com"
+                                         required
+                                     />
+                                 </div>
+                             </div>
+         
+                             <div className="space-y-2">
+                                 <div className="flex justify-between ml-1">
+                                     <label className="text-sm font-semibold text-slate-700">Password</label>
+                                     <button 
+                                         onClick={handleForgotPassword}
+                                         disabled={isResetting}
+                                         type="button" 
+                                         className="text-xs font-semibold text-blue-600 hover:text-blue-700 hover:underline disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                                     >
+                                         {isResetting && <Loader2 className="w-3 h-3 animate-spin" />}
+                                         Forgot password?
+                                     </button>
+                                 </div>
+                                 <div className="relative group">
+                                     <Lock className="absolute left-4 top-3.5 w-5 h-5 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+                                     <input
+                                         name="password"
+                                         type="password"
+                                         value={password}
+                                         onChange={(e) => setPassword(e.target.value)}
+                                         className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-medium text-slate-800"
+                                         placeholder="••••••••"
+                                         required
+                                     />
+                                 </div>
+                             </div>
+         
+                             <button
+                                 type="submit"
+                                 disabled={pending}
+                                 className="w-full bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-blue-500/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2 group disabled:opacity-70 disabled:cursor-not-allowed"
+                             >
+                                 {pending ? (
+                                     <Loader2 className="w-5 h-5 animate-spin" />
+                                 ) : (
+                                     <>Sign In <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" /></>
+                                 )}
+                             </button>
+                             
+                             <p className="text-center text-sm text-slate-500 mt-6">
+                                 Protected by <span className="font-semibold text-slate-700"><ShieldIcon className="inline w-3 h-3 mb-0.5" /> Enterprise Security</span>
+                             </p>
+                        </>
                     )}
-
-                    <div className="space-y-2">
-                        <label className="text-sm font-semibold text-slate-700 ml-1">Email / Employee ID</label>
-                        <div className="relative group">
-                            <Mail className="absolute left-4 top-3.5 w-5 h-5 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
-                            <input
-                                name="identifier"
-                                type="text"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-medium text-slate-800 placeholder:text-slate-400"
-                                placeholder="john.doe@mvportal.com"
-                                required
-                            />
-                        </div>
-                    </div>
-
-                    <div className="space-y-2">
-                        <div className="flex justify-between ml-1">
-                            <label className="text-sm font-semibold text-slate-700">Password</label>
-                            <button 
-                                onClick={handleForgotPassword}
-                                disabled={isResetting}
-                                type="button" 
-                                className="text-xs font-semibold text-blue-600 hover:text-blue-700 hover:underline disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
-                            >
-                                {isResetting && <Loader2 className="w-3 h-3 animate-spin" />}
-                                Forgot password?
-                            </button>
-                        </div>
-                        <div className="relative group">
-                            <Lock className="absolute left-4 top-3.5 w-5 h-5 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
-                            <input
-                                name="password"
-                                type="password"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-medium text-slate-800"
-                                placeholder="••••••••"
-                                required
-                            />
-                        </div>
-                    </div>
-
-                    <button
-                        type="submit"
-                        disabled={pending}
-                        className="w-full bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-blue-500/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2 group disabled:opacity-70 disabled:cursor-not-allowed"
-                    >
-                        {pending ? (
-                            <Loader2 className="w-5 h-5 animate-spin" />
-                        ) : (
-                            <>Sign In <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" /></>
-                        )}
-                    </button>
-                    
-                    <p className="text-center text-sm text-slate-500 mt-6">
-                        Protected by <span className="font-semibold text-slate-700"><ShieldIcon className="inline w-3 h-3 mb-0.5" /> Enterprise Security</span>
-                    </p>
                 </form>
             </div>
             

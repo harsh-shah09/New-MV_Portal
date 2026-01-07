@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
       SELECT 
         Id, 
         Employee__c,
-        Employee__r.Contact__r.Name,
+        Employee__r.Employee_Name__c,
         Leave_Type__c,
         Leave_Category__c,
         Start_Date__c,
@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
         Status__c,
         Approved_Date__c
       FROM Leave__c
-      WHERE Employee__c = '${recordId}'
+      WHERE Employee__c = '${currentEmployeeId}'
       ORDER BY Start_Date__c DESC
     `);
 
@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
     const leaves: LeaveRequest[] = leaveRecords.records.map((record: any) => ({
       id: record.Id,
       employeeId: currentEmployeeId,
-      employeeName: record.Employee__r?.Contact__r?.Name || email || name || "Unknown",
+      employeeName: record.Employee__r?.Employee_Name__c || email || name || "Unknown",
       leaveType: record.Leave_Category__c === 'Extra Day Pay' ? 'Extra Day Pay' : (record.Leave_Type__c || ""),
       leaveCategory: record.Leave_Category__c,
       startDate: record.Start_Date__c || "",
@@ -75,7 +75,7 @@ export async function GET(request: NextRequest) {
         SELECT 
           Id, 
           Employee__c,
-          Employee__r.Contact__r.Name,
+          Employee__r.Employee_Name__c,
           Leave_Type__c,
           Leave_Category__c,
           Start_Date__c,
@@ -95,7 +95,7 @@ export async function GET(request: NextRequest) {
       pendingApprovals = pendingLeaveRecords.records.map((record: any) => ({
         id: record.Id,
         employeeId: record.Employee__c,
-        employeeName: record.Employee__r?.Contact__r?.Name || "Unknown",
+        employeeName: record.Employee__r?.Employee_Name__c || "Unknown",
         leaveType: record.Leave_Category__c === 'Extra Day Pay' ? 'Extra Day Pay' : (record.Leave_Type__c || ""),
         leaveCategory: record.Leave_Category__c,
         startDate: record.Start_Date__c || "",
@@ -114,8 +114,8 @@ export async function GET(request: NextRequest) {
         SELECT 
           Id, 
           Employee__c,
-          Employee__r.Contact__r.Name,
-          Employee__r.Team_Lead__r.Name,
+          Employee__r.Employee_Name__c,
+          Employee__r.Team_Lead__r.Employee_Name__c,
           Leave_Type__c,
           Leave_Category__c,
           Start_Date__c,
@@ -126,7 +126,7 @@ export async function GET(request: NextRequest) {
           TL_Approval__c,
           HR_Approval__c
         FROM Leave__c
-        WHERE Employee__r.Team_Lead__r.Name = '${name}'
+        WHERE Employee__r.Team_Lead__r.Employee_Name__c = '${name}'
         AND Status__c = 'Applied'
         ORDER BY Start_Date__c ASC
       `);
@@ -136,7 +136,7 @@ export async function GET(request: NextRequest) {
       pendingApprovals = pendingLeaveRecords.records.map((record: any) => ({
         id: record.Id,
         employeeId: record.Employee__c,
-        employeeName: record.Employee__r?.Contact__r?.Name || "Unknown",
+        employeeName: record.Employee__r?.Employee_Name__c || "Unknown",
         leaveType: record.Leave_Category__c === 'Extra Day Pay' ? 'Extra Day Pay' : (record.Leave_Type__c || ""),
         leaveCategory: record.Leave_Category__c,
         startDate: record.Start_Date__c || "",
@@ -183,12 +183,14 @@ export async function POST(request: NextRequest) {
 
     // Verify the session token
     const payload = await verifyToken(session);
+
+    console.log("Payload 111:", payload);
     
     if (!payload) {
       return NextResponse.json({ error: "Invalid session" }, { status: 401 });
     }
 
-    const { recordId, name, email } = payload;
+    const { employeeId, name, email } = payload;
     const body = await request.json();
     console.log("Request body:", body);
 
@@ -244,8 +246,35 @@ export async function POST(request: NextRequest) {
     const computedDuration = isHalfDay ? 0.5 : baseCalendarDays;
     const applyRules = leaveCategory === 'loss-of-pay' && leaveType === 'Planned Leave';
 
-    let hasNonWorkingInside = false;
+    // Block leaves that fall entirely on weekends/holidays
+    const nonWorkingDays: string[] = [];
+    let allNonWorking = true;
     let cursor = start.clone();
+    while (cursor.isSame(end) || cursor.isBefore(end)) {
+      const formatted = cursor.format("YYYY-MM-DD");
+      if (isNonWorking(cursor)) {
+        nonWorkingDays.push(formatted);
+      } else {
+        allNonWorking = false;
+      }
+      cursor = cursor.add(1, "day");
+    }
+
+    if (allNonWorking) {
+      return NextResponse.json(
+        {
+          error: "Leave dates fall on weekends/holidays",
+          details: {
+            nonWorkingDays,
+            message: "Select working days; weekends and holidays are not eligible for leave.",
+          },
+        },
+        { status: 400 }
+      );
+    }
+
+    let hasNonWorkingInside = false;
+    cursor = start.clone();
     while (cursor.isSame(end) || cursor.isBefore(end)) {
       if (isNonWorking(cursor)) {
         hasNonWorkingInside = true;
@@ -273,15 +302,31 @@ export async function POST(request: NextRequest) {
     const sandwichExtra = sandwichApplied ? preSandwich + postSandwich : 0;
     const totalSandwichDeduction = rangeLeaveDays + sandwichExtra;
 
-    // Server-side One+Two rule calculation (planned leave within 5 days)
+    // Server-side One+Two rule calculation (planned leave within 5 working days)
     const today = dayjs().startOf("day");
     let onePlusTwoExtra = 0;
     if (applyRules) {
+      // Helper to count working days between two dates
+      const countWorkingDaysBetween = (fromDate: dayjs.Dayjs, toDate: dayjs.Dayjs): number => {
+        let workingDays = 0;
+        let current = fromDate.clone();
+        
+        while (current.isBefore(toDate)) {
+          if (!isNonWorking(current)) {
+            workingDays++;
+          }
+          current = current.add(1, "day");
+        }
+        
+        return workingDays;
+      };
+      
       let cursorPenalty = start.startOf("day");
       const endPenalty = end.startOf("day");
       while (cursorPenalty.isSame(endPenalty) || cursorPenalty.isBefore(endPenalty)) {
-        const daysInAdvance = cursorPenalty.diff(today, "day");
-        if (daysInAdvance < 5) {
+        // Count only working days between today and this leave day
+        const workingDaysInAdvance = countWorkingDaysBetween(today, cursorPenalty);
+        if (workingDaysInAdvance < 5) {
           onePlusTwoExtra += 2;
         }
         cursorPenalty = cursorPenalty.add(1, "day");
@@ -338,7 +383,7 @@ export async function POST(request: NextRequest) {
 
     // Prepare leave record based on category
     const leaveRecord: any = {
-      Employee__c: recordId,
+      Employee__c: employeeId,
       Start_Date__c: startDate,
       End_Date__c: endDate,
       Total_Days__c: rangeLeaveDays,
@@ -414,7 +459,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Invalid session" }, { status: 401 });
     }
 
-    const { recordId } = payload;
+    const { employeeId } = payload;
     const body = await request.json();
     const { leaveId, action } = body;
 
@@ -441,7 +486,7 @@ export async function PATCH(request: NextRequest) {
       const leave = leaveRecord.records[0];
 
       // Check if the leave belongs to the current user
-      if (leave.Employee__c !== recordId) {
+      if (leave.Employee__c !== employeeId) {
         return NextResponse.json({ error: "Unauthorized to cancel this leave" }, { status: 403 });
       }
 
@@ -471,7 +516,7 @@ export async function PATCH(request: NextRequest) {
       const leave = leaveRecord.records[0];
 
       // Check if the leave belongs to the current user
-      if (leave.Employee__c !== recordId) {
+      if (leave.Employee__c !== employeeId) {
         return NextResponse.json({ error: "Unauthorized to withdraw this leave" }, { status: 403 });
       }
 

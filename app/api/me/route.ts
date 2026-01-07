@@ -14,13 +14,12 @@ export async function GET() {
     if (!employee) {
         return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
-
+    
     return NextResponse.json({ 
         id: employee.Id,
-        firstName: employee.contact?.FirstName,
-        lastName: employee.contact?.LastName,
-        email: employee.contact?.Email,
-        role: employee.contact?.Employee_Role__c,
+        name: employee.Employee_Name__c,
+        email: employee.Employee_Email__c,
+        role: employee.Role__c,
         profilePhoto: employee.Profile_Photo__c
     });
 

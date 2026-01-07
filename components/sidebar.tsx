@@ -58,7 +58,6 @@ export function Sidebar({
     { href: "/training", label: "Training", icon: BookOpen },
     { href: "/payroll", label: "Payroll", icon: Banknote },
     { href: "/assets", label: "Assets", icon: Tag },
-    { href: "/calendar", label: "Calendar", icon: Calendar },
     { href: "/documents", label: "Documents", icon: FileText },
   ];
 
@@ -78,7 +77,6 @@ export function Sidebar({
   
   const unreadCount = notifications?.filter((n: any) => !n.Is_Read__c)?.length || 0;
   const latestNotif = notifications?.[0];
-
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 1024)
@@ -172,7 +170,7 @@ export function Sidebar({
       </div>
 
       {/* Notifications & Profile */}
-      <div className="relative z-10 p-4 border-t border-slate-100 space-y-4 bg-slate-50/50">
+      <div className="relative z-10 p-4 border-t border-slate-100 space-y-4 bg-slate-50/50 hidden lg:block">
         {/* Notification Preview */}
         <div 
             onClick={() => router.push('/notifications')}
@@ -211,7 +209,7 @@ export function Sidebar({
           </div>
           <div className="flex-1 min-w-0">
             <p key={user?.id} className="text-sm font-semibold text-slate-800 truncate group-hover:text-cyan-600 transition-colors">
-                {user ? `${user.firstName} ${user.lastName}` : 'Loading...'}
+                {user ? `${user.name}` : 'Loading...'}
             </p>
             <p className="text-xs text-slate-500 truncate">{user?.email || '...'}</p>
           </div>

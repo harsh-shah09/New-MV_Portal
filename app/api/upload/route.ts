@@ -8,7 +8,6 @@ export async function POST(request: Request) {
     const formData = await request.formData();
     const file = formData.get('file') as File;
     const employeeId = formData.get('employeeId') as string;
-    const contactId = formData.get('contactId') as string; // Optional, needed if updating contact? Profile photo url is on Emp.
     const type = formData.get('type') as string; // 'profile_photo' or 'document'
     
     if (!file || !employeeId) {
@@ -42,11 +41,7 @@ export async function POST(request: Request) {
     // If it's a profile photo, update the Employee__c record
     if (type === 'profile_photo') {
         const empUpdate = { Profile_Photo__c: s3Url };
-        if (contactId) {
-             await updateEmployee(employeeId, contactId, empUpdate);
-        } else {
-             // Fallback or error?
-        }
+        await updateEmployee(employeeId, empUpdate);
     }else{
         await createDocumentRecord({
           Employee__c: employeeId,

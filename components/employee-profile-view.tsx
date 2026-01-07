@@ -21,8 +21,11 @@ import {
   Trash2,
   Download,
   Building2,
-  CheckCircle2
+  CheckCircle2,
+  Shield,
+  Lock
 } from "lucide-react"
+import { generate2FASecretAction, verifyAndEnable2FAAction, disable2FAAction } from "@/app/employees/[id]/actions"
 import { message, Spin, Select } from "antd"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { cn } from "@/lib/utils"
@@ -33,7 +36,7 @@ interface ViewProps {
 }
 
 export function EmployeeProfileView({ employeeId }: ViewProps) {
-  const [activeTab, setActiveTab] = useState<"personal" | "employment" | "bank" | "documents">("personal")
+  const [activeTab, setActiveTab] = useState<"personal" | "employment" | "bank" | "documents" | "security">("personal")
   const [isEditing, setIsEditing] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const queryClient = useQueryClient()
@@ -59,9 +62,9 @@ export function EmployeeProfileView({ employeeId }: ViewProps) {
     })
 
     // Resolve a readable name for the stored Team Lead id (fallbacks to relationship or lookup in employeesList)
-    const teamLeadName = employee?.Team_Lead__r?.Name || (
+    const teamLeadName = employee?.Team_Lead__r?.Employee_Name__c || (
         employeesList?.find((e: any) => e.Id === employee?.Team_Lead__c)
-            ? `${employeesList.find((e: any) => e.Id === employee?.Team_Lead__c).Contact__r?.FirstName || ''} ${employeesList.find((e: any) => e.Id === employee?.Team_Lead__c).Contact__r?.LastName || ''}`.trim()
+            ? employeesList.find((e: any) => e.Id === employee?.Team_Lead__c).Employee_Name__c
             : null
     )
 
@@ -71,7 +74,7 @@ export function EmployeeProfileView({ employeeId }: ViewProps) {
       const res = await fetch(`/api/employees/${employeeId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...data, contactId: employee.contact?.Id || employee.Contact__c })
+        body: JSON.stringify(data)
       })
       if (!res.ok) throw new Error("Update failed")
       return res.json()
@@ -90,7 +93,6 @@ export function EmployeeProfileView({ employeeId }: ViewProps) {
       const formData = new FormData()
       formData.append("file", file)
       formData.append("employeeId", employeeId)
-      formData.append("contactId", employee.contact?.Id)
       formData.append("type", type)
 
       const res = await fetch("/api/upload", {
@@ -118,23 +120,34 @@ export function EmployeeProfileView({ employeeId }: ViewProps) {
         } else {
              // Start Edit - Flatten data for form
              setFormData({
-                 FirstName: employee.contact?.FirstName,
-                 LastName: employee.contact?.LastName,
-                 Email: employee.contact?.Email,
-                 Phone: employee.contact?.Phone,
-                 Birthdate: employee.contact?.Birthdate,
-                 Gender__c: employee.contact?.Gender__c,
-                 MailingStreet: employee.contact?.MailingStreet,
-                 MailingCity: employee.contact?.MailingCity,
-                 MailingState: employee.contact?.MailingState,
-                 MailingPostalCode: employee.contact?.MailingPostalCode,
-                 MailingCountry: employee.contact?.MailingCountry,
-                 Emergency_Contact_Name__c: employee.contact?.Emergency_Contact_Name__c,
-                 Emergency_Contact_Number__c: employee.contact?.Emergency_Contact_Number__c,
-                 Experience__c: employee.contact?.Experience__c,
-                 Department__c: employee.contact?.Department__c,
-                 Employee_Role__c: employee.contact?.Employee_Role__c,
-                 Employee_Title__c: employee.contact?.Employee_Title__c,
+                 Employee_Name__c: employee.Employee_Name__c,
+                 Employee_Email__c: employee.Employee_Email__c,
+                 Employee_Phone__c: employee.Employee_Phone__c,
+                 Birthdate__c: employee.Birthdate__c,
+                 Gender__c: employee.Gender__c,
+                //  Employee_Address__c: employee.Employee_Address__c, // Assuming object or text. 
+                 // If composite, we might need nested updates or flat keys. 
+                 // For now, let's assume we read/write the whole object or handle components in Field if needed.
+                 // But Field comp expects string usually.
+                 // If Employee_Address__c is an object, we need to flatten for the form or handle specific address fields.
+                 
+                 // Let's assume we bind specific address fields to the 'Employee_Address__c' components if possible.
+                 // or mapped fields.
+                 // Let's use separate state for address components if needed or map them here?
+                 // User said "Employee_Address__c which contains...".
+                 // I will attempt to map distinct keys for form if the UI breaks them down.
+                //  Employee_Address__Street__s: employee.Employee_Address__c?.street,
+                //  Employee_Address__City__s: employee.Employee_Address__c?.city,
+                //  Employee_Address__State__s: employee.Employee_Address__c?.state,
+                //  Employee_Address__PostalCode__s: employee.Employee_Address__c?.postalCode,
+                //  Employee_Address__Country__s: employee.Employee_Address__c?.country,
+
+                 Emergency_Contact_Name__c: employee.Emergency_Contact_Name__c,
+                 Emergency_Contact_Number__c: employee.Emergency_Contact_Number__c,
+                 Experience__c: employee.Experience__c,
+                 Department__c: employee.Department__c,
+                 Role__c: employee.Role__c,
+                 Title__c: employee.Title__c,
                  Team_Lead__c: employee.Team_Lead__c,
                  Joining_Date__c: employee.Joining_Date__c,
                  Base_Salary__c: employee.Base_Salary__c,
@@ -168,6 +181,70 @@ export function EmployeeProfileView({ employeeId }: ViewProps) {
   const [docFile, setDocFile] = useState<File | null>(null)
   const [docCategory, setDocCategory] = useState("Intern Docs")
   const [docType, setDocType] = useState("Resume")
+
+  // --- 2FA States ---
+  const [show2FAModal, setShow2FAModal] = useState(false)
+  const [twoFASecret, setTwoFASecret] = useState("")
+  const [twoFAQRCode, setTwoFAQRCode] = useState("")
+  const [otpCode, setOtpCode] = useState("")
+  const [is2FALoading, setIs2FALoading] = useState(false)
+
+  const handleSetup2FA = async () => {
+       setIs2FALoading(true)
+       try {
+           const res = await generate2FASecretAction(employeeId)
+           if (res.error) {
+               message.error(res.error)
+           } else {
+               setTwoFASecret(res.secret || "")
+               setTwoFAQRCode(res.qrCode || "")
+               setShow2FAModal(true)
+           }
+       } catch (e) {
+           message.error("Failed to start 2FA setup")
+       } finally {
+           setIs2FALoading(false)
+       }
+  }
+
+  const handleVerify2FA = async () => {
+      if (!otpCode || otpCode.length !== 6) {
+          message.error("Please enter a valid 6-digit code")
+          return
+      }
+      setIs2FALoading(true)
+      try {
+          const res = await verifyAndEnable2FAAction(employeeId, twoFASecret, otpCode)
+          if (res.success) {
+              message.success("2FA Enabled Successfully")
+              setShow2FAModal(false)
+              setOtpCode("")
+              setTwoFASecret("")
+              setTwoFAQRCode("")
+              queryClient.invalidateQueries({ queryKey: ["employee", employeeId] })
+          } else {
+              message.error(res.error || "Verification failed")
+          }
+      } catch (e) {
+          message.error("Verification failed")
+      } finally {
+          setIs2FALoading(false)
+      }
+  }
+
+  const handleDisable2FA = async () => {
+      try {
+          const res = await disable2FAAction(employeeId)
+          if (res.success) {
+              message.success("2FA Disabled")
+              queryClient.invalidateQueries({ queryKey: ["employee", employeeId] })
+          } else {
+              message.error("Failed to disable 2FA")
+          }
+      } catch (e) {
+          message.error("Failed to disable 2FA")
+      }
+  }
 
   // --- Bank Mutation ---
   const addBankMutation = useMutation({
@@ -276,11 +353,11 @@ export function EmployeeProfileView({ employeeId }: ViewProps) {
            <div className="flex-1 mb-2">
                <div className="flex flex-col md:flex-row md:items-center gap-4 justify-between">
                    <div>
-                       <h1 className="text-3xl font-bold text-slate-900">{employee.contact?.FirstName} {employee.contact?.LastName}</h1>
+                       <h1 className="text-3xl font-bold text-slate-900">{employee.Employee_Name__c}</h1>
                        <div className="flex items-center gap-3 text-slate-500 mt-1">
-                          <span className="flex items-center gap-1"><Briefcase className="w-4 h-4" /> {employee.contact?.Employee_Role__c || "Role not set"}</span>
+                          <span className="flex items-center gap-1"><Briefcase className="w-4 h-4" /> {employee.Role__c || "Role not set"}</span>
                           <span className="w-1 h-1 rounded-full bg-slate-300"></span>
-                          <span className="flex items-center gap-1"><MapPin className="w-4 h-4" /> {employee.contact?.MailingCity || "Location not set"}</span>
+                          <span className="flex items-center gap-1"><MapPin className="w-4 h-4" /> {employee.Employee_Address__c?.city || "Location not set"}</span>
                        </div>
                    </div>
                    <div className="flex gap-3">
@@ -324,6 +401,7 @@ export function EmployeeProfileView({ employeeId }: ViewProps) {
                      { id: "employment", label: "Employment Info", icon: Building2 },
                      { id: "bank", label: "Bank Details", icon: CreditCard },
                      { id: "documents", label: "Documents", icon: FileText },
+                     { id: "security", label: "Security", icon: Lock },
                  ].map((tab) => (
                      <button
                         key={tab.id}
@@ -343,7 +421,7 @@ export function EmployeeProfileView({ employeeId }: ViewProps) {
 
              {/* Quick Stats or Info */}
              <div className="mt-6 bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-6 text-white shadow-xl">
-                 <h3 className="font-bold text-lg mb-4">Emp Status</h3>
+                 <h3 className="font-bold text-lg mb-4">Employee Status</h3>
                  <div className="space-y-4">
                      <div>
                          <p className="text-slate-400 text-xs uppercase tracking-wider">Status</p>
@@ -354,7 +432,7 @@ export function EmployeeProfileView({ employeeId }: ViewProps) {
                      </div>
                      <div>
                          <p className="text-slate-400 text-xs uppercase tracking-wider">Employee ID</p>
-                         <p className="font-mono">{employee.contact?.Id?.slice(0, 8)}...</p>
+                         <p className="font-mono">{employee.Employee_Id__c || 'Not set'}</p>
                      </div>
                  </div>
              </div>
@@ -378,12 +456,11 @@ export function EmployeeProfileView({ employeeId }: ViewProps) {
                                           <User className="w-5 h-5 text-blue-500" /> Basic Information
                                       </h2>
                                       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-                                          <Field label="First Name" value={employee.contact?.FirstName} fieldKey="FirstName" isEditing={isEditing} formData={formData} setFormData={setFormData} />
-                                          <Field label="Last Name" value={employee.contact?.LastName} fieldKey="LastName" isEditing={isEditing} formData={formData} setFormData={setFormData} />
-                                          <Field label="Email Address" value={employee.contact?.Email} fieldKey="Email" type="email" isEditing={isEditing} formData={formData} setFormData={setFormData} />
-                                          <Field label="Phone Number" value={employee.contact?.Phone} fieldKey="Phone" type="tel" isEditing={isEditing} formData={formData} setFormData={setFormData} />
-                                          <Field label="Date of Birth" value={employee.contact?.Birthdate} fieldKey="Birthdate" type="date" isEditing={isEditing} formData={formData} setFormData={setFormData} />
-                                          <Field label="Gender" value={employee.contact?.Gender__c} fieldKey="Gender__c" isEditing={isEditing} formData={formData} setFormData={setFormData} />
+                                          <Field label="Employee Name" value={employee.Employee_Name__c} fieldKey="Employee_Name__c" isEditing={isEditing} formData={formData} setFormData={setFormData} />
+                                          <Field label="Email Address" value={employee.Employee_Email__c} fieldKey="Employee_Email__c" type="email" isEditing={isEditing} formData={formData} setFormData={setFormData} />
+                                          <Field label="Phone Number" value={employee.Employee_Phone__c} fieldKey="Employee_Phone__c" type="tel" isEditing={isEditing} formData={formData} setFormData={setFormData} />
+                                          <Field label="Date of Birth" value={employee.Birthdate__c} fieldKey="Birthdate__c" type="date" isEditing={isEditing} formData={formData} setFormData={setFormData} />
+                                          <Field label="Gender" value={employee.Gender__c} fieldKey="Gender__c" isEditing={isEditing} formData={formData} setFormData={setFormData} />
                                       </div>
                                   </div>
 
@@ -392,13 +469,13 @@ export function EmployeeProfileView({ employeeId }: ViewProps) {
                                           <MapPin className="w-5 h-5 text-indigo-500" /> Address
                                       </h2>
                                       <div className="grid grid-cols-1 gap-y-6">
-                                          <Field label="Street" value={employee.contact?.MailingStreet} fieldKey="MailingStreet" isEditing={isEditing} formData={formData} setFormData={setFormData} />
+                                          <Field label="Street" value={employee.Employee_Address__c?.street} fieldKey="street" isEditing={isEditing} formData={formData} setFormData={setFormData} />
                                           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                             <Field label="City" value={employee.contact?.MailingCity} fieldKey="MailingCity" isEditing={isEditing} formData={formData} setFormData={setFormData} />
-                                             <Field label="State" value={employee.contact?.MailingState} fieldKey="MailingState" isEditing={isEditing} formData={formData} setFormData={setFormData} />
-                                             <Field label="Zip / Postal" value={employee.contact?.MailingPostalCode} fieldKey="MailingPostalCode" isEditing={isEditing} formData={formData} setFormData={setFormData} />
+                                             <Field label="City" value={employee.Employee_Address__c?.city} fieldKey="city" isEditing={isEditing} formData={formData} setFormData={setFormData} />
+                                             <Field label="State" value={employee.Employee_Address__c?.state} fieldKey="state" isEditing={isEditing} formData={formData} setFormData={setFormData} />
+                                             <Field label="Zip / Postal" value={employee.Employee_Address__c?.postalCode} fieldKey="postalCode" isEditing={isEditing} formData={formData} setFormData={setFormData} />
                                           </div>
-                                          <Field label="Country" value={employee.contact?.MailingCountry} fieldKey="MailingCountry" isEditing={isEditing} formData={formData} setFormData={setFormData} />
+                                          <Field label="Country" value={employee.Employee_Address__c?.country} fieldKey="country" isEditing={isEditing} formData={formData} setFormData={setFormData} />
                                       </div>
                                   </div>
 
@@ -407,8 +484,8 @@ export function EmployeeProfileView({ employeeId }: ViewProps) {
                                           <Phone className="w-5 h-5 text-red-500" /> Emergency Contact
                                       </h2>
                                       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-                                          <Field label="Contact Name" value={employee.contact?.Emergency_Contact_Name__c} fieldKey="Emergency_Contact_Name__c" isEditing={isEditing} formData={formData} setFormData={setFormData} />
-                                          <Field label="Contact Number" value={employee.contact?.Emergency_Contact_Number__c} fieldKey="Emergency_Contact_Number__c" isEditing={isEditing} formData={formData} setFormData={setFormData} pattern = '^(?:(?:\\+|0{0,2})91(\\s*[\\-]\\s*)?|?)?\\d{9}$' type = 'tel'  />
+                                          <Field label="Contact Name" value={employee.Emergency_Contact_Name__c} fieldKey="Emergency_Contact_Name__c" isEditing={isEditing} formData={formData} setFormData={setFormData} />
+                                          <Field label="Contact Number" value={employee.Emergency_Contact_Number__c} fieldKey="Emergency_Contact_Number__c" isEditing={isEditing} formData={formData} setFormData={setFormData} pattern = '^(?:(?:\\+|0{0,2})91(\\s*[\\-]\\s*)?|?)?\\d{9}$' type = 'tel'  />
                                       </div>
                                   </div>
                               </div>
@@ -421,11 +498,11 @@ export function EmployeeProfileView({ employeeId }: ViewProps) {
                                           <Briefcase className="w-5 h-5 text-blue-500" /> Employment Details
                                       </h2>
                                       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-                                          <Field label="Department" value={employee.contact?.Department__c} fieldKey="Department__c" isEditing={isEditing} formData={formData} setFormData={setFormData} />
-                                          <Field label="Role" value={employee.contact?.Employee_Role__c} fieldKey="Employee_Role__c" isEditing={isEditing} formData={formData} setFormData={setFormData} />
-                                          <Field label="Job Title" value={employee.contact?.Employee_Title__c} fieldKey="Employee_Title__c" isEditing={isEditing} formData={formData} setFormData={setFormData} />
+                                          <Field label="Department" value={employee.Department__c} fieldKey="Department__c" isEditing={isEditing} formData={formData} setFormData={setFormData} />
+                                          <Field label="Role" value={employee.Role__c} fieldKey="Role__c" isEditing={isEditing} formData={formData} setFormData={setFormData} />
+                                          <Field label="Job Title" value={employee.Title__c} fieldKey="Title__c" isEditing={isEditing} formData={formData} setFormData={setFormData} />
                                           <Field label="Joining Date" value={employee.Joining_Date__c} fieldKey="Joining_Date__c" type="date" isEditing={isEditing} formData={formData} setFormData={setFormData} />
-                                          <Field label="Total Experience" value={employee.contact?.Experience__c} fieldKey="Experience__c" isEditing={isEditing} formData={formData} setFormData={setFormData} />
+                                          <Field label="Total Experience" value={employee.Experience__c} fieldKey="Experience__c" isEditing={isEditing} formData={formData} setFormData={setFormData} />
                                           <div className="space-y-1 flex flex-col">
                                               <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">Manager / Team Lead</label>
                                               {isEditing ? (
@@ -439,7 +516,7 @@ export function EmployeeProfileView({ employeeId }: ViewProps) {
                                                           onChange={(val: any) => setFormData({ ...formData, Team_Lead__c: val })}
                                                           options={employeesList?.filter((e: any) => e.Id !== employeeId).map((e: any) => ({
                                                               value: e.Id,
-                                                              label: `${e.contact?.FirstName || e.Contact__r?.FirstName || ''} ${e.contact?.LastName || e.Contact__r?.LastName || ''}`.trim()
+                                                              label: `${e.Employee_Name__c || ''}`.trim()
                                                           }))}
                                                           allowClear
                                                       />
@@ -636,6 +713,119 @@ export function EmployeeProfileView({ employeeId }: ViewProps) {
                                        <div className="text-center py-12 bg-slate-50 rounded-xl border-dashed border-2 border-slate-200">
                                           <FileText className="w-12 h-12 text-slate-300 mx-auto mb-3" />
                                           <p className="text-slate-500">No documents uploaded yet.</p>
+                                      </div>
+                                  )}
+                              </div>
+                          )}
+
+                          {activeTab === "security" && (
+                              <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
+                                  <div>
+                                      <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+                                          <Shield className="w-5 h-5 text-purple-600" /> Security Settings
+                                      </h2>
+                                      
+                                      <div className="bg-slate-50 border border-slate-200 rounded-xl p-6">
+                                          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                                              <div>
+                                                  <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+                                                      Two-Factor Authentication (2FA)
+                                                      {employee.Is2FAEnabled__c ? (
+                                                          <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-bold border border-green-200">Enabled</span>
+                                                      ) : (
+                                                          <span className="px-2 py-0.5 rounded-full bg-slate-200 text-slate-600 text-xs font-bold border border-slate-300">Disabled</span>
+                                                      )}
+                                                  </h3>
+                                                  <p className="text-slate-500 text-sm mt-1 max-w-xl">
+                                                      Add an extra layer of security to your account by requiring a verification code from your authenticator app when you sign in on a new device.
+                                                  </p>
+                                              </div>
+                                              <div>
+                                                  {employee.Is2FAEnabled__c ? (
+                                                      <button 
+                                                          onClick={() => {
+                                                              if(confirm("Are you sure you want to disable 2FA? Your account will be less secure.")) {
+                                                                  handleDisable2FA()
+                                                              }
+                                                          }}
+                                                          className="px-4 py-2 bg-red-50 text-red-600 border border-red-200 rounded-lg text-sm font-semibold hover:bg-red-100 transition"
+                                                      >
+                                                          Disable 2FA
+                                                      </button>
+                                                  ) : (
+                                                      <button 
+                                                          onClick={handleSetup2FA}
+                                                          disabled={is2FALoading}
+                                                          className="px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-semibold hover:bg-black transition shadow-lg flex items-center gap-2"
+                                                      >
+                                                          {is2FALoading ? <Spin size="small" className="invert" /> : <Lock className="w-4 h-4" />}
+                                                          Enable 2FA
+                                                      </button>
+                                                  )}
+                                              </div>
+                                          </div>
+                                      </div>
+                                  </div>
+
+                                  {/* 2FA Setup Modal */}
+                                  {show2FAModal && (
+                                      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+                                          <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-lg relative overflow-hidden">
+                                              <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-purple-500 to-indigo-600"></div>
+                                              
+                                              <button onClick={() => setShow2FAModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600">
+                                                  <X className="w-5 h-5" />
+                                              </button>
+
+                                              <div className="text-center mb-6">
+                                                  <div className="w-12 h-12 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                                                      <Lock className="w-6 h-6" />
+                                                  </div>
+                                                  <h3 className="text-2xl font-bold text-slate-900">Setup 2FA</h3>
+                                                  <p className="text-slate-500 mt-2 text-sm">Scan the QR code below with your authenticator app (Google Authenticator, Authy, etc.)</p>
+                                              </div>
+
+                                              <div className="flex flex-col items-center gap-6 mb-8">
+                                                  <div className="p-4 bg-white border-2 border-slate-100 rounded-xl shadow-sm">
+                                                      {twoFAQRCode ? (
+                                                          <Image src={twoFAQRCode} alt="QR Code" width={180} height={180} />
+                                                      ) : (
+                                                          <div className="w-[180px] h-[180px] flex items-center justify-center text-slate-400 bg-slate-50">
+                                                              <Spin />
+                                                          </div>
+                                                      )}
+                                                  </div>
+                                                  <div className="text-center">
+                                                      <p className="text-xs text-slate-400 uppercase tracking-widest font-semibold mb-1">Manual Entry Code</p>
+                                                      <code className="bg-slate-100 px-3 py-1.5 rounded text-slate-700 font-mono text-sm border border-slate-200 select-all">
+                                                          {twoFASecret}
+                                                      </code>
+                                                  </div>
+                                              </div>
+
+                                              <div className="space-y-4">
+                                                  <div>
+                                                      <label className="block text-sm font-medium text-slate-700 mb-2">Enter 6-digit verification code</label>
+                                                      <input 
+                                                          type="text" 
+                                                          value={otpCode}
+                                                          onChange={(e) => {
+                                                              const val = e.target.value.replace(/[^0-9]/g, '').slice(0, 6)
+                                                              setOtpCode(val)
+                                                          }}
+                                                          placeholder="000000"
+                                                          className="w-full text-center text-2xl tracking-[0.5em] font-mono p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none transition"
+                                                      />
+                                                  </div>
+                                                  <button 
+                                                      onClick={handleVerify2FA}
+                                                      disabled={otpCode.length !== 6 || is2FALoading}
+                                                      className="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl shadow-lg shadow-purple-500/25 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                                  >
+                                                      {is2FALoading ? <Spin size="small" className="invert" /> : "Verify & Activate"}
+                                                  </button>
+                                              </div>
+                                          </div>
                                       </div>
                                   )}
                               </div>

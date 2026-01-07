@@ -4,6 +4,9 @@ export interface SessionPayload {
   employeeId: string;
   email?: string;
   [key: string]: any;
+  role : string;
+  title? : string;
+  name : string;
 }
 
 const SECRET_KEY = process.env.SESSION_SECRET || "default_secret_key_change_me";

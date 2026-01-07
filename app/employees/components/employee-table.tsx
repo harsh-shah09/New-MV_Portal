@@ -19,7 +19,16 @@ export function EmployeeTable({ employees, onEdit, onDelete, onView }: EmployeeT
       title: 'Name',
       key: 'name',
       render: (_, record) => (
-        <span className="font-medium text-gray-900">{record.firstName} {record.lastName}</span>
+        <div className="flex items-center gap-3">
+            {record.profilePhoto ? (
+                 <img src={record.profilePhoto} alt="" className="w-8 h-8 rounded-full object-cover" />
+            ) : (
+                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold border border-primary/20">
+                    {record.firstName.charAt(0)}{record.lastName.charAt(0)}
+                </div>
+            )}
+           <span className="font-medium text-card-foreground">{record.firstName} {record.lastName}</span>
+        </div>
       ),
       sorter: (a, b) => a.firstName.localeCompare(b.firstName),
     },
@@ -27,24 +36,21 @@ export function EmployeeTable({ employees, onEdit, onDelete, onView }: EmployeeT
       title: 'Email',
       dataIndex: 'email',
       key: 'email',
+      responsive: ['md'],
     },
-    // {
-    //   title: 'Department',
-    //   dataIndex: 'department',
-    //   key: 'department',
-    //   filters: [
-    //     { text: 'IT', value: 'It' },
-    //     { text: 'Admin', value: 'Admin' },
-    //     { text: 'HR', value: 'HR' },
-    //     { text: 'Marketing', value: 'Marketing' },
-    //     { text: 'Finance', value: 'Finance' },
-    //   ],
-    //   onFilter: (value: any, record) => record.department === value,
-    // },
     {
       title: 'Position',
       dataIndex: 'position',
       key: 'position',
+    },
+    {
+        title: 'Department',
+        dataIndex: 'department',
+        key: 'department',
+        responsive: ['lg'],
+        render: (dept) => (
+             <Tag color="cyan">{dept}</Tag>
+        )
     },
     {
       title: 'Join Date',
@@ -52,39 +58,28 @@ export function EmployeeTable({ employees, onEdit, onDelete, onView }: EmployeeT
       key: 'joinDate',
       render: (date) => formatDate(date),
       sorter: (a, b) => new Date(a.joinDate).getTime() - new Date(b.joinDate).getTime(),
+      responsive: ['lg'],
     },
-    // {
-    //   title: 'Salary',
-    //   dataIndex: 'salary',
-    //   key: 'salary',
-    //   render: (salary) => `$${(salary / 1000).toFixed(0)}K`,
-    // },
-    // {
-    //   title: 'Status',
-    //   dataIndex: 'status',
-    //   key: 'status',
-    //   render: (status) => {
-    //     let color = 'default';
-    //     if (status === 'active') color = 'success';
-    //     if (status === 'inactive') color = 'default';
-    //     if (status === 'on_notice') color = 'warning';
-    //     if (status === 'terminated') color = 'error';
-    //     if (status === 'intern') color = 'processing';
-        
-    //     return (
-    //       <Tag color={color} className="capitalize">
-    //         {status ? status.replace('_', ' ') : 'Unknown'}
-    //       </Tag>
-    //     );
-    //   },
-    // },
-    
+    {
+        title: 'Status',
+        dataIndex: 'status',
+        key: 'status',
+        render: (status) => {
+             let color = 'default';
+             if (status?.toLowerCase() === 'active') color = 'success';
+             if (status?.toLowerCase() === 'on notice') color = 'warning';
+             if (status?.toLowerCase() === 'terminated') color = 'error';
+             
+             return <Tag color={color} className="capitalize">{status}</Tag>
+        }
+    }
   ];
-  if(onView){
+
+  if(onView || onEdit || onDelete){
     columns.push({
       title: 'Actions',
       key: 'actions',
-      align: 'center',
+      align: 'right',
       render: (_, record) => (
         <Space size="small">
           {onView && (
@@ -119,15 +114,83 @@ export function EmployeeTable({ employees, onEdit, onDelete, onView }: EmployeeT
       ),
     })
   }
+
   return (
-    <div className="bg-white rounded-lg shadow overflow-hidden">
-      <Table
-        columns={columns}
-        dataSource={employees}
-        rowKey="id"
-        pagination={{ pageSize: 10 }}
-        scroll={{ x: 800 }}
-      />
-    </div>
+    <>
+        {/* Desktop View */}
+        <div className="hidden md:block bg-card mt-4 rounded-xl shadow-sm border border-border overflow-hidden">
+            <Table
+                columns={columns}
+                dataSource={employees}
+                rowKey="id"
+                pagination={{ pageSize: 10 }}
+            />
+        </div>
+
+        {/* Mobile View - Card List */}
+        <div className="md:hidden space-y-4">
+            {employees.map((employee) => (
+                <div key={employee.id} className="bg-card mt-4 p-4 rounded-xl shadow-sm border border-border flex flex-col gap-4">
+                    <div className="flex justify-between items-start">
+                         <div className="flex items-center gap-3">
+                             {employee.profilePhoto ? (
+                                 <img src={employee.profilePhoto} alt="" className="w-12 h-12 rounded-full object-cover shadow-sm" />
+                             ) : (
+                                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-lg border border-primary/20">
+                                    {employee.firstName.charAt(0)}{employee.lastName.charAt(0)}
+                                </div>
+                             )}
+                             <div>
+                                 <h3 className="font-semibold text-card-foreground">{employee.firstName} {employee.lastName}</h3>
+                                 <p className="text-sm text-muted-foreground">{employee.position}</p>
+                             </div>
+                         </div>
+                         <div className="flex flex-col items-end gap-1">
+                             <Tag color={employee.status?.toLowerCase() === 'active' ? 'success' : 'default'} className="m-0 capitalize">
+                                 {employee.status}
+                             </Tag>
+                         </div>
+                    </div>
+                    
+                    <div className="space-y-2 border-t border-border pt-3">
+                        <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Email:</span>
+                            <span className="text-card-foreground break-all">{employee.email}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Department:</span>
+                            <span className="text-card-foreground">{employee.department}</span>
+                        </div>
+                         <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Joined:</span>
+                            <span className="text-card-foreground">{formatDate(employee.joinDate)}</span>
+                        </div>
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-2 border-t border-border">
+                          {onView && (
+                             <Button size="middle" icon={<EyeOutlined />} onClick={() => onView(employee)}>
+                                 View
+                             </Button>
+                          )}
+                           {onEdit && (
+                             <Button size="middle" icon={<EditOutlined />} onClick={() => onEdit(employee)}>
+                                 Edit
+                             </Button>
+                          )}
+                           {onDelete && (
+                             <Button size="middle" danger icon={<DeleteOutlined />} onClick={() => onDelete(employee.id)} />
+                          )}
+                    </div>
+                </div>
+            ))}
+            
+            {employees.length === 0 && (
+                <div className="text-center py-10 bg-card rounded-xl border border-dashed border-border">
+                    <p className="text-muted-foreground">No employees found</p>
+                </div>
+            )}
+        </div>
+    </>
   )
 }

@@ -1,9 +1,13 @@
 'use server';
 
 import { z } from 'zod';
-import { createSession, hashPassword} from '@/lib/auth';
-import { findEmployee, getSalesforceConnection } from '@/lib/salesforce';
+import { createSession, hashPassword } from '@/lib/auth';
+import { findEmployee, getSalesforceConnection, isTrustedDevice, addTrustedDevice, getTwoFactorSecret } from '@/lib/salesforce';
+import { verifyTwoFactorToken } from '@/lib/two-factor';
 import nodemailer from 'nodemailer';
+import { cookies } from 'next/headers';
+import { v4 as uuidv4 } from 'uuid';
+import { redirect } from 'next/navigation';
 
 const loginSchema = z.object({
   identifier: z.string().min(1, 'Email or Employee ID is required'),
@@ -13,6 +17,9 @@ const loginSchema = z.object({
 export type LoginState = {
   error?: string;
   success?: boolean;
+  twoFactorRequired?: boolean;
+  employeeId?: string;
+  email?: string; // For display
 };
 
 export async function loginAction(
@@ -47,13 +54,33 @@ export async function loginAction(
        return { error: 'Invalid credentials' };
     }
     
-    // Create session
+    // Check 2FA
+    if (employee.Is2FAEnabled__c) {
+        // Check trusted device
+        const cookieStore = await cookies();
+        const deviceToken = cookieStore.get('device_trust_token')?.value;
+
+        let isTrusted = false;
+        if (deviceToken) {
+            isTrusted = await isTrustedDevice(employee.Id, deviceToken);
+        }
+
+        if (!isTrusted) {
+            return { 
+                twoFactorRequired: true, 
+                employeeId: employee.Id,
+                email: employee.Employee_Email__c
+            };
+        }
+    }
+    
+    // Create session (standard flow)
     await createSession({
-      employeeId: employee.Id || '', // Ensure session ID is Employee_ID__c
-      email: employee.Email__c || employee.Contact__r?.Email,
-      name: employee.Name,
-      role: employee.Contact__r?.Employee_Role__c || 'Employee',
-      title : employee.Contact__r?.Title__c || ''
+      employeeId: employee.Id || '',
+      email: employee.Employee_Email__c || '',
+      name: employee.Employee_Name__c || employee.Name || '',
+      role: employee.Role__c || 'Employee',
+      title : employee.Title__c || ''
     });
 
     return { success: true };
@@ -61,6 +88,80 @@ export async function loginAction(
     console.error('Login error:', error);
     return { error: 'An unexpected error occurred. Please try again.' };
   }
+}
+
+export async function verify2FAAndLogin(
+    prevState: LoginState | undefined,
+    formData: FormData
+): Promise<LoginState> {
+    const employeeId = formData.get('employeeId') as string;
+    const code = formData.get('code') as string;
+    const trustDevice = formData.get('trustDevice') === 'on';
+
+    if (!employeeId || !code) {
+        return { error: 'Missing information', twoFactorRequired: true, employeeId };
+    }
+
+    try {
+        const secret = await getTwoFactorSecret(employeeId);
+        if (!secret) return { error: '2FA configuration error' };
+
+        const isValid = verifyTwoFactorToken(code, secret);
+        if (!isValid) {
+            return { error: 'Invalid verification code', twoFactorRequired: true, employeeId };
+        }
+
+        // Handle Trusted Device
+        if (trustDevice) {
+            const deviceId = uuidv4();
+            await addTrustedDevice(employeeId, deviceId);
+            const cookieStore = await cookies();
+            cookieStore.set('device_trust_token', deviceId, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+                path: '/',
+                sameSite: 'lax'
+            });
+        }
+
+        // Create Session (Need to fetch employee details again or pass them? Fetching is safer)
+        const employee = await findEmployee(employeeId); // Assuming findEmployee works with ID
+        
+        // Actually findEmployee expects identifier (email/name) in current impl? 
+        // Let's check findEmployee impl in lib/salesforce.ts.
+        // It does `WHERE email = ... OR name = ...`.
+        // If I pass ID, it might fail if ID != Name/Email.
+        // I should use `getEmployeeById` or update `findEmployee`.
+        // `getEmployeeById` was exported in lib/salesforce.ts.
+        // I'll use that but I need to adapt the session payload.
+        
+        // Wait, `getEmployeeById` returns a slightly different structure (flattened contact).
+        // Let's stick to `findEmployee` logic but wait, `employeeId` is the Salesforce ID.
+        // `findEmployee` checks Email or Name.
+        // I should probably query by ID directly here.
+        // Or make `findEmployee` support ID. 
+        // Actually, I can just query directly here or use `getEmployeeById`.
+        // Let's use `getEmployeeById` and map it.
+        const { getEmployeeById } = await import('@/lib/salesforce');
+        const empData = await getEmployeeById(employeeId);
+
+        if(!empData) return { error: 'User not found' };
+
+        await createSession({
+            employeeId: empData.Id,
+            email: empData.Employee_Email__c || '',
+            name: empData.Employee_Name__c || empData.Name || '',
+            role: empData.Role__c || 'Employee',
+            title: empData.Title__c || ''
+        });
+
+        return { success: true };
+
+    } catch (e) {
+        console.error('2FA Login Error', e);
+        return { error: 'Verification failed', twoFactorRequired: true, employeeId };
+    }
 }
 
 export async function forgotPasswordAction(identifier: string) {
@@ -96,7 +197,7 @@ export async function forgotPasswordAction(identifier: string) {
         return { error: 'Failed to update employee record' };
     }
 
-    const email = employee.Contact__r?.Email || employee.Email__c;
+    const email = employee.Employee_Email__c;
     if (!email) {
         return { error: 'No email address found for this employee' };
     }
