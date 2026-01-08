@@ -217,16 +217,16 @@ export async function forgotPasswordAction(identifier: string) {
             to: email,
             subject: 'Password Reset Link - MV Portal',
             text: `Hello ${employee.Name},\n\nA password reset has been requested for your account. \n\nPlease click the link below to reset your password:\n\n${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/auth/change-password?id=${employee.Id}\n\nIf you did not request this, please ignore this email.`,
-            html: `
-            <div style="font-family: Arial, sans-serif; color: #333;">
-                <h2>Password Reset Request</h2>
-                <p>Hello <strong>${employee.Name}</strong>,</p>
-                <p>A password reset has been requested for your account.</p>
-                <p>Please click the button below to reset your password:</p>
-                <a href="${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/auth/change-password?id=${employee.Id}" style="display: inline-block; background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Reset Password</a>
-                <p>If you did not request this, please ignore this email.</p>
-            </div>
-            `
+          html: `
+          <div style="font-family: Arial, sans-serif; color: #333;">
+            <h2>Password Reset Request</h2>
+            <p>Hello <strong>${employee.Name}</strong>,</p>
+            <p>A password reset has been requested for your account.</p>
+            <p>Please click the button below to reset your password:</p>
+            <a href="${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/auth/change-password?id=${employee.Id}" style="display: inline-block; background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Reset Password</a>
+            <p>If you did not request this, please ignore this email.</p>
+          </div>
+          `
         });
     } catch (emailError) {
         console.error("Email send error:", emailError);

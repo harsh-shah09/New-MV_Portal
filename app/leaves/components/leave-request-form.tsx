@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { Modal, Form, Input, Select, DatePicker, message , Button} from "antd"
 import dayjs from "dayjs"
+import { toast } from "sonner"
 import type { LeaveRequest } from "@/types"
 
 interface LeaveRequestFormProps {
@@ -50,6 +51,27 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
   }
 
   const handleFinish = (values: any) => {
+    // Validation: Check required fields
+    if (!values.leaveCategory) {
+      toast.error("Please select a leave category")
+      return
+    }
+
+    if (values.leaveCategory === 'loss-of-pay' && !values.leaveType) {
+      toast.error("Please select a leave type")
+      return
+    }
+
+    if (values.leaveCategory === 'extra-day-pay' && !values.extraDayReason) {
+      toast.error("Please provide a reason for extra day pay")
+      return
+    }
+
+    if (!values.startDate || !values.endDate) {
+      toast.error("Please select start and end dates")
+      return
+    }
+
     const startDate = values.startDate
     const endDate = values.endDate
     const leaveType = values.leaveType
@@ -99,19 +121,6 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
       
       if (penaltyDays > 0) {
         totalDeduction = duration + penaltyDays
-        // const confirmMessage = `Warning: Planned leave must be applied at least 5 days in advance.\n\n` +
-        //   `Leave breakdown:\n` +
-        //   `- ${daysWithPenalty} day(s) applied with less than 5 days notice\n` +
-        //   `- ${duration - daysWithPenalty} day(s) applied with sufficient notice\n\n` +
-        //   `Penalty calculation:\n` +
-        //   `- Original leave days: ${duration}\n` +
-        //   `- Penalty days (${daysWithPenalty} × 2): ${penaltyDays}\n` +
-        //   `- Total deduction: ${totalDeduction} day(s)\n\n` +
-        //   `Do you want to continue?`
-        
-        // if (!confirm(confirmMessage)) {
-        //   return
-        // }
       }
     }
 

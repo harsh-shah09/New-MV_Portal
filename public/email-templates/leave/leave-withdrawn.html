@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Leave Request Withdrawn</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      line-height: 1.6;
+      color: #1f2937;
+      background-color: #f3f4f6;
+      padding: 20px;
+    }
+    .email-wrapper {
+      max-width: 600px;
+      margin: 0 auto;
+      background-color: #ffffff;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    .header {
+      background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+      color: #ffffff;
+      padding: 30px 20px;
+      text-align: center;
+    }
+    .header h1 {
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .header .icon {
+      font-size: 48px;
+      margin-bottom: 10px;
+    }
+    .header p {
+      font-size: 16px;
+      opacity: 0.95;
+      font-weight: 400;
+    }
+    .content {
+      padding: 25px 20px;
+      background-color: #ffffff;
+    }
+    .greeting {
+      font-size: 16px;
+      margin-bottom: 15px;
+      color: #374151;
+    }
+    .message {
+      font-size: 15px;
+      color: #4b5563;
+      margin-bottom: 20px;
+      line-height: 1.6;
+    }
+    .info-card {
+      background: linear-gradient(to right, #fffbeb, #ffffff);
+      border: 1px solid #fef3c7;
+      border-left: 4px solid #f59e0b;
+      border-radius: 8px;
+      padding: 20px;
+      margin: 18px 0;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+    .info-card h3 {
+      color: #d97706;
+      font-size: 17px;
+      margin-bottom: 12px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid #f3f4f6;
+    }
+    .info-row:last-child {
+      border-bottom: none;
+    }
+    .info-label {
+      font-weight: 600;
+      color: #6b7280;
+      font-size: 14px;
+    }
+    .info-value {
+      color: #111827;
+      font-weight: 500;
+      text-align: right;
+      font-size: 14px;
+    }
+    .alert {
+      padding: 14px 16px;
+      border-radius: 8px;
+      margin: 18px 0;
+      font-size: 14px;
+      line-height: 1.5;
+      border-left: 4px solid;
+    }
+    .alert-warning {
+      background-color: #fef3c7;
+      border-left-color: #f59e0b;
+      color: #92400e;
+    }
+    .alert-success {
+      background-color: #d1fae5;
+      border-left-color: #10b981;
+      color: #065f46;
+    }
+    .alert strong {
+      font-weight: 700;
+    }
+    .footer {
+      background-color: #1f2937;
+      color: #9ca3af;
+      padding: 20px;
+      text-align: center;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .footer p {
+      margin: 5px 0;
+    }
+    .divider {
+      height: 1px;
+      background: linear-gradient(to right, transparent, #e5e7eb, transparent);
+      margin: 20px 0;
+    }
+    .highlight-box {
+      background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+      border: 2px solid #10b981;
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+      margin: 20px 0;
+    }
+    .highlight-box h3 {
+      color: #047857;
+      font-size: 18px;
+      margin-bottom: 6px;
+    }
+    .highlight-box p {
+      color: #065f46;
+      font-size: 15px;
+      margin: 0;
+    }
+    @media only screen and (max-width: 600px) {
+      .email-wrapper {
+        border-radius: 0;
+      }
+      .header, .content, .footer {
+        padding: 20px 15px;
+      }
+      .info-row {
+        flex-direction: column;
+        gap: 4px;
+      }
+      .info-value {
+        text-align: left;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="email-wrapper">
+    <div class="header">
+      <div class="icon">🔄</div>
+      <h1>Leave Request Withdrawn</h1>
+      <p>Confirmation</p>
+    </div>
+    
+    <div class="content">
+      <div class="greeting">
+        Dear <strong>{{recipientName}}</strong>,
+      </div>
+      
+      <div class="message">
+        Your leave request has been successfully <strong>withdrawn</strong> from the system.
+      </div>
+      
+      <div class="alert alert-warning">
+        <strong>🔄 Status Update:</strong> Your leave request has been withdrawn. All approvals have been cancelled and your leave balance has been restored.
+      </div>
+      
+      <div class="info-card">
+        <h3>📅 Withdrawn Leave Details</h3>
+        <div class="info-row">
+          <span class="info-label">Leave Type</span>
+          <span class="info-value">{{leaveType}}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Start Date</span>
+          <span class="info-value">{{startDate}}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">End Date</span>
+          <span class="info-value">{{endDate}}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Total Duration</span>
+          <span class="info-value"><strong>{{duration}} day(s)</strong></span>
+        </div>
+      </div>
+      
+      <div class="highlight-box">
+        <h3>✅ Balance Restored</h3>
+        <p>{{duration}} day(s) have been added back to your leave balance</p>
+      </div>
+      
+      <div class="alert alert-success">
+        <strong>ℹ️ Note:</strong> Your leave balance has been automatically updated in the system. The withdrawn leave days are now available for future leave requests.
+      </div>
+      
+      <div class="divider"></div>
+      
+      <div class="message" style="margin-bottom: 0;">
+        You can submit a new leave request at any time through the <strong>MV Portal HRMS</strong>. Check your current leave balance in the portal before submitting.
+      </div>
+    </div>
+    
+    <div class="footer">
+      <p><strong>MV Portal HRMS</strong></p>
+      <p>This is an automated message. Please do not reply to this email.</p>
+      <p>© {{year}} MV Clouds. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html>

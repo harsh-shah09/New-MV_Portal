@@ -8,12 +8,18 @@ import { LeaveTable } from "./components/leave-table"
 import { useLeaveStore } from "@/store/leaveStore"
 import type { LeaveRequest } from "@/types"
 import { useQuery } from "@tanstack/react-query"
+import { toast } from "sonner"
+import { Modal } from "antd"
 
 export default function LeavesPage() {
   const router = useRouter()
   const [showForm, setShowForm] = useState(false)
   const [selectedTab, setSelectedTab] = useState<"my-requests" | "approvals">("my-requests")
   const [currentUser, setCurrentUser] = useState<{ employeeId: string; email?: string; recordId: string; role?: string; title?: string } | null>(null)
+  const [rejectModalVisible, setRejectModalVisible] = useState(false)
+  const [rejectingLeaveId, setRejectingLeaveId] = useState<string | null>(null)
+  const [rejectReason, setRejectReason] = useState("")
+  
   console.log("Current User:", currentUser)
   const { leaves, pendingApprovals, setLeaves, setPendingApprovals, updateLeave } = useLeaveStore()
 
@@ -42,6 +48,7 @@ export default function LeavesPage() {
 
   const handleSubmitRequest = async (data: Partial<LeaveRequest>) => {
     const submit = async (payload: Partial<LeaveRequest>, confirmedRules = false): Promise<void> => {
+      const toastId = toast.loading("Submitting leave request...")
       try {
         console.log("Submitting leave request data:", payload, "confirmedRules:", confirmedRules)
         const response = await fetch("/api/leave-management", {
@@ -55,48 +62,78 @@ export default function LeavesPage() {
         const result = await response.json()
 
         if (response.status === 409 && result?.requiresConfirmation) {
+          toast.dismiss(toastId)
           const details = result.details || {}
-          const confirmMessage =
-            `Please confirm the revised leave calculation before submitting:\n\n` +
-            `Requested leave days: ${payload.duration ?? "-"}\n` +
-            `Leave span (calendar): ${details.rangeLeaveDays ?? "-"}\n` +
-            `Sandwich extra days: ${details.sandwichExtra ?? 0}\n` +
-            `One+Two extra days: ${details.onePlusTwoExtra ?? 0}\n` +
-            `Total after rules: ${details.finalTotalAfterRules ?? "-"}\n\n` +
-            `Sandwich applied: ${details.sandwichApplied ? "Yes" : "No"}\n` +
-            `One+Two applied: ${details.onePlusTwoRuleApplied ? "Yes" : "No"}`
-
-          if (confirm(confirmMessage)) {
-            await submit(payload, true)
-          }
+          
+          Modal.confirm({
+            title: '⚠️ Leave Rules Applied',
+            width: 600,
+            content: (
+              <div className="space-y-3">
+                <p className="text-gray-700 mb-4">Additional rules have been applied to your leave request. Please review:</p>
+                <div className="bg-blue-50 p-4 rounded-lg space-y-2">
+                  <div className="flex justify-between">
+                    <span className="font-medium">Requested leave days:</span>
+                    <span className="font-semibold text-blue-600">{payload.duration ?? "-"}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-medium">Leave span (calendar):</span>
+                    <span className="font-semibold">{details.rangeLeaveDays ?? "-"}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-medium">Sandwich extra days:</span>
+                    <span className="font-semibold text-orange-600">{details.sandwichExtra ?? 0}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-medium">One+Two penalty days:</span>
+                    <span className="font-semibold text-red-600">{details.onePlusTwoExtra ?? 0}</span>
+                  </div>
+                  <div className="border-t border-blue-200 pt-2 mt-2 flex justify-between">
+                    <span className="font-bold">Total after rules:</span>
+                    <span className="font-bold text-lg text-blue-700">{details.finalTotalAfterRules ?? "-"}</span>
+                  </div>
+                </div>
+                <div className="text-sm text-gray-600 mt-3">
+                  <div>• Sandwich rule: {details.sandwichApplied ? "✅ Applied" : "❌ Not applied"}</div>
+                  <div>• One+Two penalty: {details.onePlusTwoRuleApplied ? "✅ Applied" : "❌ Not applied"}</div>
+                </div>
+              </div>
+            ),
+            okText: 'Confirm & Submit',
+            cancelText: 'Cancel',
+            onOk: async () => {
+              await submit(payload, true)
+            },
+          })
           return
         }
 
         if (!response.ok) {
-          alert(result?.error || "Failed to submit leave request")
+          toast.error(result?.error || "Failed to submit leave request", { id: toastId })
           return
         }
 
         // Refetch the leaves to get the updated list
         refetch()
-
         setShowForm(false)
 
         if (result?.totals) {
           const t = result.totals
-          alert(
-            `Leave submitted successfully.\n\n` +
-            `Leave span (calendar): ${t.rangeLeaveDays}\n` +
-            `Sandwich extra days: ${t.sandwichExtra}\n` +
-            `One+Two extra days: ${t.onePlusTwoExtra}\n` +
-            `Total after rules: ${t.finalTotalAfterRules}`
+          toast.success(
+            <div className="space-y-1">
+              <div className="font-semibold">Leave request submitted successfully! 🎉</div>
+              <div className="text-sm text-gray-600">
+                Total days: {t.finalTotalAfterRules} {t.sandwichApplied || t.onePlusTwoRuleApplied ? "(with penalties)" : ""}
+              </div>
+            </div>,
+            { id: toastId, duration: 5000 }
           )
         } else {
-          alert("Leave request submitted successfully!")
+          toast.success("Leave request submitted successfully! 🎉", { id: toastId })
         }
       } catch (error) {
         console.error("Error submitting leave request:", error)
-        alert("Failed to submit leave request")
+        toast.error("Failed to submit leave request. Please try again.", { id: toastId })
       }
     }
 
@@ -105,101 +142,171 @@ export default function LeavesPage() {
 
   const handleCancel = async (leaveId: string) => {
     const leave = leaves.find((l) => l.id === leaveId)
-    if (leave && confirm("Cancel this leave request?")) {
-      try {
-        const response = await fetch("/api/leave-management", {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            leaveId,
-            action: "cancel",
-          }),
-        })
+    if (!leave) return
 
-        if (!response.ok) {
-          const error = await response.json()
-          alert(error.error || "Failed to cancel leave")
-          return
+    Modal.confirm({
+      title: '🗑️ Cancel Leave Request',
+      content: (
+        <div>
+          <p>Are you sure you want to cancel this leave request?</p>
+          <div className="mt-3 p-3 bg-gray-50 rounded">
+            <div className="text-sm">
+              <div><strong>Type:</strong> {leave.leaveType || leave.leaveCategory}</div>
+              <div><strong>Dates:</strong> {leave.startDate} to {leave.endDate}</div>
+              <div><strong>Duration:</strong> {leave.duration} day(s)</div>
+            </div>
+          </div>
+          <p className="mt-3 text-red-600 text-sm">This action cannot be undone.</p>
+        </div>
+      ),
+      okText: 'Yes, Cancel Leave',
+      cancelText: 'No, Keep It',
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        const toastId = toast.loading("Cancelling leave request...")
+        try {
+          const response = await fetch("/api/leave-management", {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              leaveId,
+              action: "cancel",
+            }),
+          })
+
+          if (!response.ok) {
+            const error = await response.json()
+            toast.error(error.error || "Failed to cancel leave", { id: toastId })
+            return
+          }
+
+          // Update local state
+          updateLeave({
+            ...leave,
+            status: "cancelled",
+          })
+          toast.success("Leave request cancelled successfully", { id: toastId })
+        } catch (error) {
+          console.error("Error cancelling leave:", error)
+          toast.error("Failed to cancel leave. Please try again.", { id: toastId })
         }
-
-        // Update local state
-        updateLeave({
-          ...leave,
-          status: "cancelled",
-        })
-      } catch (error) {
-        console.error("Error cancelling leave:", error)
-        alert("Failed to cancel leave")
-      }
-    }
+      },
+    })
   }
 
   const handleWithdraw = async (leaveId: string) => {
     const leave = leaves.find((l) => l.id === leaveId)
-    if (leave && confirm("Withdraw this approved leave?")) {
-      try {
-        const response = await fetch("/api/leave-management", {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            leaveId,
-            action: "withdraw",
-          }),
-        })
+    if (!leave) return
 
-        if (!response.ok) {
-          const error = await response.json()
-          alert(error.error || "Failed to withdraw leave")
-          return
+    Modal.confirm({
+      title: '⚠️ Withdraw Approved Leave',
+      content: (
+        <div>
+          <p className="text-orange-600 font-medium mb-3">⚠️ You are about to withdraw an approved leave!</p>
+          <div className="p-3 bg-yellow-50 border border-yellow-200 rounded">
+            <div className="text-sm space-y-1">
+              <div><strong>Type:</strong> {leave.leaveType || leave.leaveCategory}</div>
+              <div><strong>Dates:</strong> {leave.startDate} to {leave.endDate}</div>
+              <div><strong>Duration:</strong> {leave.duration} day(s)</div>
+            </div>
+          </div>
+          <p className="mt-3 text-sm text-gray-600">Your leave balance will be restored.</p>
+        </div>
+      ),
+      okText: 'Yes, Withdraw',
+      cancelText: 'No, Keep Leave',
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        const toastId = toast.loading("Withdrawing leave...")
+        try {
+          const response = await fetch("/api/leave-management", {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              leaveId,
+              action: "withdraw",
+            }),
+          })
+
+          if (!response.ok) {
+            const error = await response.json()
+            toast.error(error.error || "Failed to withdraw leave", { id: toastId })
+            return
+          }
+
+          // Update local state
+          updateLeave({
+            ...leave,
+            status: "withdrawn",
+          })
+          toast.success("Leave withdrawn successfully. Balance restored.", { id: toastId })
+        } catch (error) {
+          console.error("Error withdrawing leave:", error)
+          toast.error("Failed to withdraw leave. Please try again.", { id: toastId })
         }
-
-        // Update local state
-        updateLeave({
-          ...leave,
-          status: "withdrawn",
-        })
-      } catch (error) {
-        console.error("Error withdrawing leave:", error)
-        alert("Failed to withdraw leave")
-      }
-    }
+      },
+    })
   }
 
   const handleApprove = async (leaveId: string) => {
-    if (confirm("Approve this leave request?")) {
-      try {
-        const response = await fetch("/api/leave-management", {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            leaveId,
-            action: "approve",
-          }),
-        })
+    const leave = pendingApprovals.find((l) => l.id === leaveId)
+    
+    Modal.confirm({
+      title: '✅ Approve Leave Request',
+      content: leave ? (
+        <div>
+          <p className="mb-3">Are you sure you want to approve this leave request?</p>
+          <div className="p-3 bg-green-50 border border-green-200 rounded">
+            <div className="text-sm space-y-1">
+              <div><strong>Employee:</strong> {leave.employeeName}</div>
+              <div><strong>Type:</strong> {leave.leaveType || leave.leaveCategory}</div>
+              <div><strong>Dates:</strong> {leave.startDate} to {leave.endDate}</div>
+              <div><strong>Duration:</strong> {leave.duration} day(s)</div>
+            </div>
+          </div>
+          <p className="mt-3 text-sm text-green-700">✓ Email notification will be sent to the employee</p>
+        </div>
+      ) : 'Are you sure you want to approve this leave request?',
+      okText: 'Approve',
+      cancelText: 'Cancel',
+      okButtonProps: { style: { backgroundColor: '#10b981' } },
+      onOk: async () => {
+        const toastId = toast.loading("Approving leave request...")
+        try {
+          const response = await fetch("/api/leave-management", {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              leaveId,
+              action: "approve",
+            }),
+          })
 
-        if (!response.ok) {
-          const error = await response.json()
-          alert(error.error || "Failed to approve leave")
-          return
+          if (!response.ok) {
+            const error = await response.json()
+            toast.error(error.error || "Failed to approve leave", { id: toastId })
+            return
+          }
+
+          // Refetch to update the list
+          refetch()
+          toast.success("Leave approved successfully! ✅ Email sent to employee.", { id: toastId, duration: 4000 })
+        } catch (error) {
+          console.error("Error approving leave:", error)
+          toast.error("Failed to approve leave. Please try again.", { id: toastId })
         }
-
-        // Refetch to update the list
-        refetch()
-        alert("Leave approved successfully!")
-      } catch (error) {
-        console.error("Error approving leave:", error)
-        alert("Failed to approve leave")
-      }
-    }
+      },
+    })
   }
 
   const handleReject = async (leaveId: string, reason: string) => {
+    const toastId = toast.loading("Rejecting leave request...")
     try {
       const response = await fetch("/api/leave-management", {
         method: "PATCH",
@@ -215,16 +322,41 @@ export default function LeavesPage() {
 
       if (!response.ok) {
         const error = await response.json()
-        alert(error.error || "Failed to reject leave")
+        toast.error(error.error || "Failed to reject leave", { id: toastId })
         return
       }
 
       // Refetch to update the list
       refetch()
-      alert("Leave rejected successfully!")
+      toast.success("Leave rejected. ✉️ Email notification sent to employee.", { id: toastId, duration: 4000 })
     } catch (error) {
       console.error("Error rejecting leave:", error)
-      alert("Failed to reject leave")
+      toast.error("Failed to reject leave. Please try again.", { id: toastId })
+    }
+  }
+
+  const openRejectModal = (leaveId: string) => {
+    setRejectingLeaveId(leaveId)
+    setRejectReason("")
+    setRejectModalVisible(true)
+  }
+
+  const handleRejectConfirm = async () => {
+    if (!rejectReason.trim()) {
+      toast.error("Please provide a reason for rejection")
+      return
+    }
+    
+    if (rejectReason.trim().length < 10) {
+      toast.error("Please provide a more detailed reason (minimum 10 characters)")
+      return
+    }
+    
+    if (rejectingLeaveId) {
+      await handleReject(rejectingLeaveId, rejectReason)
+      setRejectModalVisible(false)
+      setRejectingLeaveId(null)
+      setRejectReason("")
     }
   }
 
@@ -287,13 +419,14 @@ export default function LeavesPage() {
             {selectedTab === "approvals" && (
               <div>
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">Pending Approvals</h2>
-                {(currentUser?.role === 'HR' || (currentUser?.role === 'Developer' && currentUser?.title === 'Team Lead')) ? (
+                {(currentUser?.role === 'HR' || currentUser?.role === 'Admin' || (currentUser?.role === 'Developer' && currentUser?.title === 'Team Lead')) ? (
                   pendingApprovals.length > 0 ? (
                     <div className="space-y-4">
                       {pendingApprovals.map((leave) => {
                         console.log("Pending Approval Leave:", leave)
                         const isTeamLead = currentUser?.role === 'Developer' && currentUser?.title === 'Team Lead'
                         const isHR = currentUser?.role === 'HR'
+                        const isAdmin = currentUser?.role === 'Admin'
                         const tlApproved = leave.tlApproved === 'Approved'
                         const tlRejected = leave.tlApproved === 'Rejected'
                         const hrApproved = leave.hrApproval === 'Approved'
@@ -328,10 +461,7 @@ export default function LeavesPage() {
                                       Approve
                                     </button>
                                     <button
-                                      onClick={() => {
-                                        const reason = prompt("Enter reason for rejection:");
-                                        if (reason) handleReject(leave.id, reason);
-                                      }}
+                                      onClick={() => openRejectModal(leave.id)}
                                       className="flex-1 bg-white hover:bg-gray-50 text-red-600 px-4 py-2 rounded-md text-sm font-medium border border-red-200 transition-colors"
                                     >
                                       Reject
@@ -402,7 +532,7 @@ export default function LeavesPage() {
                     <div className="text-center py-8 text-gray-500">No pending approvals</div>
                   )
                 ) : (
-                  <div className="text-center py-8 text-gray-500">Only HR and Team Leads can view pending approvals</div>
+                  <div className="text-center py-8 text-gray-500">Only HR, Admin, and Team Leads can view pending approvals</div>
                 )}
               </div>
             )}
@@ -416,6 +546,67 @@ export default function LeavesPage() {
             employeeName={currentUser?.email || "Current Employee"}
           />
         )}
+
+        {/* Reject Leave Modal */}
+        <Modal
+          title={
+            <div className="flex items-center gap-2">
+              <span className="text-red-600 text-xl">❌</span>
+              <span>Reject Leave Request</span>
+            </div>
+          }
+          open={rejectModalVisible}
+          onCancel={() => {
+            setRejectModalVisible(false)
+            setRejectingLeaveId(null)
+            setRejectReason("")
+          }}
+          onOk={handleRejectConfirm}
+          okText="Confirm Rejection"
+          cancelText="Cancel"
+          okButtonProps={{ 
+            danger: true,
+            disabled: !rejectReason.trim() || rejectReason.trim().length < 10
+          }}
+          width={600}
+        >
+          <div className="py-4">
+            <p className="text-gray-700 mb-4">
+              Please provide a reason for rejecting this leave request. This will be sent to the employee via email.
+            </p>
+            
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Rejection Reason <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                placeholder="Please provide a detailed reason for rejection..."
+                rows={4}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none resize-none"
+                autoFocus
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Minimum 10 characters required
+              </p>
+            </div>
+
+            {rejectReason.trim() && rejectReason.length < 10 && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                <p className="text-sm text-yellow-800">
+                  ⚠️ Please provide a more detailed reason ({rejectReason.length}/10 characters)
+                </p>
+              </div>
+            )}
+
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3 mt-4">
+              <p className="text-sm text-red-800 font-medium">
+                📧 The employee will receive an email notification with this reason.
+              </p>
+            </div>
+          </div>
+        </Modal>
       </div>
     </div>
   )
