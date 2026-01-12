@@ -141,9 +141,10 @@ export const findEmployee = async (identifier: string): Promise<Employee | null>
   const query = `
     SELECT Id, Employee_Name__c, Employee_Email__c, Password__c, Role__c, Title__c, Is2FAEnabled__c, Name 
     FROM Employee__c 
-    WHERE ${isEmail ? 'Employee_Email__c' : 'Employee_Name__c'} = '${escapedIdentifier}' 
+    WHERE ${isEmail ? 'Employee_Email__c' : 'Employee_Id__c'} = '${escapedIdentifier}' 
     LIMIT 1
   `;
+  console.log(query)
   // Note: Searching by 'Name' standard field might still be safer if Employee_Name__c isn't unique or standardized for login. 
   // But user said "Employee_Name__c ... use this only". I'll try to match user intent. 
   // If login fails, user might need to adjust valid identifiers.
@@ -176,8 +177,8 @@ export const getDashboardData = async (): Promise<DashboardData> => {
 
   // 1️⃣ Employee totals + department-wise count (single query using WITH ROLLUP)
   // Updated group by Department__c on Employee__c
-  const employeeAgg = await conn.query<any>(`SELECT Department__c dept, COUNT(Id) cnt FROM Employee__c GROUP BY ROLLUP(Department__c)`);
-
+  // const employeeAgg = await conn.query<any>(`SELECT Department__c dept, COUNT(Id) cnt FROM Employee__c GROUP BY ROLLUP(Department__c)`);
+  const employeeAgg = { records : []}
   let totalEmployees = 0;
 
   // Mock budget distribution
@@ -199,17 +200,17 @@ export const getDashboardData = async (): Promise<DashboardData> => {
   // ROLLUP row (grand total) comes where dept == null
   const totalRow = employeeAgg.records.find((r: any) => r.dept == null);
   if (totalRow) {
-    totalEmployees = totalRow.cnt;
+    totalEmployees = totalRow || 0;
   }
 
   // 2️⃣ Active + Pending leaves snapshot
-  const leaveAgg = await conn.query<any>(`
-    SELECT Status__c status, COUNT(Id) cnt
-    FROM Leave__c
-    WHERE Status__c IN ('Approved','Applied')
-    GROUP BY Status__c
-  `);
-
+  // const leaveAgg = await conn.query<any>(`
+  //   SELECT Status__c status, COUNT(Id) cnt
+  //   FROM Leave__c
+  //   WHERE Status__c IN ('Approved','Applied')
+  //   GROUP BY Status__c
+  // `);
+  const leaveAgg = {records:[]}
   let activeLeaves = 0;
   let pendingApprovals = 0;
 
@@ -219,13 +220,13 @@ export const getDashboardData = async (): Promise<DashboardData> => {
   });
 
   // 3️⃣ Leave Request Trends
-  const leaveTrendQuery = `
-    SELECT CreatedDate, Status__c 
-    FROM Leave__c 
-    WHERE CreatedDate = THIS_YEAR
-    ORDER BY CreatedDate ASC
-  `;
-  const leaveTrendsRaw = await conn.query<any>(leaveTrendQuery);
+  // const leaveTrendQuery = `
+  //   SELECT CreatedDate, Status__c 
+  //   FROM Leave__c 
+  //   WHERE CreatedDate = THIS_YEAR
+  //   ORDER BY CreatedDate ASC
+  // `;
+  // const leaveTrendsRaw = await conn.query<any>(leaveTrendQuery);
   
   const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const trendsMap = new Map<string, { month: string, approved: number, pending: number, rejected: number }>();
@@ -233,16 +234,16 @@ export const getDashboardData = async (): Promise<DashboardData> => {
   // Initialize current year months
   monthNames.forEach(m => trendsMap.set(m, { month: m, approved: 0, pending: 0, rejected: 0 }));
 
-  leaveTrendsRaw.records.forEach((r: any) => {
-      const date = new Date(r.CreatedDate);
-      const month = monthNames[date.getMonth()];
-      const stat = trendsMap.get(month);
-      if (stat) {
-          if (r.Status__c === 'Approved') stat.approved++;
-          else if (r.Status__c === 'Applied' || r.Status__c === 'Pending') stat.pending++;
-          else if (r.Status__c === 'Rejected') stat.rejected++;
-      }
-  });
+  // leaveTrendsRaw.records.forEach((r: any) => {
+  //     const date = new Date(r.CreatedDate);
+  //     const month = monthNames[date.getMonth()];
+  //     const stat = trendsMap.get(month);
+  //     if (stat) {
+  //         if (r.Status__c === 'Approved') stat.approved++;
+  //         else if (r.Status__c === 'Applied' || r.Status__c === 'Pending') stat.pending++;
+  //         else if (r.Status__c === 'Rejected') stat.rejected++;
+  //     }
+  // });
   
   const currentMonthIndex = new Date().getMonth();
   const leaveTrends = Array.from(trendsMap.values()).slice(0, currentMonthIndex + 1);
@@ -255,7 +256,8 @@ export const getDashboardData = async (): Promise<DashboardData> => {
     ORDER BY CreatedDate DESC 
     LIMIT 5
   `;
-  const recentLeaves = await conn.query<any>(recentLeavesQuery);
+  // const recentLeaves = await conn.query<any>(recentLeavesQuery);
+  const recentLeaves = {records:[]}
   const recentActivities = recentLeaves.records.map((r: any) => ({
       title: `${r.Employee__r?.Employee_Name__c || 'Employee'} - ${r.Status__c}`,
       value: new Date(r.CreatedDate).toLocaleDateString(),

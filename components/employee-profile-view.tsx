@@ -131,16 +131,14 @@ export function EmployeeProfileView({ employeeId }: ViewProps) {
                  // But Field comp expects string usually.
                  // If Employee_Address__c is an object, we need to flatten for the form or handle specific address fields.
                  
-                 // Let's assume we bind specific address fields to the 'Employee_Address__c' components if possible.
-                 // or mapped fields.
-                 // Let's use separate state for address components if needed or map them here?
-                 // User said "Employee_Address__c which contains...".
-                 // I will attempt to map distinct keys for form if the UI breaks them down.
-                //  Employee_Address__Street__s: employee.Employee_Address__c?.street,
-                //  Employee_Address__City__s: employee.Employee_Address__c?.city,
-                //  Employee_Address__State__s: employee.Employee_Address__c?.state,
-                //  Employee_Address__PostalCode__s: employee.Employee_Address__c?.postalCode,
-                //  Employee_Address__Country__s: employee.Employee_Address__c?.country,
+                 Employee_Address__Street__s: employee.Employee_Address__Street__s,
+                 Employee_Address__City__s: employee.Employee_Address__City__s,
+                 Employee_Address__StateCode__s: employee.Employee_Address__StateCode__s,
+                 Employee_Address__PostalCode__s: employee.Employee_Address__PostalCode__s,
+                 Employee_Address__CountryCode__s: employee.Employee_Address__CountryCode__s,
+                //  Employee_Address__Latitude__s: employee.Employee_Address__Latitude__s,
+                //  Employee_Address__Longitude__s: employee.Employee_Address__Longitude__s,
+                //  Employee_Address__GeocodeAccuracy__s: employee.Employee_Address__GeocodeAccuracy__s,
 
                  Emergency_Contact_Name__c: employee.Emergency_Contact_Name__c,
                  Emergency_Contact_Number__c: employee.Emergency_Contact_Number__c,
@@ -327,7 +325,7 @@ export function EmployeeProfileView({ employeeId }: ViewProps) {
       <div className="relative bg-white rounded-3xl p-8 border border-slate-100 shadow-xl overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-r from-cyan-500 to-blue-600"></div>
         
-        <div className="relative flex flex-col md:flex-row gap-6 items-end md:items-center mt-12">
+        <div className="relative flex flex-col md:flex-row gap-6 items-center md:items-center mt-12">
            {/* Avatar */}
            <div className="relative group">
               <div className="w-32 h-32 rounded-full border-4 border-white shadow-lg bg-slate-200 flex items-center justify-center overflow-hidden">
@@ -354,13 +352,13 @@ export function EmployeeProfileView({ employeeId }: ViewProps) {
                <div className="flex flex-col md:flex-row md:items-center gap-4 justify-between">
                    <div>
                        <h1 className="text-3xl font-bold text-slate-900">{employee.Employee_Name__c}</h1>
-                       <div className="flex items-center gap-3 text-slate-500 mt-1">
+                       <div className="flex items-center justify-center gap-3 text-slate-500 mt-1">
                           <span className="flex items-center gap-1"><Briefcase className="w-4 h-4" /> {employee.Role__c || "Role not set"}</span>
                           <span className="w-1 h-1 rounded-full bg-slate-300"></span>
-                          <span className="flex items-center gap-1"><MapPin className="w-4 h-4" /> {employee.Employee_Address__c?.city || "Location not set"}</span>
+                          <span className="flex items-center gap-1"><MapPin className="w-4 h-4" /> {employee.Employee_Address__c.city || "Location not set"}</span>
                        </div>
                    </div>
-                   <div className="flex gap-3">
+                   <div className="flex gap-3 justify-center items-center">
                        {(!isEditing) ? (
                            <button 
                              onClick={handleEditToggle}
@@ -469,13 +467,21 @@ export function EmployeeProfileView({ employeeId }: ViewProps) {
                                           <MapPin className="w-5 h-5 text-indigo-500" /> Address
                                       </h2>
                                       <div className="grid grid-cols-1 gap-y-6">
-                                          <Field label="Street" value={employee.Employee_Address__c?.street} fieldKey="street" isEditing={isEditing} formData={formData} setFormData={setFormData} />
-                                          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                             <Field label="City" value={employee.Employee_Address__c?.city} fieldKey="city" isEditing={isEditing} formData={formData} setFormData={setFormData} />
-                                             <Field label="State" value={employee.Employee_Address__c?.state} fieldKey="state" isEditing={isEditing} formData={formData} setFormData={setFormData} />
-                                             <Field label="Zip / Postal" value={employee.Employee_Address__c?.postalCode} fieldKey="postalCode" isEditing={isEditing} formData={formData} setFormData={setFormData} />
+                                          <Field label="Street" value={employee.Employee_Address__c.street} fieldKey="Employee_Address__Street__s" isEditing={isEditing} formData={formData} setFormData={setFormData} />
+                                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                             <Field label="City" value={employee.Employee_Address__c.city} fieldKey="Employee_Address__City__s" isEditing={isEditing} formData={formData} setFormData={setFormData} />
+                                             <Field label="State Code" value={employee.Employee_Address__c.stateCode} fieldKey="Employee_Address__StateCode__s" isEditing={isEditing} formData={formData} setFormData={setFormData} />
                                           </div>
-                                          <Field label="Country" value={employee.Employee_Address__c?.country} fieldKey="country" isEditing={isEditing} formData={formData} setFormData={setFormData} />
+                                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                             <Field label="Zip / Postal" value={employee.Employee_Address__c.postalCode} fieldKey="Employee_Address__PostalCode__s" isEditing={isEditing} formData={formData} setFormData={setFormData} />
+                                             <Field label="Country Code" value={employee.Employee_Address__c.countryCode} fieldKey="Employee_Address__CountryCode__s" isEditing={isEditing} formData={formData} setFormData={setFormData} />
+                                          </div>
+                                          {/* Coordinates & Accuracy */}
+                                          {/* <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                             <Field label="Latitude" value={employee.Employee_Address__Latitude__s} fieldKey="Employee_Address__Latitude__s" type="number" isEditing={isEditing} formData={formData} setFormData={setFormData} />
+                                             <Field label="Longitude" value={employee.Employee_Address__Longitude__s} fieldKey="Employee_Address__Longitude__s" type="number" isEditing={isEditing} formData={formData} setFormData={setFormData} />
+                                             <Field label="Geocode Accuracy" value={employee.Employee_Address__GeocodeAccuracy__s} fieldKey="Employee_Address__GeocodeAccuracy__s" isEditing={isEditing} formData={formData} setFormData={setFormData} />
+                                          </div> */}
                                       </div>
                                   </div>
 

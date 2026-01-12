@@ -72,7 +72,7 @@ export function ChartSection({ stats }: ChartSectionProps) {
       </div>
 
       {/* Budget Allocation */}
-      <div className="glass-card bg-white/60 border border-white/60 rounded-2xl p-6 shadow-sm flex flex-col">
+      {/* <div className="glass-card bg-white/60 border border-white/60 rounded-2xl p-6 shadow-sm flex flex-col">
         <h3 className="text-lg font-bold text-gray-800 mb-6">Budget by Department</h3>
         <div className="space-y-5 flex-1 overflow-auto pr-2 custom-scrollbar">
           {departmentData.length > 0 ? (
@@ -97,7 +97,7 @@ export function ChartSection({ stats }: ChartSectionProps) {
               <p className="text-gray-500 text-sm">No budget data available.</p>
           )}
         </div>
-      </div>
+      </div> */}
 
       {/* Leave Requests Trend */}
       {/* Making it full width as we removed the 4th card (Training) to keep balance if user wants, 
@@ -109,7 +109,7 @@ export function ChartSection({ stats }: ChartSectionProps) {
           Let's make Leave Trend full width or keep 2 col and have empty space. 
           Given "Make response and proper awesome UI", let's make the 3rd chart span full width or centered.
       */}
-      <div className="glass-card bg-white/60 border border-white/60 rounded-2xl p-6 shadow-sm lg:col-span-2">
+      {/* <div className="glass-card bg-white/60 border border-white/60 rounded-2xl p-6 shadow-sm lg:col-span-2">
         <h3 className="text-lg font-bold text-gray-800 mb-6">Leave Requests Trend</h3>
         <ResponsiveContainer width="100%" height={300}>
           <LineChart data={leaveData}>
@@ -123,7 +123,7 @@ export function ChartSection({ stats }: ChartSectionProps) {
             <Line type="monotone" dataKey="rejected" stroke="#ef4444" strokeWidth={3} dot={{r: 4, fill: '#ef4444', strokeWidth: 2, stroke: '#fff'}} />
           </LineChart>
         </ResponsiveContainer>
-      </div>
+      </div> */}
 
     </div>
   )

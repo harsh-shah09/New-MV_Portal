@@ -210,7 +210,6 @@ export async function forgotPasswordAction(identifier: string) {
         pass: process.env.GMAIL_APP_PASSWORD,
       },
     });
-
     try {
         await transporter.sendMail({
             from: process.env.GMAIL_USER,
