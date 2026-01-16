@@ -16,6 +16,16 @@ import { verifySession } from "@/lib/auth";
 export default function DashboardPage() {
   const router = useRouter()
   const [role, setRole] = useState<string | null>(null)
+  const [greeting, setGreeting] = useState("Welcome back")
+
+  useEffect(() => {
+    const hours = new Date().getHours()
+    if (hours < 12) setGreeting("Good Morning")
+    else if (hours < 18) setGreeting("Good Afternoon")
+    else if (hours < 22) setGreeting("Good Evening")
+    else setGreeting("Good Night")
+  }, [])
+
   const isHR = role === 'HR';
    useEffect(() => {
     let mounted = true
@@ -54,8 +64,12 @@ export default function DashboardPage() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
         <div className="mb-10">
-          <h1 className="text-4xl font-extrabold text-slate-900 mb-2 tracking-tight">Dashboard Overview</h1>
-          <p className="text-slate-500 text-lg">Welcome back! Here's what's happening in your organization today.</p>
+          <h1 className="text-4xl font-extrabold text-slate-900 mb-2 tracking-tight">
+            {greeting}!
+          </h1>
+          <p className="text-slate-500 text-lg">
+             Your command center is ready. Here's the latest pulse of your organization.
+          </p>
         </div>
 
         {/* KPI Cards */}

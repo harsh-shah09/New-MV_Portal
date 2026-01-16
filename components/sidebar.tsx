@@ -66,7 +66,13 @@ export function Sidebar({
      navItems.push({ href: "/nda", label: "Document Manager", icon: FileCheck });
   }
 
+  // Add Admin Console for HR/Admin
+  if (user?.role?.includes('HR') || user?.role?.includes('Admin')) {
+      navItems.push({ href: "/admin", label: "Admin Console", icon: Settings });
+  }
+
   const { data: notifications } = useQuery({
+       enabled: !!user,
       queryKey: ['notifications'],
       queryFn: async () => {
            const res = await fetch('/api/notifications');
@@ -128,7 +134,9 @@ export function Sidebar({
           Main Menu
         </div>
         {navItems.map((item) => {
-          const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`)
+          const isActive = item.href === "/dashboard" 
+            ? pathname === "/dashboard" 
+            : pathname === item.href || pathname.startsWith(`${item.href}/`)
           
           return (
             <Link 
