@@ -1,203 +1,210 @@
 <!DOCTYPE html>
-<html lang="en" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+<html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="x-apple-disable-message-reformatting">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="color-scheme" content="light">
-<meta name="supported-color-schemes" content="light">
-<title>Application Received</title>
-<!--[if mso]>
-<style type="text/css">
-  body, table, td, a, span { font-family: Verdana, Arial, sans-serif !important; }
-</style>
-<![endif]-->
-<style>
-/* Reset common gaps that Gmail/Outlook inject */
-body, table, td {
-  margin: 0;
-  padding: 0;
-}
-table {
-  border-collapse: collapse;
-  border-spacing: 0;
-  mso-table-lspace: 0pt;
-  mso-table-rspace: 0pt;
-}
-img {
-  border: 0;
-  display: block;
-  line-height: 0;
-  outline: none;
-  text-decoration: none;
-}
-/* Mobile helpers (supported by iOS Mail/Gmail) */
-@media screen and (max-width:700px){
-  .container{ width:100% !important; }
-}
-@media screen and (max-width:600px){
-  .inner{ width:92% !important; }
-  .hero{ max-width:300px !important; }
-  .footer-pad{ padding-bottom:20px !important; }
-  
-  .footer-bg {
-    background-image: none !important;
-    background-color: #CCECF9 !important;
-  }
-  .footer-img {
-    display: block !important;
-    width: 100% !important;
-    height: auto !important;
-    margin-top: 10px !important;
-  }
-
-  /* Force header social icons to shrink and stay in one row */
-  .social-icons img {
-    width: 20px !important; /* slightly smaller on mobile */
-    margin-left: 6px !important;
-  }
-  .social-icons {
-    white-space: nowrap !important;
-  }
-}
-
-/* Dark mode: keep text dark (iOS Mail) */
-@media (prefers-color-scheme: dark){
-  .force-text, .force-text a { color:#000000 !important; }
-}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>New Leave Request - Action Required</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      line-height: 1.6;
+      color: #1f2937;
+      background-color: #f3f4f6;
+      padding: 20px;
+    }
+    .email-wrapper {
+      max-width: 600px;
+      margin: 0 auto;
+      background-color: #ffffff;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    .header {
+      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+      color: #ffffff;
+      padding: 30px 20px;
+      text-align: center;
+    }
+    .header h1 {
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .header p {
+      font-size: 16px;
+      opacity: 0.95;
+      font-weight: 400;
+    }
+    .content {
+      padding: 25px 20px;
+      background-color: #ffffff;
+    }
+    .greeting {
+      font-size: 16px;
+      margin-bottom: 15px;
+      color: #374151;
+    }
+    .message {
+      font-size: 15px;
+      color: #4b5563;
+      margin-bottom: 20px;
+      line-height: 1.6;
+    }
+    .info-card {
+      background: linear-gradient(to right, #eff6ff, #ffffff);
+      border: 1px solid #dbeafe;
+      border-left: 4px solid #3b82f6;
+      border-radius: 8px;
+      padding: 20px;
+      margin: 18px 0;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+    .info-card h3 {
+      color: #2563eb;
+      font-size: 17px;
+      margin-bottom: 12px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid #f3f4f6;
+    }
+    .info-row:last-child {
+      border-bottom: none;
+    }
+    .info-label {
+      font-weight: 600;
+      color: #6b7280;
+      font-size: 14px;
+    }
+    .info-value {
+      color: #111827;
+      font-weight: 500;
+      text-align: right;
+      font-size: 14px;
+    }
+    .alert {
+      padding: 14px 16px;
+      border-radius: 8px;
+      margin: 18px 0;
+      font-size: 14px;
+      line-height: 1.5;
+      border-left: 4px solid;
+    }
+    .alert-warning {
+      background-color: #fef3c7;
+      border-left-color: #f59e0b;
+      color: #92400e;
+    }
+    .alert strong {
+      font-weight: 700;
+    }
+    .footer {
+      background-color: #1f2937;
+      color: #9ca3af;
+      padding: 20px;
+      text-align: center;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .footer p {
+      margin: 5px 0;
+    }
+    .divider {
+      height: 1px;
+      background: linear-gradient(to right, transparent, #e5e7eb, transparent);
+      margin: 20px 0;
+    }
+    @media only screen and (max-width: 600px) {
+      .email-wrapper {
+        border-radius: 0;
+      }
+      .header, .content, .footer {
+        padding: 20px 15px;
+      }
+      .info-row {
+        flex-direction: column;
+        gap: 4px;
+      }
+      .info-value {
+        text-align: left;
+      }
+    }
+  </style>
 </head>
-<body style="margin:0 !important; padding:0 !important; background-color:#ffffff; width:100% !important;">
-  <!-- Preheader (hidden) -->
-  <div style="display:none; max-height:0; overflow:hidden; mso-hide:all;">
-    We’ve received your application to MV Clouds Private Limited.
+<body>
+  <div class="email-wrapper">
+    <div class="header">
+      <h1>📋 New Leave Request</h1>
+      <p>Approval Required</p>
+    </div>
+    
+    <div class="content">
+      <div class="greeting">
+        Dear <strong>{{recipientName}}</strong>,
+      </div>
+      
+      <div class="message">
+        A new leave request has been submitted by <strong>{{employeeName}}</strong> and requires your review and approval.
+      </div>
+      
+      <div class="info-card">
+        <h3>📅 Leave Request Details</h3>
+        <div class="info-row">
+          <span class="info-label">Employee</span>
+          <span class="info-value">{{employeeName}}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Leave Type</span>
+          <span class="info-value">{{leaveType}}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Start Date</span>
+          <span class="info-value">{{startDate}}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">End Date</span>
+          <span class="info-value">{{endDate}}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Total Duration</span>
+          <span class="info-value"><strong>{{duration}} day(s)</strong></span>
+        </div>
+      </div>
+      
+      <div class="alert alert-warning">
+        <strong>⏰ Action Required:</strong> Please log in to the HRMS portal to review this leave request. Your timely response will help {{employeeName}} plan accordingly.
+      </div>
+      
+      <div class="divider"></div>
+      
+      <div class="message" style="text-align: center; margin-top: 20px;">
+        <p style="margin-bottom: 8px;">Best regards,</p>
+        <p style="font-weight: 600; color: #111827;">MV Clouds HRMS Team</p>
+      </div>
+    </div>
+    
+    <div class="footer">
+      <p>© {{year}} MV Clouds Private Limited. All rights reserved.</p>
+      <p>D-404, The First Synthesis, B/H Keshav Baugh Party Plot</p>
+      <p>Shivalik High-Street, Ahmedabad - 380015</p>
+      <p style="margin-top: 10px;">
+        <a href="mailto:info@mvclouds.com" style="color: #60a5fa; text-decoration: none;">info@mvclouds.com</a>
+        |
+        <a href="http://www.mvclouds.com" target="_blank" style="color: #60a5fa; text-decoration: none;">www.mvclouds.com</a>
+      </p>
+    </div>
   </div>
-
-  <!-- Wrapper -->
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="border-collapse:collapse; border-spacing:0; mso-table-lspace:0pt; mso-table-rspace:0pt;">
-    <tr>
-      <td align="center" style="padding:0;">
-
-        <!-- Main Card -->
-        <table role="presentation" width="700" class="container" cellpadding="0" cellspacing="0" border="0" style="width:700px; max-width:700px; border-radius:8px; box-shadow:0 0 5px rgba(0,0,0,0.25); overflow:hidden; border-collapse:collapse; border-spacing:0; mso-table-lspace:0pt; mso-table-rspace:0pt;">
-          
-          <!-- Header -->
-          <tr>
-            <td align="center" valign="top" style="padding:0; background:#ffffff; background-image:linear-gradient(to bottom, #ffffff 0%, #f0faff 40%, #CCECF9 100%);">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:700px; border-collapse:collapse; border-spacing:0; mso-table-lspace:0pt; mso-table-rspace:0pt;">
-                <tr>
-                  <td align="left" valign="middle" style="padding:20px;">
-                    <a href="https://mvclouds.com/" target="_blank" style="text-decoration:none;">
-                      <img src="https://estatexpertlistingimages.s3.amazonaws.com/logo_11_08_2025_12:32:17.png" width="150" alt="MV Clouds Logo" style="display:block; height:auto; border:0; max-height:50px;">
-                    </a>
-                  </td>
-                  <td align="right" valign="middle" style="padding:20px;" class="social-icons">
-  <a href="https://www.facebook.com/profile.php?id=100063698268170" style="text-decoration: none;" target="_blank">
-    <img src="https://estatexpertlistingimages.s3.amazonaws.com/facebook_logo_11_08_2025_12:32:17.png" width="24" alt="Facebook" style="display:inline-block; border:0; margin-left:10px;">
-  </a>
-  <a href="https://in.linkedin.com/company/mv-clouds-private-limited" style="text-decoration: none;" target="_blank">
-    <img src="https://estatexpertlistingimages.s3.amazonaws.com/linkedin_logo_11_08_2025_12:32:17.png" width="24" alt="LinkedIn" style="display:inline-block; border:0; margin-left:10px;">
-  </a>
-  <a href="https://www.instagram.com/mvcloudsync/" style="text-decoration: none;" target="_blank">
-    <img src="https://estatexpertlistingimages.s3.amazonaws.com/instagram_logo_11_08_2025_12:32:17.png" width="24" alt="Instagram" style="display:inline-block; border:0; margin-left:10px;">
-  </a>
-  <a href="https://www.youtube.com/@mvclouds5437" style="text-decoration: none;" target="_blank">
-    <img src="https://estatexpertlistingimages.s3.amazonaws.com/youtube_logo_11_08_2025_12:32:17.png" width="24" alt="YouTube" style="display:inline-block; border:0; margin-left:10px;">
-  </a>
-</td>
-
-                </tr>
-              </table>
-            </td>
-          </tr>
-
-          <!-- Main background strip -->
-          <tr>
-            <td align="center" valign="top" bgcolor="#CCECF9" style="padding:0;">
-              
-              <!-- Inner card -->
-              <!--[if gte mso 9]>
-              <v:rect xmlns:v="urn:schemas-microsoft-com:vml" fill="true" stroke="false" style="width:700px; height:auto;">
-                <v:fill type="tile" src="https://estatexpertlistingimages.s3.amazonaws.com/curv_11_08_2025_12:32:17.png" color="#e0f2f9" />
-                <v:textbox inset="0,0,0,0">
-              <![endif]-->
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:700px; border-collapse:collapse; border-spacing:0; mso-table-lspace:0pt; mso-table-rspace:0pt;">
-                <tr>
-                  <td align="center" style="padding:20px;">
-                    <table role="presentation" width="600" class="inner" cellpadding="0" cellspacing="0" border="0" style="width:600px; max-width:600px; background-color:#e0f2f9; border-radius:16px; box-shadow:0 4px 20px rgba(0,0,0,0.10); background-image:url('https://estatexpertlistingimages.s3.amazonaws.com/curv_11_08_2025_12:32:17.png'); background-repeat:no-repeat; background-position:right top; background-size:contain; border-collapse:collapse; border-spacing:0; mso-table-lspace:0pt; mso-table-rspace:0pt;">
-                      <tr>
-                        <td align="center" style="padding:20px;">
-                          <img src="https://estatexpertlistingimages.s3.amazonaws.com/interview_scheduled_vector_11_08_2025_12:32:17.png" alt="Application Received" width="400" class="hero" style="display:block; width:60%; max-width:400px; height:auto; margin:20px 0 50px 0; border:0;">
-                          <div class="force-text" style="text-align:left; font-family: Verdana, Arial, sans-serif; font-size:16px; line-height:1.5; color:#000000;">
-                            <p>    
-                Dear {!Interview__c.Job_Application__r.Contact__r.Name},<br><br>
-                We noticed you were unable to attend your scheduled interview today, and we hope everything is okay.
-            </p>
-            <p>
-                If you are still interested in the {!Interview__c.Job_Application__r.Job_Posting__r.Job_Name__c} position, please let us know. Should you have a valid reason for missing the interview, we would be happy to reschedule. If we do not hear from you, we will proceed with other candidates.
-            </p>
-            <p>
-                Thank you for your time and consideration.
-            </p>
-            <p>
-                Regards,<br>
-                <b>MV Clouds Team</b>
-            </p>
-                          </div>
-                        </td>
-                      </tr>
-                    </table>
-                  </td>
-                </tr>
-              </table>
-              <!--[if gte mso 9]>
-                </v:textbox>
-              </v:rect>
-              <![endif]-->
-            </td>
-          </tr>
-
-          <!-- Footer -->
-          <tr>
-            <td align="center" valign="top" bgcolor="#CCECF9" style="padding:0;">
-              <!--[if gte mso 9]>
-              <v:rect xmlns:v="urn:schemas-microsoft-com:vml" fill="true" stroke="false" style="width:700px; height:auto;">
-                <v:fill type="frame" src="https://estatexpertlistingimages.s3.amazonaws.com/footer_11_08_2025_12:32:17.png" color="#CCECF9" />
-                <v:textbox inset="0,0,0,0">
-              <![endif]-->
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" 
-                style="max-width:700px; background-color:#CCECF9; background-image:url('https://estatexpertlistingimages.s3.amazonaws.com/footer_11_08_2025_12:32:17.png'); background-repeat:no-repeat; background-size:100% auto; border-collapse:collapse; border-spacing:0; mso-table-lspace:0pt; mso-table-rspace:0pt;" 
-                class="footer-bg">
-                <tr>
-                  <td align="center" class="footer-pad" style="padding:0 20px 150px 20px;">
-                    <div class="force-text" style="font-family: Verdana, Arial, sans-serif; font-size:12px; color:#000000; text-align:center;">
-                      Get in touch with us at <br>
-                      <a href="mailto:info@mvclouds.com" style="color:#0070d2; text-decoration:none;">info@mvclouds.com</a>
-                      &nbsp;|&nbsp;
-                      <a href="http://www.mvclouds.com" target="_blank" style="color:#0070d2; text-decoration:none;">www.mvclouds.com</a>
-                    </div>
-                    <div class="force-text" style="font-family: Verdana, Arial, sans-serif; font-size:12px; color:#000000; text-align:center; margin-top:6px;">
-                      D-404, The First Synthesis, B/H Keshav Baugh Party Plot,<br>Shivalik High-Street, Ahmedabad - 380015
-                    </div>
-                    <!-- Mobile-only footer image -->
-                    <img src="https://estatexpertlistingimages.s3.amazonaws.com/footer_11_08_2025_12:32:17.png" 
-                         alt="" style="display:none; max-width:100%; height:auto;" class="footer-img">
-                  </td>
-                </tr>
-              </table>
-              <!--[if gte mso 9]>
-                </v:textbox>
-              </v:rect>
-              <![endif]-->
-            </td>
-          </tr>
-
-        </table>
-        <!-- /Main Card -->
-
-      </td>
-    </tr>
-  </table>
-  <!-- /Wrapper -->
 </body>
 </html>

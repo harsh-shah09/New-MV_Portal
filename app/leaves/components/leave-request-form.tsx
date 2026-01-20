@@ -160,11 +160,11 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
         }}
         className="mt-4"
       >
-          {employeeName && (
+          {/* {employeeName && (
             <div className="mb-4 p-3 bg-blue-50 rounded-lg text-blue-900 border border-blue-100">
                <span className="font-semibold">Requesting for:</span> {employeeName}
             </div>
-          )}
+          )} */}
 
           {/* Leave Category Selection */}
           <Form.Item name="leaveCategory" label="Leave Category" rules={[{ required: true }]}>

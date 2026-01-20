@@ -265,9 +265,24 @@ export async function POST(request: NextRequest) {
     } = body;
     const rulesAlreadyConfirmed = confirmedRules === true;
 
+    console.log('Duration received from client:', duration);
+
     // Validate required fields
     if (!leaveCategory || !startDate || !endDate || !sessionValue) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    }
+
+    // Validate that leave is not being applied for past dates
+    const today = dayjs().startOf("day");
+    const leaveStartDate = dayjs(startDate).startOf("day");
+    
+    if (leaveStartDate.isBefore(today)) {
+      return NextResponse.json({ 
+        error: "Cannot apply leave for past dates",
+        details: {
+          message: "Leave start date cannot be in the past. Please select a current or future date."
+        }
+      }, { status: 400 });
     }
 
     const conn = await getSalesforceConnection();
@@ -375,7 +390,6 @@ export async function POST(request: NextRequest) {
     // Server-side One+Two rule calculation (planned leave within 5 working days)
     // For half-day leaves: 0.5 + (0.5 × 2) = 1.5 total
     // For full-day leaves: 1 + 2 = 3 per day
-    const today = dayjs().startOf("day");
     let onePlusTwoExtra = 0;
     if (applyRules) {
       // Helper to count working days between two dates
@@ -538,7 +552,7 @@ export async function POST(request: NextRequest) {
                 leaveType: leaveType || 'N/A',
                 startDate: start.format('YYYY-MM-DD'),
                 endDate: end.format('YYYY-MM-DD'),
-                duration: finalTotalAfterRules
+                duration: duration
               });
               sendEmailAsync({
                 to: adminEmail,
@@ -559,7 +573,7 @@ export async function POST(request: NextRequest) {
             leaveType: leaveType || 'N/A',
             startDate: start.format('YYYY-MM-DD'),
             endDate: end.format('YYYY-MM-DD'),
-            duration: finalTotalAfterRules
+            duration: duration
           });
           sendEmailAsync({
             to: getHREmail(),
@@ -580,7 +594,7 @@ export async function POST(request: NextRequest) {
               leaveType: leaveType || 'N/A',
               startDate: start.format('YYYY-MM-DD'),
               endDate: end.format('YYYY-MM-DD'),
-              duration: finalTotalAfterRules
+              duration: duration
             });
             sendEmailAsync({
               to: teamLeadEmail,
@@ -680,7 +694,7 @@ export async function PATCH(request: NextRequest) {
     if (action === "withdraw") {
       // Verify the leave belongs to the current user
       const leaveRecordQuery = await conn.query<any>(`
-        SELECT Id, Employee__c, Status__c, Leave_Category__c, Leave_Type__c, Total_Days__c, Total_Days_After_Rule__c
+        SELECT Id, Employee__c, Status__c, Leave_Category__c, Leave_Type__c, Total_Days__c, Total_Days_After_Rule__c, Start_Date__c, End_Date__c
         FROM Leave__c
         WHERE Id = '${leaveId}'
         LIMIT 1
@@ -711,7 +725,8 @@ export async function PATCH(request: NextRequest) {
         // Send email notification about withdrawal
         try {
           const empData = await conn.query<any>(`
-            SELECT Id, Employee_Email__c, Employee_Name__c
+            SELECT Id, Employee_Email__c, Employee_Name__c, Role__c, Title__c,
+                   Team_Lead__c, Team_Lead__r.Employee_Name__c, Team_Lead__r.Employee_Email__c
             FROM Employee__c
             WHERE Id = '${leave.Employee__c}'
             LIMIT 1
@@ -719,12 +734,95 @@ export async function PATCH(request: NextRequest) {
 
           if (empData.records && empData.records.length > 0) {
             const emp = empData.records[0];
+            const employeeName = emp.Employee_Name__c || 'Employee';
+            const employeeRole = emp.Role__c;
+            const employeeTitle = emp.Title__c;
+            
+            // Send email to employee
             if (emp.Employee_Email__c) {
+              const emailTemplate = leaveWithdrawn({
+                recipientName: employeeName,
+                leaveType: leave.Leave_Type__c || leave.Leave_Category__c || 'N/A',
+                startDate: leave.Start_Date__c || 'N/A',
+                endDate: leave.End_Date__c || 'N/A',
+                duration: leave.Total_Days__c || 0
+              });
               sendEmailAsync({
                 to: emp.Employee_Email__c,
-                subject: 'Leave Status Update',
-                body: `Dear ${emp.Employee_Name__c || 'Employee'},\n\nYour leave request has been Withdrawn.\n\nRegards,\nHR Team`
+                subject: emailTemplate.subject,
+                body: emailTemplate.html
               });
+            }
+
+            // Send notification to Team Lead (for regular employees)
+            if (employeeRole !== 'HR' && employeeRole !== 'Admin' && !(employeeRole === 'Developer' && employeeTitle === 'Team Lead')) {
+              const teamLeadEmail = emp.Team_Lead__r?.Employee_Email__c;
+              const teamLeadName = emp.Team_Lead__r?.Employee_Name__c;
+              
+              if (teamLeadEmail) {
+                const tlEmailTemplate = leaveWithdrawn({
+                  recipientName: teamLeadName || 'Team Lead',
+                  employeeName,
+                  leaveType: leave.Leave_Type__c || leave.Leave_Category__c || 'N/A',
+                  startDate: leave.Start_Date__c || 'N/A',
+                  endDate: leave.End_Date__c || 'N/A',
+                  duration: leave.Total_Days__c || 0
+                });
+                sendEmailAsync({
+                  to: teamLeadEmail,
+                  subject: `Leave Withdrawn - ${employeeName}`,
+                  body: tlEmailTemplate.html
+                });
+              }
+            }
+
+            // Send notification to HR (for all employees except Admin)
+            if (employeeRole !== 'Admin') {
+              const hrEmailTemplate = leaveWithdrawn({
+                recipientName: 'HR Team',
+                employeeName,
+                leaveType: leave.Leave_Type__c || leave.Leave_Category__c || 'N/A',
+                startDate: leave.Start_Date__c || 'N/A',
+                endDate: leave.End_Date__c || 'N/A',
+                duration: leave.Total_Days__c || 0
+              });
+              sendEmailAsync({
+                to: getHREmail(),
+                subject: `Leave Withdrawn - ${employeeName}`,
+                body: hrEmailTemplate.html
+              });
+            }
+
+            // Send notification to Admin (if employee is HR)
+            if (employeeRole === 'HR') {
+              const adminQuery = await conn.query<any>(`
+                SELECT Id, Employee_Name__c, Employee_Email__c
+                FROM Employee__c
+                WHERE Role__c = 'Admin'
+                LIMIT 1
+              `);
+
+              if (adminQuery.records && adminQuery.records.length > 0) {
+                const admin = adminQuery.records[0];
+                const adminEmail = admin.Employee_Email__c;
+                const adminName = admin.Employee_Name__c;
+
+                if (adminEmail) {
+                  const adminEmailTemplate = leaveWithdrawn({
+                    recipientName: adminName || 'Admin',
+                    employeeName,
+                    leaveType: leave.Leave_Type__c || leave.Leave_Category__c || 'N/A',
+                    startDate: leave.Start_Date__c || 'N/A',
+                    endDate: leave.End_Date__c || 'N/A',
+                    duration: leave.Total_Days__c || 0
+                  });
+                  sendEmailAsync({
+                    to: adminEmail,
+                    subject: `Leave Withdrawn - ${employeeName} (HR)`,
+                    body: adminEmailTemplate.html
+                  });
+                }
+              }
             }
           }
         } catch (emailError) {
