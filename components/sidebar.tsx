@@ -65,7 +65,10 @@ export function Sidebar({
   if (user?.role?.includes('HR')) {
      navItems.push({ href: "/nda", label: "Document Manager", icon: FileCheck });
   }
-
+  // Add Admin Console for HR/Admin
+  if (user?.role?.includes('HR') || user?.role?.includes('Admin')) {
+      navItems.push({ href: "/admin", label: "Admin Console", icon: Settings });
+  }
   const { data: notifications } = useQuery({
       queryKey: ['notifications'],
       queryFn: async () => {
