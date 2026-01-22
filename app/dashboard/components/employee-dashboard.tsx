@@ -8,6 +8,7 @@ import { RecentLeaves } from "./employee/recent-leaves"
 import { UpcomingLeavesHolidays } from "./employee/upcoming-leaves-holidays"
 import { LeaveUtilizationSummary } from "./employee/leave-utilization-summary"
 import { TeamOnLeave } from "./employee/team-on-leave"
+import { GoogleIntegration } from "./employee/google-integration"
 
 interface EmployeeDashboardProps {
   data: any
@@ -57,6 +58,9 @@ export function EmployeeDashboard({ data }: EmployeeDashboardProps) {
 
       {/* Recent Leaves Table */}
       <RecentLeaves recentLeaves={recentLeaves} />
+
+      {/* Google Integration */}
+      <GoogleIntegration />
 
       {/* Upcoming Leaves and Holidays */}
       <UpcomingLeavesHolidays 

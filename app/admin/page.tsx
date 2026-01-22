@@ -10,7 +10,15 @@ import {
   AlertTriangle, 
   Loader2,
   X,
-  Plus
+  Plus,
+  Users,
+  Search,
+  CheckCircle2,
+  XCircle,
+  Workflow,
+  Check,
+  RefreshCw,
+  Trash2
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { message, Modal, Spin } from "antd";
@@ -22,12 +30,19 @@ const formatLabel = (str: string) => {
 };
 
 export default function AdminConsole() {
-  const [activeTab, setActiveTab] = useState<"admin" | "documents" | "email" | "leave">("admin");
+  const [activeTab, setActiveTab] = useState<"admin" | "documents" | "email" | "leave" | "users" | "integration">("admin");
   const [configs, setConfigs] = useState<any>(null);
+  const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [userSearch, setUserSearch] = useState("");
   const [saving, setSaving] = useState(false);
   const [unsavedChanges, setUnsavedChanges] = useState<any[]>([]);
   
+  // Integration List State
+  const [connectedUsers, setConnectedUsers] = useState<any[]>([]);
+  const [loadingIntegrations, setLoadingIntegrations] = useState(false);
+
   // Email Editor State
   const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
 
@@ -35,6 +50,85 @@ export default function AdminConsole() {
   useEffect(() => {
     fetchConfigs();
   }, []);
+
+  useEffect(() => {
+    if (activeTab === 'users') {
+        if(users.length === 0) fetchUsers();
+    }
+    if (activeTab === 'integration') {
+        if(users.length === 0) fetchUsers(); // Need users to match names
+        fetchConnectedUsers();
+    }
+  }, [activeTab]);
+
+  const fetchConnectedUsers = async () => {
+    try {
+        setLoadingIntegrations(true);
+        const res = await fetch('/api/admin/integrations/google');
+        if (res.ok) {
+            const data = await res.json();
+            setConnectedUsers(data);
+        }
+    } catch (e) {
+        console.error("Failed to fetch connected users", e);
+    } finally {
+        setLoadingIntegrations(false);
+    }
+  }
+
+  const handleDeleteIntegration = async (employeeId: string) => {
+    if(!confirm("Are you sure you want to disconnect this user's Google integration?")) return;
+    
+    try {
+        const res = await fetch(`/api/admin/integrations/google?employeeId=${employeeId}`, {
+            method: 'DELETE'
+        });
+        if(res.ok) {
+            message.success("Integration removed");
+            fetchConnectedUsers();
+        } else {
+            message.error("Failed to remove integration");
+        }
+    } catch(e) {
+        message.error("Failed to remove integration");
+    }
+  }
+
+
+
+  const fetchUsers = async () => {
+      try {
+          setLoadingUsers(true);
+          const res = await fetch('/api/admin/users');
+          if (!res.ok) throw new Error("Failed to fetch users");
+          const data = await res.json();
+          console.log('users',data)
+          setUsers(data);
+      } catch (e) {
+          message.error("Failed to load users");
+      } finally {
+          setLoadingUsers(false);
+      }
+  };
+
+  const updateUser = async (employeeId: string, updates: any) => {
+      // Optimistic update
+      setUsers(prev => prev.map(u => u.Id === employeeId ? { ...u, ...updates } : u));
+      
+      try {
+          const res = await fetch('/api/admin/users', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ employeeId, updates })
+          });
+          if (!res.ok) throw new Error("Update failed");
+          message.success("User updated");
+      } catch (e) {
+          message.error("Failed to update user");
+          // Revert on failure (could be improved)
+          fetchUsers();
+      }
+  };
 
   const fetchConfigs = async () => {
     try {
@@ -229,6 +323,8 @@ export default function AdminConsole() {
                     <TabButton id="admin" label="General Settings" icon={Settings} />
                     <TabButton id="documents" label="Documents Config" icon={FileText} />
                     <TabButton id="leave" label="Leave Rules" icon={Calendar} />
+                    <TabButton id="users" label="User Access" icon={Users} />
+                    <TabButton id="integration" label="Connected Users" icon={Workflow} />
                     <TabButton id="email" label="Email Templates" icon={Mail} />
                 </div>
                 
@@ -374,6 +470,189 @@ export default function AdminConsole() {
                                             )}
                                         </div>
                                     ))}
+                                </div>
+                            )}
+
+                            {activeTab === "users" && (
+                                <div className="space-y-6">
+                                    <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+                                        <div>
+                                            <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                                                <Users className="w-5 h-5 text-indigo-500" /> User Access
+                                            </h2>
+                                            <p className="text-slate-500 text-sm mt-1">Manage portal access and role visibility.</p>
+                                        </div>
+                                        <div className="relative w-full md:w-64">
+                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                            <input 
+                                                type="text" 
+                                                placeholder="Search employees..." 
+                                                value={userSearch}
+                                                onChange={e => setUserSearch(e.target.value)}
+                                                className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {loadingUsers ? (
+                                        <div className="flex justify-center py-10"><Spin /></div>
+                                    ) : (
+                                        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                                            <div className="overflow-x-auto">
+                                                <table className="w-full text-left text-sm text-slate-600">
+                                                    <thead className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200">
+                                                        <tr>
+                                                            <th className="px-6 py-4">Employee</th>
+                                                            <th className="px-6 py-4">Role / Visibility</th>
+                                                            <th className="px-6 py-4">Portal Access</th>
+                                                            <th className="px-6 py-4">Status</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-slate-100">
+                                                        {users.filter(u => 
+                                                            u.Name?.toLowerCase().includes(userSearch.toLowerCase()) || 
+                                                            u.Email?.toLowerCase().includes(userSearch.toLowerCase())
+                                                        ).map(user => (
+                                                            <tr key={user.Id} className="hover:bg-slate-50/50 transition-colors">
+                                                                <td className="px-6 py-4">
+                                                                    <div className="flex items-center gap-3">
+                                                                        <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden">
+                                                                            {user.Photo ? <img src={user.Photo} className="w-full h-full object-cover" /> : <span className="text-xs font-bold text-slate-500">{user.Name?.charAt(0)}</span>}
+                                                                        </div>
+                                                                        <div>
+                                                                            <div className="font-medium text-slate-900">{user.Name}</div>
+                                                                            <div className="text-xs text-slate-400">{user.Email}</div>
+                                                                        </div>
+                                                                    </div>
+                                                                </td>
+                                                                <td className="px-6 py-4">
+                                                                    <select 
+                                                                        value={user.Role || 'Employee'}
+                                                                        onChange={(e) => updateUser(user.Id, { Role__c: e.target.value })}
+                                                                        className="bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs font-medium focus:ring-2 focus:ring-indigo-500 outline-none"
+                                                                    >
+                                                                        <option value="Employee">Employee (Standard)</option>
+                                                                        <option value="HR">HR (Manager)</option>
+                                                                        <option value="Admin">Admin (Full Access)</option>
+                                                                    </select>
+                                                                </td>
+                                                                <td className="px-6 py-4">
+                                                                    <button 
+                                                                        onClick={() => {
+                                                                            const data = {
+                                                                                Active__c: user.Active__c ? false : true
+                                                                            }
+                                                                            console.log(data)
+                                                                            updateUser(user.Id, data)}}
+                                                                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                                                                            user.Active__c 
+                                                                            ? "bg-green-100 text-green-700 hover:bg-green-200" 
+                                                                            : "bg-red-100 text-red-700 hover:bg-red-200"
+                                                                        }`}
+                                                                    >
+                                                                        {user.Active__c ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                                                                        {user.Active__c ? 'Enabled' : 'Disabled'}
+                                                                    </button>
+                                                                </td>
+                                                                <td className="px-6 py-4">
+                                                                    <span className={`inline-block w-2 h-2 rounded-full mr-2 ${
+                                                                        user.Status === 'Active' ? 'bg-green-500' : 'bg-red-400'
+                                                                    }`}></span>
+                                                                    {user.Status === 'Active' ? 'Active' : 'Inactive'}
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                            {users.length === 0 && !loadingUsers && (
+                                                <div className="p-8 text-center text-slate-400 italic">No employees found.</div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+
+
+
+
+                            {activeTab === "integration" && (
+                                <div className="space-y-6">
+                                     <div className="flex justify-between items-center mb-6">
+                                        <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                                            <Workflow className="w-5 h-5 text-orange-500" /> Google Connected Users
+                                        </h2>
+                                        <button onClick={fetchConnectedUsers} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500">
+                                            <RefreshCw className="w-4 h-4" />
+                                        </button>
+                                     </div>
+
+                                     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                                        {loadingIntegrations || loadingUsers ? (
+                                             <div className="p-12 flex justify-center">
+                                                 <Spin indicator={<Loader2 className="w-8 h-8 animate-spin text-blue-500" />} />
+                                             </div>
+                                        ) : (
+                                            <div className="overflow-x-auto">
+                                                <table className="w-full text-left">
+                                                    <thead className="bg-slate-50 border-b border-slate-200">
+                                                        <tr>
+                                                            <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Employee</th>
+                                                            <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Connected Since</th>
+                                                            <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
+                                                            <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">Actions</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-slate-100">
+                                                        {connectedUsers.map((item) => {
+                                                            const employee = users.find(u => u.Id === item.Employee_Id);
+                                                            return (
+                                                                <tr key={item.Employee_Id} className="hover:bg-slate-50/50 transition-colors">
+                                                                    <td className="px-6 py-4">
+                                                                        <div className="flex items-center gap-3">
+                                                                             <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden font-bold text-slate-500 text-xs">
+                                                                                 {employee?.Photo ? <img src={employee.Photo} className="w-full h-full object-cover" /> : (employee?.Name?.charAt(0) || '?')}
+                                                                             </div>
+                                                                             <div>
+                                                                                 <div className="font-medium text-slate-900">{employee?.Name || 'Unknown Employee'}</div>
+                                                                                 <div className="text-xs text-slate-400">{employee?.Email || 'No Email'}</div>
+                                                                             </div>
+                                                                        </div>
+                                                                    </td>
+                                                                    <td className="px-6 py-4 text-sm text-slate-600">
+                                                                        {item.updated_at ? new Date(item.updated_at).toLocaleDateString() : 'N/A'}
+                                                                    </td>
+                                                                    <td className="px-6 py-4">
+                                                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
+                                                                            <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+                                                                            Active
+                                                                        </span>
+                                                                    </td>
+                                                                    <td className="px-6 py-4 text-right">
+                                                                        <button 
+                                                                            onClick={() => handleDeleteIntegration(item.Employee_Id)}
+                                                                            className="text-red-500 hover:text-red-700 p-2 hover:bg-red-50 rounded-lg transition-colors"
+                                                                            title="Revoke Access"
+                                                                        >
+                                                                            <Trash2 className="w-4 h-4" />
+                                                                        </button>
+                                                                    </td>
+                                                                </tr>
+                                                            );
+                                                        })}
+                                                        {connectedUsers.length === 0 && (
+                                                            <tr>
+                                                                <td colSpan={4} className="px-6 py-12 text-center text-slate-400 italic">
+                                                                    No users have connected their Google Workspace account yet.
+                                                                </td>
+                                                            </tr>
+                                                        )}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        )}
+                                     </div>
                                 </div>
                             )}
 

@@ -8,6 +8,7 @@ import { EmployeeStats } from "./hr/employee-stats"
 import { RecentActivities } from "./hr/recent-activities"
 import { HRQuickActions } from "./hr/hr-quick-actions"
 import { EmployeesOnLeave } from "./hr/employees-on-leave"
+import { GoogleIntegration } from "./employee/google-integration"
 
 interface HRDashboardProps {
   data: any
@@ -63,6 +64,9 @@ export function HRDashboard({ data }: HRDashboardProps) {
 
       {/* Employees On Leave Today */}
       <EmployeesOnLeave employeesOnLeave={employeesOnLeave} />
+
+      {/* Google Integration */}
+      <GoogleIntegration />
     </div>
   )
 }

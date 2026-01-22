@@ -118,6 +118,7 @@ export interface Employee {
   Emergency_Contact_Relation__c?: string;
   Gender__c?: string;
   Is2FAEnabled__c?: boolean;
+  Active__c?: boolean;
   
   // Standard fields
   Name?: string; // Standard name field often exists, but we rely on Employee_Name__c
@@ -139,7 +140,7 @@ export const findEmployee = async (identifier: string): Promise<Employee | null>
   const escapedIdentifier = identifier.replace(/'/g, "\\'");
   // Updated query to fetch fields from Employee__c directly
   const query = `
-    SELECT Id, Employee_Name__c, Employee_Email__c, Password__c, Role__c, Title__c, Is2FAEnabled__c, Name 
+    SELECT Id, Employee_Name__c, Employee_Email__c, Password__c, Role__c, Title__c, Is2FAEnabled__c, Name, Active__c
     FROM Employee__c 
     WHERE ${isEmail ? 'Employee_Email__c' : 'Employee_Id__c'} = '${escapedIdentifier}' 
     LIMIT 1
@@ -160,7 +161,7 @@ export const getAllEmployees = async (): Promise<any[]> => {
   if (!conn) return [];
 
   const query = `
-    SELECT Id, Joining_Date__c, Base_Salary__c, Status__c, Salary_CTC__c, Profile_Photo__c, 
+    SELECT Id, Joining_Date__c, Base_Salary__c, Status__c, Salary_CTC__c, Profile_Photo__c, Active__c,
            Employee_Name__c, Employee_Email__c, Employee_Phone__c, Birthdate__c, Gender__c, 
            Employee_Address__c,
            Emergency_Contact_Name__c, Emergency_Contact_Number__c, Emergency_Contact_Relation__c, 
