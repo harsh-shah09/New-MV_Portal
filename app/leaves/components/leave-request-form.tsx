@@ -1,16 +1,25 @@
 "use client"
 
-import { useState } from "react"
-import { Modal, Form, Input, Select, DatePicker, message , Button} from "antd"
+import { useState, useEffect } from "react"
+import { Modal, Form, Input, Select, DatePicker, message , Button, Tooltip } from "antd"
 import dayjs from "dayjs"
 import { toast } from "sonner"
 import type { LeaveRequest } from "@/types"
+import type { Dayjs } from "dayjs"
 
 interface LeaveRequestFormProps {
   onSubmit: (data: Partial<LeaveRequest>) => void
   onCancel: () => void
   employeeId?: string
   employeeName?: string
+}
+
+interface Holiday {
+  id: string
+  name: string
+  date: string
+  day: string
+  year: string
 }
 
 const { Option } = Select
@@ -20,6 +29,32 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
   const [form] = Form.useForm()
   const [duration, setDuration] = useState(0)
   const [leaveCategory, setLeaveCategory] = useState<string>("")
+  const [holidays, setHolidays] = useState<Holiday[]>([])
+  const [holidayMap, setHolidayMap] = useState<Map<string, string>>(new Map())
+
+  // Fetch holidays on component mount
+  useEffect(() => {
+    const fetchHolidays = async () => {
+      try {
+        const response = await fetch('/api/holidays')
+        if (response.ok) {
+          const data = await response.json()
+          setHolidays(data.holidays || [])
+          
+          // Create a map for quick lookup: date -> holiday name
+          const map = new Map<string, string>()
+          data.holidays?.forEach((holiday: Holiday) => {
+            map.set(holiday.date, holiday.name)
+          })
+          setHolidayMap(map)
+        }
+      } catch (error) {
+        console.error('Error fetching holidays:', error)
+      }
+    }
+    
+    fetchHolidays()
+  }, [])
 
   // Recalculate duration when dates change
   const onValuesChange = (changedValues: any, allValues: any) => {
@@ -48,6 +83,33 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
                setDuration(diff)
            }
       }
+  }
+
+  // Custom date cell render to highlight holidays
+  const dateFullCellRender = (current: Dayjs) => {
+    const dateStr = current.format('YYYY-MM-DD')
+    const holidayName = holidayMap.get(dateStr)
+    
+    if (holidayName) {
+      return (
+        <Tooltip title={holidayName} placement="top">
+          <div className="ant-picker-cell-inner" style={{
+            background: '#fee2e2',
+            color: '#dc2626',
+            fontWeight: 'bold',
+            borderRadius: '4px'
+          }}>
+            {current.date()}
+          </div>
+        </Tooltip>
+      )
+    }
+    
+    return (
+      <div className="ant-picker-cell-inner">
+        {current.date()}
+      </div>
+    )
   }
 
   const handleFinish = (values: any) => {
@@ -160,6 +222,7 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
         }}
         className="mt-4"
       >
+
           {/* {employeeName && (
             <div className="mb-4 p-3 bg-blue-50 rounded-lg text-blue-900 border border-blue-100">
                <span className="font-semibold">Requesting for:</span> {employeeName}
@@ -190,11 +253,11 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
               </Form.Item>
               
               <Form.Item name="startDate" label="Start Date" rules={[{ required: true }]}>
-                   <DatePicker className="w-full" format="YYYY-MM-DD" />
+                   <DatePicker className="w-full" format="YYYY-MM-DD" dateRender={dateFullCellRender} />
               </Form.Item>
               
               <Form.Item name="endDate" label="End Date" rules={[{ required: true }]}>
-                   <DatePicker className="w-full" format="YYYY-MM-DD" />
+                   <DatePicker className="w-full" format="YYYY-MM-DD" dateRender={dateFullCellRender} />
               </Form.Item>
               
               <Form.Item name="session" label="Session" rules={[{ required: true }]}>
@@ -211,11 +274,11 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Form.Item name="startDate" label="Start Date" rules={[{ required: true }]}>
-                     <DatePicker className="w-full" format="YYYY-MM-DD" />
+                     <DatePicker className="w-full" format="YYYY-MM-DD" dateRender={dateFullCellRender} />
                 </Form.Item>
                 
                 <Form.Item name="endDate" label="End Date" rules={[{ required: true }]}>
-                     <DatePicker className="w-full" format="YYYY-MM-DD" />
+                     <DatePicker className="w-full" format="YYYY-MM-DD" dateRender={dateFullCellRender} />
                 </Form.Item>
                 
                 <Form.Item label="Duration">

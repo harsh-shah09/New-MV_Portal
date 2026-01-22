@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
 
     // Verify the session token
     const payload = await verifyToken(session);
-    
+
     if (!payload) {
       return NextResponse.json({ error: "Invalid session" }, { status: 401 });
     }
@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
 
     // Fetch leaves from Salesforce for this employee
     const conn = await getSalesforceConnection();
-    
+
     // Query upcoming leaves for the current employee
     const leaveRecords = await conn.query<any>(`
       SELECT 
@@ -75,12 +75,12 @@ export async function GET(request: NextRequest) {
       status: record.Status__c?.toLowerCase() || "pending",
       approvedBy: record.Approved_By__c,
       approvalDate: record.Approved_Date__c,
-      reason : '',
+      reason: '',
     }));
 
     // Fetch pending approvals based on user role
     let pendingApprovals: LeaveRequest[] = [];
-    
+
     // Admin can approve HR leaves
     if (role === 'Admin') {
       const pendingLeaveRecords = await conn.query<any>(`
@@ -105,7 +105,7 @@ export async function GET(request: NextRequest) {
       `);
 
       console.log("Fetched pending HR approvals for Admin:", pendingLeaveRecords);
-      
+
       pendingApprovals = pendingLeaveRecords.records.map((record: any) => ({
         id: record.Id,
         employeeId: record.Employee__c,
@@ -147,7 +147,7 @@ export async function GET(request: NextRequest) {
       `);
 
       console.log("Fetched pending approvals for HR:", pendingLeaveRecords);
-      
+
       pendingApprovals = pendingLeaveRecords.records.map((record: any) => ({
         id: record.Id,
         employeeId: record.Employee__c,
@@ -188,7 +188,7 @@ export async function GET(request: NextRequest) {
       `);
 
       console.log("Fetched pending approvals for Team Lead:", pendingLeaveRecords);
-      
+
       pendingApprovals = pendingLeaveRecords.records.map((record: any) => ({
         id: record.Id,
         employeeId: record.Employee__c,
@@ -241,7 +241,7 @@ export async function POST(request: NextRequest) {
     const payload = await verifyToken(session);
 
     console.log("Payload 111:", payload);
-    
+
     if (!payload) {
       return NextResponse.json({ error: "Invalid session" }, { status: 401 });
     }
@@ -251,11 +251,11 @@ export async function POST(request: NextRequest) {
     console.log("Request body:", body);
     console.log("Submitting user - Role:", role, "Title:", title);
 
-    const { 
-      leaveCategory, 
-      leaveType, 
-      startDate, 
-      endDate, 
+    const {
+      leaveCategory,
+      leaveType,
+      startDate,
+      endDate,
       duration,
       totalDeduction,
       session: sessionValue,
@@ -275,9 +275,9 @@ export async function POST(request: NextRequest) {
     // Validate that leave is not being applied for past dates
     const today = dayjs().startOf("day");
     const leaveStartDate = dayjs(startDate).startOf("day");
-    
+
     if (leaveStartDate.isBefore(today)) {
-      return NextResponse.json({ 
+      return NextResponse.json({
         error: "Cannot apply leave for past dates",
         details: {
           message: "Leave start date cannot be in the past. Please select a current or future date."
@@ -321,7 +321,7 @@ export async function POST(request: NextRequest) {
     const applySandwichRule = applyRules && !isHalfDay; // Sandwich rule does not apply to session-based leaves
 
     // Block leaves that fall entirely on weekends/holidays (ONLY for Loss of Pay)
-    // Extra Day Pay can be applied on weekends/holidays
+    // Extra Day Pay can ONLY be applied on weekends/holidays
     if (leaveCategory === 'loss-of-pay') {
       const nonWorkingDays: string[] = [];
       let allNonWorking = true;
@@ -348,12 +348,38 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
+    } else if (leaveCategory === 'extra-day-pay') {
+      // Extra Day Pay can ONLY be applied on weekends/holidays
+      const workingDays: string[] = [];
+      let hasWorkingDay = false;
+      let cursor = start.clone();
+      while (cursor.isSame(end) || cursor.isBefore(end)) {
+        const formatted = cursor.format("YYYY-MM-DD");
+        if (!isNonWorking(cursor)) {
+          workingDays.push(formatted);
+          hasWorkingDay = true;
+        }
+        cursor = cursor.add(1, "day");
+      }
+
+      if (hasWorkingDay) {
+        return NextResponse.json(
+          {
+            error: "Extra Day Pay can only be applied on weekends/holidays",
+            details: {
+              workingDays,
+              message: "Extra Day Pay is only allowed for weekends and holidays. Please select only non-working days.",
+            },
+          },
+          { status: 400 }
+        );
+      }
     }
 
     // Sandwich rule calculation (only for Loss of Pay and NOT for half-day leaves)
     let hasNonWorkingInside = false;
     let cursor = start.clone();
-    
+
     if (applySandwichRule) {
       while (cursor.isSame(end) || cursor.isBefore(end)) {
         if (isNonWorking(cursor)) {
@@ -396,22 +422,22 @@ export async function POST(request: NextRequest) {
       const countWorkingDaysBetween = (fromDate: dayjs.Dayjs, toDate: dayjs.Dayjs): number => {
         let workingDays = 0;
         let current = fromDate.clone();
-        
+
         while (current.isBefore(toDate)) {
           if (!isNonWorking(current)) {
             workingDays++;
           }
           current = current.add(1, "day");
         }
-        
+
         return workingDays;
       };
-      
+
       // For half-day: penalty is base × 2 = 0.5 × 2 = 1
       // For full-day: penalty is 2 days per day
       const baseLeaveDays = isHalfDay ? 0.5 : 1;
       const penaltyMultiplier = isHalfDay ? (baseLeaveDays * 2) : 2; // 0.5×2=1 for half-day, 2 for full-day
-      
+
       let cursorPenalty = start.startOf("day");
       const endPenalty = end.startOf("day");
       while (cursorPenalty.isSame(endPenalty) || cursorPenalty.isBefore(endPenalty)) {
@@ -610,8 +636,8 @@ export async function POST(request: NextRequest) {
       // Don't fail the request if email fails
     }
 
-    return NextResponse.json({ 
-      success: true, 
+    return NextResponse.json({
+      success: true,
       message: "Leave request submitted successfully",
       leaveId: result.id,
       totals: {
@@ -645,7 +671,7 @@ export async function PATCH(request: NextRequest) {
 
     // Verify the session token
     const payload = await verifyToken(session);
-    
+
     if (!payload) {
       return NextResponse.json({ error: "Invalid session" }, { status: 401 });
     }
@@ -737,7 +763,7 @@ export async function PATCH(request: NextRequest) {
             const employeeName = emp.Employee_Name__c || 'Employee';
             const employeeRole = emp.Role__c;
             const employeeTitle = emp.Title__c;
-            
+
             // Send email to employee
             if (emp.Employee_Email__c) {
               const emailTemplate = leaveWithdrawn({
@@ -758,7 +784,7 @@ export async function PATCH(request: NextRequest) {
             if (employeeRole !== 'HR' && employeeRole !== 'Admin' && !(employeeRole === 'Developer' && employeeTitle === 'Team Lead')) {
               const teamLeadEmail = emp.Team_Lead__r?.Employee_Email__c;
               const teamLeadName = emp.Team_Lead__r?.Employee_Name__c;
-              
+
               if (teamLeadEmail) {
                 const tlEmailTemplate = leaveWithdrawn({
                   recipientName: teamLeadName || 'Team Lead',
@@ -836,14 +862,14 @@ export async function PATCH(request: NextRequest) {
     // Handle approve action (HR, Team Lead, or Admin)
     if (action === "approve") {
       const { role, title, name: approverName } = payload;
-      
+
       // Check if user can approve leaves
       const isHR = role === 'HR';
       const isTeamLead = role === 'Developer' && title === 'Team Lead';
       const isAdmin = role === 'Admin';
-      
+
       console.log("Approval attempt by:", role, title, "isHR:", isHR, "isTeamLead:", isTeamLead, "isAdmin:", isAdmin);
-      
+
       if (!isHR && !isTeamLead && !isAdmin) {
         return NextResponse.json({ error: "Only HR, Team Lead, or Admin can approve leaves" }, { status: 403 });
       }
@@ -964,12 +990,12 @@ export async function PATCH(request: NextRequest) {
     if (action === "reject") {
       const { role, title } = payload;
       const { reason } = body;
-      
+
       // Check if user can reject leaves
       const isHR = role === 'HR';
       const isTeamLead = role === 'Developer' && title === 'Team Lead';
       const isAdmin = role === 'Admin';
-      
+
       if (!isHR && !isTeamLead && !isAdmin) {
         return NextResponse.json({ error: "Only HR, Team Lead, or Admin can reject leaves" }, { status: 403 });
       }
@@ -1086,7 +1112,7 @@ export async function PATCH(request: NextRequest) {
 async function updateLeaveBalance(conn: any, leaveRecord: any, action: 'approve' | 'revert'): Promise<void> {
   try {
     const currentYear = new Date().getFullYear();
-    
+
     // Fetch Leave Balance record for the employee
     const leaveBalanceQuery = await conn.query(`
       SELECT Id, Annual_Leave_Remaining__c, Earned_Leave_Balance__c, 
@@ -1121,23 +1147,23 @@ async function updateLeaveBalance(conn: any, leaveRecord: any, action: 'approve'
     // Update based on Leave Category
     if (leaveRecord.Leave_Category__c === 'Loss of Pay') {
       // Update Annual Leave Remaining
-      leaveBalance.Annual_Leave_Remaining__c = 
+      leaveBalance.Annual_Leave_Remaining__c =
         (leaveBalance.Annual_Leave_Remaining__c || 0) + (multiplier * totalDaysAfterRule);
 
       // Update specific leave type counts
       if (leaveRecord.Leave_Type__c === 'Sick Leave') {
-        leaveBalance.Sick_Leave_Count__c = 
+        leaveBalance.Sick_Leave_Count__c =
           (leaveBalance.Sick_Leave_Count__c || 0) - (multiplier * totalDays);
       } else if (leaveRecord.Leave_Type__c === 'Emergency Leave') {
-        leaveBalance.Emergency_Leave_Count__c = 
+        leaveBalance.Emergency_Leave_Count__c =
           (leaveBalance.Emergency_Leave_Count__c || 0) - (multiplier * totalDays);
       } else if (leaveRecord.Leave_Type__c === 'Planned Leave') {
-        leaveBalance.Planned_Leave_Count__c = 
+        leaveBalance.Planned_Leave_Count__c =
           (leaveBalance.Planned_Leave_Count__c || 0) - (multiplier * totalDaysAfterRule);
       }
     } else if (leaveRecord.Leave_Category__c === 'Extra Day Pay') {
       // Update Earned Leave Balance
-      leaveBalance.Earned_Leave_Balance__c = 
+      leaveBalance.Earned_Leave_Balance__c =
         (leaveBalance.Earned_Leave_Balance__c || 0) - (multiplier * totalDays);
     }
 
