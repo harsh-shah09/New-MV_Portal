@@ -63,7 +63,7 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
           // Reset fields when category changes
           form.setFieldsValue({
             leaveType: undefined,
-            extraDayReason: undefined,
+            reason: undefined,
           })
       }
       
@@ -124,8 +124,8 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
       return
     }
 
-    if (values.leaveCategory === 'extra-day-pay' && !values.extraDayReason) {
-      toast.error("Please provide a reason for extra day pay")
+    if (!values.reason) {
+      toast.error("Please provide a reason for leave")
       return
     }
 
@@ -239,35 +239,45 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
 
           {/* Conditional Fields based on Leave Category */}
           {leaveCategory === "loss-of-pay" && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Form.Item name="leaveType" label="Leave Type" rules={[{ required: true }]}>
-                  <Select>
-                      <Option value="Planned Leave">Planned Leave</Option>
-                      <Option value="Sick Leave">Sick Leave</Option>
-                      <Option value="Emergency Leave">Emergency Leave</Option>
-                  </Select>
-              </Form.Item>
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Form.Item name="leaveType" label="Leave Type" rules={[{ required: true }]}>
+                    <Select>
+                        <Option value="Planned Leave">Planned Leave</Option>
+                        <Option value="Sick Leave">Sick Leave</Option>
+                        <Option value="Emergency Leave">Emergency Leave</Option>
+                    </Select>
+                </Form.Item>
+                
+                <Form.Item label="Duration">
+                    <Input value={`${duration} days`} disabled className="bg-gray-50 text-gray-600 font-medium" />
+                </Form.Item>
+                
+                <Form.Item name="startDate" label="Start Date" rules={[{ required: true }]}>
+                     <DatePicker className="w-full" format="YYYY-MM-DD" dateRender={dateFullCellRender} />
+                </Form.Item>
+                
+                <Form.Item name="endDate" label="End Date" rules={[{ required: true }]}>
+                     <DatePicker className="w-full" format="YYYY-MM-DD" dateRender={dateFullCellRender} />
+                </Form.Item>
+                
+                <Form.Item name="session" label="Session" rules={[{ required: true }]}>
+                    <Select>
+                        <Option value="Session-1">Session-1</Option>
+                        <Option value="Session-2">Session-2</Option>
+                        <Option value="Full Day">Full Day</Option>
+                    </Select>
+                </Form.Item>
+              </div>
               
-              <Form.Item label="Duration">
-                  <Input value={`${duration} days`} disabled className="bg-gray-50 text-gray-600 font-medium" />
+              <Form.Item 
+                name="reason" 
+                label="Leave Reason" 
+                rules={[{ required: true, message: 'Please provide reason for leave' }]}
+              >
+                  <TextArea rows={3} placeholder="Explain the reason for your leave..." />
               </Form.Item>
-              
-              <Form.Item name="startDate" label="Start Date" rules={[{ required: true }]}>
-                   <DatePicker className="w-full" format="YYYY-MM-DD" dateRender={dateFullCellRender} />
-              </Form.Item>
-              
-              <Form.Item name="endDate" label="End Date" rules={[{ required: true }]}>
-                   <DatePicker className="w-full" format="YYYY-MM-DD" dateRender={dateFullCellRender} />
-              </Form.Item>
-              
-              <Form.Item name="session" label="Session" rules={[{ required: true }]}>
-                  <Select>
-                      <Option value="Session-1">Session-1</Option>
-                      <Option value="Session-2">Session-2</Option>
-                      <Option value="Full Day">Full Day</Option>
-                  </Select>
-              </Form.Item>
-            </div>
+            </>
           )}
 
           {leaveCategory === "extra-day-pay" && (
@@ -295,9 +305,9 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
               </div>
               
               <Form.Item 
-                name="extraDayReason" 
-                label="Extra Day Reason" 
-                rules={[{ required: true, message: 'Please provide reason for extra day' }]}
+                name="reason" 
+                label="Reason" 
+                rules={[{ required: true, message: 'Please provide reason for extra day pay' }]}
               >
                   <TextArea rows={3} placeholder="Explain why you need extra day pay..." />
               </Form.Item>

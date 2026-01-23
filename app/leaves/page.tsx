@@ -14,11 +14,18 @@ import { Modal } from "antd"
 export default function LeavesPage() {
   const router = useRouter()
   const [showForm, setShowForm] = useState(false)
-  const [selectedTab, setSelectedTab] = useState<"my-requests" | "approvals">("my-requests")
+  const [selectedTab, setSelectedTab] = useState<"my-requests" | "approvals" | "all-leaves">("my-requests")
   const [currentUser, setCurrentUser] = useState<{ employeeId: string; email?: string; recordId: string; role?: string; title?: string } | null>(null)
   const [rejectModalVisible, setRejectModalVisible] = useState(false)
   const [rejectingLeaveId, setRejectingLeaveId] = useState<string | null>(null)
   const [rejectReason, setRejectReason] = useState("")
+  const [allLeaves, setAllLeaves] = useState<LeaveRequest[]>([])
+  const [filteredLeaves, setFilteredLeaves] = useState<LeaveRequest[]>([])
+  const [filters, setFilters] = useState({
+    status: "all",
+    leaveType: "all",
+    employeeName: "",
+  })
   
   console.log("Current User:", currentUser)
   const { leaves, pendingApprovals, setLeaves, setPendingApprovals, updateLeave } = useLeaveStore()
@@ -45,6 +52,48 @@ export default function LeavesPage() {
       setPendingApprovals(data.pendingApprovals || [])
     }
   }, [data, setLeaves, setPendingApprovals])
+
+  // Fetch all leaves for HR/Admin
+  useEffect(() => {
+    const fetchAllLeaves = async () => {
+      if (currentUser?.role === 'HR' || currentUser?.role === 'Admin') {
+        try {
+          const response = await fetch('/api/leave-management/all')
+          if (response.ok) {
+            const data = await response.json()
+            setAllLeaves(data.allLeaves || [])
+          }
+        } catch (error) {
+          console.error('Error fetching all leaves:', error)
+        }
+      }
+    }
+    fetchAllLeaves()
+  }, [currentUser])
+
+  // Apply filters
+  useEffect(() => {
+    let filtered = [...allLeaves]
+
+    if (filters.status !== "all") {
+      filtered = filtered.filter(leave => leave.status === filters.status)
+    }
+
+    if (filters.leaveType !== "all") {
+      filtered = filtered.filter(leave => {
+        const displayType = leave.leaveCategory === 'Extra Day Pay' ? 'Extra Day Pay' : leave.leaveType
+        return displayType === filters.leaveType
+      })
+    }
+
+    if (filters.employeeName) {
+      filtered = filtered.filter(leave => 
+        leave.employeeName.toLowerCase().includes(filters.employeeName.toLowerCase())
+      )
+    }
+
+    setFilteredLeaves(filtered)
+  }, [allLeaves, filters])
 
   const handleSubmitRequest = async (data: Partial<LeaveRequest>) => {
     const submit = async (payload: Partial<LeaveRequest>, confirmedRules = false): Promise<void> => {
@@ -266,6 +315,12 @@ export default function LeavesPage() {
               <div><strong>Type:</strong> {leave.leaveType || leave.leaveCategory}</div>
               <div><strong>Dates:</strong> {leave.startDate} to {leave.endDate}</div>
               <div><strong>Duration:</strong> {leave.duration} day(s)</div>
+              {leave.reason && (
+                <div className="mt-2 pt-2 border-t border-green-300">
+                  <strong>Reason:</strong> 
+                  <p className="mt-1 text-gray-700">{leave.reason}</p>
+                </div>
+              )}
             </div>
           </div>
           <p className="mt-3 text-sm text-green-700">✓ Email notification will be sent to the employee</p>
@@ -406,6 +461,17 @@ export default function LeavesPage() {
             >
               Approvals
             </button>
+            {(currentUser?.role === 'HR' || currentUser?.role === 'Admin') && (
+              <button
+                onClick={() => setSelectedTab("all-leaves")}
+                className={`flex-1 px-6 py-4 text-center font-medium transition ${selectedTab === "all-leaves"
+                  ? "text-blue-600 border-b-2 border-blue-600"
+                  : "text-gray-600 hover:text-gray-900"
+                  }`}
+              >
+                All Leaves
+              </button>
+            )}
           </div>
 
           <div className="p-6">
@@ -500,6 +566,16 @@ export default function LeavesPage() {
                                 </div>
                               </div>
 
+                              {/* Leave Reason */}
+                              {leave.reason && (
+                                <div className="mb-4">
+                                  <div className="bg-white/70 rounded-md p-3 border border-gray-100">
+                                    <p className="text-xs text-gray-500 mb-2 font-medium">Leave Reason</p>
+                                    <p className="text-sm text-gray-900">{leave.reason}</p>
+                                  </div>
+                                </div>
+                              )}
+
                               {/* Approval Status */}
                               {(leave.tlApproved || leave.hrApproval) && (
                                 <div className="flex items-center gap-4 mb-4 text-sm bg-white/70 rounded-md p-3 border border-gray-100">
@@ -533,6 +609,80 @@ export default function LeavesPage() {
                   )
                 ) : (
                   <div className="text-center py-8 text-gray-500">Only HR, Admin, and Team Leads can view pending approvals</div>
+                )}
+              </div>
+            )}
+
+            {selectedTab === "all-leaves" && (
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 mb-4">All Leave Records</h2>
+                
+                {/* Filters */}
+                <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                      <select
+                        value={filters.status}
+                        onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                      >
+                        <option value="all">All Status</option>
+                        <option value="applied">Applied</option>
+                        <option value="approved">Approved</option>
+                        <option value="rejected">Rejected</option>
+                        <option value="cancelled">Cancelled</option>
+                        <option value="withdrawn">Withdrawn</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Leave Type</label>
+                      <select
+                        value={filters.leaveType}
+                        onChange={(e) => setFilters({ ...filters, leaveType: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                      >
+                        <option value="all">All Types</option>
+                        <option value="Planned Leave">Planned Leave</option>
+                        <option value="Sick Leave">Sick Leave</option>
+                        <option value="Emergency Leave">Emergency Leave</option>
+                        <option value="Extra Day Pay">Extra Day Pay</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Employee Name</label>
+                      <input
+                        type="text"
+                        value={filters.employeeName}
+                        onChange={(e) => setFilters({ ...filters, employeeName: e.target.value })}
+                        placeholder="Search by name..."
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-3 flex items-center justify-between">
+                    <span className="text-sm text-gray-600">
+                      Showing {filteredLeaves.length} of {allLeaves.length} records
+                    </span>
+                    <button
+                      onClick={() => setFilters({ status: "all", leaveType: "all", employeeName: "" })}
+                      className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                    >
+                      Clear Filters
+                    </button>
+                  </div>
+                </div>
+
+                {/* Leave Table */}
+                {filteredLeaves.length > 0 ? (
+                  <LeaveTable leaves={filteredLeaves} onCancel={handleCancel} onWithdraw={handleWithdraw} showActions={false} />
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    {allLeaves.length === 0 ? 'No leave records found' : 'No leaves match the selected filters'}
+                  </div>
                 )}
               </div>
             )}

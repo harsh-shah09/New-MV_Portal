@@ -2,7 +2,7 @@ export interface User {
   id: string
   name: string
   email: string
-  role: "admin" | "manager" | "employee"
+  role: "admin" | "hr" | "manager" | "employee"
   department?: string
   avatar?: string
 }
@@ -168,6 +168,29 @@ export interface Payroll {
   netSalary: number
   status: "draft" | "processed" | "paid"
   paymentDate?: string
+}
+
+export interface PayrollSummary {
+  id: string
+  month: string
+  year: number
+  totalEmployees: number
+  netTotalSalary: number
+  status: "draft" | "processed" | "paid"
+  createdAt: string
+}
+
+export interface PayrollEmployeeDetail {
+  id: string
+  employeeId: string
+  employeeName: string
+  payrollMonth: string
+  year: number
+  basicSalary: number
+  totalAdditions: number
+  totalDeductions: number
+  bonus: number
+  netSalary: number
 }
 
 export interface CalendarEvent {

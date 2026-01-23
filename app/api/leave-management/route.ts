@@ -171,7 +171,8 @@ export async function GET(request: NextRequest) {
           Status__c,
           Approved_Date__c,
           TL_Approval__c,
-          HR_Approval__c
+          HR_Approval__c,
+          Reason__c
         FROM Leave__c
         WHERE Status__c = 'Applied'
         AND Employee__r.Role__c = 'HR'
@@ -192,7 +193,7 @@ export async function GET(request: NextRequest) {
         status: record.Status__c?.toLowerCase() || "pending",
         approvedBy: record.Approved_By__c,
         approvalDate: record.Approved_Date__c,
-        reason: '',
+        reason: record.Reason__c || '',
         tlApproved: record.TL_Approval__c,
         hrApproval: record.HR_Approval__c,
       }));
@@ -213,7 +214,8 @@ export async function GET(request: NextRequest) {
           Status__c,
           Approved_Date__c,
           TL_Approval__c,
-          HR_Approval__c
+          HR_Approval__c,
+          Reason__c
         FROM Leave__c
         WHERE Status__c = 'Applied'
         AND Employee__r.Role__c != 'HR'
@@ -234,7 +236,7 @@ export async function GET(request: NextRequest) {
         status: record.Status__c?.toLowerCase() || "pending",
         approvedBy: record.Approved_By__c,
         approvalDate: record.Approved_Date__c,
-        reason: '',
+        reason: record.Reason__c || '',
         tlApproved: record.TL_Approval__c,
         hrApproval: record.HR_Approval__c,
       }));
@@ -254,7 +256,8 @@ export async function GET(request: NextRequest) {
           Status__c,
           Approved_Date__c,
           TL_Approval__c,
-          HR_Approval__c
+          HR_Approval__c,
+          Reason__c
         FROM Leave__c
         WHERE Employee__r.Team_Lead__r.Employee_Name__c = '${name}'
         AND Status__c = 'Applied'
@@ -275,7 +278,7 @@ export async function GET(request: NextRequest) {
         status: record.Status__c?.toLowerCase() || "pending",
         approvedBy: record.Approved_By__c,
         approvalDate: record.Approved_Date__c,
-        reason: '',
+        reason: record.Reason__c || '',
         tlApproved: record.TL_Approval__c,
         hrApproval: record.HR_Approval__c,
       }));
@@ -333,7 +336,7 @@ export async function POST(request: NextRequest) {
       duration,
       totalDeduction,
       session: sessionValue,
-      extraDayReason,
+      reason,
       onePlusTwoApplied,
       confirmedRules
     } = body;
@@ -600,14 +603,18 @@ export async function POST(request: NextRequest) {
       if (!leaveType) {
         return NextResponse.json({ error: "Leave type is required for loss of pay" }, { status: 400 });
       }
+      if (!reason) {
+        return NextResponse.json({ error: "Leave reason is required" }, { status: 400 });
+      }
       leaveRecord.Leave_Type__c = leaveType;
       leaveRecord.Leave_Category__c = 'Loss of Pay';
+      leaveRecord.Reason__c = reason;
     } else if (leaveCategory === 'extra-day-pay') {
-      if (!extraDayReason) {
-        return NextResponse.json({ error: "Extra day reason is required for extra day pay" }, { status: 400 });
+      if (!reason) {
+        return NextResponse.json({ error: "Leave reason is required" }, { status: 400 });
       }
-      leaveRecord.Extra_Day_Reason__c = extraDayReason;
       leaveRecord.Leave_Category__c = 'Extra Day Pay';
+      leaveRecord.Reason__c = reason;
     }
 
     // Create the leave record in Salesforce
@@ -955,7 +962,7 @@ export async function PATCH(request: NextRequest) {
       }
 
       const leaveRecordQuery = await conn.query<any>(`
-        SELECT Id, Status__c, Employee__c, Employee__r.Role__c, Leave_Category__c, Leave_Type__c, Total_Days__c, Total_Days_After_Rule__c, HR_Approval__c, TL_Approval__c, Start_Date__c, End_Date__c
+        SELECT Id, Status__c, Employee__c, Employee__r.Role__c,Employee__r.Base_Salary__c, Leave_Category__c, Leave_Type__c, Total_Days__c, Total_Days_After_Rule__c, HR_Approval__c, TL_Approval__c, Start_Date__c, End_Date__c, Actual_Deduction__c, After_Rule_Deduction__c
         FROM Leave__c
         WHERE Id = '${leaveId}'
         LIMIT 1
@@ -983,6 +990,9 @@ export async function PATCH(request: NextRequest) {
         updateData.Approved_Date__c = new Date().toISOString();
         // beforeUpdate: Sync Status__c with HR_Approval__c
         updateData.Status__c = 'Approved';
+
+        //calculate the salary amount for Actual_Deduction__c and After_Rule_Deduction__c fields
+
       } else if (isTeamLead) {
         updateData.TL_Approval__c = 'Approved';
       }
