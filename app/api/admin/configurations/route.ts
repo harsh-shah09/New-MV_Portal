@@ -17,6 +17,7 @@ export async function GET() {
     }
 
     const configs = await getAllConfigurations();
+    console.log('Fetched admin configurations:', configs.leave);
     return NextResponse.json(configs);
 
   } catch (error) {

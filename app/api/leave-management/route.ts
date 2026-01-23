@@ -16,6 +16,80 @@ import {
 } from "@/lib/email-templates";
 import type { LeaveRequest } from "@/types";
 
+/**
+ * Leave Configuration Interface
+ */
+interface LeaveConfig {
+  annualLeaveBalance: number;
+  enableOnePlusTwoRule: boolean;
+  enableSandwichRule: boolean;
+  sandwichRuleAppliesTo: string[];
+  penaltyAppliesTo: string[];
+  minWorkingDayNoticePeriod: number;
+  penaltyDaysPerDay: number;
+}
+
+/**
+ * Fetch Leave Configurations from Salesforce Custom Metadata
+ */
+async function fetchLeaveConfigurations(conn: any): Promise<LeaveConfig> {
+  try {
+    const configQuery = await conn.query(
+      "SELECT DeveloperName, Value__c FROM Leave_Configurations__mdt"
+    );
+
+    const configs = configQuery.records || [];
+    const configMap = new Map<string, string>();
+    
+    configs.forEach((config: any) => {
+      configMap.set(config.DeveloperName, config.Value__c);
+    });
+
+    // Parse configurations with defaults
+    const annualLeaveBalance = parseFloat(configMap.get('Annual_Leave_Balance') || '18');
+    const enableOnePlusTwoRule = configMap.get('Enable_One_plus_two_rule')?.toLowerCase() === 'true';
+    const enableSandwichRule = configMap.get('Enable_Sandwitch_Rule')?.toLowerCase() === 'true';
+    const sandwichRuleAppliesTo = (configMap.get('Sandwitch_Rule_Applies_to') || '')
+      .split(',').map(role => role.trim()).filter(Boolean);
+    const penaltyAppliesTo = (configMap.get('penalty_applies_to') || '')
+      .split(',').map(role => role.trim()).filter(Boolean);
+    const minWorkingDayNoticePeriod = parseInt(configMap.get('minimum_working_working_day_notice_perio') || '5');
+    const penaltyDaysPerDay = parseFloat(configMap.get('penalty_days_per_day') || '2');
+
+    console.log('[Leave Config] Fetched configurations:', {
+      annualLeaveBalance,
+      enableOnePlusTwoRule,
+      enableSandwichRule,
+      sandwichRuleAppliesTo,
+      penaltyAppliesTo,
+      minWorkingDayNoticePeriod,
+      penaltyDaysPerDay,
+    });
+
+    return {
+      annualLeaveBalance,
+      enableOnePlusTwoRule,
+      enableSandwichRule,
+      sandwichRuleAppliesTo,
+      penaltyAppliesTo,
+      minWorkingDayNoticePeriod,
+      penaltyDaysPerDay,
+    };
+  } catch (error) {
+    console.error('Error fetching leave configurations:', error);
+    // Return defaults if fetch fails
+    return {
+      annualLeaveBalance: 18,
+      enableOnePlusTwoRule: true,
+      enableSandwichRule: true,
+      sandwichRuleAppliesTo: ['Developer'],
+      penaltyAppliesTo: ['Developer'],
+      minWorkingDayNoticePeriod: 5,
+      penaltyDaysPerDay: 2,
+    };
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     // Get session from cookies
@@ -287,6 +361,14 @@ export async function POST(request: NextRequest) {
 
     const conn = await getSalesforceConnection();
 
+    // Fetch dynamic leave configurations
+    const leaveConfig = await fetchLeaveConfigurations(conn);
+
+    // Check if sandwich rule applies to this user's role
+    const sandwichRuleAppliesToUser = leaveConfig.sandwichRuleAppliesTo.includes(role);
+    // Check if penalty (one+two rule) applies to this user's role
+    const penaltyAppliesToUser = leaveConfig.penaltyAppliesTo.includes(role);
+
     // --- Sandwich Rule Calculation ---
     // Fetch holidays from custom setting Holidays_List__c
     const holidayQuery = await conn.query<any>(
@@ -318,7 +400,8 @@ export async function POST(request: NextRequest) {
     // For session-based leaves: calculate as half-days (e.g., 5 days = 2.5 days)
     const computedDuration = isHalfDay ? baseCalendarDays * 0.5 : baseCalendarDays;
     const applyRules = leaveCategory === 'loss-of-pay' && leaveType === 'Planned Leave';
-    const applySandwichRule = applyRules && !isHalfDay; // Sandwich rule does not apply to session-based leaves
+    // Sandwich rule applies only if: enabled, user role is eligible, not half-day leave
+    const applySandwichRule = applyRules && !isHalfDay && leaveConfig.enableSandwichRule && sandwichRuleAppliesToUser;
 
     // Block leaves that fall entirely on weekends/holidays (ONLY for Loss of Pay)
     // Extra Day Pay can ONLY be applied on weekends/holidays
@@ -413,11 +496,10 @@ export async function POST(request: NextRequest) {
     const sandwichExtra = sandwichApplied ? preSandwich + postSandwich : 0;
     const totalSandwichDeduction = rangeLeaveDays + sandwichExtra;
 
-    // Server-side One+Two rule calculation (planned leave within 5 working days)
-    // For half-day leaves: 0.5 + (0.5 × 2) = 1.5 total
-    // For full-day leaves: 1 + 2 = 3 per day
+    // Server-side One+Two rule calculation (planned leave within minimum working day notice period)
+    // Only applies to full-day leaves, NOT half-day leaves
     let onePlusTwoExtra = 0;
-    if (applyRules) {
+    if (applyRules && !isHalfDay && leaveConfig.enableOnePlusTwoRule && penaltyAppliesToUser) {
       // Helper to count working days between two dates
       const countWorkingDaysBetween = (fromDate: dayjs.Dayjs, toDate: dayjs.Dayjs): number => {
         let workingDays = 0;
@@ -433,17 +515,15 @@ export async function POST(request: NextRequest) {
         return workingDays;
       };
 
-      // For half-day: penalty is base × 2 = 0.5 × 2 = 1
-      // For full-day: penalty is 2 days per day
-      const baseLeaveDays = isHalfDay ? 0.5 : 1;
-      const penaltyMultiplier = isHalfDay ? (baseLeaveDays * 2) : 2; // 0.5×2=1 for half-day, 2 for full-day
+      // For full-day: penalty is penaltyDaysPerDay days per day
+      const penaltyMultiplier = leaveConfig.penaltyDaysPerDay;
 
       let cursorPenalty = start.startOf("day");
       const endPenalty = end.startOf("day");
       while (cursorPenalty.isSame(endPenalty) || cursorPenalty.isBefore(endPenalty)) {
         // Count only working days between today and this leave day
         const workingDaysInAdvance = countWorkingDaysBetween(today, cursorPenalty);
-        if (workingDaysInAdvance < 5) {
+        if (workingDaysInAdvance < leaveConfig.minWorkingDayNoticePeriod) {
           onePlusTwoExtra += penaltyMultiplier;
         }
         cursorPenalty = cursorPenalty.add(1, "day");
@@ -1128,11 +1208,14 @@ async function updateLeaveBalance(conn: any, leaveRecord: any, action: 'approve'
     if (!isNewRecord) {
       leaveBalance = leaveBalanceQuery.records[0];
     } else {
+      // Fetch dynamic leave configurations for annual leave balance
+      const leaveConfig = await fetchLeaveConfigurations(conn);
+      
       // Create new Leave Balance record
       leaveBalance = {
         Employee__c: leaveRecord.Employee__c,
         Year__c: currentYear,
-        Annual_Leave_Remaining__c: 18,
+        Annual_Leave_Remaining__c: leaveConfig.annualLeaveBalance,
         Earned_Leave_Balance__c: 0,
         Sick_Leave_Count__c: 0,
         Emergency_Leave_Count__c: 0,
