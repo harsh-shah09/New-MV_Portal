@@ -40,7 +40,7 @@ async function fetchLeaveConfigurations(conn: any): Promise<LeaveConfig> {
 
     const configs = configQuery.records || [];
     const configMap = new Map<string, string>();
-    
+
     configs.forEach((config: any) => {
       configMap.set(config.DeveloperName, config.Value__c);
     });
@@ -990,8 +990,18 @@ export async function PATCH(request: NextRequest) {
         updateData.Approved_Date__c = new Date().toISOString();
         // beforeUpdate: Sync Status__c with HR_Approval__c
         updateData.Status__c = 'Approved';
-
-        //calculate the salary amount for Actual_Deduction__c and After_Rule_Deduction__c fields
+        updateData.Actual_Deduction__c = calculateLeaveDeduction(
+          oldLeave.Leave_Category__c,
+          oldLeave.Start_Date__c,
+          oldLeave.Total_Days__c,
+          oldLeave.Employee__r?.Base_Salary__c
+        );
+        updateData.After_Rule_Deduction__c = calculateLeaveDeduction(
+          oldLeave.Leave_Category__c,
+          oldLeave.Start_Date__c,
+          oldLeave.Total_Days_After_Rule__c,
+          oldLeave.Employee__r?.Base_Salary__c
+        );
 
       } else if (isTeamLead) {
         updateData.TL_Approval__c = 'Approved';
@@ -1220,7 +1230,7 @@ async function updateLeaveBalance(conn: any, leaveRecord: any, action: 'approve'
     } else {
       // Fetch dynamic leave configurations for annual leave balance
       const leaveConfig = await fetchLeaveConfigurations(conn);
-      
+
       // Create new Leave Balance record
       leaveBalance = {
         Employee__c: leaveRecord.Employee__c,
@@ -1279,4 +1289,37 @@ async function updateLeaveBalance(conn: any, leaveRecord: any, action: 'approve'
     console.error('Error updating Leave Balance:', error);
     throw error; // Re-throw to handle in calling function
   }
+}
+/**
+ * Calculate leave deduction based on leave category, days, and base salary
+ */
+function calculateLeaveDeduction(
+  Leave_Category__c: string,
+  Start_Date__c: string,
+  Total_Days__c: number,
+  Base_Salary__c: number
+): number {
+  // If no base salary is provided, return 0
+  if (!Base_Salary__c || Base_Salary__c <= 0) {
+    return 0;
+  }
+
+  // Get the month from start date and calculate days in that month
+  const startDate = dayjs(Start_Date__c);
+  const daysInMonth = startDate.daysInMonth();
+
+  // Calculate daily salary based on actual days in the month
+  const dailySalary = Base_Salary__c / daysInMonth;
+  const deductionAmount = dailySalary * Total_Days__c;
+
+  if (Leave_Category__c === 'Loss of Pay') {
+    // For Loss of Pay, deduct based on total days (negative value represents deduction)
+    return -deductionAmount;
+  } else if (Leave_Category__c === 'Extra Day Pay') {
+    // For Extra Day Pay, add based on total days (positive value represents addition)
+    return deductionAmount;
+  }
+
+  // Default case: no deduction
+  return 0;
 }
