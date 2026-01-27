@@ -184,13 +184,41 @@ export interface PayrollEmployeeDetail {
   id: string
   employeeId: string
   employeeName: string
-  payrollMonth: string
-  year: number
-  basicSalary: number
-  totalAdditions: number
-  totalDeductions: number
-  bonus: number
-  netSalary: number
+  payrollMonth?: string
+  email?: string
+  department?: string
+  role?: string
+  year?: number
+  basicSalary?: number
+  baseSalary?: number
+  totalAdditions?: number
+  totalDeductions?: number
+  totalLeaveDays?: number
+  bonus?: number
+  netSalary?: number
+  leaves?: PayrollLeaveDetail[]
+  adjustments?: PayrollAdjustment[]
+}
+
+export interface PayrollAdjustment {
+  id?: string
+  adjustmentType: "Addition" | "Deduction"
+  adjustmentAmount: number
+  adjustmentDescription: string
+}
+
+export interface PayrollLeaveDetail {
+  id: string
+  leaveType: string
+  leaveCategory: string
+  startDate: string
+  endDate: string
+  totalDays: number
+  totalDaysAfterRule: number
+  daysInSelectedMonth: number
+  status: string
+  actualDeduction: number
+  afterRuleDeduction: number
 }
 
 export interface CalendarEvent {

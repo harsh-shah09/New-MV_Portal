@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { Button, message } from "antd"
+import { useState, useEffect } from "react"
+import { Button, message, Spin } from "antd"
 import { PlusOutlined, ArrowLeftOutlined } from "@ant-design/icons"
 import { useQuery } from "@tanstack/react-query"
 
@@ -10,77 +10,6 @@ import { PayrollEmployeeList } from "./components/payroll-employee-list"
 import { PayrollEmployeeDetailView } from "./components/payroll-employee-detail"
 import { GeneratePayrollModal } from "./components/generate-payroll-modal"
 import type { PayrollSummary, PayrollEmployeeDetail } from "@/types"
-
-// Mock data for payroll summaries
-const mockPayrollSummaries: PayrollSummary[] = [
-  {
-    id: "sum-1",
-    month: "January",
-    year: 2026,
-    totalEmployees: 45,
-    netTotalSalary: 425000,
-    status: "paid",
-    createdAt: "2026-01-31",
-  },
-  {
-    id: "sum-2",
-    month: "December",
-    year: 2025,
-    totalEmployees: 43,
-    netTotalSalary: 398500,
-    status: "paid",
-    createdAt: "2025-12-31",
-  },
-  {
-    id: "sum-3",
-    month: "November",
-    year: 2025,
-    totalEmployees: 42,
-    netTotalSalary: 389000,
-    status: "paid",
-    createdAt: "2025-11-30",
-  },
-]
-
-// Mock data for employee payroll details
-const mockEmployeePayrolls: PayrollEmployeeDetail[] = [
-  {
-    id: "emp-pay-1",
-    employeeId: "1",
-    employeeName: "John Doe",
-    payrollMonth: "January",
-    year: 2026,
-    basicSalary: 120000,
-    totalAdditions: 15000,
-    totalDeductions: 5000,
-    bonus: 10000,
-    netSalary: 140000,
-  },
-  {
-    id: "emp-pay-2",
-    employeeId: "2",
-    employeeName: "Jane Smith",
-    payrollMonth: "January",
-    year: 2026,
-    basicSalary: 95000,
-    totalAdditions: 12000,
-    totalDeductions: 4000,
-    bonus: 5000,
-    netSalary: 108000,
-  },
-  {
-    id: "emp-pay-3",
-    employeeId: "3",
-    employeeName: "Mike Johnson",
-    payrollMonth: "January",
-    year: 2026,
-    basicSalary: 75000,
-    totalAdditions: 8000,
-    totalDeductions: 3000,
-    bonus: 3000,
-    netSalary: 83000,
-  },
-]
 
 export default function PayrollPage() {
   const { data: user } = useQuery({
@@ -92,29 +21,47 @@ export default function PayrollPage() {
     },
   })
 
-  console.log("Current User 1234:", user)
-  console.log("User Role:", user?.role)
-  console.log("Role type:", typeof user?.role)
-
   // State for HR/Admin view
   const [view, setView] = useState<"summary" | "employees" | "detail">("summary")
-  const [payrollSummaries, setPayrollSummaries] = useState<PayrollSummary[]>(mockPayrollSummaries)
   const [selectedSummary, setSelectedSummary] = useState<PayrollSummary | null>(null)
   const [employeePayrolls, setEmployeePayrolls] = useState<PayrollEmployeeDetail[]>([])
   const [selectedEmployee, setSelectedEmployee] = useState<PayrollEmployeeDetail | null>(null)
   const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false)
+  const [loadingEmployees, setLoadingEmployees] = useState(false)
+
+  // Fetch payroll summaries
+  const { data: summariesData, isLoading: loadingSummaries, refetch: refetchSummaries } = useQuery({
+    queryKey: ["payroll-summaries"],
+    queryFn: async () => {
+      const res = await fetch("/api/payroll/summaries")
+      if (!res.ok) throw new Error("Failed to fetch payroll summaries")
+      return res.json()
+    },
+    enabled: user?.role === "admin" || user?.role === "HR",
+  })
+
+  const payrollSummaries = summariesData?.summaries || []
 
   const isHROrAdmin = user?.role === "admin" || user?.role === "HR"
-  console.log("isHROrAdmin:", isHROrAdmin)
 
-  const handleSelectSummary = (summary: PayrollSummary) => {
+  const handleSelectSummary = async (summary: PayrollSummary) => {
     setSelectedSummary(summary)
-    // Filter employee payrolls for this summary
-    const filteredPayrolls = mockEmployeePayrolls.filter(
-      (emp) => emp.payrollMonth === summary.month && emp.year === summary.year,
-    )
-    setEmployeePayrolls(filteredPayrolls)
-    setView("employees")
+    setLoadingEmployees(true)
+    
+    try {
+      const res = await fetch(`/api/payroll/employees/${summary.id}`)
+      if (!res.ok) throw new Error("Failed to fetch employee payrolls")
+      
+      const data = await res.json()
+      setEmployeePayrolls(data.employees || [])
+      setView("employees")
+    } catch (error) {
+      console.error("Error fetching employee payrolls:", error)
+      message.error("Failed to load employee payrolls")
+      setEmployeePayrolls([])
+    } finally {
+      setLoadingEmployees(false)
+    }
   }
 
   const handleSelectEmployee = (employee: PayrollEmployeeDetail) => {
@@ -133,22 +80,16 @@ export default function PayrollPage() {
     setView("summary")
   }
 
-  const handleGeneratePayroll = (month: string, year: number) => {
-    // TODO: Implement actual payroll generation logic
-    message.success(`Generating payroll for ${month} ${year}...`)
-    console.log("Generate payroll for:", month, year)
-
-    // Mock: Add a new summary
-    const newSummary: PayrollSummary = {
-      id: `sum-${Date.now()}`,
-      month,
-      year,
-      totalEmployees: 0,
-      netTotalSalary: 0,
-      status: "draft",
-      createdAt: new Date().toISOString(),
-    }
-    setPayrollSummaries([newSummary, ...payrollSummaries])
+  const handleGeneratePayroll = async (month: string, year: number, employees: PayrollEmployeeDetail[]) => {
+    // Payroll is already saved by the modal, just refresh the list
+    message.success(`Payroll saved for ${month} ${year} - ${employees.length} employees`)
+    
+    // Refetch summaries to show the newly created one
+    await refetchSummaries()
+    
+    // If we're still on the summary view, the list will update automatically
+    // If we had selected a summary, go back to summary view
+    setView("summary")
   }
 
   // Show appropriate message if not HR/Admin
@@ -179,34 +120,48 @@ export default function PayrollPage() {
         </div>
       </div>
 
-      {view === "summary" && (
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">Payroll Summaries</h2>
-          <PayrollSummaryList summaries={payrollSummaries} onSelectSummary={handleSelectSummary} />
+      {loadingSummaries ? (
+        <div className="flex justify-center items-center py-12">
+          <Spin size="large" />
         </div>
-      )}
+      ) : (
+        <>
+          {view === "summary" && (
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">Payroll Summaries</h2>
+              <PayrollSummaryList summaries={payrollSummaries} onSelectSummary={handleSelectSummary} />
+            </div>
+          )}
 
-      {view === "employees" && selectedSummary && (
-        <div className="space-y-6">
-          <div className="flex items-center gap-4">
-            <Button icon={<ArrowLeftOutlined />} onClick={handleBackToSummary}>
-              Back to Summaries
-            </Button>
-            <h2 className="text-2xl font-bold text-gray-900">
-              {selectedSummary.month} {selectedSummary.year} - Employee Payrolls
-            </h2>
-          </div>
-          <PayrollEmployeeList
-            employees={employeePayrolls}
-            month={selectedSummary.month}
-            year={selectedSummary.year}
-            onSelectEmployee={handleSelectEmployee}
-          />
-        </div>
-      )}
+          {view === "employees" && selectedSummary && (
+            <div className="space-y-6">
+              <div className="flex items-center gap-4">
+                <Button icon={<ArrowLeftOutlined />} onClick={handleBackToSummary}>
+                  Back to Summaries
+                </Button>
+                <h2 className="text-2xl font-bold text-gray-900">
+                  {selectedSummary.month} {selectedSummary.year} - Employee Payrolls
+                </h2>
+              </div>
+              {loadingEmployees ? (
+                <div className="flex justify-center items-center py-12">
+                  <Spin size="large" />
+                </div>
+              ) : (
+                <PayrollEmployeeList
+                  employees={employeePayrolls}
+                  month={selectedSummary.month}
+                  year={selectedSummary.year}
+                  onSelectEmployee={handleSelectEmployee}
+                />
+              )}
+            </div>
+          )}
 
-      {view === "detail" && selectedEmployee && (
-        <PayrollEmployeeDetailView employee={selectedEmployee} onBack={handleBackToEmployees} />
+          {view === "detail" && selectedEmployee && (
+            <PayrollEmployeeDetailView employee={selectedEmployee} onBack={handleBackToEmployees} />
+          )}
+        </>
       )}
 
       <GeneratePayrollModal

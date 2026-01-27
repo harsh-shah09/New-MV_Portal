@@ -1,12 +1,18 @@
 "use client"
 
 import { useState } from "react"
-import { Modal, Select, Button, message } from "antd"
+import { Modal, Select, Button, message, Table, Spin, Tag, Dropdown } from "antd"
+import { PlusOutlined, DownOutlined } from "@ant-design/icons"
+import type { MenuProps } from "antd"
+import type { ColumnsType } from "antd/es/table"
+import type { PayrollEmployeeDetail, PayrollAdjustment } from "@/types"
+import { AddAdjustmentModal } from "./add-adjustment-modal"
+import { AddBonusModal } from "./add-bonus-modal"
 
 interface GeneratePayrollModalProps {
   open: boolean
   onClose: () => void
-  onGenerate: (month: string, year: number) => void
+  onGenerate: (month: string, year: number, employees: PayrollEmployeeDetail[]) => void
 }
 
 const months = [
@@ -30,62 +36,564 @@ const years = Array.from({ length: 5 }, (_, i) => currentYear - i)
 export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayrollModalProps) {
   const [selectedMonth, setSelectedMonth] = useState<string>("")
   const [selectedYear, setSelectedYear] = useState<number>(currentYear)
+  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [employeeData, setEmployeeData] = useState<PayrollEmployeeDetail[]>([])
+  const [showResults, setShowResults] = useState(false)
+  const [adjustmentModalOpen, setAdjustmentModalOpen] = useState(false)
+  const [bonusModalOpen, setBonusModalOpen] = useState(false)
+  const [selectedEmployee, setSelectedEmployee] = useState<PayrollEmployeeDetail | null>(null)
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     if (!selectedMonth) {
       message.error("Please select a month")
       return
     }
 
-    onGenerate(selectedMonth, selectedYear)
+    setLoading(true)
+    try {
+      const response = await fetch("/api/payroll/generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          month: selectedMonth,
+          year: selectedYear,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to generate payroll")
+      }
+
+      const data = await response.json()
+      setEmployeeData(data.employees || [])
+      setShowResults(true)
+      message.success(`Payroll generated for ${selectedMonth} ${selectedYear} - ${data.totalEmployees} employees`)
+    } catch (error) {
+      console.error("Error generating payroll:", error)
+      message.error("Failed to generate payroll. Please try again.")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleConfirmGeneration = async () => {
+    if (!selectedMonth || !selectedYear) {
+      message.error("Month and year are required")
+      return
+    }
+
+    if (!employeeData.length) {
+      message.error("No employee payroll data to save")
+      return
+    }
+
+    setSaving(true)
+    try {
+      const res = await fetch("/api/payroll/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ month: selectedMonth, year: selectedYear, employees: employeeData }),
+      })
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err?.error || "Failed to save payroll")
+      }
+
+      const data = await res.json()
+      message.success("Payroll saved as Draft")
+
+      // Let parent update UI/state
+      onGenerate(selectedMonth, selectedYear, employeeData)
+
+      handleClose()
+      return data
+    } catch (error: any) {
+      console.error("Error saving payroll:", error)
+      message.error(error?.message || "Failed to save payroll")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleClose = () => {
     setSelectedMonth("")
     setSelectedYear(currentYear)
+    setEmployeeData([])
+    setShowResults(false)
+    setSaving(false)
+    setSelectedEmployee(null)
+    setAdjustmentModalOpen(false)
+    setBonusModalOpen(false)
     onClose()
+  }
+
+  const handleAddAdjustment = (employeeId: string, employeeName: string) => {
+    const employee = employeeData.find(emp => emp.employeeId === employeeId)
+    if (employee) {
+      // Check if adjustment already exists
+      if (employee.adjustments && employee.adjustments.length > 0) {
+        message.warning("Only one adjustment is allowed per employee")
+        return
+      }
+      setSelectedEmployee(employee)
+      setAdjustmentModalOpen(true)
+    }
+  }
+
+  const handleAddBonus = (employeeId: string, employeeName: string) => {
+    const employee = employeeData.find(emp => emp.employeeId === employeeId)
+    if (employee) {
+      // Check if bonus already exists
+      if (employee.bonus && employee.bonus > 0) {
+        message.warning("Only one bonus is allowed per employee")
+        return
+      }
+      setSelectedEmployee(employee)
+      setBonusModalOpen(true)
+    }
+  }
+
+  const handleAdjustmentAdded = (adjustment: PayrollAdjustment) => {
+    if (!selectedEmployee) return
+
+    const updatedEmployees = employeeData.map(emp => {
+      if (emp.employeeId === selectedEmployee.employeeId) {
+        const adjustments = [...(emp.adjustments || []), adjustment]
+        
+        // Recalculate totals
+        const totalAdjustmentAdditions = adjustments
+          .filter(adj => adj.adjustmentType === "Addition")
+          .reduce((sum, adj) => sum + adj.adjustmentAmount, 0)
+        
+        const totalAdjustmentDeductions = adjustments
+          .filter(adj => adj.adjustmentType === "Deduction")
+          .reduce((sum, adj) => sum + adj.adjustmentAmount, 0)
+        
+        const baseSalary = emp.baseSalary || 0
+        const leaveDeductions = emp.leaves?.reduce((sum, leave) => sum + (leave.actualDeduction || 0), 0) || 0
+        const totalDeductions = leaveDeductions + totalAdjustmentDeductions
+        const netSalary = baseSalary + totalAdjustmentAdditions - totalDeductions
+
+        return {
+          ...emp,
+          adjustments,
+          totalAdditions: totalAdjustmentAdditions,
+          totalDeductions,
+          netSalary: Math.round(netSalary * 100) / 100,
+        }
+      }
+      return emp
+    })
+
+    setEmployeeData(updatedEmployees)
+    setAdjustmentModalOpen(false)
+    setSelectedEmployee(null)
+  }
+
+  const handleBonusAdded = (bonusAmount: number) => {
+    if (!selectedEmployee) return
+
+    const updatedEmployees = employeeData.map(emp => {
+      if (emp.employeeId === selectedEmployee.employeeId) {
+        const baseSalary = emp.baseSalary || 0
+        const leaveDeductions = emp.leaves?.reduce((sum, leave) => sum + (leave.actualDeduction || 0), 0) || 0
+        
+        const adjustmentAdditions = emp.adjustments
+          ?.filter(adj => adj.adjustmentType === "Addition")
+          .reduce((sum, adj) => sum + adj.adjustmentAmount, 0) || 0
+        
+        const adjustmentDeductions = emp.adjustments
+          ?.filter(adj => adj.adjustmentType === "Deduction")
+          .reduce((sum, adj) => sum + adj.adjustmentAmount, 0) || 0
+        
+        const totalAdditions = adjustmentAdditions + bonusAmount
+        const totalDeductions = leaveDeductions + adjustmentDeductions
+        const netSalary = baseSalary + totalAdditions - totalDeductions
+
+        return {
+          ...emp,
+          bonus: bonusAmount,
+          totalAdditions,
+          netSalary: Math.round(netSalary * 100) / 100,
+        }
+      }
+      return emp
+    })
+
+    setEmployeeData(updatedEmployees)
+    setBonusModalOpen(false)
+    setSelectedEmployee(null)
+  }
+
+  const columns: ColumnsType<PayrollEmployeeDetail> = [
+    {
+      title: "Employee Name",
+      dataIndex: "employeeName",
+      key: "employeeName",
+      width: 200,
+      fixed: "left",
+    },
+    {
+      title: "Email",
+      dataIndex: "email",
+      key: "email",
+      width: 200,
+    },
+    {
+      title: "Department",
+      dataIndex: "department",
+      key: "department",
+      width: 150,
+    },
+    {
+      title: "Role",
+      dataIndex: "role",
+      key: "role",
+      width: 150,
+    },
+    {
+      title: "Base Salary",
+      dataIndex: "baseSalary",
+      key: "baseSalary",
+      width: 120,
+      render: (amount: number) => `$${amount?.toLocaleString() || 0}`,
+    },
+    {
+      title: "Additions",
+      dataIndex: "totalAdditions",
+      key: "totalAdditions",
+      width: 100,
+      render: (amount: number) => (
+        <span className={amount > 0 ? "text-green-600" : ""}>
+          ${amount?.toLocaleString() || 0}
+        </span>
+      ),
+    },
+    {
+      title: "Leave Days",
+      dataIndex: "totalLeaveDays",
+      key: "totalLeaveDays",
+      width: 100,
+      render: (days: number) => (
+        <Tag color={days > 0 ? "orange" : "green"}>{days || 0} days</Tag>
+      ),
+    },
+    {
+      title: "Deductions",
+      dataIndex: "totalDeductions",
+      key: "totalDeductions",
+      width: 120,
+      render: (amount: number) => (
+        <span className={amount > 0 ? "text-red-600" : ""}>
+          ${amount?.toLocaleString() || 0}
+        </span>
+      ),
+    },
+    {
+      title: "Net Salary",
+      dataIndex: "netSalary",
+      key: "netSalary",
+      width: 120,
+      render: (amount: number) => (
+        <span className="font-semibold">${amount?.toLocaleString() || 0}</span>
+      ),
+    },
+    {
+      title: "Actions",
+      key: "actions",
+      width: 150,
+      fixed: "right",
+      render: (_, record) => {
+        const hasAdjustment = !!(record.adjustments && record.adjustments.length > 0)
+        const hasBonus = !!(record.bonus && record.bonus > 0)
+        const allActionsUsed = hasAdjustment && hasBonus
+
+        const menuItems: MenuProps['items'] = [
+          {
+            key: 'adjustment',
+            label: hasAdjustment ? 'Adjustment Added' : 'Add Adjustment',
+            disabled: hasAdjustment,
+            onClick: () => handleAddAdjustment(record.employeeId, record.employeeName),
+          },
+          {
+            key: 'bonus',
+            label: hasBonus ? 'Bonus Added' : 'Add Bonus',
+            disabled: hasBonus,
+            onClick: () => handleAddBonus(record.employeeId, record.employeeName),
+          },
+        ]
+
+        return (
+          <Dropdown menu={{ items: menuItems }} trigger={['click']}>
+            <Button
+              type="link"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {allActionsUsed ? 'All Added' : 'Add'} <DownOutlined />
+            </Button>
+          </Dropdown>
+        )
+      },
+    },
+  ]
+
+  // Expandable row to show leave details, adjustments, and bonus
+  const expandedRowRender = (record: PayrollEmployeeDetail) => {
+    const hasLeaves = record.leaves && record.leaves.length > 0
+    const hasAdjustments = record.adjustments && record.adjustments.length > 0
+    const hasBonus = record.bonus && record.bonus > 0
+
+    if (!hasLeaves && !hasAdjustments && !hasBonus) {
+      return <p className="text-gray-500 p-4">No leaves, adjustments, or bonus for this month</p>
+    }
+
+    return (
+      <div className="space-y-4 p-4">
+        {hasLeaves && (
+          <div>
+            <h4 className="font-semibold mb-2">Leave Details</h4>
+            <Table
+              columns={[
+                {
+                  title: "Leave Type",
+                  dataIndex: "leaveType",
+                  key: "leaveType",
+                },
+                {
+                  title: "Category",
+                  dataIndex: "leaveCategory",
+                  key: "leaveCategory",
+                },
+                {
+                  title: "Start Date",
+                  dataIndex: "startDate",
+                  key: "startDate",
+                },
+                {
+                  title: "End Date",
+                  dataIndex: "endDate",
+                  key: "endDate",
+                },
+                {
+                  title: "Days (in month)",
+                  dataIndex: "daysInSelectedMonth",
+                  key: "daysInSelectedMonth",
+                  render: (days: number, record: any) => {
+                    const daysInMonth = days || 0
+                    const totalDays = record.totalDays || 0
+                    return daysInMonth < totalDays ? `${daysInMonth} (of ${totalDays})` : daysInMonth
+                  },
+                },
+                {
+                  title: "Deduction",
+                  dataIndex: "afterRuleDeduction",
+                  key: "afterRuleDeduction",
+                  render: (amount: number, record: any) => `$${(amount || record.actualDeduction || 0).toLocaleString()}`,
+                },
+                {
+                  title: "Status",
+                  dataIndex: "status",
+                  key: "status",
+                  render: (status: string) => (
+                    <Tag color={status === "Approved" ? "green" : "blue"}>{status}</Tag>
+                  ),
+                },
+              ]}
+              dataSource={record.leaves}
+              pagination={false}
+              rowKey="id"
+              size="small"
+            />
+          </div>
+        )}
+
+        {hasAdjustments && (
+          <div>
+            <h4 className="font-semibold mb-2">Adjustments</h4>
+            <Table
+              columns={[
+                {
+                  title: "Type",
+                  dataIndex: "adjustmentType",
+                  key: "adjustmentType",
+                  render: (type: string) => (
+                    <Tag color={type === "Addition" ? "green" : "red"}>{type}</Tag>
+                  ),
+                },
+                {
+                  title: "Amount",
+                  dataIndex: "adjustmentAmount",
+                  key: "adjustmentAmount",
+                  render: (amount: number, record: any) => (
+                    <span className={record.adjustmentType === "Addition" ? "text-green-600" : "text-red-600"}>
+                      {record.adjustmentType === "Addition" ? "+" : "-"}${amount.toLocaleString()}
+                    </span>
+                  ),
+                },
+                {
+                  title: "Description",
+                  dataIndex: "adjustmentDescription",
+                  key: "adjustmentDescription",
+                },
+              ]}
+              dataSource={record.adjustments}
+              pagination={false}
+              rowKey="id"
+              size="small"
+            />
+          </div>
+        )}
+
+        {hasBonus && (
+          <div>
+            <h4 className="font-semibold mb-2">Bonus</h4>
+            <div className="p-3 bg-green-50 border border-green-200 rounded">
+              <div>
+                <p className="text-sm text-gray-600">Bonus Amount</p>
+                <p className="text-lg font-semibold text-green-600">+${record.bonus?.toLocaleString()}</p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    )
   }
 
   return (
     <Modal
-      title="Generate Payroll"
+      title={showResults ? `Payroll Preview - ${selectedMonth} ${selectedYear}` : "Generate Payroll"}
       open={open}
-      onCancel={onClose}
-      footer={[
-        <Button key="cancel" onClick={onClose}>
-          Cancel
-        </Button>,
-        <Button key="generate" type="primary" onClick={handleGenerate}>
-          Generate Payroll
-        </Button>,
-      ]}
+      onCancel={handleClose}
+      width={showResults ? 1200 : 500}
+      footer={
+        showResults
+          ? [
+              <Button key="cancel" onClick={handleClose}>
+                Cancel
+              </Button>,
+              <Button key="confirm" type="primary" onClick={handleConfirmGeneration} loading={saving} disabled={saving}>
+                Confirm & Save Payroll
+              </Button>,
+            ]
+          : [
+              <Button key="cancel" onClick={handleClose}>
+                Cancel
+              </Button>,
+              <Button key="generate" type="primary" onClick={handleGenerate} loading={loading}>
+                Generate Payroll
+              </Button>,
+            ]
+      }
     >
-      <div className="space-y-4 py-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Select Month</label>
-          <Select
-            className="w-full"
-            placeholder="Select month"
-            value={selectedMonth || undefined}
-            onChange={(value) => setSelectedMonth(value)}
-            options={months.map((month) => ({
-              label: month,
-              value: month,
-            }))}
-          />
-        </div>
+      {!showResults ? (
+        <div className="space-y-4 py-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Select Month</label>
+            <Select
+              className="w-full"
+              placeholder="Select month"
+              value={selectedMonth || undefined}
+              onChange={(value) => setSelectedMonth(value)}
+              options={months.map((month) => ({
+                label: month,
+                value: month,
+              }))}
+            />
+          </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Select Year</label>
-          <Select
-            className="w-full"
-            placeholder="Select year"
-            value={selectedYear}
-            onChange={(value) => setSelectedYear(value)}
-            options={years.map((year) => ({
-              label: year,
-              value: year,
-            }))}
-          />
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Select Year</label>
+            <Select
+              className="w-full"
+              placeholder="Select year"
+              value={selectedYear}
+              onChange={(value) => setSelectedYear(value)}
+              options={years.map((year) => ({
+                label: year,
+                value: year,
+              }))}
+            />
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="py-4">
+          {loading ? (
+            <div className="flex justify-center items-center py-12">
+              <Spin size="large" />
+            </div>
+          ) : (
+            <>
+              <div className="mb-4 p-4 bg-blue-50 rounded-lg">
+                <h3 className="font-semibold text-lg mb-2">Summary</h3>
+                <div className="grid grid-cols-4 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-600">Total Employees</p>
+                    <p className="text-2xl font-bold">{employeeData.length}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Total Additions</p>
+                    <p className="text-2xl font-bold text-green-600">
+                      ${employeeData.reduce((sum, emp) => sum + (emp.totalAdditions || 0), 0).toLocaleString()}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Total Deductions</p>
+                    <p className="text-2xl font-bold text-red-600">
+                      ${employeeData.reduce((sum, emp) => sum + (emp.totalDeductions || 0), 0).toLocaleString()}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Net Payroll</p>
+                    <p className="text-2xl font-bold">
+                      ${employeeData.reduce((sum, emp) => sum + (emp.netSalary || 0), 0).toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <Table
+                columns={columns}
+                dataSource={employeeData}
+                rowKey="id"
+                pagination={{ pageSize: 10 }}
+                scroll={{ x: 1400 }}
+                expandable={{
+                  expandedRowRender,
+                  rowExpandable: (record) => 
+                    !!(record.leaves && record.leaves.length > 0) || 
+                    !!(record.adjustments && record.adjustments.length > 0) ||
+                    !!(record.bonus && record.bonus > 0),
+                }}
+                className="bg-white rounded-lg"
+              />
+            </>
+          )}
+        </div>
+      )}
+
+      <AddAdjustmentModal
+        open={adjustmentModalOpen}
+        onClose={() => {
+          setAdjustmentModalOpen(false)
+          setSelectedEmployee(null)
+        }}
+        employeeName={selectedEmployee?.employeeName || ""}
+        onAdd={handleAdjustmentAdded}
+      />
+
+      <AddBonusModal
+        open={bonusModalOpen}
+        onClose={() => {
+          setBonusModalOpen(false)
+          setSelectedEmployee(null)
+        }}
+        employeeName={selectedEmployee?.employeeName || ""}
+        onAdd={handleBonusAdded}
+      />
     </Modal>
   )
 }
+
