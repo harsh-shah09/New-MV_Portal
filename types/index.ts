@@ -17,6 +17,7 @@ export interface Employee {
   position: string
   joinDate: string
   status: "active" | "intern" | "on_notice" | "resigned" | "terminated"
+  active?: boolean
   salary: number
   manager?: string
   bankDetails?: BankDetails

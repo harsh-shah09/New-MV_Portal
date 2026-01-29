@@ -23,19 +23,21 @@ import {
   Building2,
   CheckCircle2,
   Shield,
-  Lock
+  Lock,
+  Power
 } from "lucide-react"
 import { generate2FASecretAction, verifyAndEnable2FAAction, disable2FAAction } from "@/app/employees/[id]/actions"
-import { message, Spin, Select } from "antd"
+import { message, Spin, Select, Modal } from "antd"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { cn } from "@/lib/utils"
 import { Field } from "./field-component"
 
 interface ViewProps {
   employeeId: string;
+  currentUserRole?: string;
 }
 
-export function EmployeeProfileView({ employeeId }: ViewProps) {
+export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }: ViewProps) {
   const [activeTab, setActiveTab] = useState<"personal" | "employment" | "bank" | "documents" | "security">("personal")
   const [isEditing, setIsEditing] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -359,6 +361,46 @@ export function EmployeeProfileView({ employeeId }: ViewProps) {
                        </div>
                    </div>
                    <div className="flex gap-3 justify-center items-center">
+                       {['HR', 'Admin'].includes(currentUserRole) && (
+                           <button
+                             onClick={() => {
+                                 const isActivating = !employee.Active__c;
+                                 Modal.confirm({
+                                     title: `Are you sure you want to ${isActivating ? 'activate' : 'deactivate'} this user?`,
+                                     content: isActivating 
+                                         ? 'By activating this user, a welcome email with account setup instructions will be sent automatically.' 
+                                         : 'Deactivating this user will prevent them from logging in.',
+                                     okText: isActivating ? 'Activate & Send Email' : 'Deactivate',
+                                     okType: isActivating ? 'primary' : 'danger',
+                                     cancelText: 'Cancel',
+                                     onOk: async () => {
+                                         try {
+                                             const res = await fetch(`/api/employees/${employeeId}/toggle-active`, {
+                                                 method: 'POST',
+                                                 headers: { 'Content-Type': 'application/json' },
+                                                 body: JSON.stringify({ active: isActivating })
+                                             });
+                                             if (!res.ok) throw new Error('Failed');
+                                             message.success(`User ${isActivating ? 'activated' : 'deactivated'} successfully`);
+                                             queryClient.invalidateQueries({ queryKey: ["employee", employeeId] });
+                                         } catch (e) {
+                                             message.error("Failed to update status");
+                                         }
+                                     }
+                                 });
+                             }}
+                             className={cn(
+                                 "flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold transition border",
+                                 employee.Active__c 
+                                     ? "bg-red-50 text-red-600 border-red-100 hover:bg-red-100" 
+                                     : "bg-green-50 text-green-600 border-green-100 hover:bg-green-100"
+                             )}
+                         >
+                             <Power className="w-4 h-4" /> 
+                             {employee.Active__c ? 'Deactivate' : 'Activate'}
+                         </button>
+                       )}
+
                        {(!isEditing) ? (
                            <button 
                              onClick={handleEditToggle}

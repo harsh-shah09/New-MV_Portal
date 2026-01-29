@@ -21,7 +21,7 @@ export async function GET(req: Request) {
     // Minimal data for the list
     const users = employees.map(e => ({
         Id: e.Id,
-        Employee_ID__c: e.Employee_ID__c,
+        Employee_ID__c: e.Name,
         Name: e.Employee_Name__c,
         Email: e.Employee_Email__c,
         Role: e.Role__c,

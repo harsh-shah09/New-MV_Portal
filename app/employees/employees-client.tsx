@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useQuery } from "@tanstack/react-query"
-import { Skeleton, Card, Space, Result, Button } from "antd"
+import { Skeleton, Card, Space, Result, Button, message } from "antd"
 
 import { EmployeeForm } from "./components/employee-form"
 import { EmployeeTable } from "./components/employee-table"
@@ -25,10 +25,13 @@ export default function EmployeesClient({ role }: EmployeesClientProps) {
   const [department, setDepartment] = useState("")
   const [status, setStatus] = useState("")
   
+  const [accountStatus, setAccountStatus] = useState("")
+  
   const isHR = role === 'HR';
 
   const { addEmployee, updateEmployee, deleteEmployee } = useEmployeeStore()
 
+  /* handleUpdateEmployee implementation and queryFn fix */
   const { data: employees = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['employees'],
     queryFn: async () => {
@@ -47,20 +50,21 @@ export default function EmployeesClient({ role }: EmployeesClientProps) {
         position: record.Role__c || '',
         joinDate: record.Joining_Date__c || '',
         status: record.Status__c || 'inactive',
+        active: record.Active__c,
         salary: record.Base_Salary__c || 0,
-        // Add other fields as needed for detail view if Employee type supports them
-        // or extends the type. For now mapping core fields.
         profilePhoto: record.Profile_Photo__c,
-        emergencyContact: record.Emergency_Contact_Name__c,
-        emergencyPhone: record.Emergency_Contact_Number__c,
-        address: record.Employee_Address__c,
-        city : record.Employee_Address__c?.city,
-        state : record.Employee_Address__c?.state || 'State',
-        zipCode : record.Employee_Address__c?.postalCode ,
-        nationality : record.Employee_Address__c?.country,
+        personalDetails: {
+            address: record.Employee_Address__c?.street || (typeof record.Employee_Address__c === 'string' ? record.Employee_Address__c : ''),
+            city : record.Employee_Address__c?.city,
+            state : record.Employee_Address__c?.state || 'State',
+            zipCode : record.Employee_Address__c?.postalCode ,
+            nationality : record.Employee_Address__c?.country,
+            emergencyContact: record.Emergency_Contact_Name__c,
+            emergencyPhone: record.Emergency_Contact_Number__c,
+        },
         gender: record.Gender__c,
         experience: record.Experience__c,
-        employeeId: record.Employee_ID__c,
+        employeeId: record.Name,
         ctc: record.Salary_CTC__c,
       })) as Employee[];
     }
@@ -76,24 +80,63 @@ export default function EmployeesClient({ role }: EmployeesClientProps) {
 
     const matchesDepartment = !department || emp.department === department
     const matchesStatus = !status || emp.status.toLowerCase() === status
+    
+    // Account Status Filter
+    let matchesAccountStatus = true;
+    if (accountStatus === 'active') matchesAccountStatus = !!emp.active;
+    if (accountStatus === 'inactive') matchesAccountStatus = !emp.active;
 
-    return matchesSearch && matchesDepartment && matchesStatus
+    return matchesSearch && matchesDepartment && matchesStatus && matchesAccountStatus
   })
 
   const handleAddEmployee = (data: Employee) => {
-    // In a real app, this should call API
-    // addEmployee(data) 
-    // For now keeping store update but usually we refill query
     console.log("Add not implemented fully via API yet", data);
+    message.info("Add Employee feature coming soon via API");
     setShowForm(false)
   }
 
-  const handleUpdateEmployee = (data: Employee) => {
-     // In a real app, this should call API
-    // updateEmployee(data)
-     console.log("Update not implemented fully via API yet", data);
-    setEditingEmployee(undefined)
-    setShowForm(false)
+  const handleUpdateEmployee = async (data: Employee) => {
+     try {
+        message.loading({ content: 'Updating...', key: 'update' });
+
+        // Map frontend Employee object back to Salesforce schema
+        const salesforceData: any = {
+            Employee_Name__c: `${data.firstName} ${data.lastName}`,
+            Employee_Email__c: data.email,
+            Employee_Phone__c: data.phone,
+            Department__c: data.department,
+            Role__c: data.position,
+            Joining_Date__c: data.joinDate,
+            Base_Salary__c: data.salary,
+            Status__c: data.status,
+            // Address Handling
+            // Employee_Address__c: data.personalDetails ? {
+            //     street: data.personalDetails.address,
+            //     city: data.personalDetails.city,
+            //     state: data.personalDetails.state,
+            //     postalCode: data.personalDetails.zipCode,
+            //     country: data.personalDetails.nationality
+            // } : undefined,
+            Emergency_Contact_Name__c: data.personalDetails?.emergencyContact,
+            Emergency_Contact_Number__c: data.personalDetails?.emergencyPhone,
+        };
+
+        const res = await fetch(`/api/employees/${data.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(salesforceData),
+        });
+
+        if (!res.ok) throw new Error('Failed to update');
+
+        message.success({ content: 'Employee updated successfully!', key: 'update' });
+        await refetch();
+        setEditingEmployee(undefined)
+        setShowForm(false)
+     } catch (error) {
+         console.error("Update failed", error);
+         message.error({ content: 'Failed to update employee', key: 'update' });
+     }
   }
 
   const handleDeleteEmployee = (id: string) => {
@@ -269,7 +312,7 @@ export default function EmployeesClient({ role }: EmployeesClientProps) {
             <h1 className="text-3xl sm:text-4xl font-bold text-foreground">Employees</h1>
             <p className="text-muted-foreground mt-1">Manage your workforce</p>
           </div>
-          {isHR && (
+          {/* {isHR && (
             <Button
                 type="primary"
                 size="large"
@@ -281,7 +324,7 @@ export default function EmployeesClient({ role }: EmployeesClientProps) {
             >
                 + Add Employee
             </Button>
-          )}
+          )} */}
         </div>
 
         <EmployeeFilters
@@ -291,6 +334,8 @@ export default function EmployeesClient({ role }: EmployeesClientProps) {
           onDepartmentChange={setDepartment}
           status={status}
           onStatusChange={setStatus}
+          accountStatus={accountStatus}
+          onAccountStatusChange={setAccountStatus}
         />
 
         <EmployeeTable

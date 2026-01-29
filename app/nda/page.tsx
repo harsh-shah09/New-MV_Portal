@@ -281,8 +281,8 @@ export default function NDAPage() {
                 {
                     key: '1',
                     label: (
-                        <span className="flex items-center gap-2">
-                            <FileText className="w-4 h-4" /> Generator
+                        <span className="">
+                            {/* <FileText className="w-4 h-4" /> Generator */}
                         </span>
                     ),
                     children: (
@@ -460,197 +460,197 @@ export default function NDAPage() {
                         </div>
                     )
                 },
-                {
-                    key: '2',
-                    label: (
-                        <span className="flex items-center gap-2">
-                            <UploadCloud className="w-4 h-4" /> Requests & Uploads
-                        </span>
-                    ),
-                    children: (
-                        <div className="space-y-4">
-                            {/* Mobile Header & Actions */}
-                            <div className="md:hidden flex justify-between items-center pt-2">
-                                 <span className="text-sm font-semibold text-muted-foreground">Manage Documents</span>
-                                 <Button size="small" icon={<RefreshCw className="w-3 h-3" />} onClick={() => refetchPending()}>Refresh</Button>
-                            </div>
+                // {
+                //     key: '2',
+                //     label: (
+                //         <span className="flex items-center gap-2">
+                //             <UploadCloud className="w-4 h-4" /> Requests & Uploads
+                //         </span>
+                //     ),
+                //     children: (
+                //         <div className="space-y-4">
+                //             {/* Mobile Header & Actions */}
+                //             <div className="md:hidden flex justify-between items-center pt-2">
+                //                  <span className="text-sm font-semibold text-muted-foreground">Manage Documents</span>
+                //                  <Button size="small" icon={<RefreshCw className="w-3 h-3" />} onClick={() => refetchPending()}>Refresh</Button>
+                //             </div>
                             
-                            <Tabs 
-                                type="card"
-                                tabBarExtraContent={
-                                   <div className="hidden md:flex items-center">
-                                     <Button icon={<RefreshCw className="w-4 h-4" />} onClick={() => refetchPending()}>
-                                        Refresh Data
-                                    </Button>
-                                   </div>
-                                }
-                                items={[
-                                    {
-                                        key: 'pending',
-                                        label: (
-                                            <span className="flex items-center gap-2">
-                                                <RefreshCw className="w-3 h-3 animate-spin-slow" /> Pending Requests
-                                                <span className="bg-orange-100 text-orange-700 text-xs px-2 py-0.5 rounded-full ml-1">
-                                                    {(pendingDocs || []).filter((d: any) => d.Status__c === 'Pending').length}
-                                                </span>
-                                            </span>
-                                        ),
-                                        children: (
-                                            <Card className="shadow-sm border-border bg-card rounded-b-2xl rounded-tr-2xl border-t-0" bodyStyle={{ padding: 0 }}>
-                                                {/* Desktop Table */}
-                                                <div className="hidden md:block">
-                                                    <Table 
-                                                        dataSource={(pendingDocs || []).filter((d: any) => d.Status__c === 'Pending')} 
-                                                        columns={requestColumns} 
-                                                        loading={loadingPending}
-                                                        rowKey="Id"
-                                                        pagination={{ pageSize: 8 }}
-                                                        locale={{ emptyText: <Empty description="No pending requests" image={Empty.PRESENTED_IMAGE_SIMPLE} /> }}
-                                                    />
-                                                </div>
-                                                {/* Mobile List */}
-                                                <div className="md:hidden p-4 space-y-4">
-                                                    {(pendingDocs || []).filter((d: any) => d.Status__c === 'Pending').map((record: any) => (
-                                                        <div key={record.Id} className="bg-card border border-border rounded-xl p-4 flex flex-col gap-3 shadow-sm">
-                                                            <div className="flex justify-between items-start">
-                                                                <div>
-                                                                     <p className="font-semibold text-foreground">{record.Employee__r?.Name || 'Unknown Employee'}</p>
-                                                                     <p className="text-xs text-muted-foreground">{new Date(record.CreatedDate).toLocaleDateString()}</p>
-                                                                </div>
-                                                                <Tag color="orange">Pending</Tag>
-                                                            </div>
-                                                            <div className="text-sm">
-                                                                <span className="text-muted-foreground">Type: </span>
-                                                                <span className="font-medium text-foreground">{record.Document_Type__c}</span>
-                                                            </div>
-                                                            <div className="flex gap-2 pt-2 border-t border-border">
-                                                                <Link href={`/employees/${record.Employee__c}`} target="_blank" className="flex-1">
-                                                                    <Button block size="small" icon={<User className="w-3 h-3" />}>View</Button>
-                                                                </Link>
-                                                                <Button className="flex-1" size="small" type="primary" icon={<UploadOutlined />} onClick={() => handleUploadClick(record)}>
-                                                                    Upload
-                                                                </Button>
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                    {(pendingDocs || []).filter((d: any) => d.Status__c === 'Pending').length === 0 && (
-                                                        <div className="py-12 flex flex-col items-center justify-center text-center opacity-80">
-                                                            <div className="w-16 h-16 bg-muted/50 rounded-full flex items-center justify-center mb-4">
-                                                                <RefreshCw className="w-8 h-8 text-muted-foreground opacity-50" />
-                                                            </div>
-                                                            <p className="font-medium text-foreground">No pending requests</p>
-                                                            <p className="text-sm text-muted-foreground mt-1">New document requests will appear here</p>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </Card>
-                                        )
-                                    },
-                                    {
-                                        key: 'uploaded',
-                                        label: (
-                                            <span className="flex items-center gap-2">
-                                                <FileCheck className="w-3 h-3 text-green-500" /> Uploaded Documents
-                                                <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full ml-1">
-                                                    {(pendingDocs || []).filter((d: any) => d.Status__c === 'Uploaded').length}
-                                                </span>
-                                            </span>
-                                        ),
-                                        children: (
-                                            <Card className="shadow-sm border-border bg-card rounded-b-2xl rounded-tl-2xl border-t-0" bodyStyle={{ padding: 0 }}>
-                                                {/* Desktop Table */}
-                                                <div className="hidden md:block">
-                                                    <Table 
-                                                        dataSource={(pendingDocs || []).filter((d: any) => d.Status__c === 'Uploaded')} 
-                                                        columns={[
-                                                            {                                                                  title: 'Employee', 
-                                                                dataIndex: ['Employee__r', 'Employee_Name__c'], 
-                                                                key: 'empName',
-                                                                render: (text: string, record: any) => (
-                                                                    <div className="flex items-center gap-2">
-                                                                        <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs">
-                                                                            {(text || record.Employee__r?.Employee_Name__c)?.[0]}
-                                                                        </div>
-                                                                        <span className="font-medium">{text || record.Employee__r?.Employee_Name__c}</span>
-                                                                    </div>
-                                                                )
-                                                            },
-                                                            { 
-                                                                title: 'Document Type', 
-                                                                dataIndex: 'Document_Type__c', 
-                                                                key: 'type',
-                                                                render: (text) => <span className="text-muted-foreground">{text}</span>
-                                                            },
-                                                            { 
-                                                                title: 'Uploaded Date', 
-                                                                dataIndex: 'CreatedDate', 
-                                                                key: 'date', 
-                                                                render: (d: string) => <span className="text-muted-foreground">{new Date(d).toLocaleDateString()}</span> 
-                                                            },
-                                                            {
-                                                                title: 'Action',
-                                                                key: 'action',
-                                                                render: (_: any, record: any) => (
-                                                                    <Link href={record.File_URL__c || '#'} target="_blank">
-                                                                        <Button size="small" type="default" icon={<FileText className="w-3 h-3" />}>
-                                                                            View File
-                                                                        </Button>
-                                                                    </Link>
-                                                                )
-                                                            }
-                                                        ]} 
-                                                        loading={loadingPending}
-                                                        rowKey="Id"
-                                                        locale={{ emptyText: <Empty description="No uploaded documents" image={Empty.PRESENTED_IMAGE_SIMPLE} /> }}
-                                                    />
-                                                </div>
-                                                {/* Mobile View */}
-                                                <div className="md:hidden p-4 space-y-4">
-                                                    {(pendingDocs || []).filter((d: any) => d.Status__c === 'Uploaded').map((record: any) => (
-                                                        <div key={record.Id} className="bg-card border border-border rounded-xl p-4 flex flex-col gap-3 shadow-sm">
-                                                            <div className="flex justify-between items-start">
-                                                                <div className="flex items-center gap-2">
-                                                                    <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs">
-                                                                        {(record.Employee__r?.Employee_Name__c)?.[0]}
-                                                                    </div>
-                                                                    <div>
-                                                                        <p className="font-semibold text-foreground">{record.Employee__r?.Employee_Name__c || 'Unknown'}</p>
-                                                                        <p className="text-xs text-muted-foreground">{new Date(record.CreatedDate).toLocaleDateString()}</p>
-                                                                    </div>
-                                                                </div>
-                                                                <Tag color="green">Uploaded</Tag>
-                                                            </div>
-                                                            <div className="text-sm border-t border-border pt-2 mt-1">
-                                                                <span className="text-muted-foreground text-xs uppercase tracking-wide">Document Type</span>
-                                                                <p className="font-medium text-foreground">{record.Document_Type__c}</p>
-                                                            </div>
-                                                            <div className="pt-2">
-                                                                <Link href={record.File_URL__c || '#'} target="_blank">
-                                                                    <Button block icon={<FileText className="w-3 h-3" />}>
-                                                                        View File
-                                                                    </Button>
-                                                                </Link>
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                    {(pendingDocs || []).filter((d: any) => d.Status__c === 'Uploaded').length === 0 && (
-                                                         <div className="py-12 flex flex-col items-center justify-center text-center opacity-80">
-                                                            <div className="w-16 h-16 bg-muted/50 rounded-full flex items-center justify-center mb-4">
-                                                                <FileCheck className="w-8 h-8 text-muted-foreground opacity-50" />
-                                                            </div>
-                                                            <p className="font-medium text-foreground">No uploaded documents</p>
-                                                            <p className="text-sm text-muted-foreground mt-1">Completed uploads will appear here</p>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </Card>
-                                        )
-                                    }
-                                ]}
-                            />
-                        </div>
-                    )
-                }
+                //             <Tabs 
+                //                 type="card"
+                //                 tabBarExtraContent={
+                //                    <div className="hidden md:flex items-center">
+                //                      <Button icon={<RefreshCw className="w-4 h-4" />} onClick={() => refetchPending()}>
+                //                         Refresh Data
+                //                     </Button>
+                //                    </div>
+                //                 }
+                //                 items={[
+                //                     {
+                //                         key: 'pending',
+                //                         label: (
+                //                             <span className="flex items-center gap-2">
+                //                                 <RefreshCw className="w-3 h-3 animate-spin-slow" /> Pending Requests
+                //                                 <span className="bg-orange-100 text-orange-700 text-xs px-2 py-0.5 rounded-full ml-1">
+                //                                     {(pendingDocs || []).filter((d: any) => d.Status__c === 'Pending').length}
+                //                                 </span>
+                //                             </span>
+                //                         ),
+                //                         children: (
+                //                             <Card className="shadow-sm border-border bg-card rounded-b-2xl rounded-tr-2xl border-t-0" bodyStyle={{ padding: 0 }}>
+                //                                 {/* Desktop Table */}
+                //                                 <div className="hidden md:block">
+                //                                     <Table 
+                //                                         dataSource={(pendingDocs || []).filter((d: any) => d.Status__c === 'Pending')} 
+                //                                         columns={requestColumns} 
+                //                                         loading={loadingPending}
+                //                                         rowKey="Id"
+                //                                         pagination={{ pageSize: 8 }}
+                //                                         locale={{ emptyText: <Empty description="No pending requests" image={Empty.PRESENTED_IMAGE_SIMPLE} /> }}
+                //                                     />
+                //                                 </div>
+                //                                 {/* Mobile List */}
+                //                                 <div className="md:hidden p-4 space-y-4">
+                //                                     {(pendingDocs || []).filter((d: any) => d.Status__c === 'Pending').map((record: any) => (
+                //                                         <div key={record.Id} className="bg-card border border-border rounded-xl p-4 flex flex-col gap-3 shadow-sm">
+                //                                             <div className="flex justify-between items-start">
+                //                                                 <div>
+                //                                                      <p className="font-semibold text-foreground">{record.Employee__r?.Name || 'Unknown Employee'}</p>
+                //                                                      <p className="text-xs text-muted-foreground">{new Date(record.CreatedDate).toLocaleDateString()}</p>
+                //                                                 </div>
+                //                                                 <Tag color="orange">Pending</Tag>
+                //                                             </div>
+                //                                             <div className="text-sm">
+                //                                                 <span className="text-muted-foreground">Type: </span>
+                //                                                 <span className="font-medium text-foreground">{record.Document_Type__c}</span>
+                //                                             </div>
+                //                                             <div className="flex gap-2 pt-2 border-t border-border">
+                //                                                 <Link href={`/employees/${record.Employee__c}`} target="_blank" className="flex-1">
+                //                                                     <Button block size="small" icon={<User className="w-3 h-3" />}>View</Button>
+                //                                                 </Link>
+                //                                                 <Button className="flex-1" size="small" type="primary" icon={<UploadOutlined />} onClick={() => handleUploadClick(record)}>
+                //                                                     Upload
+                //                                                 </Button>
+                //                                             </div>
+                //                                         </div>
+                //                                     ))}
+                //                                     {(pendingDocs || []).filter((d: any) => d.Status__c === 'Pending').length === 0 && (
+                //                                         <div className="py-12 flex flex-col items-center justify-center text-center opacity-80">
+                //                                             <div className="w-16 h-16 bg-muted/50 rounded-full flex items-center justify-center mb-4">
+                //                                                 <RefreshCw className="w-8 h-8 text-muted-foreground opacity-50" />
+                //                                             </div>
+                //                                             <p className="font-medium text-foreground">No pending requests</p>
+                //                                             <p className="text-sm text-muted-foreground mt-1">New document requests will appear here</p>
+                //                                         </div>
+                //                                     )}
+                //                                 </div>
+                //                             </Card>
+                //                         )
+                //                     },
+                //                     {
+                //                         key: 'uploaded',
+                //                         label: (
+                //                             <span className="flex items-center gap-2">
+                //                                 <FileCheck className="w-3 h-3 text-green-500" /> Uploaded Documents
+                //                                 <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full ml-1">
+                //                                     {(pendingDocs || []).filter((d: any) => d.Status__c === 'Uploaded').length}
+                //                                 </span>
+                //                             </span>
+                //                         ),
+                //                         children: (
+                //                             <Card className="shadow-sm border-border bg-card rounded-b-2xl rounded-tl-2xl border-t-0" bodyStyle={{ padding: 0 }}>
+                //                                 {/* Desktop Table */}
+                //                                 <div className="hidden md:block">
+                //                                     <Table 
+                //                                         dataSource={(pendingDocs || []).filter((d: any) => d.Status__c === 'Uploaded')} 
+                //                                         columns={[
+                //                                             {                                                                  title: 'Employee', 
+                //                                                 dataIndex: ['Employee__r', 'Employee_Name__c'], 
+                //                                                 key: 'empName',
+                //                                                 render: (text: string, record: any) => (
+                //                                                     <div className="flex items-center gap-2">
+                //                                                         <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs">
+                //                                                             {(text || record.Employee__r?.Employee_Name__c)?.[0]}
+                //                                                         </div>
+                //                                                         <span className="font-medium">{text || record.Employee__r?.Employee_Name__c}</span>
+                //                                                     </div>
+                //                                                 )
+                //                                             },
+                //                                             { 
+                //                                                 title: 'Document Type', 
+                //                                                 dataIndex: 'Document_Type__c', 
+                //                                                 key: 'type',
+                //                                                 render: (text) => <span className="text-muted-foreground">{text}</span>
+                //                                             },
+                //                                             { 
+                //                                                 title: 'Uploaded Date', 
+                //                                                 dataIndex: 'CreatedDate', 
+                //                                                 key: 'date', 
+                //                                                 render: (d: string) => <span className="text-muted-foreground">{new Date(d).toLocaleDateString()}</span> 
+                //                                             },
+                //                                             {
+                //                                                 title: 'Action',
+                //                                                 key: 'action',
+                //                                                 render: (_: any, record: any) => (
+                //                                                     <Link href={record.File_URL__c || '#'} target="_blank">
+                //                                                         <Button size="small" type="default" icon={<FileText className="w-3 h-3" />}>
+                //                                                             View File
+                //                                                         </Button>
+                //                                                     </Link>
+                //                                                 )
+                //                                             }
+                //                                         ]} 
+                //                                         loading={loadingPending}
+                //                                         rowKey="Id"
+                //                                         locale={{ emptyText: <Empty description="No uploaded documents" image={Empty.PRESENTED_IMAGE_SIMPLE} /> }}
+                //                                     />
+                //                                 </div>
+                //                                 {/* Mobile View */}
+                //                                 <div className="md:hidden p-4 space-y-4">
+                //                                     {(pendingDocs || []).filter((d: any) => d.Status__c === 'Uploaded').map((record: any) => (
+                //                                         <div key={record.Id} className="bg-card border border-border rounded-xl p-4 flex flex-col gap-3 shadow-sm">
+                //                                             <div className="flex justify-between items-start">
+                //                                                 <div className="flex items-center gap-2">
+                //                                                     <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs">
+                //                                                         {(record.Employee__r?.Employee_Name__c)?.[0]}
+                //                                                     </div>
+                //                                                     <div>
+                //                                                         <p className="font-semibold text-foreground">{record.Employee__r?.Employee_Name__c || 'Unknown'}</p>
+                //                                                         <p className="text-xs text-muted-foreground">{new Date(record.CreatedDate).toLocaleDateString()}</p>
+                //                                                     </div>
+                //                                                 </div>
+                //                                                 <Tag color="green">Uploaded</Tag>
+                //                                             </div>
+                //                                             <div className="text-sm border-t border-border pt-2 mt-1">
+                //                                                 <span className="text-muted-foreground text-xs uppercase tracking-wide">Document Type</span>
+                //                                                 <p className="font-medium text-foreground">{record.Document_Type__c}</p>
+                //                                             </div>
+                //                                             <div className="pt-2">
+                //                                                 <Link href={record.File_URL__c || '#'} target="_blank">
+                //                                                     <Button block icon={<FileText className="w-3 h-3" />}>
+                //                                                         View File
+                //                                                     </Button>
+                //                                                 </Link>
+                //                                             </div>
+                //                                         </div>
+                //                                     ))}
+                //                                     {(pendingDocs || []).filter((d: any) => d.Status__c === 'Uploaded').length === 0 && (
+                //                                          <div className="py-12 flex flex-col items-center justify-center text-center opacity-80">
+                //                                             <div className="w-16 h-16 bg-muted/50 rounded-full flex items-center justify-center mb-4">
+                //                                                 <FileCheck className="w-8 h-8 text-muted-foreground opacity-50" />
+                //                                             </div>
+                //                                             <p className="font-medium text-foreground">No uploaded documents</p>
+                //                                             <p className="text-sm text-muted-foreground mt-1">Completed uploads will appear here</p>
+                //                                         </div>
+                //                                     )}
+                //                                 </div>
+                //                             </Card>
+                //                         )
+                //                     }
+                //                 ]}
+                //             />
+                //         </div>
+                //     )
+                // }
             ]}
          />
 

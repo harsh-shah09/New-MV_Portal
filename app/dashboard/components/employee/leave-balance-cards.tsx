@@ -25,7 +25,7 @@ export function LeaveBalanceCards({ leaveBalanceData, totalAllowance }: LeaveBal
             title="Annual Leave Remaining"
             value={leaveBalanceData.annualLeaveRemaining}
             suffix={`/ ${totalAllowance}`}
-            styles={{ value: { color: '#3b82f6' } }}
+            styles={{content: { color: '#3b82f6' }}}
             prefix={<CalendarOutlined />}
           />
           <Progress 
@@ -41,7 +41,7 @@ export function LeaveBalanceCards({ leaveBalanceData, totalAllowance }: LeaveBal
           <Statistic
             title="Sick Leave Taken"
             value={leaveBalanceData.sickLeaveCount}
-            styles={{ value: { color: '#ef4444' } }}
+            styles={{content: { color: '#ef4444' }}}
             prefix={<ClockCircleOutlined />}
           />
         </Card>
@@ -51,7 +51,7 @@ export function LeaveBalanceCards({ leaveBalanceData, totalAllowance }: LeaveBal
           <Statistic
             title="Emergency Leave Taken"
             value={leaveBalanceData.emergencyLeaveCount}
-            styles={{ value: { color: '#f59e0b' } }}
+            styles={{content: { color: '#f59e0b' }}}
             prefix={<ClockCircleOutlined />}
           />
         </Card>
@@ -61,7 +61,7 @@ export function LeaveBalanceCards({ leaveBalanceData, totalAllowance }: LeaveBal
           <Statistic
             title="Planned Leave Taken"
             value={leaveBalanceData.plannedLeaveCount}
-            styles={{ value: { color: '#10b981' } }}
+            styles={{content: { color: '#10b981' }}}
             prefix={<ClockCircleOutlined />}
           />
         </Card>

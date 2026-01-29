@@ -8,6 +8,7 @@ import {
   TeamOutlined
 } from "@ant-design/icons"
 import { useRouter } from "next/navigation"
+import { color } from "framer-motion"
 
 interface HRKPIStatsProps {
   stats: {
@@ -27,7 +28,7 @@ export function HRKPIStats({ stats }: HRKPIStatsProps) {
           <Statistic
             title="Pending Approvals"
             value={stats.pendingApprovals}
-            styles={{ value: { color: '#f59e0b' } }}
+            styles={{content: { color: '#f59e0b' }}}
             prefix={<ClockCircleOutlined />}
           />
           <Button 
@@ -45,7 +46,7 @@ export function HRKPIStats({ stats }: HRKPIStatsProps) {
           <Statistic
             title="Approved Today"
             value={stats.approvedToday}
-            styles={{ value: { color: '#10b981' } }}
+            styles={{content: { color: '#10b981' }}}
             prefix={<CheckCircleOutlined />}
           />
         </Card>
@@ -55,7 +56,7 @@ export function HRKPIStats({ stats }: HRKPIStatsProps) {
           <Statistic
             title="On Leave Today"
             value={stats.onLeaveToday}
-            styles={{ value: { color: '#3b82f6' } }}
+            styles={{content: { color: '#3b82f6' }}}
             prefix={<UserOutlined />}
           />
         </Card>
@@ -65,7 +66,7 @@ export function HRKPIStats({ stats }: HRKPIStatsProps) {
           <Statistic
             title="Total Employees"
             value={stats.totalEmployees}
-            styles={{ value: { color: '#8b5cf6' } }}
+            styles={{content: { color: '#8b5cf6' }}}
             prefix={<TeamOutlined />}
           />
         </Card>

@@ -3,6 +3,7 @@
 import { Input, Select, Card, Row, Col } from 'antd'
 import { SearchOutlined, FilterOutlined } from '@ant-design/icons'
 
+
 interface EmployeeFiltersProps {
   searchTerm: string
   onSearchChange: (value: string) => void
@@ -10,6 +11,8 @@ interface EmployeeFiltersProps {
   onDepartmentChange: (value: string) => void
   status: string
   onStatusChange: (value: string) => void
+  accountStatus: string
+  onAccountStatusChange: (value: string) => void
 }
 
 const { Option } = Select
@@ -21,17 +24,19 @@ export function EmployeeFilters({
   onDepartmentChange,
   status,
   onStatusChange,
+  accountStatus,
+  onAccountStatusChange
 }: EmployeeFiltersProps) {
   return (
     <Card className="rounded-xl shadow-sm border-border bg-card text-card-foreground mb-6" bodyStyle={{ padding: '16px' }}>
       <Row gutter={[16, 16]}>
-        <Col xs={24} md={8}>
+        <Col xs={24} md={6}>
           <label className="block text-sm font-medium text-muted-foreground mb-1.5">
             Search
           </label>
           <Input
             prefix={<SearchOutlined className="text-muted-foreground" />}
-            placeholder="Search by name, email, or phone..."
+            placeholder="Search..."
             value={searchTerm}
             onChange={(e) => onSearchChange(e.target.value)}
             allowClear
@@ -40,14 +45,14 @@ export function EmployeeFilters({
           />
         </Col>
 
-        <Col xs={24} md={8}>
+        <Col xs={24} md={6}>
           <label className="block text-sm font-medium text-muted-foreground mb-1.5">
             Department
           </label>
           <Select
             value={department || undefined}
             onChange={onDepartmentChange}
-            placeholder="All Departments"
+            placeholder="All"
             allowClear
             style={{ width: '100%' }}
             size="large"
@@ -62,14 +67,14 @@ export function EmployeeFilters({
           </Select>
         </Col>
 
-        <Col xs={24} md={8}>
+        <Col xs={24} md={6}>
           <label className="block text-sm font-medium text-muted-foreground mb-1.5">
-            Status
+            Employment Status
           </label>
           <Select
             value={status || undefined}
             onChange={onStatusChange}
-            placeholder="All Statuses"
+            placeholder="All"
             allowClear
             style={{ width: '100%' }}
             size="large"
@@ -80,6 +85,25 @@ export function EmployeeFilters({
             <Option value="On Notice">On Notice</Option>
             <Option value="Resigned">Resigned</Option>
             <Option value="Terminated">Terminated</Option>
+          </Select>
+        </Col>
+        
+        <Col xs={24} md={6}>
+          <label className="block text-sm font-medium text-muted-foreground mb-1.5">
+            Account Status
+          </label>
+          <Select
+            value={accountStatus || undefined}
+            onChange={onAccountStatusChange}
+            placeholder="All"
+            allowClear
+            style={{ width: '100%' }}
+            size="large"
+            className="rounded-lg"
+          >
+            <Option value="">All</Option>
+            <Option value="active">Active Users</Option>
+            <Option value="inactive">Inactive Users</Option>
           </Select>
         </Col>
       </Row>

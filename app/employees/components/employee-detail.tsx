@@ -9,10 +9,11 @@ interface EmployeeDetailProps {
   employee: Employee
   onClose: () => void
   onEdit?: (employee: Employee) => void
+  currentUserRole?: string
 }
 
-export function EmployeeDetail({ employee, onClose, onEdit }: EmployeeDetailProps) {
-  const [activeTab, setActiveTab] = useState<"basic" | "personal" | "bank" | "documents">("basic")
+export function EmployeeDetail({ employee, onClose, onEdit, currentUserRole = 'Employee' }: EmployeeDetailProps) {
+  const [activeTab, setActiveTab] = useState<"basic" | "personal" | "bank" | "documents" | "welcome">("basic")
 
   const tabs = [
     { id: "basic", label: "Basic Info" },
@@ -137,13 +138,38 @@ export function EmployeeDetail({ employee, onClose, onEdit }: EmployeeDetailProp
             Close
           </button>
           
-          {onEdit && (
+
+
+          {onEdit && ['HR', 'Admin'].includes(currentUserRole) && (
+            <div className="flex gap-3">
+                 <button
+                    onClick={async () => {
+                        if (confirm(`Are you sure you want to ${employee.active ? 'deactivate' : 'activate'} this employee? ${!employee.active ? 'They will receive a welcome email.' : ''}`)) {
+                             try {
+                                 const res = await fetch(`/api/employees/${employee.id}/toggle-active`, {
+                                     method: 'POST',
+                                     headers: { 'Content-Type': 'application/json' },
+                                     body: JSON.stringify({ active: !employee.active })
+                                 });
+                                 if(!res.ok) throw new Error('Failed');
+                                 onClose(); 
+                                 window.location.reload(); // Simple refresh for now
+                             } catch(e) {
+                                 alert('Failed to update status')
+                             }
+                        }
+                    }}
+                    className={`px-6 py-2 border rounded-lg font-medium transition ${employee.active ? 'border-red-200 text-red-600 hover:bg-red-50' : 'border-green-200 text-green-600 hover:bg-green-50'}`}
+                >
+                    {employee.active ? 'Deactivate' : 'Activate User'}
+                </button>
             <button
             onClick={() => onEdit(employee)}
             className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition"
           >
             Edit Profile
           </button>
+          </div>
           )}
         </div>
       </div>

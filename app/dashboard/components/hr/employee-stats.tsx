@@ -29,7 +29,7 @@ export function EmployeeStats({ stats }: EmployeeStatsProps) {
             <Statistic
               title="Active Employees"
               value={stats.totalEmployees - stats.onLeaveToday}
-              styles={{ value: { color: '#3b82f6', fontSize: '24px' } }}
+              styles={{content: { color: '#3b82f6', fontSize: '24px' }}}
             />
           </Card>
         </Col>
@@ -38,7 +38,7 @@ export function EmployeeStats({ stats }: EmployeeStatsProps) {
             <Statistic
               title="New Joiners (Month)"
               value={stats.newJoinersThisMonth}
-              styles={{ value: { color: '#10b981', fontSize: '24px' } }}
+              styles={{content: { color: '#10b981', fontSize: '24px' }}}
             />
           </Card>
         </Col>
@@ -47,7 +47,7 @@ export function EmployeeStats({ stats }: EmployeeStatsProps) {
             <Statistic
               title="Pending Documents"
               value={stats.pendingDocuments}
-              styles={{ value: { color: '#f59e0b', fontSize: '24px' } }}
+              styles={{content: { color: '#f59e0b', fontSize: '24px' }}}
             />
           </Card>
         </Col>
@@ -56,7 +56,7 @@ export function EmployeeStats({ stats }: EmployeeStatsProps) {
             <Statistic
               title="On Leave"
               value={stats.onLeaveToday}
-              styles={{ value: { color: '#8b5cf6', fontSize: '24px' } }}
+              styles={{content: { color: '#8b5cf6', fontSize: '24px' }}}
             />
           </Card>
         </Col>

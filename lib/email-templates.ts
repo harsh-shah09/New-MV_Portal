@@ -138,3 +138,19 @@ export function leaveWithdrawn(data: LeaveEmailData): { subject: string; html: s
   
   return { subject, html, text };
 }
+
+/**
+ * Template: Welcome Email
+ */
+export function welcomeEmail(data: { recipientName: string; setupLink: string }): { subject: string; html: string; text: string } {
+    const subject = `Welcome to MV Clouds Team!`;
+    const templatePath = path.join(process.cwd(), 'public', 'email-templates', 'leave', 'welcome-email.html');
+    let html = fs.readFileSync(templatePath, 'utf-8');
+
+    html = html.replace(/{{recipientName}}/g, data.recipientName);
+    html = html.replace(/{{setupLink}}/g, data.setupLink);
+    html = html.replace(/{{year}}/g, new Date().getFullYear().toString());
+    
+    const text = `Dear ${data.recipientName},\n\nWelcome to MV Clouds! Please set up your account here: ${data.setupLink}`;
+    return { subject, html, text };
+}

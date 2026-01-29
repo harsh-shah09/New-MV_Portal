@@ -140,9 +140,9 @@ export const findEmployee = async (identifier: string): Promise<Employee | null>
   const escapedIdentifier = identifier.replace(/'/g, "\\'");
   // Updated query to fetch fields from Employee__c directly
   const query = `
-    SELECT Id, Employee_Name__c, Employee_Email__c, Password__c, Role__c, Title__c, Is2FAEnabled__c, Name, Active__c
+    SELECT Id , Employee_Name__c, Employee_Email__c, Password__c, Role__c, Title__c, Is2FAEnabled__c, Name, Active__c
     FROM Employee__c 
-    WHERE ${isEmail ? 'Employee_Email__c' : 'Employee_Id__c'} = '${escapedIdentifier}' 
+    WHERE ${isEmail ? 'Employee_Email__c' : 'Name'} = '${escapedIdentifier}' 
     LIMIT 1
   `;
   console.log(query)
@@ -161,7 +161,7 @@ export const getAllEmployees = async (): Promise<any[]> => {
   if (!conn) return [];
 
   const query = `
-    SELECT Id, Joining_Date__c, Base_Salary__c, Status__c, Salary_CTC__c, Profile_Photo__c, Active__c,
+    SELECT Id, Name, Joining_Date__c, Base_Salary__c, Status__c, Salary_CTC__c, Profile_Photo__c, Active__c,
            Employee_Name__c, Employee_Email__c, Employee_Phone__c, Birthdate__c, Gender__c, 
            Employee_Address__c,
            Emergency_Contact_Name__c, Emergency_Contact_Number__c, Emergency_Contact_Relation__c, 
@@ -294,7 +294,7 @@ export const getEmployeeById = async (id: string): Promise<any | null> => {
 
     // 1. Fetch Employee Details (All component fields directly)
     const empQuery = `
-      SELECT Id, Employee_Id__c , Employee_Name__c, Employee_Email__c, Joining_Date__c, Base_Salary__c, Salary_CTC__c, Status__c, Profile_Photo__c, Team_Lead__c, Password__c, Is2FAEnabled__c,
+      SELECT Id, Name,Employee_Id__c , Employee_Name__c, Employee_Email__c, Joining_Date__c, Base_Salary__c, Salary_CTC__c, Status__c, Active__c, Profile_Photo__c, Team_Lead__c, Password__c, Is2FAEnabled__c,
              Employee_Phone__c, Birthdate__c, Gender__c, Employee_Address__c, 
              Emergency_Contact_Name__c, Emergency_Contact_Number__c, Emergency_Contact_Relation__c, 
              Experience__c, Department__c, Role__c, Title__c
@@ -335,16 +335,8 @@ export const getEmployeeById = async (id: string): Promise<any | null> => {
 export const updateEmployee = async (id: string, data: any) => {
     const conn = await getSalesforceConnection();
     if (!conn) throw new Error("No Salesforce connection");
-
-    // All fields are on Employee__c now.
-    // We can just filter out fields that are NOT part of the object if we want to be safe, 
-    // or assume 'data' contains valid keys.
-    // Excluding nested objects or read-only if any.
-    
-    // Safety: ensure Id is set
     const updateData: any = { Id: id, ...data };
     console.log('Updated data',updateData)
-    // Remove "contactId" if it was passed by legacy code
     delete updateData.contactId;
 
     await conn.sobject("Employee__c").update(updateData);
@@ -411,6 +403,21 @@ export const updateDocument = async (docData: any) => {
     const conn = await getSalesforceConnection();
     if (!conn) throw new Error("No Salesforce connection");
     return await conn.sobject("Document__c").update(docData);
+}
+
+export const getHandbookDocuments = async () => {
+    const conn = await getSalesforceConnection();
+    if (!conn) throw new Error("No Salesforce connection");
+    
+    // Fetch documents with Category 'Handbook'
+    const query = `
+      SELECT Id, Name, Document_Type__c, Document_Category__c, File_URL__c, Status__c, CreatedDate
+      FROM Document__c
+      WHERE Document_Category__c = 'Handbook'
+      ORDER BY CreatedDate DESC
+    `;
+    const result = await conn.query(query);
+    return result.records;
 }
 
 export const getNotifications = async (employeeId: string) => {

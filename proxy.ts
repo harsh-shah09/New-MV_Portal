@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server'
 import { verifyToken } from '@/lib/auth-utils'
 
 export async function proxy(request: NextRequest) {
-  const publicPaths = ['/auth/login', '/' , '/auth/change-password'];
+  const publicPaths = ['/auth/login', '/' , '/auth/change-password' , '/auth/welcome' , '/auth/reset-password'];
   const isPublic = publicPaths.includes(request.nextUrl.pathname);
 
   // Check for session
@@ -25,5 +25,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!api|_next/static|_next/image|/auth/change-password/*|favicon.ico).*)'],
+  matcher: ['/((?!api|_next/static|_next/image|/auth/change-password/*|/auth/welcome/*|favicon.ico).*)'],
 }

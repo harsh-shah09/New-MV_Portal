@@ -55,9 +55,9 @@ export function Sidebar({
     { href: "/employees", label: "Employees", icon: Users },
     { href: "/leaves", label: "Leave", icon: CalendarDays },
     { href: "/holidays", label: "Holidays", icon: CalendarRange },
-    { href: "/training", label: "Training", icon: BookOpen },
+    // { href: "/training", label: "Training", icon: BookOpen },
     { href: "/assets", label: "Assets", icon: Tag },
-    { href: "/documents", label: "Documents", icon: FileText },
+    // { href: "/documents", label: "Documents", icon: FileText },
   ];
 
   // Add Payroll or My Payslips based on role
