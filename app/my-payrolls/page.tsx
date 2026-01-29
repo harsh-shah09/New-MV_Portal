@@ -1,8 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import { Card, Table, Button, Spin, message, Empty } from "antd"
-import { EyeOutlined, FileTextOutlined } from "@ant-design/icons"
+import { Card, Table, Button, Spin, message, Empty, Space } from "antd"
+import { EyeOutlined, FileTextOutlined, DownloadOutlined } from "@ant-design/icons"
 import { useQuery } from "@tanstack/react-query"
 import type { ColumnsType } from "antd/es/table"
 import { PayslipView } from "@/components/payslip-view"
@@ -37,6 +37,38 @@ export default function MyPayrollsPage() {
   })
 
   const payrolls: EmployeePayroll[] = data?.payrolls || []
+
+  const handleDownloadPDF = async (record: EmployeePayroll) => {
+    try {
+      message.loading({ content: "Generating PDF...", key: "pdf-download" })
+      
+      const response = await fetch(`/api/payroll/payslips/${record.id}/download`)
+      
+      if (!response.ok) {
+        throw new Error("Failed to download PDF")
+      }
+
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      link.href = url
+      
+      const contentDisposition = response.headers.get("Content-Disposition")
+      const filenameMatch = contentDisposition?.match(/filename="(.+)"/)
+      const filename = filenameMatch ? filenameMatch[1] : `Payslip_${record.payrollMonth}_${record.payrollYear}.pdf`
+      
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+      
+      message.success({ content: "PDF downloaded successfully!", key: "pdf-download" })
+    } catch (error) {
+      console.error("Error downloading PDF:", error)
+      message.error({ content: "Failed to download PDF", key: "pdf-download" })
+    }
+  }
 
   const columns: ColumnsType<EmployeePayroll> = [
     {

@@ -151,6 +151,29 @@ export async function POST(request: NextRequest) {
 
         console.log(`✓ PDF uploaded for ${emp.employeeName}: ${s3Url}`)
         
+        // Create Document__c record for the payslip
+        try {
+          const documentName = `Payslip_${emp.employeeId.slice(0, 8)}_${month}_${year}`
+          const documentRecord = {
+            Name: documentName,
+            Document_Category__c: 'Payslip',
+            Employee__c: emp.employeeId,
+            File_URL__c: s3Url,
+          }
+          
+          const documentResult = await conn.sobject("Document__c").create(documentRecord)
+          
+          if (Array.isArray(documentResult) ? documentResult[0].success : documentResult.success) {
+            console.log(`✓ Document record created for ${emp.employeeName}`)
+          } else {
+            console.error(`Failed to create document record for ${emp.employeeName}:`, 
+              Array.isArray(documentResult) ? documentResult[0].errors : documentResult.errors)
+          }
+        } catch (docError: any) {
+          console.error(`Error creating document record for ${emp.employeeName}:`, docError)
+          // Don't fail the whole process if document creation fails
+        }
+        
         pdfUploadResults.push({
           employeeId: emp.employeeId,
           employeeName: emp.employeeName,

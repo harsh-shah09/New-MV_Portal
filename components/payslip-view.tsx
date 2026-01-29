@@ -85,8 +85,37 @@ export function PayslipView({ payrollId, onClose }: PayslipViewProps) {
     window.print()
   }
 
-  const handleDownload = () => {
-    message.info("PDF download functionality coming soon")
+  const handleDownload = async () => {
+    try {
+      message.loading({ content: "Generating PDF...", key: "pdf-download" })
+      
+      const response = await fetch(`/api/payroll/payslips/${payrollId}/download`)
+      
+      if (!response.ok) {
+        throw new Error("Failed to download PDF")
+      }
+
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      link.href = url
+      
+      // Extract filename from Content-Disposition header or use default
+      const contentDisposition = response.headers.get("Content-Disposition")
+      const filenameMatch = contentDisposition?.match(/filename="(.+)"/)
+      const filename = filenameMatch ? filenameMatch[1] : `Payslip_${payslip?.payrollMonth}_${payslip?.payrollYear}.pdf`
+      
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+      
+      message.success({ content: "PDF downloaded successfully!", key: "pdf-download" })
+    } catch (error) {
+      console.error("Error downloading PDF:", error)
+      message.error({ content: "Failed to download PDF", key: "pdf-download" })
+    }
   }
 
   if (loading) {

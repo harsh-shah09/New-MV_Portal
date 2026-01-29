@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button, Card, Table, Tag, Modal, Input, Select, message, Tabs, Form, Typography } from 'antd';
-import { Plus, FileText, Clock, FileCheck, CheckCircle, Loader2 } from 'lucide-react';
+import { Plus, FileText, Clock, FileCheck, CheckCircle, Loader2, Receipt } from 'lucide-react';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
@@ -20,6 +20,16 @@ export default function DocumentsPage() {
         queryFn: async () => {
             const res = await fetch('/api/documents/my-documents');
             if (!res.ok) throw new Error("Failed");
+            return res.json();
+        }
+    });
+
+    // Fetch My Payslips
+    const { data: payslips = [], isLoading: payslipsLoading } = useQuery({
+        queryKey: ['myPayslips'],
+        queryFn: async () => {
+            const res = await fetch('/api/documents/payslips');
+            if (!res.ok) throw new Error("Failed to fetch payslips");
             return res.json();
         }
     });
@@ -54,6 +64,56 @@ export default function DocumentsPage() {
 
     const pendingDocs = documents.filter((d: any) => d.Status__c === 'Pending' || d.Status__c === 'Requested');
     const uploadedDocs = documents.filter((d: any) => d.Status__c === 'Uploaded');
+
+    const payslipColumns = [
+        { 
+            title: 'Payslip', 
+            dataIndex: 'Name', 
+            key: 'name',
+            render: (text: string) => (
+                <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-blue-50">
+                        <Receipt className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <div>
+                        <div className="font-medium text-slate-700">{text}</div>
+                        <div className="text-xs text-slate-400">Payslip Document</div>
+                    </div>
+                </div>
+            )
+        },
+        { 
+            title: 'Generated Date', 
+            dataIndex: 'CreatedDate', 
+            key: 'date', 
+            width: 200,
+            render: (d: string) => (
+                <div className="flex items-center gap-2 text-slate-500">
+                    <Clock className="w-3.5 h-3.5" />
+                    <span>{new Date(d).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+                </div>
+            )
+        },
+        {
+            title: 'Action',
+            key: 'action',
+            width: 200,
+            render: (_: any, record: any) => (
+                record.File_URL__c ? (
+                    <Button 
+                        type="primary" 
+                        ghost 
+                        href={record.File_URL__c} 
+                        target="_blank" 
+                        icon={<Receipt className="w-4 h-4" />}
+                        className="flex items-center gap-2"
+                    >
+                        View Payslip
+                    </Button>
+                ) : <span className="text-slate-400 text-xs">Not available</span>
+            )
+        }
+    ];
 
     const commonColumns = [
         { 
@@ -171,6 +231,22 @@ export default function DocumentsPage() {
     );
 
     const items = [
+        {
+            key: 'payslips',
+            label: (
+                <div className="flex items-center gap-2 px-2 py-1">
+                    <Receipt className="w-4 h-4" />
+                    <span>My Payslips</span>
+                    <span className="ml-2 bg-blue-50 text-blue-600 text-xs px-2 py-0.5 rounded-full">{payslips.length}</span>
+                </div>
+            ),
+            children: renderTable(
+                payslips, 
+                payslipColumns, 
+                "No payslips available yet", 
+                <Receipt className="w-8 h-8 text-slate-300" />
+            )
+        },
         {
             key: 'pending',
             label: (
