@@ -39,10 +39,12 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [employeeData, setEmployeeData] = useState<PayrollEmployeeDetail[]>([])
+  const [originalEmployeeData, setOriginalEmployeeData] = useState<PayrollEmployeeDetail[]>([])
   const [showResults, setShowResults] = useState(false)
   const [adjustmentModalOpen, setAdjustmentModalOpen] = useState(false)
   const [bonusModalOpen, setBonusModalOpen] = useState(false)
   const [selectedEmployee, setSelectedEmployee] = useState<PayrollEmployeeDetail | null>(null)
+  const [editMode, setEditMode] = useState(false)
 
   const handleGenerate = async () => {
     if (!selectedMonth) {
@@ -69,6 +71,7 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
 
       const data = await response.json()
       setEmployeeData(data.employees || [])
+      setOriginalEmployeeData(data.employees || [])
       setShowResults(true)
       message.success(`Payroll generated for ${selectedMonth} ${selectedYear} - ${data.totalEmployees} employees`)
     } catch (error) {
@@ -134,8 +137,8 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
   const handleAddAdjustment = (employeeId: string, employeeName: string) => {
     const employee = employeeData.find(emp => emp.employeeId === employeeId)
     if (employee) {
-      // Check if adjustment already exists
-      if (employee.adjustments && employee.adjustments.length > 0) {
+      // Check if adjustment already exists (only if not in edit mode)
+      if (!editMode && employee.adjustments && employee.adjustments.length > 0) {
         message.warning("Only one adjustment is allowed per employee")
         return
       }
@@ -147,11 +150,29 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
   const handleAddBonus = (employeeId: string, employeeName: string) => {
     const employee = employeeData.find(emp => emp.employeeId === employeeId)
     if (employee) {
-      // Check if bonus already exists
-      if (employee.bonus && employee.bonus > 0) {
+      // Check if bonus already exists (only if not in edit mode)
+      if (!editMode && employee.bonus && employee.bonus > 0) {
         message.warning("Only one bonus is allowed per employee")
         return
       }
+      setSelectedEmployee(employee)
+      setBonusModalOpen(true)
+    }
+  }
+
+  const handleEditAdjustment = (employeeId: string, employeeName: string) => {
+    const employee = employeeData.find(emp => emp.employeeId === employeeId)
+    if (employee) {
+      setEditMode(true)
+      setSelectedEmployee(employee)
+      setAdjustmentModalOpen(true)
+    }
+  }
+
+  const handleEditBonus = (employeeId: string, employeeName: string) => {
+    const employee = employeeData.find(emp => emp.employeeId === employeeId)
+    if (employee) {
+      setEditMode(true)
       setSelectedEmployee(employee)
       setBonusModalOpen(true)
     }
@@ -162,9 +183,19 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
 
     const updatedEmployees = employeeData.map(emp => {
       if (emp.employeeId === selectedEmployee.employeeId) {
-        const adjustments = [...(emp.adjustments || []), adjustment]
+        // In edit mode, replace adjustment; otherwise add it
+        const adjustments = editMode ? [adjustment] : [...(emp.adjustments || []), adjustment]
         
-        // Recalculate totals
+        // Get current employee data (may already have bonus)
+        const baseSalary = emp.baseSalary || 0
+        const bonus = emp.bonus || 0
+        
+        // Get ORIGINAL base values from API (Extra Day Pay and Leave Deductions from leaves)
+        const originalEmp = originalEmployeeData.find(e => e.employeeId === emp.employeeId)
+        const baseExtraDayPay = originalEmp?.totalAdditions || 0
+        const baseLeaveDeductions = originalEmp?.totalDeductions || 0
+        
+        // Recalculate adjustment totals
         const totalAdjustmentAdditions = adjustments
           .filter(adj => adj.adjustmentType === "Addition")
           .reduce((sum, adj) => sum + adj.adjustmentAmount, 0)
@@ -173,15 +204,18 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
           .filter(adj => adj.adjustmentType === "Deduction")
           .reduce((sum, adj) => sum + adj.adjustmentAmount, 0)
         
-        const baseSalary = emp.baseSalary || 0
-        const leaveDeductions = emp.leaves?.reduce((sum, leave) => sum + (leave.actualDeduction || 0), 0) || 0
-        const totalDeductions = leaveDeductions + totalAdjustmentDeductions
-        const netSalary = baseSalary + totalAdjustmentAdditions - totalDeductions
+        // Total additions = Extra Day Pay (from API) + Bonus + Adjustment Additions
+        const totalAdditions = baseExtraDayPay + bonus + totalAdjustmentAdditions
+        
+        // Total deductions = Leave Deductions (from API) + Adjustment Deductions
+        const totalDeductions = baseLeaveDeductions + totalAdjustmentDeductions
+        
+        const netSalary = baseSalary + totalAdditions - totalDeductions
 
         return {
           ...emp,
           adjustments,
-          totalAdditions: totalAdjustmentAdditions,
+          totalAdditions,
           totalDeductions,
           netSalary: Math.round(netSalary * 100) / 100,
         }
@@ -192,6 +226,7 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
     setEmployeeData(updatedEmployees)
     setAdjustmentModalOpen(false)
     setSelectedEmployee(null)
+    setEditMode(false)
   }
 
   const handleBonusAdded = (bonusAmount: number) => {
@@ -200,8 +235,13 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
     const updatedEmployees = employeeData.map(emp => {
       if (emp.employeeId === selectedEmployee.employeeId) {
         const baseSalary = emp.baseSalary || 0
-        const leaveDeductions = emp.leaves?.reduce((sum, leave) => sum + (leave.actualDeduction || 0), 0) || 0
         
+        // Get ORIGINAL base values from API (Extra Day Pay and Leave Deductions from leaves)
+        const originalEmp = originalEmployeeData.find(e => e.employeeId === emp.employeeId)
+        const baseExtraDayPay = originalEmp?.totalAdditions || 0
+        const baseLeaveDeductions = originalEmp?.totalDeductions || 0
+        
+        // Get current adjustment totals (may have been added before bonus)
         const adjustmentAdditions = emp.adjustments
           ?.filter(adj => adj.adjustmentType === "Addition")
           .reduce((sum, adj) => sum + adj.adjustmentAmount, 0) || 0
@@ -210,14 +250,19 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
           ?.filter(adj => adj.adjustmentType === "Deduction")
           .reduce((sum, adj) => sum + adj.adjustmentAmount, 0) || 0
         
-        const totalAdditions = adjustmentAdditions + bonusAmount
-        const totalDeductions = leaveDeductions + adjustmentDeductions
+        // Total additions = Extra Day Pay (from API) + Bonus + Adjustment Additions
+        const totalAdditions = baseExtraDayPay + bonusAmount + adjustmentAdditions
+        
+        // Total deductions = Leave Deductions (from API) + Adjustment Deductions
+        const totalDeductions = baseLeaveDeductions + adjustmentDeductions
+        
         const netSalary = baseSalary + totalAdditions - totalDeductions
 
         return {
           ...emp,
           bonus: bonusAmount,
           totalAdditions,
+          totalDeductions,
           netSalary: Math.round(netSalary * 100) / 100,
         }
       }
@@ -227,6 +272,77 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
     setEmployeeData(updatedEmployees)
     setBonusModalOpen(false)
     setSelectedEmployee(null)
+    setEditMode(false)
+  }
+
+  const handleDeleteAdjustment = (employeeId: string) => {
+    const updatedEmployees = employeeData.map(emp => {
+      if (emp.employeeId === employeeId) {
+        const baseSalary = emp.baseSalary || 0
+        const bonus = emp.bonus || 0
+        
+        // Get ORIGINAL base values from API
+        const originalEmp = originalEmployeeData.find(e => e.employeeId === emp.employeeId)
+        const baseExtraDayPay = originalEmp?.totalAdditions || 0
+        const baseLeaveDeductions = originalEmp?.totalDeductions || 0
+        
+        // Recalculate without adjustments
+        const totalAdditions = baseExtraDayPay + bonus
+        const totalDeductions = baseLeaveDeductions
+        const netSalary = baseSalary + totalAdditions - totalDeductions
+
+        return {
+          ...emp,
+          adjustments: [],
+          totalAdditions,
+          totalDeductions,
+          netSalary: Math.round(netSalary * 100) / 100,
+        }
+      }
+      return emp
+    })
+
+    setEmployeeData(updatedEmployees)
+    message.success("Adjustment deleted successfully")
+  }
+
+  const handleDeleteBonus = (employeeId: string) => {
+    const updatedEmployees = employeeData.map(emp => {
+      if (emp.employeeId === employeeId) {
+        const baseSalary = emp.baseSalary || 0
+        
+        // Get ORIGINAL base values from API
+        const originalEmp = originalEmployeeData.find(e => e.employeeId === emp.employeeId)
+        const baseExtraDayPay = originalEmp?.totalAdditions || 0
+        const baseLeaveDeductions = originalEmp?.totalDeductions || 0
+        
+        // Get current adjustment totals
+        const adjustmentAdditions = emp.adjustments
+          ?.filter(adj => adj.adjustmentType === "Addition")
+          .reduce((sum, adj) => sum + adj.adjustmentAmount, 0) || 0
+        
+        const adjustmentDeductions = emp.adjustments
+          ?.filter(adj => adj.adjustmentType === "Deduction")
+          .reduce((sum, adj) => sum + adj.adjustmentAmount, 0) || 0
+        
+        // Recalculate without bonus
+        const totalAdditions = baseExtraDayPay + adjustmentAdditions
+        const totalDeductions = baseLeaveDeductions + adjustmentDeductions
+        const netSalary = baseSalary + totalAdditions - totalDeductions
+
+        return {
+          ...emp,
+          bonus: 0,
+          totalAdditions,
+          totalDeductions,
+          netSalary: Math.round(netSalary * 100) / 100,
+        }
+      }
+      return emp
+    })
+
+    setEmployeeData(updatedEmployees)
+    message.success("Bonus deleted successfully")
   }
 
   const columns: ColumnsType<PayrollEmployeeDetail> = [
@@ -260,7 +376,7 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
       dataIndex: "baseSalary",
       key: "baseSalary",
       width: 120,
-      render: (amount: number) => `$${amount?.toLocaleString() || 0}`,
+      render: (amount: number) => `₹${amount?.toLocaleString() || 0}`,
     },
     {
       title: "Additions",
@@ -269,7 +385,7 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
       width: 100,
       render: (amount: number) => (
         <span className={amount > 0 ? "text-green-600" : ""}>
-          ${amount?.toLocaleString() || 0}
+          ₹{amount?.toLocaleString() || 0}
         </span>
       ),
     },
@@ -289,7 +405,7 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
       width: 120,
       render: (amount: number) => (
         <span className={amount > 0 ? "text-red-600" : ""}>
-          ${amount?.toLocaleString() || 0}
+          ₹{amount?.toLocaleString() || 0}
         </span>
       ),
     },
@@ -299,7 +415,7 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
       key: "netSalary",
       width: 120,
       render: (amount: number) => (
-        <span className="font-semibold">${amount?.toLocaleString() || 0}</span>
+        <span className="font-semibold text-green-600">₹{amount?.toLocaleString() || 0}</span>
       ),
     },
     {
@@ -315,17 +431,39 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
         const menuItems: MenuProps['items'] = [
           {
             key: 'adjustment',
-            label: hasAdjustment ? 'Adjustment Added' : 'Add Adjustment',
-            disabled: hasAdjustment,
-            onClick: () => handleAddAdjustment(record.employeeId, record.employeeName),
+            label: hasAdjustment ? 'Edit Adjustment' : 'Add Adjustment',
+            onClick: () => {
+              if (hasAdjustment) {
+                handleEditAdjustment(record.employeeId, record.employeeName)
+              } else {
+                handleAddAdjustment(record.employeeId, record.employeeName)
+              }
+            },
           },
+          hasAdjustment ? {
+            key: 'delete-adjustment',
+            label: 'Delete Adjustment',
+            danger: true,
+            onClick: () => handleDeleteAdjustment(record.employeeId),
+          } : null,
           {
             key: 'bonus',
-            label: hasBonus ? 'Bonus Added' : 'Add Bonus',
-            disabled: hasBonus,
-            onClick: () => handleAddBonus(record.employeeId, record.employeeName),
+            label: hasBonus ? 'Edit Bonus' : 'Add Bonus',
+            onClick: () => {
+              if (hasBonus) {
+                handleEditBonus(record.employeeId, record.employeeName)
+              } else {
+                handleAddBonus(record.employeeId, record.employeeName)
+              }
+            },
           },
-        ]
+          hasBonus ? {
+            key: 'delete-bonus',
+            label: 'Delete Bonus',
+            danger: true,
+            onClick: () => handleDeleteBonus(record.employeeId),
+          } : null,
+        ].filter(Boolean)
 
         return (
           <Dropdown menu={{ items: menuItems }} trigger={['click']}>
@@ -333,7 +471,7 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
               type="link"
               onClick={(e) => e.stopPropagation()}
             >
-              {allActionsUsed ? 'All Added' : 'Add'} <DownOutlined />
+              {allActionsUsed ? 'Edit' : hasAdjustment || hasBonus ? 'Manage' : 'Add'} <DownOutlined />
             </Button>
           </Dropdown>
         )
@@ -392,7 +530,7 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
                   title: "Deduction",
                   dataIndex: "afterRuleDeduction",
                   key: "afterRuleDeduction",
-                  render: (amount: number, record: any) => `$${(amount || record.actualDeduction || 0).toLocaleString()}`,
+                  render: (amount: number, record: any) => `₹${(amount || record.actualDeduction || 0).toLocaleString()}`,
                 },
                 {
                   title: "Status",
@@ -430,7 +568,7 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
                   key: "adjustmentAmount",
                   render: (amount: number, record: any) => (
                     <span className={record.adjustmentType === "Addition" ? "text-green-600" : "text-red-600"}>
-                      {record.adjustmentType === "Addition" ? "+" : "-"}${amount.toLocaleString()}
+                      {record.adjustmentType === "Addition" ? "+" : "-"}₹{amount.toLocaleString()}
                     </span>
                   ),
                 },
@@ -454,7 +592,7 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
             <div className="p-3 bg-green-50 border border-green-200 rounded">
               <div>
                 <p className="text-sm text-gray-600">Bonus Amount</p>
-                <p className="text-lg font-semibold text-green-600">+${record.bonus?.toLocaleString()}</p>
+                <p className="text-lg font-semibold text-green-600">+₹{record.bonus?.toLocaleString()}</p>
               </div>
             </div>
           </div>
@@ -537,19 +675,19 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
                   <div>
                     <p className="text-sm text-gray-600">Total Additions</p>
                     <p className="text-2xl font-bold text-green-600">
-                      ${employeeData.reduce((sum, emp) => sum + (emp.totalAdditions || 0), 0).toLocaleString()}
+                      ₹{employeeData.reduce((sum, emp) => sum + (emp.totalAdditions || 0), 0).toLocaleString()}
                     </p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Total Deductions</p>
                     <p className="text-2xl font-bold text-red-600">
-                      ${employeeData.reduce((sum, emp) => sum + (emp.totalDeductions || 0), 0).toLocaleString()}
+                      ₹{employeeData.reduce((sum, emp) => sum + (emp.totalDeductions || 0), 0).toLocaleString()}
                     </p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Net Payroll</p>
                     <p className="text-2xl font-bold">
-                      ${employeeData.reduce((sum, emp) => sum + (emp.netSalary || 0), 0).toLocaleString()}
+                      ₹{employeeData.reduce((sum, emp) => sum + (emp.netSalary || 0), 0).toLocaleString()}
                     </p>
                   </div>
                 </div>
@@ -579,9 +717,11 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
         onClose={() => {
           setAdjustmentModalOpen(false)
           setSelectedEmployee(null)
+          setEditMode(false)
         }}
         employeeName={selectedEmployee?.employeeName || ""}
         onAdd={handleAdjustmentAdded}
+        initialAdjustment={editMode && selectedEmployee?.adjustments?.[0] ? selectedEmployee.adjustments[0] : undefined}
       />
 
       <AddBonusModal
@@ -589,9 +729,11 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
         onClose={() => {
           setBonusModalOpen(false)
           setSelectedEmployee(null)
+          setEditMode(false)
         }}
         employeeName={selectedEmployee?.employeeName || ""}
         onAdd={handleBonusAdded}
+        initialBonus={editMode && selectedEmployee?.bonus ? selectedEmployee.bonus : undefined}
       />
     </Modal>
   )

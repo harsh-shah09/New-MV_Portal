@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { cookies } from "next/headers"
 import { verifyToken } from "@/lib/auth-utils"
 import { getSalesforceConnection } from "@/lib/salesforce"
+import { generatePayslipPDF } from "@/lib/pdf-generator"
+import { uploadPayslipToS3 } from "@/lib/s3"
 
 export async function POST(request: NextRequest) {
   try {
@@ -65,6 +67,12 @@ export async function POST(request: NextRequest) {
       // Extract adjustment details (only 1 adjustment allowed per employee)
       const adjustment = emp.adjustments && emp.adjustments.length > 0 ? emp.adjustments[0] : null
       
+      // totalAdditions and totalDeductions already include all calculations from frontend
+      // (Extra Day Pay + Bonus + Adjustments for additions)
+      // (Leave Deductions + Adjustments for deductions)
+      const totalAdditions = emp.totalAdditions || 0
+      const totalDeductions = emp.totalDeductions || 0
+      
       return {
         Payroll_Summary__c: summaryId,
         Employee__c: emp.employeeId,
@@ -74,8 +82,8 @@ export async function POST(request: NextRequest) {
         Adjustment_Type__c: adjustment?.adjustmentType || null,
         Adjustment_Amount__c: adjustment?.adjustmentAmount || null,
         Adjustment_Description__c: adjustment?.adjustmentDescription || null,
-        Total_Additions__c: emp.totalAdditions || 0,
-        Total_Deductions__c: emp.totalDeductions || 0,
+        Total_Additions__c: totalAdditions,
+        Total_Deductions__c: totalDeductions,
       }
     })
 
@@ -86,10 +94,87 @@ export async function POST(request: NextRequest) {
     
     console.log("Payroll creation result:", JSON.stringify(payrollResult, null, 2))
 
+    // Generate and upload PDFs to S3
+    console.log("Generating and uploading payslip PDFs to S3...")
+    const pdfUploadResults = []
+    
+    for (let i = 0; i < employees.length; i++) {
+      const emp = employees[i]
+      const payrollRecord = Array.isArray(payrollResult) ? payrollResult[i] : payrollResult
+      
+      if (!payrollRecord.success) {
+        console.error(`Skipping PDF generation for ${emp.employeeName} due to payroll creation failure`)
+        pdfUploadResults.push({
+          employeeId: emp.employeeId,
+          employeeName: emp.employeeName,
+          success: false,
+          error: "Payroll record creation failed"
+        })
+        continue
+      }
+
+      try {
+        // Prepare payslip data for PDF generation
+        const daysInMonth = new Date(year, 
+          ["January", "February", "March", "April", "May", "June",
+           "July", "August", "September", "October", "November", "December"].indexOf(month) + 1,
+          0
+        ).getDate()
+
+        const payslipData = {
+          employeeName: emp.employeeName,
+          employeeId: emp.employeeId,
+          email: emp.email || "",
+          department: emp.department || "",
+          role: emp.role || "",
+          payrollMonth: month,
+          payrollYear: year,
+          basicSalary: emp.baseSalary || emp.basicSalary || 0,
+          bonus: emp.bonus || 0,
+          totalAdditions: emp.totalAdditions || 0,
+          totalDeductions: emp.totalDeductions || 0,
+          netSalary: emp.netSalary || 0,
+          totalLeaveDays: emp.totalLeaveDays || 0,
+          totalLeaveDaysAfterRule: emp.totalLeaveDaysAfterRule || emp.totalLeaveDays || 0,
+          totalLeaveDeductions: emp.leaves?.reduce((sum: number, leave: any) => 
+            sum + (leave.afterRuleDeduction || 0), 0) || 0,
+          leaves: emp.leaves || [],
+          adjustments: emp.adjustments || [],
+          daysInMonth,
+        }
+
+        // Generate PDF
+        const pdfBuffer = await generatePayslipPDF(payslipData)
+
+        // Upload to S3
+        const s3Url = await uploadPayslipToS3(pdfBuffer, emp.employeeId, month, year)
+
+        console.log(`✓ PDF uploaded for ${emp.employeeName}: ${s3Url}`)
+        
+        pdfUploadResults.push({
+          employeeId: emp.employeeId,
+          employeeName: emp.employeeName,
+          success: true,
+          s3Url
+        })
+      } catch (error: any) {
+        console.error(`Error generating/uploading PDF for ${emp.employeeName}:`, error)
+        pdfUploadResults.push({
+          employeeId: emp.employeeId,
+          employeeName: emp.employeeName,
+          success: false,
+          error: error.message
+        })
+      }
+    }
+
+    console.log("PDF generation and upload completed")
+
     return NextResponse.json({
       payrollSummaryId: summaryId,
       payrollResults: payrollResult,
       totalRecordsCreated: Array.isArray(payrollResult) ? payrollResult.length : 1,
+      pdfUploadResults,
     })
   } catch (error) {
     console.error("Error saving payroll:", error)

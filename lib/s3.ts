@@ -32,3 +32,28 @@ export const uploadFileToS3 = async (
   // For now, standard S3 URL
   return `https://${bucketName}.s3.${process.env.AWS_REGION || "us-east-1"}.amazonaws.com/${key}`;
 };
+
+export const uploadPayslipToS3 = async (
+  pdfBuffer: Buffer,
+  employeeId: string,
+  month: string,
+  year: number
+): Promise<string> => {
+  const bucketName = process.env.S3_BUCKET_NAME;
+  if (!bucketName) throw new Error("S3_BUCKET_NAME is not defined");
+
+  const fileName = `Payslip_${employeeId}_${month}_${year}.pdf`;
+  const key = `Payrolls/${fileName}`;
+
+  const command = new PutObjectCommand({
+    Bucket: bucketName,
+    Key: key,
+    Body: pdfBuffer,
+    ContentType: "application/pdf",
+  });
+
+  await s3Client.send(command);
+
+  // Return the S3 URL
+  return `https://${bucketName}.s3.${process.env.AWS_REGION || "us-east-1"}.amazonaws.com/${key}`;
+};

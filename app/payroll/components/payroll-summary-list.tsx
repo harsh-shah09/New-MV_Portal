@@ -31,7 +31,7 @@ export function PayrollSummaryList({ summaries, onSelectSummary }: PayrollSummar
       title: "Net Total Salary",
       dataIndex: "netTotalSalary",
       key: "netTotalSalary",
-      render: (amount: number) => `$${amount.toLocaleString()}`,
+      render: (amount: number) => `₹${amount.toLocaleString()}`,
     },
     {
       title: "Status",

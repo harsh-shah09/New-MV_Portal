@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Modal, InputNumber, Input, Button, message, Form } from "antd"
 
 interface AddBonusModalProps {
@@ -8,18 +8,27 @@ interface AddBonusModalProps {
   onClose: () => void
   employeeName: string
   onAdd: (bonusAmount: number) => void
+  initialBonus?: number
 }
 
-export function AddBonusModal({ open, onClose, employeeName, onAdd }: AddBonusModalProps) {
+export function AddBonusModal({ open, onClose, employeeName, onAdd, initialBonus }: AddBonusModalProps) {
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (open && initialBonus) {
+      form.setFieldsValue({ bonusAmount: initialBonus })
+    } else if (open) {
+      form.resetFields()
+    }
+  }, [open, initialBonus, form])
 
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields()
       
       onAdd(values.bonusAmount)
-      message.success("Bonus added successfully")
+      message.success(initialBonus ? "Bonus updated successfully" : "Bonus added successfully")
       form.resetFields()
       onClose()
     } catch (error) {
@@ -34,7 +43,7 @@ export function AddBonusModal({ open, onClose, employeeName, onAdd }: AddBonusMo
 
   return (
     <Modal
-      title={`Add Bonus - ${employeeName}`}
+      title={`${initialBonus ? 'Edit' : 'Add'} Bonus - ${employeeName}`}
       open={open}
       onCancel={handleClose}
       footer={[
@@ -42,7 +51,7 @@ export function AddBonusModal({ open, onClose, employeeName, onAdd }: AddBonusMo
           Cancel
         </Button>,
         <Button key="submit" type="primary" onClick={handleSubmit} loading={loading}>
-          Add Bonus
+          {initialBonus ? 'Update' : 'Add'} Bonus
         </Button>,
       ]}
     >
@@ -62,7 +71,7 @@ export function AddBonusModal({ open, onClose, employeeName, onAdd }: AddBonusMo
           <InputNumber
             className="w-full"
             placeholder="Enter amount"
-            prefix="$"
+            prefix="₹"
             min={0}
             precision={2}
           />

@@ -2,6 +2,70 @@ import { NextRequest, NextResponse } from "next/server"
 import { cookies } from "next/headers"
 import { verifyToken } from "@/lib/auth-utils"
 import { getSalesforceConnection } from "@/lib/salesforce"
+import dayjs from "dayjs"
+
+/**
+ * Leave Configuration Interface
+ */
+interface LeaveConfig {
+  annualLeaveBalance: number
+  enableOnePlusTwoRule: boolean
+  enableSandwichRule: boolean
+  sandwichRuleAppliesTo: string[]
+  penaltyAppliesTo: string[]
+  minWorkingDayNoticePeriod: number
+  penaltyDaysPerDay: number
+}
+
+/**
+ * Fetch Leave Configurations from Salesforce Custom Metadata
+ */
+async function fetchLeaveConfigurations(conn: any): Promise<LeaveConfig> {
+  try {
+    const configQuery = await conn.query(
+      "SELECT DeveloperName, Value__c FROM Leave_Configurations__mdt"
+    )
+
+    const configs = configQuery.records || []
+    const configMap = new Map<string, string>()
+
+    configs.forEach((config: any) => {
+      configMap.set(config.DeveloperName, config.Value__c)
+    })
+
+    // Parse configurations with defaults
+    const annualLeaveBalance = parseFloat(configMap.get('Annual_Leave_Balance') || '18')
+    const enableOnePlusTwoRule = configMap.get('Enable_One_plus_two_rule')?.toLowerCase() === 'true'
+    const enableSandwichRule = configMap.get('Enable_Sandwitch_Rule')?.toLowerCase() === 'true'
+    const sandwichRuleAppliesTo = (configMap.get('Sandwitch_Rule_Applies_to') || '')
+      .split(',').map(role => role.trim()).filter(Boolean)
+    const penaltyAppliesTo = (configMap.get('penalty_applies_to') || '')
+      .split(',').map(role => role.trim()).filter(Boolean)
+    const minWorkingDayNoticePeriod = parseInt(configMap.get('minimum_working_working_day_notice_perio') || '5')
+    const penaltyDaysPerDay = parseFloat(configMap.get('penalty_days_per_day') || '2')
+
+    return {
+      annualLeaveBalance,
+      enableOnePlusTwoRule,
+      enableSandwichRule,
+      sandwichRuleAppliesTo,
+      penaltyAppliesTo,
+      minWorkingDayNoticePeriod,
+      penaltyDaysPerDay,
+    }
+  } catch (error) {
+    console.error('Error fetching leave configurations:', error)
+    return {
+      annualLeaveBalance: 18,
+      enableOnePlusTwoRule: true,
+      enableSandwichRule: true,
+      sandwichRuleAppliesTo: ['Developer'],
+      penaltyAppliesTo: ['Developer'],
+      minWorkingDayNoticePeriod: 5,
+      penaltyDaysPerDay: 2,
+    }
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -34,7 +98,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Month and year are required" }, { status: 400 })
     }
 
+    console.log('\n==========================================')
+    console.log('🚀 PAYROLL GENERATION STARTED')
+    console.log('==========================================')
+    console.log(`📅 Period: ${month} ${year}`)
+    console.log(`👤 Requested by: ${payload.email} (${role})`)
+    console.log('------------------------------------------\n')
+
     const conn = await getSalesforceConnection()
+
+    // Fetch leave configurations
+    const leaveConfig = await fetchLeaveConfigurations(conn)
+    
+    console.log('⚙️  LEAVE CONFIGURATIONS:')
+    console.log('  • Sandwich Rule Enabled:', leaveConfig.enableSandwichRule)
+    console.log('  • Sandwich Applies To:', leaveConfig.sandwichRuleAppliesTo.join(', '))
+    console.log('  • 1+2 Rule Enabled:', leaveConfig.enableOnePlusTwoRule)
+    console.log('  • 1+2 Applies To:', leaveConfig.penaltyAppliesTo.join(', '))
+    console.log('  • Min Notice Period:', leaveConfig.minWorkingDayNoticePeriod, 'working days')
+    console.log('  • Penalty Per Day:', leaveConfig.penaltyDaysPerDay, 'days')
+    console.log('------------------------------------------\n')
 
     // Get all active employees with their salary details
     const employeeRecords = await conn.query<any>(`
@@ -52,7 +135,8 @@ export async function POST(request: NextRequest) {
       ORDER BY Employee_Name__c
     `)
 
-    console.log(`Fetched ${employeeRecords.totalSize} active employees`)
+    console.log('📊 DATA FETCHING:')
+    console.log(`  ✓ Fetched ${employeeRecords.totalSize} active employees`)
 
     // Calculate the date range for the selected month
     const monthIndex = [
@@ -76,32 +160,64 @@ export async function POST(request: NextRequest) {
     const startDateStr = startDate.toISOString().split("T")[0]
     const endDateStr = endDate.toISOString().split("T")[0]
 
-    console.log(`Querying leaves from ${startDateStr} to ${endDateStr}`)
+    console.log(`  📆 Date Range: ${startDateStr} to ${endDateStr}`)
 
     // Get all leaves for the selected month for all employees
-    const leaveRecords = await conn.query<any>(`
-      SELECT 
-        Id,
-        Employee__c,
-        Employee__r.Employee_Name__c,
-        Leave_Type__c,
-        Leave_Category__c,
-        Start_Date__c,
-        End_Date__c,
-        Total_Days__c,
-        Total_Days_After_Rule__c,
-        Status__c,
-        Actual_Deduction__c,
-        After_Rule_Deduction__c
-      FROM Leave__c
-      WHERE 
-        (Start_Date__c >= ${startDateStr} OR End_Date__c >= ${startDateStr})
-        AND (Start_Date__c <= ${endDateStr} OR End_Date__c <= ${endDateStr})
-        AND Status__c IN ('Approved')
-      ORDER BY Employee__c, Start_Date__c
-    `)
+    // Also fetch holidays and employee roles for rule calculations
+    const [leaveRecords, holidayRecords] = await Promise.all([
+      conn.query<any>(`
+        SELECT 
+          Id,
+          Employee__c,
+          Employee__r.Employee_Name__c,
+          Employee__r.Role__c,
+          Leave_Type__c,
+          Leave_Category__c,
+          Start_Date__c,
+          End_Date__c,
+          Session__c,
+          Status__c,
+          CreatedDate
+        FROM Leave__c
+        WHERE 
+          (Start_Date__c >= ${startDateStr} OR End_Date__c >= ${startDateStr})
+          AND (Start_Date__c <= ${endDateStr} OR End_Date__c <= ${endDateStr})
+          AND Status__c IN ('Approved')
+        ORDER BY Employee__c, Start_Date__c
+      `),
+      conn.query<any>(`
+        SELECT Date__c, Day__c 
+        FROM Holidays_List__c
+      `)
+    ])
+
+    console.log('Leave Records : ', leaveRecords);
+    console.log('Holiday Records : ', holidayRecords);
 
     console.log(`Fetched ${leaveRecords.totalSize} leaves for the selected month`)
+
+    // Helper: Check if date is weekend
+    const isWeekend = (d: dayjs.Dayjs): boolean => {
+      const day = d.day()
+      return day === 0 || day === 6 // Sunday or Saturday
+    }
+
+    // Helper: Create holiday set
+    const holidayDates = (holidayRecords.records || [])
+      .map((h: any) => h?.Date__c)
+      .filter(Boolean)
+      .map((d: string) => dayjs(d).format("YYYY-MM-DD"))
+    const holidaySet = new Set(holidayDates)
+
+    // Helper: Check if date is holiday
+    const isHoliday = (d: dayjs.Dayjs): boolean => {
+      return holidaySet.has(d.format("YYYY-MM-DD"))
+    }
+
+    // Helper: Check if date is non-working day
+    const isNonWorking = (d: dayjs.Dayjs): boolean => {
+      return isWeekend(d) || isHoliday(d)
+    }
 
     // Helper function to calculate days in the selected month for a leave period
     const calculateDaysInMonth = (leaveStart: string, leaveEnd: string, monthStart: Date, monthEnd: Date): number => {
@@ -142,21 +258,202 @@ export async function POST(request: NextRequest) {
       return Math.round(deduction * 100) / 100 // Round to 2 decimal places
     }
 
-    // Group leaves by employee and calculate deductions
+    // Group leaves by employee and calculate deductions with fresh rule calculations
     const leavesByEmployee = new Map<string, any[]>()
+    
+    console.log('🔄 PROCESSING LEAVES:')
+    console.log('------------------------------------------')
+    
     leaveRecords.records.forEach((leave: any) => {
       const empId = leave.Employee__c
       if (!leavesByEmployee.has(empId)) {
         leavesByEmployee.set(empId, [])
       }
       
-      // Calculate actual days in the selected month
-      const daysInSelectedMonth = calculateDaysInMonth(
+      const employeeRole = leave.Employee__r?.Role__c || ""
+      const leaveType = leave.Leave_Type__c
+      const leaveCategory = leave.Leave_Category__c
+      const sessionValue = leave.Session__c
+      const createdDate = dayjs(leave.CreatedDate)
+      
+      // Parse leave dates
+      const start = dayjs(leave.Start_Date__c)
+      const end = dayjs(leave.End_Date__c)
+      
+      // Check if half-day leave
+      const isHalfDay = sessionValue === "Session-1" || sessionValue === "Session-2"
+      
+      console.log(`\n📝 Leave ID: ${leave.Id.substring(0, 8)}...`)
+      console.log(`   Employee: ${leave.Employee__r?.Employee_Name__c} (${employeeRole})`)
+      console.log(`   Period: ${leave.Start_Date__c} → ${leave.End_Date__c}`)
+      console.log(`   Type: ${leaveType} | Category: ${leaveCategory}`)
+      console.log(`   Session: ${sessionValue} | Half Day: ${isHalfDay}`)
+      console.log(`   Created: ${createdDate.format('YYYY-MM-DD')}`)
+      
+      // Calculate base calendar days for the FULL leave period
+      const baseCalendarDays = end.diff(start, "day") + 1
+      
+      // Calculate days that fall in the selected payroll month
+      let daysInSelectedMonth = calculateDaysInMonth(
         leave.Start_Date__c,
         leave.End_Date__c,
         startDate,
         endDate
       )
+      
+      // Adjust for half-day leaves
+      if (isHalfDay) {
+        daysInSelectedMonth = daysInSelectedMonth * 0.5
+      }
+      
+      console.log(`   Base Days: ${baseCalendarDays} | Days in Month: ${daysInSelectedMonth}${isHalfDay ? ' (Half Day)' : ''}`)
+      
+      if (daysInSelectedMonth === 0) {
+        console.log(`   ⚠️  SKIPPED: No overlap with selected month`)
+        return // Skip if no overlap with this month
+      }
+      
+      // Determine if rules apply
+      // Handle both 'Loss of Pay' and 'loss-of-pay' formats (case-insensitive)
+      const normalizedCategory = leaveCategory?.toLowerCase().replace(/\s+/g, '-') || ''
+      const normalizedType = leaveType?.toLowerCase() || ''
+      const applyRules = normalizedCategory === 'loss-of-pay' && normalizedType === 'planned leave'
+      const sandwichRuleAppliesToUser = leaveConfig.sandwichRuleAppliesTo.includes(employeeRole)
+      const penaltyAppliesToUser = leaveConfig.penaltyAppliesTo.includes(employeeRole)
+      
+      const applySandwichRule = applyRules && !isHalfDay && leaveConfig.enableSandwichRule && sandwichRuleAppliesToUser
+      const applyOnePlusTwoRule = applyRules && !isHalfDay && leaveConfig.enableOnePlusTwoRule && penaltyAppliesToUser
+      
+      console.log(`   Rules Evaluation:`)
+      console.log(`     • applyRules: ${applyRules} (category: '${leaveCategory}' → '${normalizedCategory}', type: '${leaveType}' → '${normalizedType}')`)
+      console.log(`     • isHalfDay: ${isHalfDay}`)
+      console.log(`     • sandwichRuleAppliesToUser: ${sandwichRuleAppliesToUser}`)
+      console.log(`     • penaltyAppliesToUser: ${penaltyAppliesToUser}`)
+      console.log(`     • Sandwich Rule: ${applySandwichRule ? '✓ APPLIES' : '✗ Not Applicable'}`)
+      console.log(`     • 1+2 Rule: ${applyOnePlusTwoRule ? '✓ APPLIES' : '✗ Not Applicable'}`)
+      
+      // --- SANDWICH RULE CALCULATION ---
+      let hasNonWorkingInside = false
+      let preSandwich = 0
+      let postSandwich = 0
+      
+      if (applySandwichRule) {
+        // Check for non-working days within the leave period
+        let cursor = start.clone()
+        while (cursor.isSame(end) || cursor.isBefore(end)) {
+          if (isNonWorking(cursor)) {
+            hasNonWorkingInside = true
+            break
+          }
+          cursor = cursor.add(1, "day")
+        }
+        
+        // Check pre-sandwich days (only count if within selected month)
+        cursor = start.subtract(1, "day")
+        const monthStartDay = dayjs(startDate)
+        while (isNonWorking(cursor) && !cursor.isBefore(monthStartDay)) {
+          preSandwich += 1
+          cursor = cursor.subtract(1, "day")
+        }
+        
+        // Check post-sandwich days (only count if within selected month)
+        cursor = end.add(1, "day")
+        const monthEndDay = dayjs(endDate)
+        while (isNonWorking(cursor) && !cursor.isAfter(monthEndDay)) {
+          postSandwich += 1
+          cursor = cursor.add(1, "day")
+        }
+      }
+      
+      const sandwichApplied = applySandwichRule && (hasNonWorkingInside || (preSandwich > 0 && postSandwich > 0))
+      
+      if (applySandwichRule) {
+        console.log(`   🥪 Sandwich Calculation:`)
+        console.log(`     • Non-working inside: ${hasNonWorkingInside ? 'Yes' : 'No'}`)
+        console.log(`     • Pre-sandwich days: ${preSandwich}`)
+        console.log(`     • Post-sandwich days: ${postSandwich}`)
+        console.log(`     • Sandwich Applied: ${sandwichApplied ? 'YES' : 'NO'}`)
+      }
+      
+      // Calculate days with sandwich rule
+      let rangeLeaveDays = isHalfDay ? baseCalendarDays * 0.5 : baseCalendarDays
+      const sandwichExtra = sandwichApplied ? preSandwich + postSandwich : 0
+      const totalSandwichDeduction = rangeLeaveDays + sandwichExtra
+      
+      // --- ONE+TWO RULE CALCULATION ---
+      let onePlusTwoExtra = 0
+      
+      if (applyOnePlusTwoRule) {
+        console.log(`   🔍 1+2 Rule Debug:`)
+        console.log(`     • Created Date: ${createdDate.format('YYYY-MM-DD')}`)
+        console.log(`     • Leave Start: ${start.format('YYYY-MM-DD')}`)
+        console.log(`     • Min Notice Required: ${leaveConfig.minWorkingDayNoticePeriod} working days`)
+        
+        // Helper to count working days between two dates
+        const countWorkingDaysBetween = (fromDate: dayjs.Dayjs, toDate: dayjs.Dayjs): number => {
+          let workingDays = 0
+          let current = fromDate.clone()
+          
+          while (current.isBefore(toDate)) {
+            if (!isNonWorking(current)) {
+              workingDays++
+            }
+            current = current.add(1, "day")
+          }
+          
+          return workingDays
+        }
+        
+        const penaltyMultiplier = leaveConfig.penaltyDaysPerDay
+        
+        let cursorPenalty = start.startOf("day")
+        const endPenalty = end.startOf("day")
+        
+        while (cursorPenalty.isSame(endPenalty) || cursorPenalty.isBefore(endPenalty)) {
+          // Count only working days between CREATED DATE and this leave day
+          const workingDaysInAdvance = countWorkingDaysBetween(createdDate, cursorPenalty)
+          console.log(`     • Leave Day ${cursorPenalty.format('YYYY-MM-DD')}: ${workingDaysInAdvance} working days notice`)
+          if (workingDaysInAdvance < leaveConfig.minWorkingDayNoticePeriod) {
+            console.log(`       → Penalty Applied! (${workingDaysInAdvance} < ${leaveConfig.minWorkingDayNoticePeriod})`)
+            onePlusTwoExtra += penaltyMultiplier
+          }
+          cursorPenalty = cursorPenalty.add(1, "day")
+        }
+        console.log(`     • Total Penalty Days: ${onePlusTwoExtra}`)
+      }
+      
+      const onePlusTwoRuleApplied = applyRules && onePlusTwoExtra > 0
+      const finalTotalAfterRules = totalSandwichDeduction + onePlusTwoExtra
+      
+      if (applyOnePlusTwoRule) {
+        console.log(`   1️⃣+2️⃣ Penalty Calculation:`)
+        console.log(`     • Penalty Days Added: ${onePlusTwoExtra}`)
+        console.log(`     • 1+2 Applied: ${onePlusTwoRuleApplied ? 'YES' : 'NO'}`)
+      }
+      
+      // --- CALCULATE DAYS FOR THIS MONTH ONLY ---
+      let daysAfterRuleInMonth = daysInSelectedMonth
+      
+      if (sandwichApplied || onePlusTwoRuleApplied) {
+        // For cross-month leaves, calculate proportionally
+        const totalLeaveDays = rangeLeaveDays
+        const proportionInMonth = totalLeaveDays > 0 ? daysInSelectedMonth / totalLeaveDays : 0
+        
+        // Apply sandwich extra proportionally
+        const sandwichInMonth = Math.round(sandwichExtra * proportionInMonth * 100) / 100
+        
+        // Apply 1+2 penalty proportionally
+        const penaltyInMonth = Math.round(onePlusTwoExtra * proportionInMonth * 100) / 100
+        
+        daysAfterRuleInMonth = daysInSelectedMonth + sandwichInMonth + penaltyInMonth
+      }
+      
+      daysAfterRuleInMonth = Math.round(daysAfterRuleInMonth * 100) / 100
+      
+      console.log(`   📊 Final Calculation:`)
+      console.log(`     • Days in Month (Before Rules): ${daysInSelectedMonth}`)
+      console.log(`     • Days in Month (After Rules): ${daysAfterRuleInMonth}`)
+      console.log(`   ✅ Leave Processed\n`)
       
       leavesByEmployee.get(empId)!.push({
         id: leave.Id,
@@ -164,33 +461,111 @@ export async function POST(request: NextRequest) {
         leaveCategory: leave.Leave_Category__c,
         startDate: leave.Start_Date__c,
         endDate: leave.End_Date__c,
-        totalDays: leave.Total_Days__c || 0,
-        totalDaysAfterRule: leave.Total_Days_After_Rule__c || 0,
+        totalDays: rangeLeaveDays,
+        totalDaysAfterRule: finalTotalAfterRules,
         daysInSelectedMonth,
+        daysAfterRuleInMonth,
         status: leave.Status__c,
+        sandwichApplied,
+        onePlusTwoRuleApplied,
       })
     })
 
+    console.log('------------------------------------------')
+    console.log('\n💰 CALCULATING EMPLOYEE PAYROLLS:')
+    console.log('------------------------------------------\n')
+    
     // Map employees with their salary and leave details
     const employeePayrollData = employeeRecords.records.map((emp: any) => {
       const employeeLeaves = leavesByEmployee.get(emp.Id) || []
       const baseSalary = emp.Base_Salary__c || 0
       
-      // Calculate total leave days that fall in this month
+      console.log(`👤 ${emp.Employee_Name__c}`)
+      console.log(`   Base Salary: ₹${baseSalary.toLocaleString()}`)
+      console.log(`   Leaves Count: ${employeeLeaves.length}`)
+      
+      // Calculate total leave days that fall in this month (before rules)
       const totalLeaveDays = employeeLeaves.reduce((sum, leave) => sum + leave.daysInSelectedMonth, 0)
       
-      // Calculate deduction for each leave based on days in the selected month
+      // Calculate total leave days after rules (includes sandwich and 1+2 penalties)
+      const totalLeaveDaysAfterRule = employeeLeaves.reduce((sum, leave) => sum + leave.daysAfterRuleInMonth, 0)
+      
+      console.log(`   Leave Days (Before Rules): ${totalLeaveDays}`)
+      console.log(`   Leave Days (After Rules): ${totalLeaveDaysAfterRule}`)
+      
+      // Calculate deduction/addition for each leave
       const leavesWithDeductions = employeeLeaves.map(leave => {
-        const deduction = calculateDeduction(baseSalary, leave.daysInSelectedMonth, startDate)
+        const normalizedCategory = leave.leaveCategory?.toLowerCase().replace(/\s+/g, '-') || ''
+        const isHalfDay = leave.totalDays < 1 // Check if it's a half-day leave
+        
+        // For Extra Day Pay, add amount instead of deducting
+        if (normalizedCategory === 'extra-day-pay') {
+          const extraPayAmount = calculateDeduction(baseSalary, leave.daysInSelectedMonth, startDate)
+          console.log(`     • Leave ${leave.id.substring(0, 8)} (Extra Day Pay): +₹${extraPayAmount}`)
+          return {
+            ...leave,
+            actualDeduction: -extraPayAmount, // Negative means addition
+            afterRuleDeduction: -extraPayAmount,
+          }
+        }
+        
+        // For Loss of Pay leaves
+        if (normalizedCategory === 'loss-of-pay') {
+          // For half-day, ignore sandwich and 1+2 rules, use actual days only
+          if (isHalfDay) {
+            const halfDayDeduction = calculateDeduction(baseSalary, leave.daysInSelectedMonth, startDate)
+            console.log(`     • Leave ${leave.id.substring(0, 8)} (Half Day): ₹${halfDayDeduction}`)
+            return {
+              ...leave,
+              actualDeduction: halfDayDeduction,
+              afterRuleDeduction: halfDayDeduction, // No rules applied for half-day
+            }
+          }
+          
+          // For full-day, apply rules
+          const actualDeduction = calculateDeduction(baseSalary, leave.daysInSelectedMonth, startDate)
+          const afterRuleDeduction = calculateDeduction(baseSalary, leave.daysAfterRuleInMonth, startDate)
+          console.log(`     • Leave ${leave.id.substring(0, 8)}: ₹${actualDeduction} → ₹${afterRuleDeduction}`)
+          return {
+            ...leave,
+            actualDeduction,
+            afterRuleDeduction,
+          }
+        }
+        
+        // For other leave types, deduct actual days
+        const actualDeduction = calculateDeduction(baseSalary, leave.daysInSelectedMonth, startDate)
+        const afterRuleDeduction = calculateDeduction(baseSalary, leave.daysAfterRuleInMonth, startDate)
+        console.log(`     • Leave ${leave.id.substring(0, 8)}: ₹${actualDeduction} → ₹${afterRuleDeduction}`)
         return {
           ...leave,
-          actualDeduction: deduction,
-          afterRuleDeduction: deduction,
+          actualDeduction,
+          afterRuleDeduction,
         }
       })
       
-      // Calculate total deductions
-      const totalDeductions = leavesWithDeductions.reduce((sum, leave) => sum + leave.actualDeduction, 0)
+      // Calculate total deductions (negative values = additions)
+      const totalDeductions = leavesWithDeductions.reduce((sum, leave) => sum + leave.afterRuleDeduction, 0)
+      
+      // Separate additions and deductions for clarity
+      const totalAdditions = leavesWithDeductions
+        .filter(leave => leave.afterRuleDeduction < 0)
+        .reduce((sum, leave) => sum + Math.abs(leave.afterRuleDeduction), 0)
+      
+      const totalActualDeductions = leavesWithDeductions
+        .filter(leave => leave.afterRuleDeduction > 0)
+        .reduce((sum, leave) => sum + leave.afterRuleDeduction, 0)
+      
+      const netSalary = baseSalary - totalDeductions
+      
+      if (totalAdditions > 0) {
+        console.log(`   Total Additions: ₹${totalAdditions.toLocaleString()}`)
+      }
+      if (totalActualDeductions > 0) {
+        console.log(`   Total Deductions: ₹${totalActualDeductions.toLocaleString()}`)
+      }
+      console.log(`   Net Salary: ₹${netSalary.toLocaleString()}`)
+      console.log(`   ✅ Payroll Calculated\n`)
 
       return {
         id: emp.Id,
@@ -201,11 +576,25 @@ export async function POST(request: NextRequest) {
         role: emp.Role__c || "",
         baseSalary,
         totalLeaveDays,
-        totalDeductions: Math.round(totalDeductions * 100) / 100,
+        totalLeaveDaysAfterRule,
+        totalAdditions: Math.round(totalAdditions * 100) / 100,
+        totalDeductions: Math.round(totalActualDeductions * 100) / 100,
         leaves: leavesWithDeductions,
-        netSalary: Math.round((baseSalary - totalDeductions) * 100) / 100,
+        netSalary: Math.round(netSalary * 100) / 100,
       }
     })
+
+    const totalNetSalary = employeePayrollData.reduce((sum, emp) => sum + emp.netSalary, 0)
+    const totalDeductionsAll = employeePayrollData.reduce((sum, emp) => sum + emp.totalDeductions, 0)
+    
+    console.log('------------------------------------------')
+    console.log('✨ PAYROLL GENERATION COMPLETED')
+    console.log('------------------------------------------')
+    console.log(`📊 Summary:`)
+    console.log(`   • Total Employees: ${employeePayrollData.length}`)
+    console.log(`   • Total Deductions: ₹${totalDeductionsAll.toLocaleString()}`)
+    console.log(`   • Total Net Salary: ₹${totalNetSalary.toLocaleString()}`)
+    console.log('==========================================\n')
 
     return NextResponse.json({
       month,

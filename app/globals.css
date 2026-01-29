@@ -157,3 +157,53 @@
 .ant-picker-dropdown .ant-picker-cell-holiday:hover {
   background: #fecaca !important;
 }
+
+/* Print styles for payslip */
+@media print {
+  @page {
+    margin: 1cm;
+    size: A4;
+  }
+  
+  body {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+  
+  .print\:hidden {
+    display: none !important;
+  }
+  
+  .print\:shadow-none {
+    box-shadow: none !important;
+  }
+  
+  /* Hide navigation, sidebar, and other UI elements */
+  nav,
+  aside,
+  .ant-layout-sider,
+  button:not(.print-btn),
+  .no-print {
+    display: none !important;
+  }
+  
+  /* Ensure tables fit on page */
+  table {
+    page-break-inside: auto;
+  }
+  
+  tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+  
+  thead {
+    display: table-header-group;
+  }
+  
+  /* Better spacing for print */
+  .ant-card {
+    box-shadow: none !important;
+    page-break-inside: avoid;
+  }
+}

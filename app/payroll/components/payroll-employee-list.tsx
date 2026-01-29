@@ -1,6 +1,7 @@
 "use client"
 
-import { Table, Tag } from "antd"
+import { Table, Tag, Button } from "antd"
+import { EyeOutlined } from "@ant-design/icons"
 import type { ColumnsType } from "antd/es/table"
 import type { PayrollEmployeeDetail } from "@/types"
 
@@ -33,7 +34,7 @@ export function PayrollEmployeeList({ employees, month, year, onSelectEmployee }
       width: 120,
       render: (amount: number, record) => {
         const salary = amount || record.basicSalary || 0
-        return `$${salary.toLocaleString()}`
+        return `₹${salary.toLocaleString()}`
       },
     },
     {
@@ -43,7 +44,7 @@ export function PayrollEmployeeList({ employees, month, year, onSelectEmployee }
       width: 100,
       render: (amount: number) => (
         <span className={amount > 0 ? "text-green-600" : ""}>
-          ${(amount || 0).toLocaleString()}
+          ₹{(amount || 0).toLocaleString()}
         </span>
       ),
     },
@@ -54,7 +55,7 @@ export function PayrollEmployeeList({ employees, month, year, onSelectEmployee }
       width: 120,
       render: (amount: number) => (
         <span className={amount > 0 ? "text-red-600" : ""}>
-          ${(amount || 0).toLocaleString()}
+          ₹{(amount || 0).toLocaleString()}
         </span>
       ),
     },
@@ -64,7 +65,26 @@ export function PayrollEmployeeList({ employees, month, year, onSelectEmployee }
       key: "netSalary",
       width: 120,
       render: (amount: number) => (
-        <span className="font-semibold">${(amount || 0).toLocaleString()}</span>
+        <span className="font-semibold">₹{(amount || 0).toLocaleString()}</span>
+      ),
+    },
+    {
+      title: "Action",
+      key: "action",
+      width: 120,
+      fixed: "right",
+      render: (_, record) => (
+        <Button
+          type="primary"
+          size="small"
+          icon={<EyeOutlined />}
+          onClick={(e) => {
+            e.stopPropagation()
+            onSelectEmployee(record)
+          }}
+        >
+          View
+        </Button>
       ),
     },
   ]
@@ -113,14 +133,25 @@ export function PayrollEmployeeList({ employees, month, year, onSelectEmployee }
                   render: (days: number, record: any) => {
                     const daysInMonth = days || 0
                     const totalDays = record.totalDays || 0
-                    return daysInMonth < totalDays ? `${daysInMonth} (of ${totalDays})` : daysInMonth
+                    const daysAfterRule = record.daysAfterRuleInMonth || daysInMonth
+                    const hasRules = daysAfterRule !== daysInMonth
+                    return (
+                      <span>
+                        {daysInMonth < totalDays ? `${daysInMonth} (of ${totalDays})` : daysInMonth}
+                        {hasRules && (
+                          <span className="text-orange-600 ml-1">
+                            → {daysAfterRule.toFixed(1)}
+                          </span>
+                        )}
+                      </span>
+                    )
                   },
                 },
                 {
                   title: "Deduction",
                   dataIndex: "afterRuleDeduction",
                   key: "afterRuleDeduction",
-                  render: (amount: number, record: any) => `$${(amount || record.actualDeduction || 0).toLocaleString()}`,
+                  render: (amount: number, record: any) => `₹${(amount || record.actualDeduction || 0).toLocaleString()}`,
                 },
                 {
                   title: "Status",
@@ -204,9 +235,9 @@ export function PayrollEmployeeList({ employees, month, year, onSelectEmployee }
       expandable={{
         expandedRowRender,
         rowExpandable: (record) => 
-          (record.leaves && record.leaves.length > 0) || 
-          (record.adjustments && record.adjustments.length > 0) ||
-          (record.bonus && record.bonus > 0),
+          !!(record.leaves && record.leaves.length > 0) || 
+          !!(record.adjustments && record.adjustments.length > 0) ||
+          !!(record.bonus && record.bonus > 0),
       }}
       scroll={{ x: 1000 }}
       className="bg-white rounded-lg shadow"

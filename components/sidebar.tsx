@@ -56,10 +56,16 @@ export function Sidebar({
     { href: "/leaves", label: "Leave", icon: CalendarDays },
     { href: "/holidays", label: "Holidays", icon: CalendarRange },
     { href: "/training", label: "Training", icon: BookOpen },
-    { href: "/payroll", label: "Payroll", icon: Banknote },
     { href: "/assets", label: "Assets", icon: Tag },
     { href: "/documents", label: "Documents", icon: FileText },
   ];
+
+  // Add Payroll or My Payslips based on role
+  if (user?.role?.includes('HR') || user?.role?.includes('Admin')) {
+    navItems.push({ href: "/payroll", label: "Payroll", icon: Banknote });
+  } else {
+    navItems.push({ href: "/my-payrolls", label: "My Payslips", icon: Banknote });
+  }
 
   // Add Document Manager for HR only
   if (user?.role?.includes('HR')) {

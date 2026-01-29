@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Modal, Select, InputNumber, Input, Button, message, Form } from "antd"
 import type { PayrollAdjustment } from "@/types"
 
@@ -9,25 +9,38 @@ interface AddAdjustmentModalProps {
   onClose: () => void
   employeeName: string
   onAdd: (adjustment: PayrollAdjustment) => void
+  initialAdjustment?: PayrollAdjustment
 }
 
-export function AddAdjustmentModal({ open, onClose, employeeName, onAdd }: AddAdjustmentModalProps) {
+export function AddAdjustmentModal({ open, onClose, employeeName, onAdd, initialAdjustment }: AddAdjustmentModalProps) {
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (open && initialAdjustment) {
+      form.setFieldsValue({
+        adjustmentType: initialAdjustment.adjustmentType,
+        adjustmentAmount: initialAdjustment.adjustmentAmount,
+        adjustmentDescription: initialAdjustment.adjustmentDescription,
+      })
+    } else if (open) {
+      form.resetFields()
+    }
+  }, [open, initialAdjustment, form])
 
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields()
       
       const adjustment: PayrollAdjustment = {
-        id: `adj-${Date.now()}`,
+        id: initialAdjustment?.id || `adj-${Date.now()}`,
         adjustmentType: values.adjustmentType,
         adjustmentAmount: values.adjustmentAmount,
         adjustmentDescription: values.adjustmentDescription,
       }
 
       onAdd(adjustment)
-      message.success("Adjustment added successfully")
+      message.success(initialAdjustment ? "Adjustment updated successfully" : "Adjustment added successfully")
       form.resetFields()
       onClose()
     } catch (error) {
@@ -42,7 +55,7 @@ export function AddAdjustmentModal({ open, onClose, employeeName, onAdd }: AddAd
 
   return (
     <Modal
-      title={`Add Adjustment - ${employeeName}`}
+      title={`${initialAdjustment ? 'Edit' : 'Add'} Adjustment - ${employeeName}`}
       open={open}
       onCancel={handleClose}
       footer={[
@@ -50,7 +63,7 @@ export function AddAdjustmentModal({ open, onClose, employeeName, onAdd }: AddAd
           Cancel
         </Button>,
         <Button key="submit" type="primary" onClick={handleSubmit} loading={loading}>
-          Add Adjustment
+          {initialAdjustment ? 'Update' : 'Add'} Adjustment
         </Button>,
       ]}
     >
@@ -84,7 +97,7 @@ export function AddAdjustmentModal({ open, onClose, employeeName, onAdd }: AddAd
           <InputNumber
             className="w-full"
             placeholder="Enter amount"
-            prefix="$"
+            prefix="₹"
             min={0}
             precision={2}
           />
