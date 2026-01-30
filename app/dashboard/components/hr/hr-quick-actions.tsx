@@ -42,14 +42,14 @@ export function HRQuickActions() {
         >
           Manage Holidays
         </Button>
-        <Button 
+        {/* <Button 
           block 
           size="large"
           icon={<FileTextOutlined />}
           onClick={() => router.push('/documents')}
         >
           Document Templates
-        </Button>
+        </Button> */}
         <Button 
           block 
           size="large"
@@ -58,14 +58,14 @@ export function HRQuickActions() {
         >
           View Employees
         </Button>
-        <Button 
+        {/* <Button 
           block 
           size="large"
           icon={<DownloadOutlined />}
           onClick={() => console.log('Generate report')}
         >
           Generate Report
-        </Button>
+        </Button> */}
       </div>
     </Card>
   )
