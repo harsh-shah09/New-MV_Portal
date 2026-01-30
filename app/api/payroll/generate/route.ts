@@ -18,6 +18,13 @@ interface LeaveConfig {
 }
 
 /**
+ * Payroll Configuration Interface
+ */
+interface PayrollConfig {
+  anniversaryBonusEnabled: boolean
+}
+
+/**
  * Fetch Leave Configurations from Salesforce Custom Metadata
  */
 async function fetchLeaveConfigurations(conn: any): Promise<LeaveConfig> {
@@ -63,6 +70,36 @@ async function fetchLeaveConfigurations(conn: any): Promise<LeaveConfig> {
       penaltyAppliesTo: ['Developer'],
       minWorkingDayNoticePeriod: 5,
       penaltyDaysPerDay: 2,
+    }
+  }
+}
+
+/**
+ * Fetch Payroll Configurations from Salesforce Custom Metadata
+ */
+async function fetchPayrollConfigurations(conn: any): Promise<PayrollConfig> {
+  try {
+    const configQuery = await conn.query(
+      "SELECT DeveloperName, Value__c FROM Payroll_Configurations__mdt"
+    )
+
+    const configs = configQuery.records || []
+    const configMap = new Map<string, string>()
+
+    configs.forEach((config: any) => {
+      configMap.set(config.DeveloperName, config.Value__c)
+    })
+
+    // Parse configurations with defaults
+    const anniversaryBonusEnabled = configMap.get('Auto_Apply_Anniversary_Bonus')?.toLowerCase() === 'true'
+
+    return {
+      anniversaryBonusEnabled,
+    }
+  } catch (error) {
+    console.error('Error fetching payroll configurations:', error)
+    return {
+      anniversaryBonusEnabled: false,
     }
   }
 }
@@ -119,6 +156,13 @@ export async function POST(request: NextRequest) {
     console.log('  • Penalty Per Day:', leaveConfig.penaltyDaysPerDay, 'days')
     console.log('------------------------------------------\n')
 
+    // Fetch payroll configurations
+    const payrollConfig = await fetchPayrollConfigurations(conn)
+    
+    console.log('💰 PAYROLL CONFIGURATIONS:')
+    console.log('  • Anniversary Bonus Enabled:', payrollConfig.anniversaryBonusEnabled)
+    console.log('------------------------------------------\n')
+
     // Get all active employees with their salary details
     const employeeRecords = await conn.query<any>(`
       SELECT 
@@ -126,6 +170,8 @@ export async function POST(request: NextRequest) {
         Employee_Name__c,
         Employee_Email__c,
         Base_Salary__c,
+        Company_Security_Deduction__c,
+        Joining_Date__c,
         Department__c,
         Role__c,
         Status__c,
@@ -556,13 +602,49 @@ export async function POST(request: NextRequest) {
         .filter(leave => leave.afterRuleDeduction > 0)
         .reduce((sum, leave) => sum + leave.afterRuleDeduction, 0)
       
-      const netSalary = baseSalary - totalDeductions
+      // Calculate Anniversary Bonus
+      let anniversaryBonus = 0
+      if (payrollConfig.anniversaryBonusEnabled && emp.Joining_Date__c) {
+        const joiningDate = new Date(emp.Joining_Date__c)
+        const joiningMonth = joiningDate.getMonth() // 0-11
+        const payrollMonth = monthIndex // 0-11
+        
+        // Check if current payroll month matches joining month
+        if (joiningMonth === payrollMonth) {
+          const currentYear = year
+          const joiningYear = joiningDate.getFullYear()
+          const yearsCompleted = currentYear - joiningYear
+          
+          // Only give bonus if at least 1 year is completed
+          if (yearsCompleted > 0) {
+            const companySecurityDeduction = emp.Company_Security_Deduction__c || 0
+            anniversaryBonus = companySecurityDeduction * 12
+            console.log(`   🎉 Anniversary Bonus: Company Security (₹${companySecurityDeduction.toLocaleString()}) × 12 = ₹${anniversaryBonus.toLocaleString()}`)
+            console.log(`   🎂 Completed ${yearsCompleted} year(s) with the company`)
+          }
+        }
+      }
+      
+      // Add Company Security Deduction
+      const companySecurityDeduction = emp.Company_Security_Deduction__c || 0
+      const totalDeductionsWithSecurity = totalActualDeductions + companySecurityDeduction
+      
+      // Update total additions to include anniversary bonus
+      const totalAdditionsWithBonus = totalAdditions + anniversaryBonus
+      
+      const netSalary = baseSalary + totalAdditionsWithBonus - totalDeductions - companySecurityDeduction
       
       if (totalAdditions > 0) {
         console.log(`   Total Additions: ₹${totalAdditions.toLocaleString()}`)
       }
+      if (anniversaryBonus > 0) {
+        console.log(`   Anniversary Bonus: ₹${anniversaryBonus.toLocaleString()}`)
+      }
       if (totalActualDeductions > 0) {
         console.log(`   Total Deductions: ₹${totalActualDeductions.toLocaleString()}`)
+      }
+      if (companySecurityDeduction > 0) {
+        console.log(`   Company Security Deduction: ₹${companySecurityDeduction.toLocaleString()}`)
       }
       console.log(`   Net Salary: ₹${netSalary.toLocaleString()}`)
       console.log(`   ✅ Payroll Calculated\n`)
@@ -577,8 +659,10 @@ export async function POST(request: NextRequest) {
         baseSalary,
         totalLeaveDays,
         totalLeaveDaysAfterRule,
-        totalAdditions: Math.round(totalAdditions * 100) / 100,
-        totalDeductions: Math.round(totalActualDeductions * 100) / 100,
+        totalAdditions: Math.round(totalAdditionsWithBonus * 100) / 100,
+        totalDeductions: Math.round(totalDeductionsWithSecurity * 100) / 100,
+        companySecurityDeduction: Math.round(companySecurityDeduction * 100) / 100,
+        anniversaryBonus: Math.round(anniversaryBonus * 100) / 100,
         leaves: leavesWithDeductions,
         netSalary: Math.round(netSalary * 100) / 100,
       }

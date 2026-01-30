@@ -390,6 +390,17 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
       ),
     },
     {
+      title: "Anniversary Bonus",
+      dataIndex: "anniversaryBonus",
+      key: "anniversaryBonus",
+      width: 130,
+      render: (amount: number) => (
+        <span className={amount > 0 ? "text-purple-600 font-semibold" : ""}>
+          {amount > 0 ? `₹${amount?.toLocaleString()}` : '-'}
+        </span>
+      ),
+    },
+    {
       title: "Leave Days",
       dataIndex: "totalLeaveDays",
       key: "totalLeaveDays",
@@ -405,6 +416,17 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
       width: 120,
       render: (amount: number) => (
         <span className={amount > 0 ? "text-red-600" : ""}>
+          ₹{amount?.toLocaleString() || 0}
+        </span>
+      ),
+    },
+    {
+      title: "Security Deduction",
+      dataIndex: "companySecurityDeduction",
+      key: "companySecurityDeduction",
+      width: 130,
+      render: (amount: number) => (
+        <span className={amount > 0 ? "text-orange-600" : ""}>
           ₹{amount?.toLocaleString() || 0}
         </span>
       ),
@@ -667,7 +689,7 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
             <>
               <div className="mb-4 p-4 bg-blue-50 rounded-lg">
                 <h3 className="font-semibold text-lg mb-2">Summary</h3>
-                <div className="grid grid-cols-4 gap-4">
+                <div className="grid grid-cols-6 gap-4">
                   <div>
                     <p className="text-sm text-gray-600">Total Employees</p>
                     <p className="text-2xl font-bold">{employeeData.length}</p>
@@ -679,9 +701,21 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
                     </p>
                   </div>
                   <div>
+                    <p className="text-sm text-gray-600">Anniversary Bonus</p>
+                    <p className="text-2xl font-bold text-purple-600">
+                      ₹{employeeData.reduce((sum, emp) => sum + (emp.anniversaryBonus || 0), 0).toLocaleString()}
+                    </p>
+                  </div>
+                  <div>
                     <p className="text-sm text-gray-600">Total Deductions</p>
                     <p className="text-2xl font-bold text-red-600">
                       ₹{employeeData.reduce((sum, emp) => sum + (emp.totalDeductions || 0), 0).toLocaleString()}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Security Deductions</p>
+                    <p className="text-2xl font-bold text-orange-600">
+                      ₹{employeeData.reduce((sum, emp) => sum + (emp.companySecurityDeduction || 0), 0).toLocaleString()}
                     </p>
                   </div>
                   <div>
@@ -697,7 +731,7 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
                 dataSource={employeeData}
                 rowKey="id"
                 pagination={{ pageSize: 10 }}
-                scroll={{ x: 1400 }}
+                scroll={{ x: 1700 }}
                 expandable={{
                   expandedRowRender,
                   rowExpandable: (record) => 

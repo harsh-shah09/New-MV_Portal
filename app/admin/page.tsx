@@ -18,7 +18,8 @@ import {
   Workflow,
   Check,
   RefreshCw,
-  Trash2
+  Trash2,
+  DollarSign
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { message, Modal, Spin } from "antd";
@@ -30,7 +31,7 @@ const formatLabel = (str: string) => {
 };
 
 export default function AdminConsole() {
-  const [activeTab, setActiveTab] = useState<"admin" | "documents" | "email" | "leave" | "users" | "integration">("admin");
+  const [activeTab, setActiveTab] = useState<"admin" | "documents" | "email" | "leave" | "payroll" | "users" | "integration">("admin");
   const [configs, setConfigs] = useState<any>(null);
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -161,7 +162,8 @@ export default function AdminConsole() {
     const section = 
       metadataType === 'Admin_Configurations__mdt' ? 'admin' :
       metadataType === 'Documents_Configurations__mdt' ? 'documents' :
-      metadataType === 'Email_Templates__mdt' ? 'emailTemplates' : 'leave';
+      metadataType === 'Email_Templates__mdt' ? 'emailTemplates' :
+      metadataType === 'Payroll_Configurations__mdt' ? 'payroll' : 'leave';
 
     setConfigs((prev: any) => ({
       ...prev,
@@ -254,6 +256,9 @@ export default function AdminConsole() {
 
           message.success("Configurations updated successfully");
           setUnsavedChanges([]);
+          
+          // Refetch configurations to ensure UI is in sync
+          await fetchConfigs();
         } catch (error) {
           console.error(error);
           message.error("Failed to save changes");
@@ -323,6 +328,7 @@ export default function AdminConsole() {
                     <TabButton id="admin" label="General Settings" icon={Settings} />
                     <TabButton id="documents" label="Documents Config" icon={FileText} />
                     <TabButton id="leave" label="Leave Rules" icon={Calendar} />
+                    <TabButton id="payroll" label="Payroll Config" icon={DollarSign} />
                     <TabButton id="users" label="User Access" icon={Users} />
                     <TabButton id="integration" label="Connected Users" icon={Workflow} />
                     <TabButton id="email" label="Email Templates" icon={Mail} />
@@ -465,6 +471,35 @@ export default function AdminConsole() {
                                                     type="text"
                                                     value={record.Value__c || ''}
                                                     onChange={(e) => handleInputChange('Leave_Configurations__mdt', record, e.target.value)}
+                                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition group-hover:bg-white"
+                                                />
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {activeTab === "payroll" && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    {configs.payroll?.map((record: any) => (
+                                        <div key={record.Id} className="group">
+                                            <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                                {formatLabel(record.MasterLabel)}
+                                            </label>
+                                            {['Auto_Apply_Anniversary_Bonus'].includes(record.DeveloperName) ? (
+                                                <select
+                                                    value={record.Value__c || 'false'}
+                                                    onChange={(e) => handleInputChange('Payroll_Configurations__mdt', record, e.target.value)}
+                                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                                                >
+                                                    <option value="true">Enabled</option>
+                                                    <option value="false">Disabled</option>
+                                                </select>
+                                            ) : (
+                                                <input 
+                                                    type="text"
+                                                    value={record.Value__c || ''}
+                                                    onChange={(e) => handleInputChange('Payroll_Configurations__mdt', record, e.target.value)}
                                                     className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition group-hover:bg-white"
                                                 />
                                             )}

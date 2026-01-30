@@ -33,8 +33,10 @@ interface PayslipData {
   payrollYear: number
   basicSalary: number
   bonus: number
+  anniversaryBonus?: number
   totalAdditions: number
   totalDeductions: number
+  companySecurityDeduction?: number
   netSalary: number
   totalLeaveDays: number
   totalLeaveDaysAfterRule: number
@@ -81,7 +83,7 @@ function generatePayslipHTML(payslip: PayslipData): string {
   const adjustmentAdditions = payslip.adjustments
     ?.filter(a => a.adjustmentType === 'Addition')
     .reduce((sum, a) => sum + a.adjustmentAmount, 0) || 0
-  const extraDayPay = payslip.totalAdditions - payslip.bonus - adjustmentAdditions
+  const extraDayPay = payslip.totalAdditions - payslip.bonus - (payslip.anniversaryBonus || 0) - adjustmentAdditions
 
   const grossEarnings = payslip.basicSalary + (payslip.totalAdditions || 0)
 
@@ -208,6 +210,12 @@ function generatePayslipHTML(payslip: PayslipData): string {
               <span class="ed-amount">₹${payslip.bonus.toLocaleString()}</span>
             </div>
             ` : ''}
+            ${(payslip.anniversaryBonus || 0) > 0 ? `
+            <div class="ed-row">
+              <span class="ed-label">Anniversary Bonus</span>
+              <span class="ed-amount">₹${(payslip.anniversaryBonus || 0).toLocaleString()}</span>
+            </div>
+            ` : ''}
             ${extraDayPay > 0 ? `
             <div class="ed-row">
               <span class="ed-label">Extra Day Pay</span>
@@ -230,6 +238,12 @@ function generatePayslipHTML(payslip: PayslipData): string {
             <div class="ed-row">
               <span class="ed-label">Leave Deduction</span>
               <span class="ed-amount">₹${payslip.totalLeaveDeductions.toLocaleString()}</span>
+            </div>
+            ` : ''}
+            ${(payslip.companySecurityDeduction || 0) > 0 ? `
+            <div class="ed-row">
+              <span class="ed-label">Company Security Deduction</span>
+              <span class="ed-amount">₹${(payslip.companySecurityDeduction || 0).toLocaleString()}</span>
             </div>
             ` : ''}
             ${payslip.adjustments?.filter(a => a.adjustmentType === 'Deduction').map(adj => `

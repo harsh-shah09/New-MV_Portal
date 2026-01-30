@@ -16,31 +16,35 @@ export interface AdminConfigs {
   documents: MetadataRecord[];
   emailTemplates: MetadataRecord[];
   leave: MetadataRecord[];
+  payroll: MetadataRecord[];
 }
 
 const METADATA_TYPES = {
   ADMIN: 'Admin_Configurations__mdt',
   DOCUMENTS: 'Documents_Configurations__mdt',
   EMAIL: 'Email_Templates__mdt',
-  LEAVE: 'Leave_Configurations__mdt'
+  LEAVE: 'Leave_Configurations__mdt',
+  PAYROLL: 'Payroll_Configurations__mdt'
 };
 
 export const getAllConfigurations = async (): Promise<AdminConfigs> => {
   const conn = await getSalesforceConnection();
   if (!conn) throw new Error("No Salesforce connection");
 
-  const [admin, documents, emailTemplates, leave] = await Promise.all([
+  const [admin, documents, emailTemplates, leave, payroll] = await Promise.all([
     conn.query(`SELECT Id, DeveloperName, MasterLabel, QualifiedApiName, Value__c FROM ${METADATA_TYPES.ADMIN}`),
     conn.query(`SELECT Id, DeveloperName, MasterLabel, QualifiedApiName, Value__c FROM ${METADATA_TYPES.DOCUMENTS}`),
     conn.query(`SELECT Id, DeveloperName, MasterLabel, QualifiedApiName, Value__c FROM ${METADATA_TYPES.EMAIL}`),
     conn.query(`SELECT Id, DeveloperName, MasterLabel, QualifiedApiName, Value__c FROM ${METADATA_TYPES.LEAVE}`),
+    conn.query(`SELECT Id, DeveloperName, MasterLabel, QualifiedApiName, Value__c FROM ${METADATA_TYPES.PAYROLL}`),
   ]);
 
   return {
     admin: admin.records as unknown as MetadataRecord[],
     documents: documents.records as unknown as MetadataRecord[],
     emailTemplates: emailTemplates.records as unknown as MetadataRecord[],
-    leave: leave.records as unknown as MetadataRecord[]
+    leave: leave.records as unknown as MetadataRecord[],
+    payroll: payroll.records as unknown as MetadataRecord[]
   };
 };
 

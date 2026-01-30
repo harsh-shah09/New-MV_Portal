@@ -68,17 +68,22 @@ export async function POST(request: NextRequest) {
       const adjustment = emp.adjustments && emp.adjustments.length > 0 ? emp.adjustments[0] : null
       
       // totalAdditions and totalDeductions already include all calculations from frontend
-      // (Extra Day Pay + Bonus + Adjustments for additions)
-      // (Leave Deductions + Adjustments for deductions)
+      // (Extra Day Pay + Bonus + Anniversary Bonus + Adjustments for additions)
+      // (Leave Deductions + Adjustments + Company Security Deduction for deductions)
       const totalAdditions = emp.totalAdditions || 0
       const totalDeductions = emp.totalDeductions || 0
+      const companySecurityDeduction = emp.companySecurityDeduction || 0
+      const anniversaryBonus = emp.anniversaryBonus || 0
+      
+      // Combine manual bonus and anniversary bonus for Bonus__c field
+      const totalBonus = (emp.bonus || 0) + anniversaryBonus
       
       return {
         Payroll_Summary__c: summaryId,
         Employee__c: emp.employeeId,
         Payroll_Month__c: month,
         Basic_Salary__c: emp.baseSalary || emp.basicSalary || 0,
-        Bonus__c: emp.bonus || 0,
+        Bonus__c: totalBonus,
         Adjustment_Type__c: adjustment?.adjustmentType || null,
         Adjustment_Amount__c: adjustment?.adjustmentAmount || null,
         Adjustment_Description__c: adjustment?.adjustmentDescription || null,
@@ -131,8 +136,10 @@ export async function POST(request: NextRequest) {
           payrollYear: year,
           basicSalary: emp.baseSalary || emp.basicSalary || 0,
           bonus: emp.bonus || 0,
+          anniversaryBonus: emp.anniversaryBonus || 0,
           totalAdditions: emp.totalAdditions || 0,
           totalDeductions: emp.totalDeductions || 0,
+          companySecurityDeduction: emp.companySecurityDeduction || 0,
           netSalary: emp.netSalary || 0,
           totalLeaveDays: emp.totalLeaveDays || 0,
           totalLeaveDaysAfterRule: emp.totalLeaveDaysAfterRule || emp.totalLeaveDays || 0,
@@ -157,6 +164,8 @@ export async function POST(request: NextRequest) {
           const documentRecord = {
             Name: documentName,
             Document_Category__c: 'Payslip',
+            Document_Type__c: 'Payslip',
+            Status__c: 'Uploaded',
             Employee__c: emp.employeeId,
             File_URL__c: s3Url,
           }

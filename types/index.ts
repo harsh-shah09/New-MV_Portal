@@ -194,6 +194,8 @@ export interface PayrollEmployeeDetail {
   baseSalary?: number
   totalAdditions?: number
   totalDeductions?: number
+  companySecurityDeduction?: number
+  anniversaryBonus?: number
   totalLeaveDays?: number
   bonus?: number
   netSalary?: number
