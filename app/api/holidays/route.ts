@@ -76,9 +76,9 @@ export async function POST(request: NextRequest) {
 
     const { role } = payload;
 
-    // Check if user is HR
-    if (role !== 'HR') {
-      return NextResponse.json({ error: "Only HR can create holidays" }, { status: 403 });
+    // Check if user is HR or Admin
+    if (role !== 'HR' && role !== 'Admin') {
+      return NextResponse.json({ error: "Only HR and Admin can create holidays" }, { status: 403 });
     }
 
     const body = await request.json();
@@ -184,9 +184,9 @@ export async function PATCH(request: NextRequest) {
 
     const { role } = payload;
 
-    // Check if user is HR
-    if (role !== 'HR') {
-      return NextResponse.json({ error: "Only HR can update holidays" }, { status: 403 });
+    // Check if user is HR or Admin
+    if (role !== 'HR' && role !== 'Admin') {
+      return NextResponse.json({ error: "Only HR and Admin can update holidays" }, { status: 403 });
     }
 
     const body = await request.json();
@@ -239,9 +239,9 @@ export async function DELETE(request: NextRequest) {
 
     const { role } = payload;
 
-    // Check if user is HR
-    if (role !== 'HR') {
-      return NextResponse.json({ error: "Only HR can delete holidays" }, { status: 403 });
+    // Check if user is HR or Admin
+    if (role !== 'HR' && role !== 'Admin') {
+      return NextResponse.json({ error: "Only HR and Admin can delete holidays" }, { status: 403 });
     }
 
     const { searchParams } = new URL(request.url);

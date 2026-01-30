@@ -54,7 +54,7 @@ export default function HolidaysPage() {
 
   const holidays: Holiday[] = data?.holidays || []
   const userRole = data?.userRole
-  const isHR = userRole === 'HR'
+  const isHR = userRole === 'HR' || userRole === 'Admin'
 
   // Get unique years from holidays
   const availableYears = [...new Set(holidays.map(h => String(h.year)))].sort((a, b) => parseInt(b) - parseInt(a))

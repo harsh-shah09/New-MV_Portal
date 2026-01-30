@@ -203,15 +203,23 @@ export async function POST(request: NextRequest) {
     const startDate = new Date(year, monthIndex, 1)
     const endDate = new Date(year, monthIndex + 1, 0)
 
-    const startDateStr = startDate.toISOString().split("T")[0]
-    const endDateStr = endDate.toISOString().split("T")[0]
+    // Format dates as YYYY-MM-DD without timezone conversion
+    const formatDate = (date: Date) => {
+      const y = date.getFullYear()
+      const m = String(date.getMonth() + 1).padStart(2, '0')
+      const d = String(date.getDate()).padStart(2, '0')
+      return `${y}-${m}-${d}`
+    }
+
+    const startDateStr = formatDate(startDate)
+    const endDateStr = formatDate(endDate)
 
     console.log(`  📆 Date Range: ${startDateStr} to ${endDateStr}`)
+    console.log(`  📆 End Date Details: Month=${monthIndex}, Year=${year}, Last Day=${endDate.getDate()}`)
 
     // Get all leaves for the selected month for all employees
     // Also fetch holidays and employee roles for rule calculations
-    const [leaveRecords, holidayRecords] = await Promise.all([
-      conn.query<any>(`
+    const leaveQuery = `
         SELECT 
           Id,
           Employee__c,
@@ -226,11 +234,18 @@ export async function POST(request: NextRequest) {
           CreatedDate
         FROM Leave__c
         WHERE 
-          (Start_Date__c >= ${startDateStr} OR End_Date__c >= ${startDateStr})
-          AND (Start_Date__c <= ${endDateStr} OR End_Date__c <= ${endDateStr})
+          Start_Date__c <= ${endDateStr}
+          AND End_Date__c >= ${startDateStr}
           AND Status__c IN ('Approved')
         ORDER BY Employee__c, Start_Date__c
-      `),
+      `
+    
+    console.log('📋 LEAVE QUERY:')
+    console.log(leaveQuery)
+    console.log('------------------------------------------\n')
+    
+    const [leaveRecords, holidayRecords] = await Promise.all([
+      conn.query<any>(leaveQuery),
       conn.query<any>(`
         SELECT Date__c, Day__c 
         FROM Holidays_List__c
@@ -267,8 +282,14 @@ export async function POST(request: NextRequest) {
 
     // Helper function to calculate days in the selected month for a leave period
     const calculateDaysInMonth = (leaveStart: string, leaveEnd: string, monthStart: Date, monthEnd: Date): number => {
-      const start = new Date(leaveStart)
-      const end = new Date(leaveEnd)
+      // Parse dates without timezone issues
+      const parseDate = (dateStr: string) => {
+        const [y, m, d] = dateStr.split('-').map(Number)
+        return new Date(y, m - 1, d)
+      }
+      
+      const start = parseDate(leaveStart)
+      const end = parseDate(leaveEnd)
       
       // Determine the overlap period
       const overlapStart = start > monthStart ? start : monthStart

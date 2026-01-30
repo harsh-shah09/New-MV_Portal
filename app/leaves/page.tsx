@@ -452,15 +452,17 @@ export default function LeavesPage() {
             >
               My Requests
             </button>
-            <button
-              onClick={() => setSelectedTab("approvals")}
-              className={`flex-1 px-6 py-4 text-center font-medium transition ${selectedTab === "approvals"
-                ? "text-blue-600 border-b-2 border-blue-600"
-                : "text-gray-600 hover:text-gray-900"
-                }`}
-            >
-              Approvals
-            </button>
+            {(currentUser?.role === 'HR' || currentUser?.role === 'Admin' || currentUser?.title === 'Team Lead') && (
+              <button
+                onClick={() => setSelectedTab("approvals")}
+                className={`flex-1 px-6 py-4 text-center font-medium transition ${selectedTab === "approvals"
+                  ? "text-blue-600 border-b-2 border-blue-600"
+                  : "text-gray-600 hover:text-gray-900"
+                  }`}
+              >
+                Approvals
+              </button>
+            )}
             {(currentUser?.role === 'HR' || currentUser?.role === 'Admin') && (
               <button
                 onClick={() => setSelectedTab("all-leaves")}

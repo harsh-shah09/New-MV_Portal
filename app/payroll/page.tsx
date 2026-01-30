@@ -37,12 +37,12 @@ export default function PayrollPage() {
       if (!res.ok) throw new Error("Failed to fetch payroll summaries")
       return res.json()
     },
-    enabled: user?.role === "admin" || user?.role === "HR",
+    enabled: user?.role === "Admin" || user?.role === "HR",
   })
 
   const payrollSummaries = summariesData?.summaries || []
 
-  const isHROrAdmin = user?.role === "admin" || user?.role === "HR"
+  const isHROrAdmin = user?.role === "Admin" || user?.role === "HR"
 
   const handleSelectSummary = async (summary: PayrollSummary) => {
     setSelectedSummary(summary)
