@@ -3,7 +3,8 @@
 import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useQuery } from "@tanstack/react-query"
-import { Skeleton, Card, Space, Result, Button, message } from "antd"
+import { Skeleton, Card, Space, Result, Button, message, Tooltip } from "antd"
+import { RefreshCw } from "lucide-react"
 
 import { EmployeeForm } from "./components/employee-form"
 import { EmployeeTable } from "./components/employee-table"
@@ -27,12 +28,12 @@ export default function EmployeesClient({ role }: EmployeesClientProps) {
   
   const [accountStatus, setAccountStatus] = useState("")
   
-  const isHR = role === 'HR';
+  const isHR = role === 'HR' || role === 'Admin';
 
   const { addEmployee, updateEmployee, deleteEmployee } = useEmployeeStore()
 
   /* handleUpdateEmployee implementation and queryFn fix */
-  const { data: employees = [], isLoading, isError, refetch } = useQuery({
+  const { data: employees = [], isLoading, isFetching, isError, refetch } = useQuery({
     queryKey: ['employees'],
     queryFn: async () => {
       const res = await fetch('/api/employees');
@@ -312,7 +313,14 @@ export default function EmployeesClient({ role }: EmployeesClientProps) {
             <h1 className="text-3xl sm:text-4xl font-bold text-foreground">Employees</h1>
             <p className="text-muted-foreground mt-1">Manage your workforce</p>
           </div>
-          {/* {isHR && (
+          <div className="flex gap-2">
+            <Tooltip title="Refresh Data">
+              <Button 
+                icon={<RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />} 
+                onClick={() => refetch()} 
+              />
+            </Tooltip>
+            {/* {isHR && (
             <Button
                 type="primary"
                 size="large"
@@ -325,6 +333,7 @@ export default function EmployeesClient({ role }: EmployeesClientProps) {
                 + Add Employee
             </Button>
           )} */}
+          </div>
         </div>
 
         <EmployeeFilters
@@ -338,15 +347,16 @@ export default function EmployeesClient({ role }: EmployeesClientProps) {
           onAccountStatusChange={setAccountStatus}
         />
 
-        <EmployeeTable
-          employees={filteredEmployees}
-          onEdit={isHR ? (emp) => {
-            setEditingEmployee(emp)
-            setShowForm(true)
-          } : undefined}
-          onDelete={isHR ? handleDeleteEmployee : undefined}
-          onView={isHR ? (emp) => router.push(`/employees/${emp.id}`) : undefined}
-        />
+        <div className="bg-card rounded-xl shadow-sm border border-border p-4 sm:p-6 mb-8 overflow-hidden">
+          <EmployeeTable 
+            employees={filteredEmployees}
+            onView={(emp) => router.push(`/employees/${emp.id}`)}
+            // onEdit={setEditingEmployee}
+            // onDelete={handleDeleteEmployee} 
+            loading={isFetching}
+            isHR={isHR}
+          />
+        </div>
 
         {showForm && isHR && (
           <EmployeeForm

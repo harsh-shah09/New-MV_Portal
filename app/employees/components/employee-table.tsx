@@ -11,9 +11,11 @@ interface EmployeeTableProps {
   onEdit?: (employee: Employee) => void
   onDelete?: (id: string) => void
   onView?: (employee: Employee) => void
+  loading?: boolean
+  isHR?: boolean
 }
 
-export function EmployeeTable({ employees, onEdit, onDelete, onView }: EmployeeTableProps) {
+export function EmployeeTable({ employees, onEdit, onDelete, onView, loading, isHR }: EmployeeTableProps) {
   const columns: ColumnsType<Employee> = [
     {
       title: 'Name',
@@ -59,21 +61,24 @@ export function EmployeeTable({ employees, onEdit, onDelete, onView }: EmployeeT
       render: (date) => formatDate(date),
       sorter: (a, b) => new Date(a.joinDate).getTime() - new Date(b.joinDate).getTime(),
       responsive: ['lg'],
-    },
-    {
-        title: 'Status',
-        dataIndex: 'status',
-        key: 'status',
-        render: (status) => {
-             let color = 'default';
-             if (status?.toLowerCase() === 'active') color = 'success';
-             if (status?.toLowerCase() === 'on notice') color = 'warning';
-             if (status?.toLowerCase() === 'terminated') color = 'error';
-             
-             return <Tag color={color} className="capitalize">{status}</Tag>
-        }
     }
   ];
+
+  if (isHR) {
+      columns.push({
+          title: 'Account Status',
+          dataIndex: 'status',
+          key: 'status',
+          render: (status) => {
+               let color = 'default';
+               if (status?.toLowerCase() === 'active') color = 'success';
+               if (status?.toLowerCase() === 'on notice') color = 'warning';
+               if (status?.toLowerCase() === 'terminated') color = 'error';
+               
+               return <Tag color={color} className="capitalize">{status}</Tag>
+          }
+      });
+  }
 
   if(onView || onEdit || onDelete){
     columns.push({
@@ -124,12 +129,31 @@ export function EmployeeTable({ employees, onEdit, onDelete, onView }: EmployeeT
                 dataSource={employees}
                 rowKey="id"
                 pagination={{ pageSize: 10 }}
+                loading={loading}
             />
         </div>
 
         {/* Mobile View - Card List */}
         <div className="md:hidden space-y-4">
-            {employees.map((employee) => (
+            {loading ? (
+                 // Simple skeleton for mobile
+                 Array(3).fill(0).map((_, i) => (
+                    <div key={i} className="bg-card mt-4 p-4 rounded-xl shadow-sm border border-border h-[250px] animate-pulse">
+                         <div className="flex gap-3 mb-4">
+                             <div className="w-12 h-12 rounded-full bg-slate-200"></div>
+                             <div className="space-y-2 flex-1">
+                                 <div className="h-4 w-32 bg-slate-200 rounded"></div>
+                                 <div className="h-3 w-24 bg-slate-200 rounded"></div>
+                             </div>
+                         </div>
+                         <div className="space-y-3">
+                             <div className="h-3 w-full bg-slate-200 rounded"></div>
+                             <div className="h-3 w-full bg-slate-200 rounded"></div>
+                             <div className="h-3 w-full bg-slate-200 rounded"></div>
+                         </div>
+                    </div>
+                 ))
+            ) : employees.map((employee) => (
                 <div key={employee.id} className="bg-card mt-4 p-4 rounded-xl shadow-sm border border-border flex flex-col gap-4">
                     <div className="flex justify-between items-start">
                          <div className="flex items-center gap-3">

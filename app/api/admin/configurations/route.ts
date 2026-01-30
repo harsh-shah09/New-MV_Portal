@@ -11,13 +11,7 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const employee = await getEmployeeById(session.employeeId);
-    if (!employee || (employee.Role__c !== 'Admin' && employee.Role__c !== 'HR')) {
-       return NextResponse.json({ error: 'Access Denied: Admin or HR role required.' }, { status: 403 });
-    }
-
     const configs = await getAllConfigurations();
-    console.log('Fetched admin configurations:', configs.leave);
     return NextResponse.json(configs);
 
   } catch (error) {

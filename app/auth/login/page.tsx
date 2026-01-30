@@ -48,7 +48,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen w-full flex overflow-hidden bg-slate-50">
+    <div className="min-h-screen w-full flex overflow-hidden bg-slate-50 flex-row-reverse">
       {/* Left Side - Visual Showcase */}
       <div className="hidden lg:flex lg:w-1/2 relative bg-slate-900 overflow-hidden items-center justify-center">
         <div className="absolute inset-0 z-0">

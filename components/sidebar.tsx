@@ -52,16 +52,17 @@ export function Sidebar({
 
   const navItems = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { href: "/employees", label: "Employees", icon: Users },
     { href: "/leaves", label: "Leave", icon: CalendarDays },
     { href: "/holidays", label: "Holidays", icon: CalendarRange },
-    { href: "/handbook", label: "Handbook", icon: BookOpen },
     // { href: "/training", label: "Training", icon: BookOpen },
     { href: "/assets", label: "Assets", icon: Tag },
     // { href: "/documents", label: "Documents", icon: FileText },
   ];
 
-  // Add Payroll based on role
+  if(user?.role?.includes('HR') || user?.role?.includes('Admin')) {
+    navItems.push({ href: "/employees", label: "Employees", icon: Users });
+  }
+  // Add Payroll and My Payslips based on role
   if (user?.role?.includes('HR') || user?.role?.includes('Admin')) {
     navItems.push({ href: "/payroll", label: "Payroll", icon: Banknote });
     navItems.push({ href: "/my-payrolls", label: "My Payslips", icon: Banknote });
@@ -74,7 +75,7 @@ export function Sidebar({
      navItems.push({ href: "/nda", label: "Document Manager", icon: FileCheck });
   }
   // Add Admin Console for HR/Admin
-  if (user?.role?.includes('HR') || user?.role?.includes('Admin')) {
+  if (user?.role?.includes('Admin')) {
       navItems.push({ href: "/admin", label: "Admin Console", icon: Settings });
   }
   const { data: notifications } = useQuery({
@@ -206,7 +207,7 @@ export function Sidebar({
         {/* Profile Card */}
         <div 
           onClick={handleProfileClick}
-          className="flex items-center gap-3 p-3 rounded-xl bg-white border border-slate-100 shadow-sm hover:shadow-md transition-all group cursor-pointer"
+          className="flex items-center gap-3 p-3 rounded-xl bg-white border border-slate-100 shadow-sm hover:shadow-md transition-all group cursor-pointer relative"
         >
           <div className="relative h-10 w-10 shrink-0">
              <div className="relative h-full w-full rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500 overflow-hidden">
@@ -219,20 +220,34 @@ export function Sidebar({
             <div className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-green-500 border-2 border-white"></div>
           </div>
           <div className="flex-1 min-w-0">
-            <p key={user?.id} className="text-sm font-semibold text-slate-800 truncate group-hover:text-cyan-600 transition-colors">
-                {user ? `${user.name}` : 'Loading...'}
-            </p>
+            <div className="flex items-center gap-2">
+                 <p key={user?.id} className="text-sm font-semibold text-slate-800 truncate group-hover:text-cyan-600 transition-colors">
+                    {user ? `${user.name}` : 'Loading...'}
+                </p>
+                {/* Role Badge */}
+                <span className={cn(
+                    "px-1.5 py-0.5 rounded-md text-[10px] font-bold border uppercase tracking-wide",
+                    (user?.role?.includes('HR') || user?.role?.includes('Admin')) 
+                        ? "bg-purple-100 text-purple-700 border-purple-200" 
+                        : "bg-blue-50 text-blue-600 border-blue-100"
+                )}>
+                    {user?.role || 'Employee'}
+                </span>
+            </div>
             <p className="text-xs text-slate-500 truncate">{user?.email || '...'}</p>
           </div>
-          <button 
-            onClick={(e) => {
-                e.stopPropagation();
-                handleLogout();
-            }}
-            className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-red-500 transition-colors"
-          >
-            <LogOut className="w-4 h-4" />
-          </button>
+          <div className="flex flex-col gap-1">
+               <button 
+                onClick={(e) => {
+                    e.stopPropagation();
+                    handleLogout();
+                }}
+                className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-red-500 transition-colors"
+                title="Logout"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+          </div>
         </div>
       </div>
     </div>

@@ -37,14 +37,14 @@ export function EmployeeQuickActions({ employeeId }: EmployeeQuickActionsProps) 
         >
           Request Leave
         </Button>
-        <Button 
+        {/* <Button 
           block 
           size="large"
           icon={<FileTextOutlined />}
           onClick={() => router.push('/documents')}
         >
           View Documents
-        </Button>
+        </Button> */}
         <Button 
           block 
           size="large"

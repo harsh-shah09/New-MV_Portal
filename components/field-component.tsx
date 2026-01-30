@@ -1,18 +1,111 @@
 
 // Helper hook/component to avoid re-creation
-export const Field = ({ label, value, fieldKey, type = "text", isEditing, formData, setFormData , pattern }: any) => (
-    <div className="space-y-1">
-      <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">{label}</label>
-      {isEditing ? (
-         <input 
-            type={type}
-            value={formData[fieldKey] !== undefined ? formData[fieldKey] : (value || "")}
-            onChange={(e) => setFormData({...formData, [fieldKey]: e.target.value})}
-            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none transition"
-            pattern={pattern}
-         />
+import { Eye, EyeOff } from "lucide-react"
+import { useState } from "react"
+import { cn } from "@/lib/utils"
+
+export interface FieldProps {
+  label: string
+  value: any
+  fieldKey: string
+  type?: string
+  isEditing: boolean
+  formData: any
+  setFormData: (data: any) => void
+  pattern?: string
+  placeholder?: string
+  options?: { label: string; value: string }[]
+  error?: string
+  className?: string
+  locked?: boolean
+}
+
+export const Field = ({ 
+  label, 
+  value, 
+  fieldKey, 
+  type = "text", 
+  isEditing, 
+  formData, 
+  setFormData, 
+  pattern,
+  placeholder,
+  options,
+  error,
+  className,
+  locked
+}: FieldProps) => {
+  const [showPassword, setShowPassword] = useState(false)
+  const isPasswordType = type === "password" || type === "confidential"
+  const inputType = isPasswordType ? (showPassword ? "text" : "password") : type
+
+  const currentValue = formData[fieldKey] !== undefined ? formData[fieldKey] : (value || "")
+
+  const handleChange = (val: any) => {
+      setFormData({ ...formData, [fieldKey]: val })
+  }
+
+  return (
+    <div className={cn("space-y-1.5", className)}>
+      <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 flex justify-between">
+        {label}
+        {error && isEditing && <span className="text-red-500 text-[10px] normal-case tracking-normal font-medium animate-pulse">{error}</span>}
+      </label>
+      
+      {isEditing && !locked ? (
+        type === "select" ? (
+          <div className="relative">
+             <select
+                value={currentValue}
+                onChange={(e) => handleChange(e.target.value)}
+                className={cn(
+                  "w-full bg-slate-50 border rounded-lg px-3 py-2.5 text-sm text-slate-800 focus:ring-2 outline-none transition appearance-none",
+                  error ? "border-red-300 focus:ring-red-200" : "border-slate-200 focus:ring-blue-500/20 focus:border-blue-400"
+                )}
+             >
+                <option value="">Select {label}</option>
+                {options?.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+             </select>
+             <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none">
+                <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+             </div>
+          </div>
+        ) : (
+          <div className="relative">
+             <input 
+                type={inputType}
+                value={currentValue}
+                onChange={(e) => handleChange(e.target.value)}
+                className={cn(
+                  "w-full bg-slate-50 border rounded-lg px-3 py-2.5 text-sm text-slate-800 focus:ring-2 outline-none transition placeholder:text-slate-400",
+                  error ? "border-red-300 focus:ring-red-200" : "border-slate-200 focus:ring-blue-500/20 focus:border-blue-400",
+                  isPasswordType && "pr-10"
+                )}
+                pattern={pattern}
+                placeholder={placeholder}
+              />
+              {isPasswordType && (
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              )}
+          </div>
+        )
       ) : (
-         <p className="font-medium text-slate-800 text-sm break-words">{value || <span className="text-slate-400 italic">Not set</span>}</p>
+         <p className="font-medium text-slate-800 text-sm break-words py-1">
+             {/* Mask confidential data if not editing */
+               (isPasswordType && value) 
+                 ? "•".repeat(8) 
+                 : (value || <span className="text-slate-400 italic">Not set</span>)
+             }
+         </p>
       )}
     </div>
   )
+}

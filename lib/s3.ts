@@ -11,12 +11,16 @@ const s3Client = new S3Client({
 export const uploadFileToS3 = async (
   fileBuffer: Buffer,
   fileName: string,
-  contentType: string
+  contentType: string,
+  folderPath: string = "uploads"
 ): Promise<string> => {
   const bucketName = process.env.S3_BUCKET_NAME;
   if (!bucketName) throw new Error("S3_BUCKET_NAME is not defined");
 
-  const key = `uploads/${Date.now()}-${fileName}`;
+  // Cleanup folder path - remove trailing slash if present
+  const cleanFolder = folderPath.replace(/\/$/, "");
+  
+  const key = `${cleanFolder}/${Date.now()}-${fileName}`;
 
   const command = new PutObjectCommand({
     Bucket: bucketName,

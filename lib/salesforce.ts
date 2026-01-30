@@ -361,6 +361,12 @@ export const updateBankDetail = async (bankData: any) => {
     return await conn.sobject("Bank_Detail__c").update(bankData);
 };
 
+export const deleteBankDetail = async (bankId: string) => {
+    const conn = await getSalesforceConnection();
+    if (!conn) throw new Error("No Salesforce connection");
+    return await conn.sobject("Bank_Detail__c").destroy(bankId);
+};
+
 // --- Notifications ---
 
 export const createNotification = async (notifData: any) => {
@@ -403,6 +409,12 @@ export const updateDocument = async (docData: any) => {
     const conn = await getSalesforceConnection();
     if (!conn) throw new Error("No Salesforce connection");
     return await conn.sobject("Document__c").update(docData);
+}
+
+export const deleteDocument = async (docId: string) => {
+    const conn = await getSalesforceConnection();
+    if (!conn) throw new Error("No Salesforce connection");
+    return await conn.sobject("Document__c").destroy(docId);
 }
 
 export const getHandbookDocuments = async () => {

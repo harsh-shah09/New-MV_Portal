@@ -5,9 +5,8 @@ import { useState, useEffect, useRef } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { Select, Button, Spin, message, Card, Tabs, Empty, Input, Table, Tag, Modal, Upload, Form } from "antd"
 import { Download, FileText, User, Search, Printer, FileCheck, UploadCloud, RefreshCw } from "lucide-react"
-import { jsPDF } from "jspdf";
-import html2canvas from 'html2canvas-pro'
 import { UploadOutlined } from '@ant-design/icons'
+import { generateNDAPDF } from "./actions"
 
 export default function NDAPage() {
   const [selectedEmpId, setSelectedEmpId] = useState<string | null>(null)
@@ -145,56 +144,39 @@ export default function NDAPage() {
       generatePDF('nda-preview-content', `${tmplName}_${name}.pdf`);
   }
 
-  // Generate PDF for a DOM element. Clone node and inline computed colors to avoid lab()/color() formats
   const generatePDF = async (elementId: string, fileName: string) => {
       try {
-          const element = document.getElementById(elementId) as HTMLElement;
-          if (!element) throw new Error('Element not found');
-
-          const canvas = await html2canvas(element, { scale: Math.max(2, window.devicePixelRatio || 1), useCORS: true, allowTaint: true });
-          const imgData = canvas.toDataURL('image/png', 1.0);
-          
-          // Helper to pixels
-          const imgWidth = canvas.width;
-          const imgHeight = canvas.height;
-          
-          // A4 Size in pt (approx) at 72dpi: 595 x 842. JsPDF default unit is mm usually or pt. 
-          // We used 'pt' in constructor. 595.28 x 841.89
-          const pdf = new jsPDF({ unit: 'pt', format: 'a4', compress: true });
-          const pageWidth = pdf.internal.pageSize.getWidth();
-          const pageHeight = pdf.internal.pageSize.getHeight();
-          
-          const ratio = pageWidth / imgWidth;
-          const pdfImgHeight = imgHeight * ratio;
-          
-          let heightLeft = pdfImgHeight;
-          let position = 0;
-
-          // First Page
-          pdf.addImage(imgData, 'PNG', 0, position, pageWidth, pdfImgHeight);
-          heightLeft -= pageHeight;
-
-          // Subsequent Pages
-          while (heightLeft > 0) {
-              position = heightLeft - pdfImgHeight; // This calculation logic needs to be careful. 
-              // Actually standard way: position starts at 0. Next page position is -pageHeight? 
-              // Usually: position = -pageHeight * pageIndex
-              
-              pdf.addPage();
-              position = - (pdfImgHeight - heightLeft); // Shift up by the amount already printed? 
-              // No, simplified logic:
-              // We are printing the SAME image shifted up.
-              // Page 2 starts showing the image at y = -pageHeight
-              
-              // Let's use a simpler counter
-              pdf.addImage(imgData, 'PNG', 0, -(pdfImgHeight - heightLeft), pageWidth, pdfImgHeight);
-              heightLeft -= pageHeight;
+          if (!previewContent) {
+            message.error("No content to generate");
+            return;
           }
+          setLoadingTemplate(true);
           
-          pdf.save(fileName);
+          const base64Pdf = await generateNDAPDF(previewContent);
+          
+          const binaryString = window.atob(base64Pdf);
+          const len = binaryString.length;
+          const bytes = new Uint8Array(len);
+          for (let i = 0; i < len; i++) {
+              bytes[i] = binaryString.charCodeAt(i);
+          }
+          const blob = new Blob([bytes], { type: 'application/pdf' });
+          
+          const url = window.URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = fileName;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          window.URL.revokeObjectURL(url);
+
+          message.success("PDF generated successfully");
       } catch (err) {
           console.error('PDF Generation Error', err);
           message.error('Failed to generate PDF');
+      } finally {
+          setLoadingTemplate(false);
       }
   }
 
