@@ -89,7 +89,7 @@ export default function MyPayrollsPage() {
       title: "Basic Salary",
       dataIndex: "basicSalary",
       key: "basicSalary",
-      render: (amount: number) => `$${amount.toLocaleString()}`,
+      render: (amount: number) => `₹${amount.toLocaleString()}`,
     },
     {
       title: "Bonus",
@@ -97,7 +97,7 @@ export default function MyPayrollsPage() {
       key: "bonus",
       render: (amount: number) => (
         <span className={amount > 0 ? "text-green-600 font-semibold" : ""}>
-          {amount > 0 ? `+$${amount.toLocaleString()}` : "-"}
+          {amount > 0 ? `+₹${amount.toLocaleString()}` : "-"}
         </span>
       ),
     },
@@ -107,7 +107,7 @@ export default function MyPayrollsPage() {
       key: "totalDeductions",
       render: (amount: number) => (
         <span className={amount > 0 ? "text-red-600" : ""}>
-          {amount > 0 ? `-$${amount.toLocaleString()}` : "-"}
+          {amount > 0 ? `-₹${amount.toLocaleString()}` : "-"}
         </span>
       ),
     },
@@ -117,7 +117,7 @@ export default function MyPayrollsPage() {
       key: "netSalary",
       render: (amount: number) => (
         <span className="text-lg font-bold text-green-600">
-          ${amount.toLocaleString()}
+          ₹{amount.toLocaleString()}
         </span>
       ),
     },
