@@ -123,7 +123,7 @@ export async function getProducts() {
   if (!conn) throw new Error("Salesforce connection failed");
   
   const query = `
-    SELECT Id, Name, AMS_Category__c, AMS_Model_Number__c, AMS_Specifications__c, AMS_Description__c
+    SELECT Id, Name, AMS_Category__c, AMS_Model_Number__c, AMS_Specifications__c, AMS_Description__c , IsActive
     FROM Product2
     WHERE IsActive = true
   `;
@@ -144,6 +144,22 @@ export async function getProductById(id: string) {
   const result = await conn.query(query);
   if (result.records.length === 0) return null;
   return result.records[0] as unknown as SalesforceProduct;
+}
+export async function getProductCategories() {
+  const conn = await getSalesforceConnection();
+  if (!conn) throw new Error("Salesforce connection failed");
+  
+  try {
+      const describe = await conn.describe('Product2');
+      const categoryField = describe.fields.find(f => f.name === 'AMS_Category__c');
+      if (categoryField && categoryField.picklistValues) {
+          return categoryField.picklistValues.filter(v => v.active).map(v => ({ label: v.label, value: v.value }));
+      }
+      return [];
+  } catch (e) {
+      console.warn("Failed to fetch Product2 describe information", e);
+      return [];
+  }
 }
 
 export async function getAllEmployeesForSelect() {

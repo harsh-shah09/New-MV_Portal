@@ -1,8 +1,7 @@
 "use client"
-
-import { useState } from 'react';
-import { Modal, Form, Input, Checkbox, Button, message } from 'antd';
-import { createProduct } from '../actions';
+import { useState, useEffect } from 'react';
+import { Modal, Form, Input, Checkbox, Button, message, Select } from 'antd';
+import { createProduct, getProductCategories } from '../actions';
 
 interface CreateProductModalProps {
   visible: boolean;
@@ -13,6 +12,15 @@ interface CreateProductModalProps {
 export function CreateProductModal({ visible, onCancel, onSuccess }: CreateProductModalProps) {
     const [form] = Form.useForm();
     const [loading, setLoading] = useState(false);
+    const [categories, setCategories] = useState<{ label: string, value: string }[]>([]);
+
+    useEffect(() => {
+        if (visible) {
+            getProductCategories()
+                .then(setCategories)
+                .catch(console.error);
+        }
+    }, [visible]);
 
     const handleFinish = async (values: any) => {
         setLoading(true);
@@ -45,7 +53,7 @@ export function CreateProductModal({ visible, onCancel, onSuccess }: CreateProdu
                         <Input />
                     </Form.Item>
                      <Form.Item name="AMS_Category__c" label="Category" rules={[{ required: true }]}>
-                        <Input placeholder="e.g. Laptop" />
+                        <Select placeholder="Select Category" options={categories} />
                     </Form.Item>
                 </div>
                  <Form.Item name="AMS_Specifications__c" label="Specifications">

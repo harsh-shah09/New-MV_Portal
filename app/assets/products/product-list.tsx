@@ -101,12 +101,15 @@ export function ProductList({ products: initialProducts }: { products: Salesforc
                     dataSource={filtered} 
                     columns={columns} 
                     pagination={{ 
-                        pageSize: 10,
-                        showSizeChanger: true,
-                        showTotal: (total) => `Total ${total} products`,
-                        className: "px-6 pb-4"
+                        position: ['bottomRight'],
+                        // showSizeChanger: true,
+                        // pageSizeOptions: ['10', '25', '50', '100'],
+                        defaultPageSize: 10,
+                        // showTotal: (total, range) => `${total} products`,
                     }}
-                    className="ant-table-premium"
+                    scroll={{ x: 800 }}
+                    size='large'
+                    className="overflow-hidden"
                 />
             </div>
 
