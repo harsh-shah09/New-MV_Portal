@@ -9,7 +9,8 @@ import { useLeaveStore } from "@/store/leaveStore"
 import type { LeaveRequest } from "@/types"
 import { useQuery } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { Modal } from "antd"
+import { Modal, Select, Input, Card, Row, Col } from "antd"
+import { SearchOutlined } from "@ant-design/icons"
 
 export default function LeavesPage() {
   const router = useRouter()
@@ -21,9 +22,10 @@ export default function LeavesPage() {
   const [rejectReason, setRejectReason] = useState("")
   const [allLeaves, setAllLeaves] = useState<LeaveRequest[]>([])
   const [filteredLeaves, setFilteredLeaves] = useState<LeaveRequest[]>([])
+  const [isRefreshingAllLeaves, setIsRefreshingAllLeaves] = useState(false)
   const [filters, setFilters] = useState({
-    status: "all",
-    leaveType: "all",
+    status: "",
+    leaveType: "",
     employeeName: "",
   })
   
@@ -54,20 +56,26 @@ export default function LeavesPage() {
   }, [data, setLeaves, setPendingApprovals])
 
   // Fetch all leaves for HR/Admin
-  useEffect(() => {
-    const fetchAllLeaves = async () => {
-      if (currentUser?.role === 'HR' || currentUser?.role === 'Admin') {
-        try {
-          const response = await fetch('/api/leave-management/all')
-          if (response.ok) {
-            const data = await response.json()
-            setAllLeaves(data.allLeaves || [])
-          }
-        } catch (error) {
-          console.error('Error fetching all leaves:', error)
+  const fetchAllLeaves = async () => {
+    if (currentUser?.role === 'HR' || currentUser?.role === 'Admin') {
+      setIsRefreshingAllLeaves(true)
+      try {
+        const response = await fetch('/api/leave-management/all')
+        if (response.ok) {
+          const data = await response.json()
+          setAllLeaves(data.allLeaves || [])
+          toast.success('All leaves refreshed successfully')
         }
+      } catch (error) {
+        console.error('Error fetching all leaves:', error)
+        toast.error('Failed to refresh all leaves')
+      } finally {
+        setIsRefreshingAllLeaves(false)
       }
     }
+  }
+
+  useEffect(() => {
     fetchAllLeaves()
   }, [currentUser])
 
@@ -75,11 +83,11 @@ export default function LeavesPage() {
   useEffect(() => {
     let filtered = [...allLeaves]
 
-    if (filters.status !== "all") {
+    if (filters.status && filters.status !== "") {
       filtered = filtered.filter(leave => leave.status === filters.status)
     }
 
-    if (filters.leaveType !== "all") {
+    if (filters.leaveType && filters.leaveType !== "") {
       filtered = filtered.filter(leave => {
         const displayType = leave.leaveCategory === 'Extra Day Pay' ? 'Extra Day Pay' : leave.leaveType
         return displayType === filters.leaveType
@@ -479,14 +487,38 @@ export default function LeavesPage() {
           <div className="p-6">
             {selectedTab === "my-requests" && (
               <div>
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">My Leave Requests</h2>
+                <div className="flex items-center gap-2 mb-4">
+                  <h2 className="text-lg font-semibold text-gray-900">My Leave Requests</h2>
+                  <button
+                    onClick={() => refetch()}
+                    disabled={isLoading}
+                    className="p-1.5 hover:bg-gray-100 rounded-full transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Refresh"
+                  >
+                    <svg className={`w-4 h-4 text-gray-600 ${isLoading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                  </button>
+                </div>
                 <LeaveTable leaves={leaves} onCancel={handleCancel} onWithdraw={handleWithdraw} />
               </div>
             )}
 
             {selectedTab === "approvals" && (
               <div>
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">Pending Approvals</h2>
+                <div className="flex items-center gap-2 mb-4">
+                  <h2 className="text-lg font-semibold text-gray-900">Pending Approvals</h2>
+                  <button
+                    onClick={() => refetch()}
+                    disabled={isLoading}
+                    className="p-1.5 hover:bg-gray-100 rounded-full transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Refresh"
+                  >
+                    <svg className={`w-4 h-4 text-gray-600 ${isLoading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                  </button>
+                </div>
                 {(currentUser?.role === 'HR' || currentUser?.role === 'Admin' || (currentUser?.role === 'Developer' && currentUser?.title === 'Team Lead')) ? (
                   pendingApprovals.length > 0 ? (
                     <div className="space-y-4">
@@ -617,66 +649,86 @@ export default function LeavesPage() {
 
             {selectedTab === "all-leaves" && (
               <div>
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">All Leave Records</h2>
+                <div className="flex items-center gap-2 mb-4">
+                  <h2 className="text-lg font-semibold text-gray-900">All Leave Records</h2>
+                  <button
+                    onClick={() => fetchAllLeaves()}
+                    disabled={isRefreshingAllLeaves}
+                    className="p-1.5 hover:bg-gray-100 rounded-full transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Refresh"
+                  >
+                    <svg className={`w-4 h-4 text-gray-600 ${isRefreshingAllLeaves ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                  </button>
+                </div>
                 
                 {/* Filters */}
-                <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-                      <select
-                        value={filters.status}
-                        onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                <Card className="rounded-xl shadow-sm border-border bg-card text-card-foreground mb-6" bodyStyle={{ padding: '16px' }}>
+                  <Row gutter={[16, 16]}>
+                    <Col xs={24} md={8}>
+                      <label className="block text-sm font-medium text-muted-foreground mb-1.5">
+                        Status
+                      </label>
+                      <Select
+                        value={filters.status || undefined}
+                        onChange={(value) => setFilters({ ...filters, status: value || "" })}
+                        placeholder="All Status"
+                        allowClear
+                        style={{ width: '100%' }}
+                        size="large"
+                        className="rounded-lg"
                       >
-                        <option value="all">All Status</option>
-                        <option value="applied">Applied</option>
-                        <option value="approved">Approved</option>
-                        <option value="rejected">Rejected</option>
-                        <option value="cancelled">Cancelled</option>
-                        <option value="withdrawn">Withdrawn</option>
-                      </select>
-                    </div>
+                        <Select.Option value="applied">Applied</Select.Option>
+                        <Select.Option value="approved">Approved</Select.Option>
+                        <Select.Option value="rejected">Rejected</Select.Option>
+                        <Select.Option value="cancelled">Cancelled</Select.Option>
+                        <Select.Option value="withdrawn">Withdrawn</Select.Option>
+                      </Select>
+                    </Col>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Leave Type</label>
-                      <select
-                        value={filters.leaveType}
-                        onChange={(e) => setFilters({ ...filters, leaveType: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                    <Col xs={24} md={8}>
+                      <label className="block text-sm font-medium text-muted-foreground mb-1.5">
+                        Leave Type
+                      </label>
+                      <Select
+                        value={filters.leaveType || undefined}
+                        onChange={(value) => setFilters({ ...filters, leaveType: value || "" })}
+                        placeholder="All Types"
+                        allowClear
+                        style={{ width: '100%' }}
+                        size="large"
+                        className="rounded-lg"
                       >
-                        <option value="all">All Types</option>
-                        <option value="Planned Leave">Planned Leave</option>
-                        <option value="Sick Leave">Sick Leave</option>
-                        <option value="Emergency Leave">Emergency Leave</option>
-                        <option value="Extra Day Pay">Extra Day Pay</option>
-                      </select>
-                    </div>
+                        <Select.Option value="Planned Leave">Planned Leave</Select.Option>
+                        <Select.Option value="Sick Leave">Sick Leave</Select.Option>
+                        <Select.Option value="Emergency Leave">Emergency Leave</Select.Option>
+                        <Select.Option value="Extra Day Pay">Extra Day Pay</Select.Option>
+                      </Select>
+                    </Col>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Employee Name</label>
-                      <input
-                        type="text"
+                    <Col xs={24} md={8}>
+                      <label className="block text-sm font-medium text-muted-foreground mb-1.5">
+                        Employee Name
+                      </label>
+                      <Input
+                        prefix={<SearchOutlined className="text-muted-foreground" />}
                         value={filters.employeeName}
                         onChange={(e) => setFilters({ ...filters, employeeName: e.target.value })}
                         placeholder="Search by name..."
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                        allowClear
+                        size="large"
+                        className="rounded-lg"
                       />
-                    </div>
-                  </div>
-
-                  <div className="mt-3 flex items-center justify-between">
+                    </Col>
+                  </Row>
+                  
+                  <div className="mt-3">
                     <span className="text-sm text-gray-600">
                       Showing {filteredLeaves.length} of {allLeaves.length} records
                     </span>
-                    <button
-                      onClick={() => setFilters({ status: "all", leaveType: "all", employeeName: "" })}
-                      className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-                    >
-                      Clear Filters
-                    </button>
                   </div>
-                </div>
+                </Card>
 
                 {/* Leave Table */}
                 {filteredLeaves.length > 0 ? (

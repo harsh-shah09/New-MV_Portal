@@ -375,6 +375,51 @@ export const createNotification = async (notifData: any) => {
     return await conn.sobject("MV_Notification__c").create(notifData);
 }
 
+/**
+ * Helper function to send in-app notifications to multiple recipients
+ * @param recipients - Array of employee IDs to notify
+ * @param message - Notification message
+ * @param type - Type of notification (Leave, Payroll, etc.)
+ * @param actionRequired - Whether action is required from recipient
+ */
+export const sendInAppNotifications = async (
+    recipients: string[],
+    message: string,
+    type: string = 'General',
+    actionRequired: boolean = false
+) => {
+    try {
+        const conn = await getSalesforceConnection();
+        if (!conn) {
+            console.error("No Salesforce connection for sending notifications");
+            return;
+        }
+
+        // Filter out null/undefined recipients
+        const validRecipients = recipients.filter(r => r);
+        
+        if (validRecipients.length === 0) {
+            console.warn("No valid recipients for notification");
+            return;
+        }
+
+        const notifications = validRecipients.map(employeeId => ({
+            Employee__c: employeeId,
+            Message__c: message,
+            Notification_Type__c: type,
+            Action_Required__c: actionRequired,
+            Is_Read__c: false,
+            Status__c: 'Unread'
+        }));
+
+        await conn.sobject("MV_Notification__c").create(notifications);
+        console.log(`✓ In-app notifications sent to ${validRecipients.length} recipient(s)`);
+    } catch (error) {
+        console.error('Error sending in-app notifications:', error);
+        // Don't throw error to prevent breaking the main flow
+    }
+}
+
 // --- Documents ---
 
 export const getDocumentsByEmployee = async (employeeId: string) => {

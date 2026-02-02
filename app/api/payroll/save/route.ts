@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { cookies } from "next/headers"
 import { verifyToken } from "@/lib/auth-utils"
-import { getSalesforceConnection } from "@/lib/salesforce"
+import { getSalesforceConnection, sendInAppNotifications } from "@/lib/salesforce"
 import { generatePayslipPDF } from "@/lib/pdf-generator"
 import { uploadPayslipToS3 } from "@/lib/s3"
 
@@ -201,6 +201,24 @@ export async function POST(request: NextRequest) {
     }
 
     console.log("PDF generation and upload completed")
+
+    // Send in-app notifications to all employees about payslip generation
+    try {
+      const employeeIds = employees.map((emp: any) => emp.employeeId).filter(Boolean);
+      
+      if (employeeIds.length > 0) {
+        await sendInAppNotifications(
+          employeeIds,
+          `Your payslip for ${month} ${year} has been generated and is now available for download.`,
+          'Payroll',
+          false
+        );
+        console.log(`✓ In-app notifications sent to ${employeeIds.length} employees about payslip generation`);
+      }
+    } catch (notifError) {
+      console.error('Error sending payslip notifications:', notifError);
+      // Don't fail the request if notification fails
+    }
 
     return NextResponse.json({
       payrollSummaryId: summaryId,

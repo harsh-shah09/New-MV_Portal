@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import dayjs from "dayjs";
 import { verifyToken } from "@/lib/auth-utils";
-import { getSalesforceConnection } from "@/lib/salesforce";
+import { getSalesforceConnection, sendInAppNotifications } from "@/lib/salesforce";
 import { sendEmailAsync, getHREmail } from "@/lib/email";
 import {
   newLeaveRequestToTeamLead,
@@ -643,6 +643,9 @@ export async function POST(request: NextRequest) {
 
         console.log("Employee applying leave - Name:", employeeName, "Role:", employeeRole, "Title:", employeeTitle);
 
+        // Prepare notification recipients
+        const notificationRecipients: string[] = [];
+
         // Case 1: If employee is HR, send notification to Admin
         if (employeeRole === 'HR') {
           // Find Admin employee
@@ -657,6 +660,9 @@ export async function POST(request: NextRequest) {
             const admin = adminQuery.records[0];
             const adminEmail = admin.Employee_Email__c;
             const adminName = admin.Employee_Name__c;
+
+            // Add admin to in-app notification recipients
+            notificationRecipients.push(admin.Id);
 
             if (adminEmail) {
               const emailTemplate = hrLeaveRequestToAdmin({
@@ -680,6 +686,19 @@ export async function POST(request: NextRequest) {
         }
         // Case 2: If employee is Team Lead, send notification directly to HR
         else if (employeeRole === 'Developer' && employeeTitle === 'Team Lead') {
+          // Find HR employee(s)
+          const hrQuery = await conn.query<any>(`
+            SELECT Id, Employee_Name__c, Employee_Email__c
+            FROM Employee__c
+            WHERE Role__c = 'HR' AND Active__c = true
+            LIMIT 1
+          `);
+
+          if (hrQuery.records && hrQuery.records.length > 0) {
+            const hr = hrQuery.records[0];
+            notificationRecipients.push(hr.Id);
+          }
+
           const emailTemplate = teamLeadLeaveRequestToHR({
             recipientName: 'HR Team',
             employeeName,
@@ -695,10 +714,29 @@ export async function POST(request: NextRequest) {
           });
           console.log("Email sent to HR for Team Lead leave:", getHREmail());
         }
-        // Case 3: Regular employee - send to their Team Lead
+        // Case 3: Regular employee - send to their Team Lead and HR
         else {
           const teamLeadEmail = emp.Team_Lead__r?.Employee_Email__c;
           const teamLeadName = emp.Team_Lead__r?.Employee_Name__c;
+          const teamLeadId = emp.Team_Lead__c;
+
+          // Add TL to notification recipients
+          if (teamLeadId) {
+            notificationRecipients.push(teamLeadId);
+          }
+
+          // Add HR to notification recipients
+          const hrQuery = await conn.query<any>(`
+            SELECT Id, Employee_Name__c, Employee_Email__c
+            FROM Employee__c
+            WHERE Role__c = 'HR' AND Active__c = true
+            LIMIT 1
+          `);
+
+          if (hrQuery.records && hrQuery.records.length > 0) {
+            const hr = hrQuery.records[0];
+            notificationRecipients.push(hr.Id);
+          }
 
           if (teamLeadEmail && !leaveRecord.TL_Approval__c) {
             const emailTemplate = newLeaveRequestToTeamLead({
@@ -716,6 +754,16 @@ export async function POST(request: NextRequest) {
             });
             console.log("Email sent to Team Lead:", teamLeadEmail);
           }
+        }
+
+        // Send in-app notifications
+        if (notificationRecipients.length > 0) {
+          await sendInAppNotifications(
+            notificationRecipients,
+            `${employeeName} has applied for ${leaveType || leaveCategory} leave from ${start.format('DD MMM YYYY')} to ${end.format('DD MMM YYYY')} (${duration} day${duration > 1 ? 's' : ''})`,
+            'Leave',
+            true
+          );
         }
       }
     } catch (emailError) {
@@ -777,7 +825,7 @@ export async function PATCH(request: NextRequest) {
     if (action === "cancel") {
       // Verify the leave belongs to the current user
       const leaveRecord = await conn.query<any>(`
-        SELECT Id, Employee__c, Status__c
+        SELECT Id, Employee__c, Status__c, Leave_Type__c, Leave_Category__c, Start_Date__c, End_Date__c, Total_Days__c
         FROM Leave__c
         WHERE Id = '${leaveId}'
         LIMIT 1
@@ -799,6 +847,66 @@ export async function PATCH(request: NextRequest) {
         Id: leaveId,
         Status__c: 'Cancelled',
       });
+
+      // Send in-app notifications to TL and HR
+      try {
+        const empData = await conn.query<any>(`
+          SELECT Id, Employee_Name__c, Role__c, Title__c, Team_Lead__c
+          FROM Employee__c
+          WHERE Id = '${leave.Employee__c}'
+          LIMIT 1
+        `);
+
+        if (empData.records && empData.records.length > 0) {
+          const emp = empData.records[0];
+          const employeeName = emp.Employee_Name__c || 'Employee';
+          const employeeRole = emp.Role__c;
+          const employeeTitle = emp.Title__c;
+          const notificationRecipients: string[] = [];
+
+          // Add Team Lead for regular employees
+          if (employeeRole !== 'HR' && employeeRole !== 'Admin' && !(employeeRole === 'Developer' && employeeTitle === 'Team Lead')) {
+            if (emp.Team_Lead__c) {
+              notificationRecipients.push(emp.Team_Lead__c);
+            }
+          }
+
+          // Add HR for all employees except Admin
+          if (employeeRole !== 'Admin') {
+            const hrQuery = await conn.query<any>(`
+              SELECT Id FROM Employee__c
+              WHERE Role__c = 'HR' AND Active__c = true
+              LIMIT 1
+            `);
+            if (hrQuery.records && hrQuery.records.length > 0) {
+              notificationRecipients.push(hrQuery.records[0].Id);
+            }
+          }
+
+          // Add Admin if employee is HR
+          if (employeeRole === 'HR') {
+            const adminQuery = await conn.query<any>(`
+              SELECT Id FROM Employee__c
+              WHERE Role__c = 'Admin'
+              LIMIT 1
+            `);
+            if (adminQuery.records && adminQuery.records.length > 0) {
+              notificationRecipients.push(adminQuery.records[0].Id);
+            }
+          }
+
+          if (notificationRecipients.length > 0) {
+            await sendInAppNotifications(
+              notificationRecipients,
+              `${employeeName} has cancelled their leave request from ${dayjs(leave.Start_Date__c).format('DD MMM YYYY')} to ${dayjs(leave.End_Date__c).format('DD MMM YYYY')}.`,
+              'Leave',
+              false
+            );
+          }
+        }
+      } catch (notifError) {
+        console.error('Error sending cancellation notifications:', notifError);
+      }
 
       return NextResponse.json({ success: true, message: "Leave cancelled successfully" });
     }
@@ -851,6 +959,8 @@ export async function PATCH(request: NextRequest) {
             const employeeRole = emp.Role__c;
             const employeeTitle = emp.Title__c;
 
+            const notificationRecipients: string[] = [];
+
             // Send email to employee
             if (emp.Employee_Email__c) {
               const emailTemplate = leaveWithdrawn({
@@ -872,6 +982,10 @@ export async function PATCH(request: NextRequest) {
               const teamLeadEmail = emp.Team_Lead__r?.Employee_Email__c;
               const teamLeadName = emp.Team_Lead__r?.Employee_Name__c;
 
+              if (emp.Team_Lead__c) {
+                notificationRecipients.push(emp.Team_Lead__c);
+              }
+
               if (teamLeadEmail) {
                 const tlEmailTemplate = leaveWithdrawn({
                   recipientName: teamLeadName || 'Team Lead',
@@ -891,6 +1005,15 @@ export async function PATCH(request: NextRequest) {
 
             // Send notification to HR (for all employees except Admin)
             if (employeeRole !== 'Admin') {
+              const hrQuery = await conn.query<any>(`
+                SELECT Id FROM Employee__c
+                WHERE Role__c = 'HR' AND Active__c = true
+                LIMIT 1
+              `);
+              if (hrQuery.records && hrQuery.records.length > 0) {
+                notificationRecipients.push(hrQuery.records[0].Id);
+              }
+
               const hrEmailTemplate = leaveWithdrawn({
                 recipientName: 'HR Team',
                 employeeName,
@@ -920,6 +1043,8 @@ export async function PATCH(request: NextRequest) {
                 const adminEmail = admin.Employee_Email__c;
                 const adminName = admin.Employee_Name__c;
 
+                notificationRecipients.push(admin.Id);
+
                 if (adminEmail) {
                   const adminEmailTemplate = leaveWithdrawn({
                     recipientName: adminName || 'Admin',
@@ -936,6 +1061,16 @@ export async function PATCH(request: NextRequest) {
                   });
                 }
               }
+            }
+
+            // Send in-app notifications
+            if (notificationRecipients.length > 0) {
+              await sendInAppNotifications(
+                notificationRecipients,
+                `${employeeName} has withdrawn their approved leave from ${dayjs(leave.Start_Date__c).format('DD MMM YYYY')} to ${dayjs(leave.End_Date__c).format('DD MMM YYYY')}.`,
+                'Leave',
+                false
+              );
             }
           }
         } catch (emailError) {
@@ -1041,6 +1176,14 @@ export async function PATCH(request: NextRequest) {
               });
             }
 
+            // Send in-app notification to employee
+            await sendInAppNotifications(
+              [oldLeave.Employee__c],
+              `Your leave request from ${dayjs(oldLeave.Start_Date__c).format('DD MMM YYYY')} to ${dayjs(oldLeave.End_Date__c).format('DD MMM YYYY')} has been approved by your Team Lead. Awaiting HR approval.`,
+              'Leave',
+              false
+            );
+
             // Send email to HR about TL approval
             const emailTemplateHR = tlApprovalToHR({
               recipientName: 'HR Team',
@@ -1056,6 +1199,21 @@ export async function PATCH(request: NextRequest) {
               subject: emailTemplateHR.subject,
               body: emailTemplateHR.html
             });
+
+            // Send in-app notification to HR
+            const hrQuery = await conn.query<any>(`
+              SELECT Id FROM Employee__c
+              WHERE Role__c = 'HR' AND Active__c = true
+              LIMIT 1
+            `);
+            if (hrQuery.records && hrQuery.records.length > 0) {
+              await sendInAppNotifications(
+                [hrQuery.records[0].Id],
+                `${employeeName}'s leave request from ${dayjs(oldLeave.Start_Date__c).format('DD MMM YYYY')} to ${dayjs(oldLeave.End_Date__c).format('DD MMM YYYY')} has been approved by Team Lead (${teamLeadName}). Awaiting your approval.`,
+                'Leave',
+                true
+              );
+            }
           } else if ((isHR || isAdmin) && !oldLeave.HR_Approval__c) {
             // HR or Admin just approved - send email to employee
             if (employeeEmail) {
@@ -1073,6 +1231,30 @@ export async function PATCH(request: NextRequest) {
                 subject: emailTemplate.subject,
                 body: emailTemplate.html
               });
+            }
+
+            // Send in-app notification to employee
+            const approverTitle = isAdmin ? 'Admin' : 'HR';
+            await sendInAppNotifications(
+              [oldLeave.Employee__c],
+              `Your leave request from ${dayjs(oldLeave.Start_Date__c).format('DD MMM YYYY')} to ${dayjs(oldLeave.End_Date__c).format('DD MMM YYYY')} has been approved by ${approverTitle}. Enjoy your leave!`,
+              'Leave',
+              false
+            );
+
+            // Send in-app notification to Team Lead (for regular employees)
+            const tlQuery = await conn.query<any>(`
+              SELECT Team_Lead__c FROM Employee__c
+              WHERE Id = '${oldLeave.Employee__c}' AND Team_Lead__c != null
+              LIMIT 1
+            `);
+            if (tlQuery.records && tlQuery.records.length > 0 && tlQuery.records[0].Team_Lead__c) {
+              await sendInAppNotifications(
+                [tlQuery.records[0].Team_Lead__c],
+                `${employeeName}'s leave request from ${dayjs(oldLeave.Start_Date__c).format('DD MMM YYYY')} to ${dayjs(oldLeave.End_Date__c).format('DD MMM YYYY')} has been approved by ${approverTitle}.`,
+                'Leave',
+                false
+              );
             }
 
             // Update Leave Balance when HR/Admin approves (Status becomes Approved)
@@ -1167,6 +1349,30 @@ export async function PATCH(request: NextRequest) {
                 body: emailTemplate.html
               });
             }
+
+            // Send in-app notification to employee
+            const reasonText = reason ? ` Reason: ${reason}` : '';
+            await sendInAppNotifications(
+              [oldLeave.Employee__c],
+              `Your leave request from ${dayjs(oldLeave.Start_Date__c).format('DD MMM YYYY')} to ${dayjs(oldLeave.End_Date__c).format('DD MMM YYYY')} has been rejected by your Team Lead.${reasonText}`,
+              'Leave',
+              false
+            );
+
+            // Send in-app notification to HR
+            const hrQuery = await conn.query<any>(`
+              SELECT Id FROM Employee__c
+              WHERE Role__c = 'HR' AND Active__c = true
+              LIMIT 1
+            `);
+            if (hrQuery.records && hrQuery.records.length > 0) {
+              await sendInAppNotifications(
+                [hrQuery.records[0].Id],
+                `${employeeName}'s leave request from ${dayjs(oldLeave.Start_Date__c).format('DD MMM YYYY')} to ${dayjs(oldLeave.End_Date__c).format('DD MMM YYYY')} has been rejected by Team Lead.${reasonText}`,
+                'Leave',
+                false
+              );
+            }
           } else if ((isHR || isAdmin) && !oldLeave.HR_Approval__c) {
             // HR or Admin just rejected
             if (employeeEmail) {
@@ -1185,6 +1391,31 @@ export async function PATCH(request: NextRequest) {
                 subject: emailTemplate.subject,
                 body: emailTemplate.html
               });
+            }
+
+            // Send in-app notification to employee
+            const approverTitle = isAdmin ? 'Admin' : 'HR';
+            const reasonText = reason ? ` Reason: ${reason}` : '';
+            await sendInAppNotifications(
+              [oldLeave.Employee__c],
+              `Your leave request from ${dayjs(oldLeave.Start_Date__c).format('DD MMM YYYY')} to ${dayjs(oldLeave.End_Date__c).format('DD MMM YYYY')} has been rejected by ${approverTitle}.${reasonText}`,
+              'Leave',
+              false
+            );
+
+            // Send in-app notification to Team Lead (for regular employees)
+            const tlQuery = await conn.query<any>(`
+              SELECT Team_Lead__c FROM Employee__c
+              WHERE Id = '${oldLeave.Employee__c}' AND Team_Lead__c != null
+              LIMIT 1
+            `);
+            if (tlQuery.records && tlQuery.records.length > 0 && tlQuery.records[0].Team_Lead__c) {
+              await sendInAppNotifications(
+                [tlQuery.records[0].Team_Lead__c],
+                `${employeeName}'s leave request from ${dayjs(oldLeave.Start_Date__c).format('DD MMM YYYY')} to ${dayjs(oldLeave.End_Date__c).format('DD MMM YYYY')} has been rejected by ${approverTitle}.${reasonText}`,
+                'Leave',
+                false
+              );
             }
           }
         }
