@@ -152,13 +152,24 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
         return day === 0 || day === 6 // Sunday or Saturday
       }
       
-      // Count working days backward from leave start date
-      const countWorkingDaysBackward = (fromDate: dayjs.Dayjs, targetWorkingDays: number) => {
+      // Helper to check if a day is a holiday
+      const isHoliday = (date: dayjs.Dayjs) => {
+        const dateStr = date.format('YYYY-MM-DD')
+        return holidayMap.has(dateStr)
+      }
+      
+      // Helper to check if a day is a non-working day
+      const isNonWorkingDay = (date: dayjs.Dayjs) => {
+        return isWeekend(date) || isHoliday(date)
+      }
+      
+      // Count working days between two dates
+      const countWorkingDaysBetween = (fromDate: dayjs.Dayjs, toDate: dayjs.Dayjs) => {
         let workingDaysCount = 0
-        let checkDate = today.clone()
+        let checkDate = fromDate.clone()
         
-        while (checkDate.isBefore(fromDate) && workingDaysCount < targetWorkingDays) {
-          if (!isWeekend(checkDate)) {
+        while (checkDate.isBefore(toDate)) {
+          if (!isNonWorkingDay(checkDate)) {
             workingDaysCount++
           }
           checkDate = checkDate.add(1, 'day')
@@ -167,15 +178,18 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
         return workingDaysCount
       }
       
-      // Calculate penalty for each day of leave
+      // Calculate penalty ONLY for WORKING days in leave range
       let currentDate = startDate.clone()
       while (currentDate.isBefore(endDate) || currentDate.isSame(endDate, 'day')) {
-        // Count only working days between today and this leave day
-        const workingDaysInAdvance = countWorkingDaysBackward(currentDate, 5)
-        
-        if (workingDaysInAdvance < 5) {
-          penaltyDays += 2 // Add 2 penalty days for this leave day
-          daysWithPenalty++
+        // Only check penalty for working days
+        if (!isNonWorkingDay(currentDate)) {
+          // Count only working days between today and this leave day
+          const workingDaysInAdvance = countWorkingDaysBetween(today, currentDate)
+          
+          if (workingDaysInAdvance < 5) {
+            penaltyDays += 2 // Add 2 penalty days for this working day
+            daysWithPenalty++
+          }
         }
         
         currentDate = currentDate.add(1, 'day')

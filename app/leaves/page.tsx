@@ -130,29 +130,38 @@ export default function LeavesPage() {
                 <p className="text-gray-700 mb-4">Additional rules have been applied to your leave request. Please review:</p>
                 <div className="bg-blue-50 p-4 rounded-lg space-y-2">
                   <div className="flex justify-between">
-                    <span className="font-medium">Requested leave days:</span>
-                    <span className="font-semibold text-blue-600">{payload.duration ?? "-"}</span>
+                    <span className="font-medium">Original working days requested:</span>
+                    <span className="font-semibold text-blue-600">{details.workingDaysInRange ?? payload.duration ?? "-"}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="font-medium">Leave span (calendar):</span>
-                    <span className="font-semibold">{details.rangeLeaveDays ?? "-"}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="font-medium">Sandwich extra days:</span>
-                    <span className="font-semibold text-orange-600">{details.sandwichExtra ?? 0}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="font-medium">One+Two penalty days:</span>
-                    <span className="font-semibold text-red-600">{details.onePlusTwoExtra ?? 0}</span>
-                  </div>
+                  {details.sandwichApplied && (
+                    <>
+                      <div className="flex justify-between text-orange-700">
+                        <span className="font-medium">+ Non-working days in range:</span>
+                        <span className="font-semibold">{details.nonWorkingDaysInRange ?? 0}</span>
+                      </div>
+                      {(details.sandwichExtra ?? 0) > 0 && (
+                        <div className="flex justify-between text-orange-700">
+                          <span className="font-medium">+ Sandwich days (before/after):</span>
+                          <span className="font-semibold">{details.sandwichExtra}</span>
+                        </div>
+                      )}
+                    </>
+                  )}
+                  {(details.onePlusTwoExtra ?? 0) > 0 && (
+                    <div className="flex justify-between text-red-700">
+                      <span className="font-medium">+ One+Two penalty days:</span>
+                      <span className="font-semibold">{details.onePlusTwoExtra}</span>
+                    </div>
+                  )}
                   <div className="border-t border-blue-200 pt-2 mt-2 flex justify-between">
-                    <span className="font-bold">Total after rules:</span>
-                    <span className="font-bold text-lg text-blue-700">{details.finalTotalAfterRules ?? "-"}</span>
+                    <span className="font-bold">Total deduction:</span>
+                    <span className="font-bold text-lg text-blue-700">{details.finalTotalAfterRules ?? "-"} days</span>
                   </div>
                 </div>
-                <div className="text-sm text-gray-600 mt-3">
-                  <div>• Sandwich rule: {details.sandwichApplied ? "✅ Applied" : "❌ Not applied"}</div>
-                  <div>• One+Two penalty: {details.onePlusTwoRuleApplied ? "✅ Applied" : "❌ Not applied"}</div>
+                <div className="text-sm bg-gray-50 p-3 rounded border border-gray-200">
+                  <div className="font-medium mb-1">Rules Applied:</div>
+                  <div>• Sandwich rule: {details.sandwichApplied ? "✅ Applied - holidays/weekends between leave days counted" : "❌ Not applied"}</div>
+                  <div>• One+Two penalty: {details.onePlusTwoRuleApplied ? "✅ Applied - less than 5 working days notice" : "❌ Not applied"}</div>
                 </div>
               </div>
             ),

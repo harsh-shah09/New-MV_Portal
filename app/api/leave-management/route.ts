@@ -463,21 +463,48 @@ export async function POST(request: NextRequest) {
     }
 
     // Sandwich rule calculation (only for Loss of Pay and NOT for half-day leaves)
-    let hasNonWorkingInside = false;
+    // Count working days in the leave range first
+    let workingDaysInRange = 0;
+    let nonWorkingDaysInRange = 0;
     let cursor = start.clone();
+    
+    while (cursor.isSame(end) || cursor.isBefore(end)) {
+      if (isNonWorking(cursor)) {
+        nonWorkingDaysInRange++;
+      } else {
+        workingDaysInRange++;
+      }
+      cursor = cursor.add(1, "day");
+    }
 
-    if (applySandwichRule) {
+    // Check if there are non-working days sandwiched between working days
+    let hasNonWorkingInside = false;
+    if (applySandwichRule && nonWorkingDaysInRange > 0) {
+      // Check if there's at least one working day before and after non-working days
+      let foundWorkingBefore = false;
+      let foundNonWorking = false;
+      let foundWorkingAfter = false;
+      
+      cursor = start.clone();
       while (cursor.isSame(end) || cursor.isBefore(end)) {
-        if (isNonWorking(cursor)) {
-          hasNonWorkingInside = true;
-          break;
+        if (!isNonWorking(cursor)) {
+          if (!foundNonWorking) {
+            foundWorkingBefore = true;
+          } else {
+            foundWorkingAfter = true;
+            break;
+          }
+        } else if (foundWorkingBefore) {
+          foundNonWorking = true;
         }
         cursor = cursor.add(1, "day");
       }
+      
+      hasNonWorkingInside = foundWorkingBefore && foundNonWorking && foundWorkingAfter;
     }
 
     let preSandwich = 0;
-    if (applySandwichRule) {
+    if (applySandwichRule && workingDaysInRange > 0) {
       cursor = start.subtract(1, "day");
       while (isNonWorking(cursor)) {
         preSandwich += 1;
@@ -486,7 +513,7 @@ export async function POST(request: NextRequest) {
     }
 
     let postSandwich = 0;
-    if (applySandwichRule) {
+    if (applySandwichRule && workingDaysInRange > 0) {
       cursor = end.add(1, "day");
       while (isNonWorking(cursor)) {
         postSandwich += 1;
@@ -494,8 +521,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Sandwich applies if: non-working days are sandwiched inside OR there are non-working days both before and after
     const sandwichApplied = applySandwichRule && (hasNonWorkingInside || (preSandwich > 0 && postSandwich > 0));
-    const rangeLeaveDays = sandwichApplied ? baseCalendarDays : computedDuration;
+    // Base leave days should be only working days when no sandwich, or all calendar days when sandwich applies
+    const rangeLeaveDays = sandwichApplied ? baseCalendarDays : workingDaysInRange;
     const sandwichExtra = sandwichApplied ? preSandwich + postSandwich : 0;
     const totalSandwichDeduction = rangeLeaveDays + sandwichExtra;
 
@@ -521,13 +550,26 @@ export async function POST(request: NextRequest) {
       // For full-day: penalty is penaltyDaysPerDay days per day
       const penaltyMultiplier = leaveConfig.penaltyDaysPerDay;
 
+      // Only count penalty for WORKING days in the leave range
       let cursorPenalty = start.startOf("day");
       const endPenalty = end.startOf("day");
+      console.log(`[One+Two Rule] Today: ${today.format('YYYY-MM-DD')}, Start: ${start.format('YYYY-MM-DD')}, End: ${end.format('YYYY-MM-DD')}`);
+      console.log(`[One+Two Rule] Min notice period: ${leaveConfig.minWorkingDayNoticePeriod} working days, Penalty per day: ${penaltyMultiplier}`);
+      
       while (cursorPenalty.isSame(endPenalty) || cursorPenalty.isBefore(endPenalty)) {
-        // Count only working days between today and this leave day
-        const workingDaysInAdvance = countWorkingDaysBetween(today, cursorPenalty);
-        if (workingDaysInAdvance < leaveConfig.minWorkingDayNoticePeriod) {
-          onePlusTwoExtra += penaltyMultiplier;
+        // Only apply penalty if this is a working day
+        if (!isNonWorking(cursorPenalty)) {
+          // Count only working days between today and this leave day
+          const workingDaysInAdvance = countWorkingDaysBetween(today, cursorPenalty);
+          console.log(`[One+Two Rule] Checking ${cursorPenalty.format('YYYY-MM-DD')}: ${workingDaysInAdvance} working days in advance`);
+          if (workingDaysInAdvance < leaveConfig.minWorkingDayNoticePeriod) {
+            onePlusTwoExtra += penaltyMultiplier;
+            console.log(`[One+Two Rule] ✅ Penalty applied! Total penalty now: ${onePlusTwoExtra}`);
+          } else {
+            console.log(`[One+Two Rule] ❌ No penalty - sufficient notice`);
+          }
+        } else {
+          console.log(`[One+Two Rule] Skipping ${cursorPenalty.format('YYYY-MM-DD')} - non-working day`);
         }
         cursorPenalty = cursorPenalty.add(1, "day");
       }
@@ -550,6 +592,8 @@ export async function POST(request: NextRequest) {
     });
     console.log("[Leave Rules] Holidays", holidayDates);
     console.log("[Leave Rules] Evaluation", {
+      workingDaysInRange,
+      nonWorkingDaysInRange,
       hasNonWorkingInside,
       preSandwich,
       postSandwich,
@@ -572,6 +616,8 @@ export async function POST(request: NextRequest) {
             sandwichApplied,
             onePlusTwoRuleApplied,
             baseCalendarDays,
+            workingDaysInRange,
+            nonWorkingDaysInRange,
             rangeLeaveDays,
             sandwichExtra,
             totalSandwichDeduction,
