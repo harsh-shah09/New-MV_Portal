@@ -160,7 +160,7 @@ export async function POST(request: NextRequest) {
         
         // Create Document__c record for the payslip
         try {
-          const documentName = `Payslip_${emp.employeeId.slice(0, 8)}_${month}_${year}`
+          const documentName = `Payslip_${emp.employeeId}_${month}_${year}`
           const documentRecord = {
             Name: documentName,
             Document_Category__c: 'Payslip',

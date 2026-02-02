@@ -92,6 +92,34 @@ export default function PayrollPage() {
     setView("summary")
   }
 
+  const handleDeleteSummary = async (summaryId: string) => {
+    try {
+      const res = await fetch(`/api/payroll/summaries/${summaryId}`, {
+        method: "DELETE",
+      })
+
+      if (!res.ok) {
+        const error = await res.json()
+        throw new Error(error.error || "Failed to delete payroll summary")
+      }
+
+      const result = await res.json()
+      message.success(`Payroll summary for ${result.summary.month} ${result.summary.year} deleted successfully`)
+      
+      // Refetch summaries to update the list
+      await refetchSummaries()
+      
+      // If we're viewing employees from this summary, go back to summary view
+      if (selectedSummary?.id === summaryId) {
+        handleBackToSummary()
+      }
+    } catch (error: any) {
+      console.error("Error deleting payroll summary:", error)
+      message.error(error.message || "Failed to delete payroll summary")
+      throw error // Re-throw to let the component know deletion failed
+    }
+  }
+
   // Show appropriate message if not HR/Admin
   if (!isHROrAdmin) {
     return (
@@ -129,7 +157,11 @@ export default function PayrollPage() {
           {view === "summary" && (
             <div>
               <h2 className="text-2xl font-bold text-gray-900 mb-6">Payroll Summaries</h2>
-              <PayrollSummaryList summaries={payrollSummaries} onSelectSummary={handleSelectSummary} />
+              <PayrollSummaryList 
+                summaries={payrollSummaries} 
+                onSelectSummary={handleSelectSummary}
+                onDeleteSummary={handleDeleteSummary}
+              />
             </div>
           )}
 

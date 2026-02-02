@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 
 const s3Client = new S3Client({
   region: process.env.AWS_REGION || "us-east-1",
@@ -60,4 +60,23 @@ export const uploadPayslipToS3 = async (
 
   // Return the S3 URL
   return `https://${bucketName}.s3.${process.env.AWS_REGION || "us-east-1"}.amazonaws.com/${key}`;
+};
+
+export const deletePayslipFromS3 = async (
+  employeeId: string,
+  month: string,
+  year: number
+): Promise<void> => {
+  const bucketName = process.env.S3_BUCKET_NAME;
+  if (!bucketName) throw new Error("S3_BUCKET_NAME is not defined");
+
+  const fileName = `Payslip_${employeeId}_${month}_${year}.pdf`;
+  const key = `Payrolls/${fileName}`;
+
+  const command = new DeleteObjectCommand({
+    Bucket: bucketName,
+    Key: key,
+  });
+
+  await s3Client.send(command);
 };

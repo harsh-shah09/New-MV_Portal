@@ -626,9 +626,15 @@ export async function POST(request: NextRequest) {
       // Calculate Anniversary Bonus
       let anniversaryBonus = 0
       if (payrollConfig.anniversaryBonusEnabled && emp.Joining_Date__c) {
+        console.log(`   🎂 Checking Anniversary Bonus Eligibility:`)
         const joiningDate = new Date(emp.Joining_Date__c)
         const joiningMonth = joiningDate.getMonth() // 0-11
         const payrollMonth = monthIndex // 0-11
+        
+        console.log(`     • Joining Date: ${emp.Joining_Date__c}`)
+        console.log(`     • Joining Month: ${joiningMonth} (${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][joiningMonth]})`)
+        console.log(`     • Payroll Month: ${payrollMonth} (${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][payrollMonth]})`)
+        console.log(`     • Month Match: ${joiningMonth === payrollMonth ? '✅ Yes' : '❌ No'}`)
         
         // Check if current payroll month matches joining month
         if (joiningMonth === payrollMonth) {
@@ -636,14 +642,30 @@ export async function POST(request: NextRequest) {
           const joiningYear = joiningDate.getFullYear()
           const yearsCompleted = currentYear - joiningYear
           
+          console.log(`     • Joining Year: ${joiningYear}`)
+          console.log(`     • Current Year: ${currentYear}`)
+          console.log(`     • Years Completed: ${yearsCompleted}`)
+          console.log(`     • Eligible (>0 years): ${yearsCompleted > 0 ? '✅ Yes' : '❌ No'}`)
+          
           // Only give bonus if at least 1 year is completed
           if (yearsCompleted > 0) {
             const companySecurityDeduction = emp.Company_Security_Deduction__c || 0
             anniversaryBonus = companySecurityDeduction * 12
-            console.log(`   🎉 Anniversary Bonus: Company Security (₹${companySecurityDeduction.toLocaleString()}) × 12 = ₹${anniversaryBonus.toLocaleString()}`)
+            console.log(`   🎉 Anniversary Bonus Calculation:`)
+            console.log(`     • Company Security: ₹${companySecurityDeduction.toLocaleString()}`)
+            console.log(`     • Formula: Security × 12`)
+            console.log(`     • Bonus Amount: ₹${anniversaryBonus.toLocaleString()}`)
             console.log(`   🎂 Completed ${yearsCompleted} year(s) with the company`)
+          } else {
+            console.log(`   ❌ No Anniversary Bonus (less than 1 year completed)`)
           }
+        } else {
+          console.log(`   ❌ No Anniversary Bonus (not anniversary month)`)
         }
+      } else if (!payrollConfig.anniversaryBonusEnabled) {
+        console.log(`   ⚙️  Anniversary Bonus: Disabled in configuration`)
+      } else {
+        console.log(`   ⚠️  Anniversary Bonus: No joining date on record`)
       }
       
       // Add Company Security Deduction

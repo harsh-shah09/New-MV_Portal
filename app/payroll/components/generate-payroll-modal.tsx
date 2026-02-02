@@ -5,6 +5,7 @@ import { Modal, Select, Button, message, Table, Spin, Tag, Dropdown } from "antd
 import { PlusOutlined, DownOutlined } from "@ant-design/icons"
 import type { MenuProps } from "antd"
 import type { ColumnsType } from "antd/es/table"
+import Image from "next/image"
 import type { PayrollEmployeeDetail, PayrollAdjustment } from "@/types"
 import { AddAdjustmentModal } from "./add-adjustment-modal"
 import { AddBonusModal } from "./add-bonus-modal"
@@ -625,7 +626,18 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
 
   return (
     <Modal
-      title={showResults ? `Payroll Preview - ${selectedMonth} ${selectedYear}` : "Generate Payroll"}
+      title={
+        <div className="flex items-center gap-3">
+          <Image
+            src="/mv_logo.png"
+            alt="MV Clouds Logo"
+            width={40}
+            height={40}
+            className="object-contain"
+          />
+          <span>{showResults ? `Payroll Preview - ${selectedMonth} ${selectedYear}` : "Generate Payroll"}</span>
+        </div>
+      }
       open={open}
       onCancel={handleClose}
       width={showResults ? 1200 : 500}
@@ -702,7 +714,7 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Anniversary Bonus</p>
-                    <p className="text-2xl font-bold text-purple-600">
+                    <p className="text-2xl font-bold">
                       ₹{employeeData.reduce((sum, emp) => sum + (emp.anniversaryBonus || 0), 0).toLocaleString()}
                     </p>
                   </div>
@@ -714,7 +726,7 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Security Deductions</p>
-                    <p className="text-2xl font-bold text-orange-600">
+                    <p className="text-2xl font-bold">
                       ₹{employeeData.reduce((sum, emp) => sum + (emp.companySecurityDeduction || 0), 0).toLocaleString()}
                     </p>
                   </div>

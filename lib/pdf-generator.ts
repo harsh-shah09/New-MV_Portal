@@ -1,4 +1,6 @@
 import puppeteer from 'puppeteer'
+import fs from 'fs'
+import path from 'path'
 
 interface Leave {
   id: string
@@ -87,6 +89,16 @@ function generatePayslipHTML(payslip: PayslipData): string {
 
   const grossEarnings = payslip.basicSalary + (payslip.totalAdditions || 0)
 
+  // Read and encode logo as base64
+  let logoBase64 = ''
+  try {
+    const logoPath = path.join(process.cwd(), 'public', 'mv_logo.png')
+    const logoBuffer = fs.readFileSync(logoPath)
+    logoBase64 = `data:image/png;base64,${logoBuffer.toString('base64')}`
+  } catch (error) {
+    console.error('Error reading logo:', error)
+  }
+
   return `
 <!DOCTYPE html>
 <html>
@@ -98,7 +110,8 @@ function generatePayslipHTML(payslip: PayslipData): string {
     .container { max-width: 900px; margin: 0 auto; border: 1px solid #e5e7eb; }
     .header { display: flex; justify-content: space-between; padding: 30px; border-bottom: 2px solid #e5e7eb; }
     .company-info { display: flex; align-items: center; gap: 15px; }
-    .logo { width: 60px; height: 60px; background: #3b82f6; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 24px; font-weight: bold; }
+    .logo { width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; }
+    .logo img { width: 60px; height: 60px; object-fit: contain; }
     .company-details h1 { font-size: 24px; color: #111827; }
     .company-details p { font-size: 12px; color: #6b7280; margin-top: 4px; }
     .period-info { text-align: right; }
@@ -143,7 +156,9 @@ function generatePayslipHTML(payslip: PayslipData): string {
   <div class="container">
     <div class="header">
       <div class="company-info">
-        <div class="logo">MV</div>
+        <div class="logo">
+          ${logoBase64 ? `<img src="${logoBase64}" alt="MV Logo" />` : '<span style="font-size: 24px; font-weight: bold;">MV</span>'}
+        </div>
         <div class="company-details">
           <h1>MV Clouds</h1>
           <p>D-404 Synthesis the first Ahmedabad India</p>

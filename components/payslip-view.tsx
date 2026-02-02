@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { Card, Descriptions, Table, Divider, Spin, message, Button } from "antd"
 import { PrinterOutlined, DownloadOutlined } from "@ant-design/icons"
+import Image from "next/image"
 import type { ColumnsType } from "antd/es/table"
 
 interface Leave {
@@ -240,8 +241,14 @@ export function PayslipView({ payrollId, onClose }: PayslipViewProps) {
         {/* Company Header */}
         <div className="flex justify-between items-start p-8 pb-6 border-b">
           <div className="flex items-center gap-4">
-            <div className="w-16 h-16 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold text-2xl">
-              MV
+            <div className="w-16 h-16 flex items-center justify-center">
+              <Image
+                src="/mv_logo.png"
+                alt="MV Clouds Logo"
+                width={70}
+                height={60}
+                className="object-contain"
+              />
             </div>
             <div>
               <h1 className="text-2xl font-bold text-gray-900">MV Clouds</h1>
