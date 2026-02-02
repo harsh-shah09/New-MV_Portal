@@ -27,7 +27,7 @@ import {
   Power,
   AlertTriangle 
 } from "lucide-react"
-import { generate2FASecretAction, verifyAndEnable2FAAction, disable2FAAction } from "@/app/employees/[id]/actions"
+import { generate2FASecretAction, verifyAndEnable2FAAction, disable2FAAction, getEmployeeTitles } from "@/app/employees/[id]/actions"
 import { message, Spin, Select, Modal } from "antd"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { cn } from "@/lib/utils"
@@ -43,6 +43,11 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
   const [isEditing, setIsEditing] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const queryClient = useQueryClient()
+  const [titles, setTitles] = useState<{ label: string, value: string }[]>([])
+
+  useEffect(() => {
+    getEmployeeTitles().then(setTitles).catch(console.error)
+  }, [])
 
   // --- Data Fetching ---
   const { data: employee, isLoading } = useQuery({
@@ -778,7 +783,17 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                                 {label: 'Finance', value: 'Finance'},
                                             ]}
                                           />
-                                          <Field label="Job Title" value={employee.Title__c} fieldKey="Title__c" isEditing={isEditing && ['HR', 'Admin'].includes(currentUserRole)} formData={formData} setFormData={setFormData} placeholder="e.g. Senior Software Engineer" />
+                                          <Field 
+                                            label="Job Title" 
+                                            value={employee.Title__c} 
+                                            fieldKey="Title__c" 
+                                            isEditing={isEditing && ['HR', 'Admin'].includes(currentUserRole)} 
+                                            formData={formData} 
+                                            setFormData={setFormData}
+                                            type="select"
+                                            options={titles}
+                                            placeholder="Select Job Title" 
+                                          />
                                           <Field label="Joining Date" value={employee.Joining_Date__c} fieldKey="Joining_Date__c" type="date" isEditing={isEditing && ['HR', 'Admin'].includes(currentUserRole)} formData={formData} setFormData={setFormData} error={errors.Joining_Date__c} />
                                           <Field label="Total Experience" value={employee.Experience__c} fieldKey="Experience__c" isEditing={isEditing && ['HR', 'Admin'].includes(currentUserRole)} formData={formData} setFormData={setFormData} placeholder="e.g. 5 Years" />
                                           <div className="space-y-1 flex flex-col">
