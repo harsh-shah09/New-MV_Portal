@@ -41,33 +41,63 @@ export default function EmployeesClient({ role }: EmployeesClientProps) {
       const rawData = await res.json();
       
       // Map Salesforce data to Employee type
-      return rawData.map((record: any) => ({
-        id: record.Id,
-        firstName: record.Employee_Name__c?.split(' ')[0] || '',
-        lastName: record.Employee_Name__c?.split(' ').slice(1).join(' ') || '',
-        email: record.Employee_Email__c || '',
-        phone: record.Employee_Phone__c || '',
-        department: record.Department__c || 'Un-Assigned',
-        position: record.Role__c || '',
-        joinDate: record.Joining_Date__c || '',
-        status: record.Status__c || 'inactive',
-        active: record.Active__c,
-        salary: record.Base_Salary__c || 0,
-        profilePhoto: record.Profile_Photo__c,
-        personalDetails: {
-            address: record.Employee_Address__c?.street || (typeof record.Employee_Address__c === 'string' ? record.Employee_Address__c : ''),
-            city : record.Employee_Address__c?.city,
-            state : record.Employee_Address__c?.state || 'State',
-            zipCode : record.Employee_Address__c?.postalCode ,
-            nationality : record.Employee_Address__c?.country,
-            emergencyContact: record.Emergency_Contact_Name__c,
-            emergencyPhone: record.Emergency_Contact_Number__c,
-        },
-        gender: record.Gender__c,
-        experience: record.Experience__c,
-        employeeId: record.Name,
-        ctc: record.Salary_CTC__c,
-      })) as Employee[];
+      // Map Salesforce data to Employee type
+      return rawData.map((record: any) => {
+        // Parse Address
+        let addressStr = record.Employee_Address__c || '';
+        let street = '', city = '', state = '', zipCode = '', country = '';
+        
+        try {
+            const parsed = JSON.parse(addressStr);
+            if (typeof parsed === 'object' && parsed !== null) {
+                street = parsed.street || '';
+                city = parsed.city || '';
+                state = parsed.state || '';
+                country = parsed.country || '';
+                zipCode = parsed.postalCode || '';
+            }
+        } catch (e) {
+            // Fallback to comma split
+            if (addressStr.includes(',')) {
+                const parts = addressStr.split(',').map((s: string) => s.trim());
+                if (parts.length >= 1) street = parts[0];
+                if (parts.length >= 2) city = parts[1];
+                if (parts.length >= 3) state = parts[2];
+                if (parts.length >= 4) country = parts[3];
+                if (parts.length >= 5) zipCode = parts[parts.length - 1];
+            } else {
+                street = addressStr;
+            }
+        }
+
+        return {
+            id: record.Id,
+            firstName: record.Employee_Name__c?.split(' ')[0] || '',
+            lastName: record.Employee_Name__c?.split(' ').slice(1).join(' ') || '',
+            email: record.Employee_Email__c || '',
+            phone: record.Employee_Phone__c || '',
+            department: record.Department__c || 'Un-Assigned',
+            position: record.Role__c || '',
+            joinDate: record.Joining_Date__c || '',
+            status: record.Status__c || 'inactive',
+            active: record.Active__c,
+            salary: record.Base_Salary__c || 0,
+            profilePhoto: record.Profile_Photo__c,
+            personalDetails: {
+                address: street,
+                city : city,
+                state : state,
+                zipCode : zipCode,
+                nationality : country,
+                emergencyContact: record.Emergency_Contact_Name__c,
+                emergencyPhone: record.Emergency_Contact_Number__c,
+            },
+            gender: record.Gender__c,
+            experience: record.Experience__c,
+            employeeId: record.Name,
+            ctc: record.Salary_CTC__c,
+        };
+      }) as Employee[];
     }
   });
 
@@ -100,7 +130,6 @@ export default function EmployeesClient({ role }: EmployeesClientProps) {
      try {
         message.loading({ content: 'Updating...', key: 'update' });
 
-        // Map frontend Employee object back to Salesforce schema
         const salesforceData: any = {
             Employee_Name__c: `${data.firstName} ${data.lastName}`,
             Employee_Email__c: data.email,
@@ -110,14 +139,14 @@ export default function EmployeesClient({ role }: EmployeesClientProps) {
             Joining_Date__c: data.joinDate,
             Base_Salary__c: data.salary,
             Status__c: data.status,
-            // Address Handling
-            // Employee_Address__c: data.personalDetails ? {
-            //     street: data.personalDetails.address,
-            //     city: data.personalDetails.city,
-            //     state: data.personalDetails.state,
-            //     postalCode: data.personalDetails.zipCode,
-            //     country: data.personalDetails.nationality
-            // } : undefined,
+            // Store structured address object (API will JSON.stringify it)
+            Employee_Address__c: {
+                street: data.personalDetails?.address || '',
+                city: data.personalDetails?.city || '',
+                state: data.personalDetails?.state || '',
+                postalCode: data.personalDetails?.zipCode || '',
+                country: data.personalDetails?.nationality || ''
+            },
             Emergency_Contact_Name__c: data.personalDetails?.emergencyContact,
             Emergency_Contact_Number__c: data.personalDetails?.emergencyPhone,
         };

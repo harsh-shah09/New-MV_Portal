@@ -170,11 +170,13 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
              Birthdate__c: employee.Birthdate__c,
              Gender__c: employee.Gender__c,
              
-             Employee_Address__Street__s: employee.Employee_Address__Street__s,
-             Employee_Address__City__s: employee.Employee_Address__City__s,
-             Employee_Address__StateCode__s: employee.Employee_Address__StateCode__s,
-             Employee_Address__PostalCode__s: employee.Employee_Address__PostalCode__s,
-             Employee_Address__CountryCode__s: employee.Employee_Address__CountryCode__s,
+             Employee_Address__c: employee.Employee_Address__c || {}, 
+    
+             Employee_Address__Street__s: employee.Employee_Address__c?.street || '',
+             Employee_Address__City__s: employee.Employee_Address__c?.city || '',
+             Employee_Address__StateCode__s: employee.Employee_Address__c?.state || '',
+             Employee_Address__PostalCode__s: employee.Employee_Address__c?.postalCode || '',
+             Employee_Address__CountryCode__s: employee.Employee_Address__c?.country || '',
 
              Emergency_Contact_Name__c: employee.Emergency_Contact_Name__c,
              Emergency_Contact_Number__c: employee.Emergency_Contact_Number__c,
@@ -194,7 +196,25 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
   const handleSave = () => {
       if (validateForm()) {
         setWarningMsg(null)
-        updateMutation.mutate(formData)
+        
+        // Prepare payload with Address Object
+        const payload = { ...formData };
+        payload.Employee_Address__c = {
+            street: formData.Employee_Address__Street__s,
+            city: formData.Employee_Address__City__s,
+            state: formData.Employee_Address__StateCode__s,
+            postalCode: formData.Employee_Address__PostalCode__s,
+            country: formData.Employee_Address__CountryCode__s
+        };
+        
+        // Remove flattened address fields from payload
+        delete payload.Employee_Address__Street__s;
+        delete payload.Employee_Address__City__s;
+        delete payload.Employee_Address__StateCode__s;
+        delete payload.Employee_Address__PostalCode__s;
+        delete payload.Employee_Address__CountryCode__s;
+
+        updateMutation.mutate(payload)
       } else {
         setWarningMsg("Please fix the validation errors before saving.")
         window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -684,15 +704,15 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                           <MapPin className="w-5 h-5 text-indigo-500" /> Address
                                       </h2>
                                       <div className="grid grid-cols-1 gap-y-6">
-                                          <Field label="Street" value={employee.Employee_Address__c.street} fieldKey="Employee_Address__Street__s" isEditing={isEditing} formData={formData} setFormData={setFormData} />
-                                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                             <Field label="City" value={employee.Employee_Address__c.city} fieldKey="Employee_Address__City__s" isEditing={isEditing} formData={formData} setFormData={setFormData} />
-                                             <Field label="State Code" value={employee.Employee_Address__c.stateCode} fieldKey="Employee_Address__StateCode__s" isEditing={isEditing} formData={formData} setFormData={setFormData} />
-                                          </div>
-                                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                             <Field label="Zip / Postal" value={employee.Employee_Address__c.postalCode} fieldKey="Employee_Address__PostalCode__s" isEditing={isEditing} formData={formData} setFormData={setFormData} />
-                                             <Field label="Country Code" value={employee.Employee_Address__c.countryCode} fieldKey="Employee_Address__CountryCode__s" isEditing={isEditing} formData={formData} setFormData={setFormData} />
-                                          </div>
+                                          <Field label="Street" value={employee.Employee_Address__c?.street} fieldKey="Employee_Address__Street__s" isEditing={isEditing} formData={formData} setFormData={setFormData} />
+                                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                              <Field label="City" value={employee.Employee_Address__c?.city} fieldKey="Employee_Address__City__s" isEditing={isEditing} formData={formData} setFormData={setFormData} />
+                                              <Field label="State" value={employee.Employee_Address__c?.state} fieldKey="Employee_Address__StateCode__s" isEditing={isEditing} formData={formData} setFormData={setFormData} />
+                                           </div>
+                                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                              <Field label="Zip / Postal" value={employee.Employee_Address__c?.postalCode} fieldKey="Employee_Address__PostalCode__s" isEditing={isEditing} formData={formData} setFormData={setFormData} />
+                                              <Field label="Country" value={employee.Employee_Address__c?.country} fieldKey="Employee_Address__CountryCode__s" isEditing={isEditing} formData={formData} setFormData={setFormData} />
+                                           </div>
                                           {/* Coordinates & Accuracy */}
                                           {/* <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                              <Field label="Latitude" value={employee.Employee_Address__Latitude__s} fieldKey="Employee_Address__Latitude__s" type="number" isEditing={isEditing} formData={formData} setFormData={setFormData} />

@@ -87,7 +87,7 @@ export function EmployeeDetail({ employee, onClose, onEdit, currentUserRole = 'E
 
            {activeTab === "personal" && (
              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8 animate-in fade-in duration-300">
-                <DetailItem label="Address" value={employee.personalDetails?.address} />
+                <DetailItem label="House / Street" value={employee.personalDetails?.address} />
                 <DetailItem label="City" value={employee.personalDetails?.city} />
                 <DetailItem label="State" value={employee.personalDetails?.state} />
                 <DetailItem label="Zip Code" value={employee.personalDetails?.zipCode} />
