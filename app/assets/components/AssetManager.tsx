@@ -1,0 +1,173 @@
+"use client"
+
+import { useState } from 'react';
+import { Button, message, Input } from 'antd';
+import { PlusOutlined, SearchOutlined, ReloadOutlined, AppstoreOutlined, FileAddOutlined } from '@ant-design/icons';
+import { useRouter } from 'next/navigation';
+import { AssetTable } from './AssetTable';
+import { AssetAssignmentModal } from './AssetAssignmentModal';
+import { CreateAssetModal } from './CreateAssetModal';
+import { SalesforceAsset, AssignmentHistory } from '../types';
+import { getAssetById, getAssets } from '../actions';
+
+// Responsive wrapper for Modal width
+const modalWidth = {
+  xs: '95%',
+  sm: '90%',
+  md: 600,
+};
+
+interface AssetManagerProps {
+  initialAssets: SalesforceAsset[];
+}
+
+export function AssetManager({ initialAssets }: AssetManagerProps) {
+  const router = useRouter();
+  const [assets, setAssets] = useState<SalesforceAsset[]>(initialAssets);
+  const [loading, setLoading] = useState(false);
+  const [searchText, setSearchText] = useState('');
+  
+  // Modal States
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [isCreateModalVisible, setIsCreateModalVisible] = useState(false);
+  const [currentAssignment, setCurrentAssignment] = useState<AssignmentHistory | null>(null);
+  const [selectedAsset, setSelectedAsset] = useState<SalesforceAsset | null>(null);
+
+
+
+
+  const refreshAssets = async () => {
+    setLoading(true);
+    try {
+      const data = await getAssets();
+      setAssets(data);
+    } catch (e) {
+      message.error("Failed to refresh assets");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreateSuccess = () => {
+      setIsCreateModalVisible(false);
+      refreshAssets();
+  }
+
+  const handleManageAssignment = async (asset: SalesforceAsset) => {
+    setSelectedAsset(asset);
+    try {
+        const details = await getAssetById(asset.Id);
+        if (details && details.history) {
+            const active = details.history.find(h => !h.AMS_Returned_Date__c);
+            setCurrentAssignment(active || null);
+        } else {
+             setCurrentAssignment(null);
+        }
+        setIsModalVisible(true);
+    } catch (e) {
+        message.error("Failed to fetch assignment details");
+    }
+  };
+
+  const handleModalSuccess = () => {
+    setIsModalVisible(false);
+    refreshAssets();
+  };
+
+  // Filter
+  const filteredAssets = assets.filter(a => 
+    a.Name.toLowerCase().includes(searchText.toLowerCase()) || 
+    (a.AMS_Product__r?.Name || '').toLowerCase().includes(searchText.toLowerCase()) ||
+    (a.AMS_Assigned_To__r?.Employee_Name__c || '').toLowerCase().includes(searchText.toLowerCase())
+  );
+
+  return (
+    <div className="space-y-6">
+      {/* Header Actions */}
+      {/* Header Actions - Mobile Optimized */}
+      <div className="flex flex-col lg:flex-row gap-4 justify-between items-stretch lg:items-center">
+        <div className="relative w-full lg:w-96">
+            <Input 
+                prefix={<SearchOutlined className="text-gray-400" />} 
+                placeholder="Search assets..." 
+                value={searchText}
+                onChange={e => setSearchText(e.target.value)}
+                className="rounded-lg py-2.5 shadow-sm text-base"
+                size="large"
+            />
+        </div>
+        
+        <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto items-center">
+            {/* Mobile: Grid of actions */}
+            <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full">
+                <Button 
+                    icon={<ReloadOutlined />} 
+                    onClick={refreshAssets} 
+                    loading={loading}
+                    className="w-full sm:w-auto h-10 border-gray-200 text-gray-600 hover:text-blue-600 hover:border-blue-200"
+                >
+                    Refresh
+                </Button>
+                
+                <Button 
+                    icon={<AppstoreOutlined />} 
+                    onClick={() => router.push('/assets/products')}
+                    className="w-full sm:w-auto h-10 border-gray-200 text-gray-600"
+                >
+                    Catalog
+                </Button>
+            </div>
+            
+            <Button 
+                type="primary" 
+                icon={<PlusOutlined />} 
+                onClick={() => setIsCreateModalVisible(true)}
+                className="w-full sm:w-auto h-10 bg-blue-600 hover:bg-blue-500 shadow-md shadow-blue-200"
+            >
+                New Asset
+            </Button>
+        </div>
+      </div>
+
+      {/* Stats Summary */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+          <StatCard title="Total Assets" value={assets.length} color="blue" />
+          <StatCard title="Assigned" value={assets.filter(a => a.AMS_Status__c === 'Assigned').length} color="purple" />
+          <StatCard title="In Stock" value={assets.filter(a => a.AMS_Status__c === 'Un-Assigned').length} color="green" />
+          <StatCard title="Discarded" value={assets.filter(a => a.AMS_Status__c === 'Discarded').length} color="gray" />
+      </div>
+
+      {/* Table */}
+      <AssetTable 
+        assets={filteredAssets} 
+        loading={loading} 
+        onManageAssignment={handleManageAssignment} 
+      />
+
+      {/* Assignment Modal */}
+      <AssetAssignmentModal 
+        visible={isModalVisible}
+        onCancel={() => setIsModalVisible(false)}
+        onSuccess={handleModalSuccess}
+        asset={selectedAsset}
+        currentAssignment={currentAssignment}
+      />
+
+      {/* Create Asset Modal */}
+      <CreateAssetModal
+        visible={isCreateModalVisible}
+        onCancel={() => setIsCreateModalVisible(false)}
+        onSuccess={handleCreateSuccess}
+      />
+    </div>
+  );
+}
+
+function StatCard({ title, value, color }: { title: string, value: number, color: string }) {
+    return (
+        <div className={`p-4 rounded-xl bg-white border border-${color}-100 shadow-sm flex flex-col items-center justify-center`}>
+            <span className="text-gray-500 text-xs font-medium uppercase tracking-wider">{title}</span>
+            <span className={`text-2xl font-bold text-${color}-600`}>{value}</span>
+        </div>
+    )
+}

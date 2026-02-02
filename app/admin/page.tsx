@@ -19,7 +19,8 @@ import {
   Check,
   RefreshCw,
   Trash2,
-  DollarSign
+  DollarSign,
+  Package
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { message, Modal, Spin } from "antd";
@@ -31,7 +32,7 @@ const formatLabel = (str: string) => {
 };
 
 export default function AdminConsole() {
-  const [activeTab, setActiveTab] = useState<"admin" | "documents" | "email" | "leave" | "payroll" | "users" | "integration">("admin");
+  const [activeTab, setActiveTab] = useState<"admin" | "documents" | "email" | "leave" | "payroll" | "users" | "integration" | "assets">("admin");
   const [configs, setConfigs] = useState<any>(null);
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -163,7 +164,8 @@ export default function AdminConsole() {
       metadataType === 'Admin_Configurations__mdt' ? 'admin' :
       metadataType === 'Documents_Configurations__mdt' ? 'documents' :
       metadataType === 'Email_Templates__mdt' ? 'emailTemplates' :
-      metadataType === 'Payroll_Configurations__mdt' ? 'payroll' : 'leave';
+      metadataType === 'Payroll_Configurations__mdt' ? 'payroll' : 
+      metadataType === 'Asset_Configuration__mdt' ? 'assets' : 'leave';
 
     setConfigs((prev: any) => ({
       ...prev,
@@ -332,6 +334,7 @@ export default function AdminConsole() {
                     <TabButton id="users" label="User Access" icon={Users} />
                     <TabButton id="integration" label="Connected Users" icon={Workflow} />
                     <TabButton id="email" label="Email Templates" icon={Mail} />
+                    <TabButton id="assets" label="Asset Settings" icon={Package} />
                 </div>
                 
                 {unsavedChanges.length > 0 && (
@@ -355,6 +358,39 @@ export default function AdminConsole() {
                             exit={{ opacity: 0, y: -10 }}
                             transition={{ duration: 0.2 }}
                         >
+                            {activeTab === "assets" && (
+                                <div className="space-y-6">
+                                    <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+                                        <Package className="w-5 h-5 text-indigo-500" /> Asset Management
+                                    </h2>
+                                    {configs.assets?.map((record: any) => (
+                                        <div key={record.Id} className="flex items-center justify-between p-6 bg-white border border-slate-200 rounded-2xl shadow-sm">
+                                            <div>
+                                                <div className="font-semibold text-slate-800 text-lg mb-1">{record.MasterLabel}</div>
+                                                <div className="text-slate-500 text-sm">System-wide configuration for Asset Management module.</div>
+                                            </div>
+                                            <div className="flex items-center gap-3">
+                                                <span className={`text-sm font-medium ${record?.Bypass_Validation__c === 'Yes' ? 'text-green-600' : 'text-slate-500'}`}>
+                                                    {record?.Bypass_Validation__c === 'Yes' ? 'Enabled' : 'Disabled'}
+                                                </span>
+                                                <label className="relative inline-flex items-center cursor-pointer">
+                                                    <input 
+                                                        type="checkbox" 
+                                                        className="sr-only peer"
+                                                        defaultChecked={record.Bypass_Validation__c === 'Yes'}
+                                                        onChange={(e) => handleInputChange('Asset_Configuration__mdt', record, e.target.checked ? 'Yes' : 'No')}
+                                                    />
+                                                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                                                </label>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {(!configs.assets || configs.assets.length === 0) && (
+                                        <div className="text-center p-8 text-slate-400">No asset configurations found.</div>
+                                    )}
+                                </div>
+                            )}
+
                             {activeTab === "admin" && (
                                 <div>
                                     <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">

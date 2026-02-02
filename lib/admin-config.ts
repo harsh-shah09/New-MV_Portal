@@ -17,6 +17,7 @@ export interface AdminConfigs {
   emailTemplates: MetadataRecord[];
   leave: MetadataRecord[];
   payroll: MetadataRecord[];
+  assets: any[]; // Asset_Configuration__mdt has specific fields
 }
 
 const METADATA_TYPES = {
@@ -24,19 +25,21 @@ const METADATA_TYPES = {
   DOCUMENTS: 'Documents_Configurations__mdt',
   EMAIL: 'Email_Templates__mdt',
   LEAVE: 'Leave_Configurations__mdt',
-  PAYROLL: 'Payroll_Configurations__mdt'
+  PAYROLL: 'Payroll_Configurations__mdt',
+  ASSETS: 'Asset_Configuration__mdt'
 };
 
 export const getAllConfigurations = async (): Promise<AdminConfigs> => {
   const conn = await getSalesforceConnection();
   if (!conn) throw new Error("No Salesforce connection");
 
-  const [admin, documents, emailTemplates, leave, payroll] = await Promise.all([
+  const [admin, documents, emailTemplates, leave, payroll, assets] = await Promise.all([
     conn.query(`SELECT Id, DeveloperName, MasterLabel, QualifiedApiName, Value__c FROM ${METADATA_TYPES.ADMIN}`),
     conn.query(`SELECT Id, DeveloperName, MasterLabel, QualifiedApiName, Value__c FROM ${METADATA_TYPES.DOCUMENTS}`),
     conn.query(`SELECT Id, DeveloperName, MasterLabel, QualifiedApiName, Value__c FROM ${METADATA_TYPES.EMAIL}`),
     conn.query(`SELECT Id, DeveloperName, MasterLabel, QualifiedApiName, Value__c FROM ${METADATA_TYPES.LEAVE}`),
     conn.query(`SELECT Id, DeveloperName, MasterLabel, QualifiedApiName, Value__c FROM ${METADATA_TYPES.PAYROLL}`),
+    conn.query(`SELECT Id, DeveloperName, MasterLabel, QualifiedApiName, Bypass_Validation__c FROM Asset_Configuration__mdt`),
   ]);
 
   return {
@@ -44,7 +47,8 @@ export const getAllConfigurations = async (): Promise<AdminConfigs> => {
     documents: documents.records as unknown as MetadataRecord[],
     emailTemplates: emailTemplates.records as unknown as MetadataRecord[],
     leave: leave.records as unknown as MetadataRecord[],
-    payroll: payroll.records as unknown as MetadataRecord[]
+    payroll: payroll.records as unknown as MetadataRecord[],
+    assets: assets.records as unknown as any[]
   };
 };
 

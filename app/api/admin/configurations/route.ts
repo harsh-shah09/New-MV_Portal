@@ -47,13 +47,27 @@ export async function POST(req: Request) {
     // The updates array from frontend should contain: { metadataType, fullName, label, value }
     
     // We can just process them.
-    const recordsToUpdate = updates.map((u: any) => ({
-        fullName: u.fullName,
-        label: u.label,
-        values: [
-            { field: 'Value__c', value: u.value }
-        ]
-    }));
+    const recordsToUpdate = updates.map((u: any) => {
+        // Special handling for Asset Configuration which uses 'Bypass_Validation__c'
+        if (u.metadataType === 'Asset_Configuration__mdt') {
+            return {
+                fullName: u.fullName,
+                label: u.label,
+                values: [
+                    { field: 'Bypass_Validation__c', value: u.value }
+                ]
+            };
+        }
+
+        // Default handling for 'Value__c'
+        return {
+            fullName: u.fullName,
+            label: u.label,
+            values: [
+                { field: 'Value__c', value: u.value }
+            ]
+        };
+    });
 
     if (recordsToUpdate.length === 0) {
         return NextResponse.json({ success: true, message: "No updates" });
