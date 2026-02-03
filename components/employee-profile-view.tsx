@@ -25,7 +25,11 @@ import {
   Shield,
   Lock,
   Power,
-  AlertTriangle 
+  AlertTriangle,
+  Laptop,
+  History,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react"
 import { generate2FASecretAction, verifyAndEnable2FAAction, disable2FAAction, getEmployeeTitles } from "@/app/employees/[id]/actions"
 import { message, Spin, Select, Modal } from "antd"
@@ -39,7 +43,8 @@ interface ViewProps {
 }
 
 export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }: ViewProps) {
-  const [activeTab, setActiveTab] = useState<"personal" | "employment" | "bank" | "documents" | "security">("personal")
+  const [activeTab, setActiveTab] = useState<"personal" | "employment" | "bank" | "documents" | "security" | "assets">("personal")
+  const [showAssetHistory, setShowAssetHistory] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const queryClient = useQueryClient()
@@ -639,6 +644,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                  {[
                      { id: "personal", label: "Personal Details", icon: User },
                      { id: "employment", label: "Employment Info", icon: Building2 },
+                     { id: "assets", label: "Assets", icon: Laptop },
                      { id: "bank", label: "Bank Details", icon: CreditCard },
                      { id: "documents", label: "Documents", icon: FileText },
                      { id: "security", label: "Security", icon: Lock },
@@ -1151,6 +1157,136 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                           </div>
                                       </div>
                                   )}
+                              </div>
+                          )}
+                          
+                          {activeTab === "assets" && (
+                              <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
+                                  <div>
+                                      <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+                                          <Laptop className="w-5 h-5 text-indigo-600" /> Active Assets
+                                      </h2>
+                                      
+                                      {(() => {
+                                          const historyList = employee.assetHistory || [];
+                                          const activeAssets = historyList.filter((h: any) => !h.AMS_Returned_Date__c);
+                                          const returnedAssets = historyList.filter((h: any) => h.AMS_Returned_Date__c);
+
+                                          return (
+                                              <div className="space-y-8">
+                                                  {/* Active Assets */}
+                                                  {activeAssets.length > 0 ? (
+                                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                          {activeAssets.map((history: any) => {
+                                                              const asset = history.AMS_Asset__r || {};
+                                                              return (
+                                                                  <div key={history.Id} className="bg-white border border-slate-200 rounded-xl p-5 hover:shadow-md transition group shadow-sm">
+                                                                      <div className="flex justify-between items-start mb-3">
+                                                                          <div className="flex items-center gap-3">
+                                                                              <div className="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                                                                                  <Laptop className="w-5 h-5" />
+                                                                              </div>
+                                                                              <div>
+                                                                                  <h3 className="font-semibold text-slate-800">{asset.Name || "Asset"}</h3>
+                                                                                  <p className="text-xs text-slate-500">{asset.AMS_Product__r?.Name || "Unknown Product"}</p>
+                                                                              </div>
+                                                                          </div>
+                                                                          <span className="px-2.5 py-1 rounded-full text-xs font-medium border bg-green-50 text-green-700 border-green-100">
+                                                                              Active
+                                                                          </span>
+                                                                      </div>
+                                                                      
+                                                                      <div className="grid grid-cols-2 gap-y-2 text-sm mt-4 pt-4 border-t border-slate-100">
+                                                                          <div>
+                                                                              <p className="text-slate-400 text-xs uppercase tracking-wider mb-0.5">Serial Number</p>
+                                                                              <p className="font-mono text-slate-700">{asset.AMS_Asset_Serial_Number__c || "-"}</p>
+                                                                          </div>
+                                                                          <div>
+                                                                              <p className="text-slate-400 text-xs uppercase tracking-wider mb-0.5">Category</p>
+                                                                              <p className="text-slate-700">{asset.AMS_Product__r?.AMS_Category__c || "-"}</p>
+                                                                          </div>
+                                                                          <div>
+                                                                              <p className="text-slate-400 text-xs uppercase tracking-wider mb-0.5">Assigned Date</p>
+                                                                              <p className="text-slate-700">{history.AMS_Assigned_Date__c ? new Date(history.AMS_Assigned_Date__c).toLocaleDateString() : "-"}</p>
+                                                                          </div>
+                                                                           <div>
+                                                                              <p className="text-slate-400 text-xs uppercase tracking-wider mb-0.5">Warranty</p>
+                                                                              <p className="text-slate-700">{asset.AMS_Warranty_Expiry_Date__c ? new Date(asset.AMS_Warranty_Expiry_Date__c).toLocaleDateString() : "-"}</p>
+                                                                          </div>
+                                                                      </div>
+                                                                  </div>
+                                                              )
+                                                          })}
+                                                      </div>
+                                                  ) : (
+                                                      <div className="text-center py-10 bg-slate-50 rounded-xl border-dashed border-2 border-slate-200">
+                                                          <Laptop className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+                                                          <p className="text-slate-500 text-sm">No active assets currently assigned.</p>
+                                                      </div>
+                                                  )}
+
+                                                  {/* History Section */}
+                                                  {returnedAssets.length > 0 && (
+                                                      <div className="border border-slate-200 rounded-2xl overflow-hidden">
+                                                          <button 
+                                                              onClick={() => setShowAssetHistory(!showAssetHistory)}
+                                                              className="w-full flex items-center justify-between p-4 bg-slate-50 hover:bg-slate-100 transition text-left"
+                                                          >
+                                                              <div className="flex items-center gap-2 font-semibold text-slate-700">
+                                                                  <History className="w-5 h-5 text-slate-500" />
+                                                                  <span>Asset History ({returnedAssets.length})</span>
+                                                              </div>
+                                                              {showAssetHistory ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
+                                                          </button>
+                                                          
+                                                          {showAssetHistory && (
+                                                              <div className="p-4 bg-slate-50/50 border-t border-slate-200 animate-in slide-in-from-top-2">
+                                                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                                      {returnedAssets.map((history: any) => {
+                                                                          const asset = history.AMS_Asset__r || {};
+                                                                          return (
+                                                                              <div key={history.Id} className="bg-white border border-slate-200/60 rounded-xl p-5 opacity-90 hover:opacity-100 hover:shadow-sm transition">
+                                                                                  <div className="flex justify-between items-start mb-3">
+                                                                                      <div className="flex items-center gap-3">
+                                                                                          <div className="w-10 h-10 rounded-lg bg-slate-100 text-slate-500 flex items-center justify-center">
+                                                                                              <Laptop className="w-5 h-5" />
+                                                                                          </div>
+                                                                                          <div>
+                                                                                              <h3 className="font-semibold text-slate-700">{asset.Name || "Asset"}</h3>
+                                                                                              <p className="text-xs text-slate-500">{asset.AMS_Product__r?.Name || "Unknown Product"}</p>
+                                                                                          </div>
+                                                                                      </div>
+                                                                                      <span className="px-2.5 py-1 rounded-full text-xs font-medium border bg-slate-100 text-slate-600 border-slate-200">
+                                                                                          Returned
+                                                                                      </span>
+                                                                                  </div>
+                                                                                  
+                                                                                  <div className="grid grid-cols-2 gap-y-2 text-sm mt-4 pt-4 border-t border-slate-100">
+                                                                                      <div>
+                                                                                          <p className="text-slate-400 text-xs uppercase tracking-wider mb-0.5">Serial Number</p>
+                                                                                          <p className="font-mono text-slate-600">{asset.AMS_Asset_Serial_Number__c || "-"}</p>
+                                                                                      </div>
+                                                                                      <div>
+                                                                                          <p className="text-slate-400 text-xs uppercase tracking-wider mb-0.5">Assigned Date</p>
+                                                                                          <p className="text-slate-600">{history.AMS_Assigned_Date__c ? new Date(history.AMS_Assigned_Date__c).toLocaleDateString() : "-"}</p>
+                                                                                      </div>
+                                                                                      <div>
+                                                                                          <p className="text-slate-400 text-xs uppercase tracking-wider mb-0.5">Returned Date</p>
+                                                                                          <p className="text-slate-600">{history.AMS_Returned_Date__c ? new Date(history.AMS_Returned_Date__c).toLocaleDateString() : "-"}</p>
+                                                                                      </div>
+                                                                                  </div>
+                                                                              </div>
+                                                                          )
+                                                                      })}
+                                                                  </div>
+                                                              </div>
+                                                          )}
+                                                      </div>
+                                                  )}
+                                              </div>
+                                          )
+                                      })()}
+                                  </div>
                               </div>
                           )}
                       </motion.div>

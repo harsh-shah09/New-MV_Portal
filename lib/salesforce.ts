@@ -323,12 +323,25 @@ export const getEmployeeById = async (id: string): Promise<any | null> => {
     `;
     const docResult = await conn.query(docQuery);
 
+    // 4. Fetch Asset Assignment History (Current & Past)
+    const historyQuery = `
+      SELECT Id, AMS_Assigned_Date__c, AMS_Returned_Date__c, 
+             AMS_Asset__r.Name, AMS_Asset__r.AMS_Asset_Serial_Number__c, 
+             AMS_Asset__r.AMS_Product__r.Name, AMS_Asset__r.AMS_Product__r.AMS_Category__c, 
+             AMS_Asset__r.AMS_Status__c, AMS_Asset__r.AMS_Warranty_Expiry_Date__c
+      FROM AMS_Asset_Assignment_History__c
+      WHERE AMS_Assigned_Person__c = '${id}'
+      ORDER BY AMS_Assigned_Date__c DESC
+    `;
+    const historyResult = await conn.query(historyQuery);
+
     // Map to a clean structure
     return {
         ...empRecord, 
         // No more separate contact object, everything is on top level
         bankDetails: bankResult.records,
-        documents: docResult.records
+        documents: docResult.records,
+        assetHistory: historyResult.records
     };
 };
 

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Modal, Form, Select, DatePicker, Input, Button, message } from 'antd';
 import { createAsset, getProducts } from '../actions';
 import { SalesforceProduct } from '../types';
+import dayjs from 'dayjs';
 
 interface CreateAssetModalProps {
   visible: boolean;
@@ -113,14 +114,35 @@ export function CreateAssetModal({ visible, onCancel, onSuccess }: CreateAssetMo
         </div>
 
         <div className="grid grid-cols-2 gap-4">
-             <Form.Item 
+            <Form.Item 
                 name="AMS_Purchase_Date__c" 
                 label="Purchase Date"
-                rules={[{ required: true }]}
+                rules={[{ required: true, message: 'Purchase Date is required' }]}
             >
-                <DatePicker className="w-full" />
+                <DatePicker 
+                    className="w-full" 
+                    disabledDate={(current) => current && current > dayjs().endOf('day')}
+                />
             </Form.Item>
-             <Form.Item name="AMS_Warranty_Expiry_Date__c" label="Warranty Expiry">
+             <Form.Item 
+                name="AMS_Warranty_Expiry_Date__c" 
+                label="Warranty Expiry"
+                dependencies={['AMS_Purchase_Date__c']}
+                rules={[
+                    { required: true, message: 'Warranty Expiry Date is required' },
+                    ({ getFieldValue }) => ({
+                        validator(_, value) {
+                            if (!value || !getFieldValue('AMS_Purchase_Date__c')) {
+                                return Promise.resolve();
+                            }
+                            if (value.isBefore(getFieldValue('AMS_Purchase_Date__c'))) {
+                                return Promise.reject(new Error('Warranty Expiry cannot be before Purchase Date!'));
+                            }
+                            return Promise.resolve();
+                        },
+                    }),
+                ]}
+            >
                 <DatePicker className="w-full" />
             </Form.Item>
         </div>
