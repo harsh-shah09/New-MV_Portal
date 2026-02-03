@@ -27,15 +27,17 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-screen bg-slate-50/50">
+    <div className="min-h-screen bg-slate-50/50 flex flex-col font-sans text-slate-900">
       <OnboardingWizard />
-      <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} />
-      <div className="flex-1 flex flex-col min-w-0 min-h-screen transition-all duration-300 ease-in-out"> 
-            <MobileHeader onMenuClick={() => setSidebarOpen(true)} />
-         <main className="flex-1 overflow-y-auto">
-            {children}
-         </main>
+      {/* Top Navigation Bar */}
+      <div className="sticky top-0 z-50 w-full backdrop-blur-sm bg-white/80 border-b border-slate-200/60 shadow-sm supports-[backdrop-filter]:bg-white/60">
+          <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} />
       </div>
+      
+      {/* Main Content Area */}
+      <main className="flex-1 w-full max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          {children}
+      </main>
     </div>
   )
 }

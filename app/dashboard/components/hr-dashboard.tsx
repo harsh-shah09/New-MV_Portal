@@ -30,12 +30,6 @@ export function HRDashboard({ data }: HRDashboardProps) {
 
   return (
     <div className="space-y-6">
-      {/* Header Section */}
-      <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg p-6 text-white">
-        <h1 className="text-3xl font-bold mb-2">HR Dashboard</h1>
-        <p className="text-blue-100">Manage your organization's leave requests and employee data</p>
-      </div>
-
       {/* KPI Stats */}
       <HRKPIStats stats={stats} />
 

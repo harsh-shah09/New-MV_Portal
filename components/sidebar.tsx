@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useQuery } from "@tanstack/react-query"
 import Link from "next/link"
 import Image from "next/image"
@@ -10,25 +10,20 @@ import {
   LayoutDashboard, 
   Users, 
   CalendarDays, 
-  BookOpen, 
   Banknote, 
   Tag, 
   FileCheck, 
-  Calendar,
-  LogOut,
-  CalendarRange,
-  Bell,
   Settings,
-  ChevronRight,
   Menu,
   X,
-  User,
-  FileText
+  User as UserIcon,
+  Bell,
+  LogOut,
+  CalendarRange,
+  ChevronDown
 } from "lucide-react"
 import { logout } from "@/lib/auth"
 import { cn } from "@/lib/utils"
-
-  /* Static definition removed. Dynamic navItems used below */
 
 export function Sidebar({ 
   open, 
@@ -40,6 +35,9 @@ export function Sidebar({
   const pathname = usePathname()
   const router = useRouter()
   const [isMobile, setIsMobile] = useState(false)
+  const [scrolled, setScrolled] = useState(false)
+  const [profileOpen, setProfileOpen] = useState(false)
+  const profileRef = useRef<HTMLDivElement>(null)
 
   const { data: user } = useQuery({
       queryKey: ['me'],
@@ -50,19 +48,42 @@ export function Sidebar({
       }
   })
 
+  useEffect(() => {
+    const handleScroll = () => {
+        setScrolled(window.scrollY > 10)
+    }
+    window.addEventListener('scroll', handleScroll)
+    // Mobile Check
+    const checkMobile = () => setIsMobile(window.innerWidth < 1024)
+    checkMobile()
+    window.addEventListener("resize", checkMobile)
+    
+    // Check click outside profile popup
+    const handleClickOutside = (event: MouseEvent) => {
+      if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
+        setProfileOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+
+    return () => {
+        window.removeEventListener('scroll', handleScroll)
+        window.removeEventListener("resize", checkMobile)
+        document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [])
+
   const navItems = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/leaves", label: "Leave", icon: CalendarDays },
     { href: "/holidays", label: "Holidays", icon: CalendarRange },
-    // { href: "/training", label: "Training", icon: BookOpen },
     { href: "/assets", label: "Assets", icon: Tag },
-    // { href: "/documents", label: "Documents", icon: FileText },
   ];
 
   if(user?.role?.includes('HR') || user?.role?.includes('Admin')) {
     navItems.push({ href: "/employees", label: "Employees", icon: Users });
   }
-  // Add Payroll and My Payslips based on role
+
   if (user?.role?.includes('HR') || user?.role?.includes('Admin')) {
     navItems.push({ href: "/payroll", label: "Payroll", icon: Banknote });
     navItems.push({ href: "/my-payrolls", label: "My Payslips", icon: Banknote });
@@ -70,14 +91,14 @@ export function Sidebar({
     navItems.push({ href: "/my-payrolls", label: "My Payslips", icon: Banknote });
   }
 
-  // Add Document Manager for HR only
   if (user?.role?.includes('HR')) {
-     navItems.push({ href: "/nda", label: "Document Manager", icon: FileCheck });
+     navItems.push({ href: "/nda", label: "Docs", icon: FileCheck });
   }
-  // Add Admin Console for HR/Admin
+  
   if (user?.role?.includes('Admin')) {
-      navItems.push({ href: "/admin", label: "Admin Console", icon: Settings });
+      navItems.push({ href: "/admin", label: "Admin", icon: Settings });
   }
+
   const { data: notifications } = useQuery({
       queryKey: ['notifications'],
       queryFn: async () => {
@@ -88,206 +109,234 @@ export function Sidebar({
   })
   
   const unreadCount = notifications?.filter((n: any) => !n.Is_Read__c)?.length || 0;
-  const latestNotif = notifications?.[0];
-
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 1024)
-    checkMobile()
-    window.addEventListener("resize", checkMobile)
-    return () => window.removeEventListener("resize", checkMobile)
-  }, [])
 
   const handleLogout = () => {
     logout()
     router.push("/auth/login")
   }
 
-  const handleProfileClick = () => {
-      if(user?.id) {
-          router.push(`/employees/${user.id}`)
-      }
-  }
-
-  const SidebarContent = () => (
-    <div className="flex flex-col h-full bg-white text-slate-800 relative overflow-hidden border-r border-slate-200">
-      {/* Background Gradients (Subtle for Light Mode) */}
-      <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-white via-slate-50 to-blue-50/20 z-0"></div>
-      <div className="absolute top-0 left-0 w-full h-64 bg-cyan-100/30 blur-[100px] z-0"></div>
-      
-      {/* Logo Section */}
-      <div className="relative z-10 flex items-center gap-3 p-6 border-b border-slate-100">
-        <div className="relative group cursor-pointer">
-          <div className="absolute -inset-1 bg-gradient-to-r from-cyan-400 to-blue-600 rounded-lg blur opacity-20 group-hover:opacity-40 transition duration-1000 group-hover:duration-200"></div>
-          <div className="relative bg-white rounded-lg p-1.5 ring-1 ring-slate-100 shadow-sm">
-            <Image 
-              src="/mv_logo.png" 
-              alt="MV Portal" 
-              width={40} 
-              height={40} 
-              className="w-8 h-8 object-contain"
-            />
-          </div>
-        </div>
-        <div className="flex flex-col">
-          <span className="font-bold text-lg tracking-tight bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">MV Portal</span>
-          <span className="text-[10px] uppercase tracking-wider text-slate-500 font-medium">HR Management</span>
-        </div>
-      </div>
-
-      {/* Navigation */}
-      <div className="relative z-10 flex-1 overflow-y-auto py-6 px-3 space-y-1 scrollbar-hide">
-        <div className="mb-2 px-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">
-          Main Menu
-        </div>
-        {navItems.map((item) => {
-          const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`)
-          
-          return (
-            <Link 
-              key={item.href} 
-              href={item.href}
-              onClick={() => isMobile && setOpen?.(false)}
-              className="block"
-            >
-              <div 
-                className={cn(
-                  "group relative flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-300",
-                  isActive 
-                    ? "text-white shadow-md shadow-blue-500/15" 
-                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/80"
-                )}
-              >
-                {isActive && (
-                  <motion.div
-                    layoutId="active-pill"
-                    className="absolute inset-0 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-xl -z-10"
-                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                  />
-                )}
-                <item.icon className={cn("w-5 h-5", isActive ? "text-white" : "text-slate-500 group-hover:text-cyan-600 transition-colors")} />
-                <span className="font-medium">{item.label}</span>
-                {isActive && (
-                  <motion.div 
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    className="ml-auto"
-                  >
-                    <ChevronRight className="w-4 h-4 text-white/80" />
-                  </motion.div>
-                )}
+  const MobileSidebarContent = () => (
+    <div className="flex flex-col h-full bg-white text-slate-800 relative overflow-hidden">
+       <div className="p-6 border-b border-slate-100/50">
+          <Link href="/dashboard" onClick={() => setOpen?.(false)} className="flex items-center gap-3 group">
+             <div className="relative w-10 h-10 p-2 bg-gradient-to-br from-indigo-50 to-blue-50 rounded-xl border border-indigo-100/50 shadow-sm group-hover:shadow-md group-hover:scale-105 transition-all duration-300">
+                <Image src="/mv_logo.png" alt="MV Portal" fill className="object-contain p-1.5" />
+             </div>
+             <div className="flex flex-col">
+                <span className="font-bold text-lg tracking-tight bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent group-hover:from-indigo-600 group-hover:to-blue-600 transition-all duration-300">MV Portal</span>
+                <span className="text-[10px] uppercase tracking-widest text-slate-400 font-semibold group-hover:text-indigo-400 transition-colors">Employee Hub</span>
+             </div>
+          </Link>
+       </div>
+       <div className="flex-1 overflow-y-auto py-4 space-y-1 px-3">
+         {navItems.map((item) => {
+             const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`)
+             return (
+                 <Link key={item.href} href={item.href} onClick={() => setOpen?.(false)} className="block">
+                     <div className={cn("flex items-center gap-3 px-4 py-3 rounded-xl transition-all", isActive ? "bg-blue-50 text-blue-600 font-medium" : "text-slate-600 hover:bg-slate-50")}>
+                         <item.icon className="w-5 h-5" />
+                         <span>{item.label}</span>
+                     </div>
+                 </Link>
+             )
+         })}
+       </div>
+       
+       {/* Mobile Logout / Profile */}
+       <div className="p-4 border-t border-slate-100">
+          <div className="flex items-center gap-3 mb-4">
+              <div className="h-10 w-10 rounded-full bg-slate-100 overflow-hidden relative">
+                 {user?.profilePhoto ? (
+                    <Image src={user.profilePhoto} alt="Profile" fill className="object-cover" />
+                 ) : (
+                    <UserIcon className="w-5 h-5 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-slate-400" />
+                 )}
               </div>
-            </Link>
-          )
-        })}
-      </div>
-
-      {/* Notifications & Profile */}
-      <div className="relative z-10 p-4 border-t border-slate-100 space-y-4 bg-slate-50/50 hidden lg:block">
-        {/* Notification Preview */}
-        <div 
-            onClick={() => router.push('/notifications')}
-            className="px-3 py-3 bg-white rounded-xl border border-slate-100 shadow-sm cursor-pointer hover:shadow-md hover:border-blue-100 transition-all group"
-        >
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2 text-xs font-medium text-slate-600 group-hover:text-blue-600 transition-colors">
-              <Bell className="w-3.5 h-3.5 text-cyan-500" />
-              Notifications
-            </div>
-            {unreadCount > 0 && (
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-red-100 text-red-600 text-[10px] font-bold">
-                    {unreadCount}
-                </span>
-            )}
+              <div>
+                  <p className="font-medium text-slate-900">{user?.name}</p>
+                  <p className="text-xs text-slate-500">{user?.role}</p>
+              </div>
           </div>
-          <p className="text-[11px] text-slate-500 line-clamp-1">
-              {latestNotif ? latestNotif.Message__c : 'No new notifications'}
-          </p>
-        </div>
-
-        {/* Profile Card */}
-        <div 
-          onClick={handleProfileClick}
-          className="flex items-center gap-3 p-3 rounded-xl bg-white border border-slate-100 shadow-sm hover:shadow-md transition-all group cursor-pointer relative"
-        >
-          <div className="relative h-10 w-10 shrink-0">
-             <div className="relative h-full w-full rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500 overflow-hidden">
-                {user?.profilePhoto ? (
-                    <Image key={user?.id} src={user.profilePhoto} width={40} height={40} className="w-full h-full object-cover" alt="Profile" />
-                ) : (
-                    <User size={20} />
-                )}
-            </div>
-            <div className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-green-500 border-2 border-white"></div>
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-                 <p key={user?.id} className="text-sm font-semibold text-slate-800 truncate group-hover:text-cyan-600 transition-colors">
-                    {user ? `${user.name}` : 'Loading...'}
-                </p>
-                {/* Role Badge */}
-                <span className={cn(
-                    "px-1.5 py-0.5 rounded-md text-[10px] font-bold border uppercase tracking-wide",
-                    (user?.role?.includes('HR') || user?.role?.includes('Admin')) 
-                        ? "bg-purple-100 text-purple-700 border-purple-200" 
-                        : "bg-blue-50 text-blue-600 border-blue-100"
-                )}>
-                    {user?.role || 'Employee'}
-                </span>
-            </div>
-            <p className="text-xs text-slate-500 truncate">{user?.email || '...'}</p>
-          </div>
-          <div className="flex flex-col gap-1">
-               <button 
-                onClick={(e) => {
-                    e.stopPropagation();
-                    handleLogout();
-                }}
-                className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-red-500 transition-colors"
-                title="Logout"
-              >
-                <LogOut className="w-4 h-4" />
-              </button>
-          </div>
-        </div>
-      </div>
+          <button 
+                onClick={handleLogout}
+                className="w-full flex items-center justify-center gap-2 p-2.5 rounded-lg border border-red-100 text-red-600 hover:bg-red-50 transition-colors"
+          >
+              <LogOut className="w-4 h-4" />
+              <span>Logout</span>
+          </button>
+       </div>
     </div>
   )
 
-  if (isMobile) {
-    return (
+  return (
+    <>
+      {/* Desktop Top Bar */}
+      <div className={cn(
+          "hidden lg:flex items-center justify-between px-6 h-20 w-full transition-all duration-300",
+          scrolled ? "bg-white/95 backdrop-blur-md shadow-md border-b border-slate-100" : "bg-white shadow-sm border-b border-slate-200"
+      )}>
+          {/* Left: Logo & Nav */}
+          <div className="flex items-center gap-8">
+            <Link href="/dashboard" className="flex items-center gap-3">
+                <div className="relative h-9 w-9">
+                    <Image src="/mv_logo.png" alt="Logo" fill className="object-contain" />
+                </div>
+                <span className="font-bold text-xl tracking-tight text-slate-800 hidden xl:block">MV Portal</span>
+            </Link>
+
+             {/* Navigation (Horizontal) */}
+            <nav className="flex items-center gap-1 bg-slate-50/50 p-1 rounded-2xl border border-slate-200/50">
+                {navItems.map((item) => {
+                     const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`)
+                     return (
+                         <Link key={item.href} href={item.href} className="relative px-4 py-2 text-sm font-medium transition-colors rounded-xl overflow-hidden group">
+                             <span className={cn("relative z-10 flex items-center gap-2 transition-colors", isActive ? "text-blue-600 font-semibold" : "text-slate-500 hover:text-slate-700")}>
+                                 <item.icon className={cn("w-4 h-4", isActive ? "text-blue-600" : "text-slate-400 group-hover:text-slate-500")} />
+                                 {item.label}
+                             </span>
+                             {isActive && (
+                                 <motion.div 
+                                    layoutId="navbar-pill"
+                                    className="absolute inset-0 bg-white shadow-sm border border-slate-100 rounded-xl z-0"
+                                    transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                                 />
+                             )}
+                         </Link>
+                     )
+                })}
+            </nav>
+          </div>
+
+          {/* Right: Actions */}
+          <div className="flex items-center gap-5">
+              {/* Notification Bell */}
+              <div 
+                  className="relative cursor-pointer text-slate-500 hover:text-blue-600 transition-colors p-2.5 rounded-full hover:bg-slate-100 border border-transparent hover:border-slate-200"
+                  onClick={() => router.push('/notifications')}
+              >
+                  <Bell className="w-5 h-5" />
+                  {unreadCount > 0 && (
+                      <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white animate-pulse" />
+                  )}
+              </div>
+
+              <div className="h-6 w-px bg-slate-200 mx-1"></div>
+
+              {/* Profile Dropdown */}
+              <div className="relative" ref={profileRef}>
+                  <div 
+                    className="cursor-pointer"
+                    onClick={() => setProfileOpen(!profileOpen)}
+                  >
+                       <div className="h-10 w-10 rounded-full ring-2 ring-slate-100 hover:ring-blue-100 transition-all overflow-hidden relative">
+                          {user?.profilePhoto ? (
+                              <Image src={user.profilePhoto} alt="Profile" fill className="object-cover" />
+                          ) : (
+                              <div className="w-full h-full bg-slate-100 flex items-center justify-center text-slate-400">
+                                  <UserIcon className="w-5 h-5" />
+                              </div>
+                          )}
+                       </div>
+                  </div>
+
+                  {/* Popup Menu */}
+                  <AnimatePresence>
+                      {profileOpen && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                            transition={{ duration: 0.2 }}
+                            className="absolute right-0 top-14 w-64 bg-white rounded-2xl shadow-xl border border-slate-100 p-2 z-50 origin-top-right"
+                          >
+                              <div className="px-4 py-3 mb-2 bg-slate-50/50 rounded-xl border border-slate-100/50">
+                                  <p className="font-semibold text-slate-800 truncate">{user?.name || 'User'}</p>
+                                  <p className="text-xs text-slate-500 truncate">{user?.email}</p>
+                                  <span className="inline-block mt-2 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-blue-100 text-blue-700">
+                                      {user?.role}
+                                  </span>
+                              </div>
+                              
+                              <Link 
+                                href={`/employees/${user?.id}`}
+                                onClick={() => setProfileOpen(false)}
+                                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-slate-600 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                              >
+                                  <UserIcon className="w-4 h-4" />
+                                  My Profile
+                              </Link>
+                              
+                              <div className="my-1 border-t border-slate-100"></div>
+                              
+                              <button 
+                                onClick={handleLogout}
+                                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-red-600 hover:bg-red-50 transition-colors"
+                              >
+                                  <LogOut className="w-4 h-4" />
+                                  Log Out
+                              </button>
+                          </motion.div>
+                      )}
+                  </AnimatePresence>
+              </div>
+          </div>
+      </div>
+
+      {/* Mobile Top Bar */}
+      <div className="lg:hidden flex items-center justify-between px-4 h-16 bg-white border-b border-slate-200 sticky top-0 z-50">
+         <div className="flex items-center gap-3">
+            <button 
+                onClick={() => setOpen?.(true)} 
+                className="p-2 -ml-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+            >
+                <Menu className="w-6 h-6" />
+            </button>
+            <span className="font-bold text-lg text-slate-800">MV Portal</span>
+         </div>
+         
+         <div 
+            className="relative h-8 w-8 rounded-full bg-slate-100 overflow-hidden ring-1 ring-slate-200" 
+            onClick={() => setOpen?.(true)} // Clicking profile mobile opens sidebar too for simplicity, or router push
+         >
+             {user?.profilePhoto ? (
+                 <Image src={user.profilePhoto} alt="Profile" fill className="object-cover" />
+             ) : (
+                 <UserIcon className="w-4 h-4 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-slate-500" />
+             )}
+         </div>
+      </div>
+
+      {/* Mobile Sidebar Drawer Overlay */}
       <AnimatePresence>
-        {open && (
-          <>
+        {(open && isMobile) && (
+          <div className="fixed inset-0 z-[60] lg:hidden">
+            {/* Backdrop */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setOpen?.(false)}
-              className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 lg:hidden"
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
             />
+            {/* Drawer */}
             <motion.div
               initial={{ x: "-100%" }}
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
-              transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              className="fixed inset-y-0 left-0 w-72 bg-white z-50 lg:hidden shadow-2xl"
+              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              className="absolute inset-y-0 left-0 w-80 shadow-2xl h-full"
             >
-                <div className="absolute right-4 top-4 z-50">
-                    <button onClick={() => setOpen?.(false)} className="text-slate-500 hover:text-slate-800">
-                        <X className="w-6 h-6" />
-                    </button>
-                </div>
-              <SidebarContent />
+                <MobileSidebarContent />
+                <button 
+                    onClick={() => setOpen?.(false)}
+                    className="absolute top-4 right-4 p-2 bg-white/80 rounded-full text-slate-500 shadow-sm border border-slate-100"
+                >
+                    <X className="w-5 h-5" />
+                </button>
             </motion.div>
-          </>
+          </div>
         )}
       </AnimatePresence>
-    )
-  }
-
-  return (
-    <div className="hidden lg:block w-72 h-screen sticky top-0 shadow-xl shadow-slate-200/50 z-40">
-      <SidebarContent />
-    </div>
+    </>
   )
 }
