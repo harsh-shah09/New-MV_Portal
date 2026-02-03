@@ -336,10 +336,11 @@ export async function POST(request: NextRequest) {
       duration,
       totalDeduction,
       session: sessionValue,
-      reason,
+      reason: rawReason,
       onePlusTwoApplied,
       confirmedRules
     } = body;
+    const reason = rawReason?.trim() || '';
     const rulesAlreadyConfirmed = confirmedRules === true;
 
     console.log('Duration received from client:', duration);
@@ -398,6 +399,60 @@ export async function POST(request: NextRequest) {
           }
         }
       }, { status: 400 });
+    }
+
+    // Check for consecutive dates with the same leave category
+    const requestStartDate = dayjs(startDate);
+    const requestEndDate = dayjs(endDate);
+    
+    // Query for leaves that are consecutive (one day before or after the requested dates)
+    const consecutiveLeavesQuery = await conn.query<any>(`
+      SELECT 
+        Id, 
+        Start_Date__c,
+        End_Date__c,
+        Status__c,
+        Leave_Type__c,
+        Leave_Category__c
+      FROM Leave__c
+      WHERE Employee__c = '${employeeId}'
+      AND Status__c IN ('Applied', 'Approved')
+      AND Leave_Category__c = '${leaveCategory === 'loss-of-pay' ? 'Loss of Pay' : 'Extra Day Pay'}'
+    `);
+
+    console.log("Consecutive leaves check:", consecutiveLeavesQuery);
+
+    if (consecutiveLeavesQuery.records && consecutiveLeavesQuery.records.length > 0) {
+      for (const existingLeave of consecutiveLeavesQuery.records) {
+        const existingStart = dayjs(existingLeave.Start_Date__c);
+        const existingEnd = dayjs(existingLeave.End_Date__c);
+        
+        // Check if the new leave is exactly one day before or after an existing leave
+        const isOneDayBefore = requestEndDate.add(1, 'day').isSame(existingStart, 'day');
+        const isOneDayAfter = requestStartDate.subtract(1, 'day').isSame(existingEnd, 'day');
+        
+        if (isOneDayBefore || isOneDayAfter) {
+          const combinedStart = isOneDayBefore ? requestStartDate : existingStart;
+          const combinedEnd = isOneDayAfter ? requestEndDate : existingEnd;
+          
+          return NextResponse.json({
+            error: "Consecutive leave dates detected",
+            details: {
+              message: `You have an existing ${existingLeave.Leave_Category__c} leave from ${existingStart.format('DD MMM YYYY')} to ${existingEnd.format('DD MMM YYYY')}. Please apply a single leave for consecutive dates from ${combinedStart.format('DD MMM YYYY')} to ${combinedEnd.format('DD MMM YYYY')} instead of multiple separate requests.`,
+              existingLeave: {
+                startDate: existingLeave.Start_Date__c,
+                endDate: existingLeave.End_Date__c,
+                status: existingLeave.Status__c,
+                leaveCategory: existingLeave.Leave_Category__c
+              },
+              suggestedDates: {
+                startDate: combinedStart.format('YYYY-MM-DD'),
+                endDate: combinedEnd.format('YYYY-MM-DD')
+              }
+            }
+          }, { status: 400 });
+        }
+      }
     }
 
     // Fetch dynamic leave configurations
@@ -685,18 +740,18 @@ export async function POST(request: NextRequest) {
       if (!leaveType) {
         return NextResponse.json({ error: "Leave type is required for loss of pay" }, { status: 400 });
       }
-      if (!reason) {
+      if (!reason || reason.trim() === '') {
         return NextResponse.json({ error: "Leave reason is required" }, { status: 400 });
       }
       leaveRecord.Leave_Type__c = leaveType;
       leaveRecord.Leave_Category__c = 'Loss of Pay';
-      leaveRecord.Reason__c = reason;
+      leaveRecord.Reason__c = reason.trim();
     } else if (leaveCategory === 'extra-day-pay') {
-      if (!reason) {
+      if (!reason || reason.trim() === '') {
         return NextResponse.json({ error: "Leave reason is required" }, { status: 400 });
       }
       leaveRecord.Leave_Category__c = 'Extra Day Pay';
-      leaveRecord.Reason__c = reason;
+      leaveRecord.Reason__c = reason.trim();
     }
 
     // Create the leave record in Salesforce

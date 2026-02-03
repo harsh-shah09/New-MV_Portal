@@ -112,6 +112,23 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
     )
   }
 
+  // Disable dates function for loss-of-pay category
+  const disabledDate = (current: Dayjs) => {
+    if (!current || leaveCategory !== 'loss-of-pay') {
+      return false
+    }
+
+    // Check if it's a weekend (Saturday or Sunday)
+    const isWeekend = current.day() === 0 || current.day() === 6
+    
+    // Check if it's a holiday
+    const dateStr = current.format('YYYY-MM-DD')
+    const isHoliday = holidayMap.has(dateStr)
+    
+    // Disable if it's a weekend or holiday for loss-of-pay
+    return isWeekend || isHoliday
+  }
+
   const handleFinish = (values: any) => {
     // Validation: Check required fields
     if (!values.leaveCategory) {
@@ -268,11 +285,11 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
                 </Form.Item>
                 
                 <Form.Item name="startDate" label="Start Date" rules={[{ required: true }]}>
-                     <DatePicker className="w-full" format="YYYY-MM-DD" dateRender={dateFullCellRender} />
+                     <DatePicker className="w-full" format="YYYY-MM-DD" dateRender={dateFullCellRender} disabledDate={disabledDate} />
                 </Form.Item>
                 
                 <Form.Item name="endDate" label="End Date" rules={[{ required: true }]}>
-                     <DatePicker className="w-full" format="YYYY-MM-DD" dateRender={dateFullCellRender} />
+                     <DatePicker className="w-full" format="YYYY-MM-DD" dateRender={dateFullCellRender} disabledDate={disabledDate} />
                 </Form.Item>
                 
                 <Form.Item name="session" label="Session" rules={[{ required: true }]}>

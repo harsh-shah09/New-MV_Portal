@@ -1,10 +1,9 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Card, Descriptions, Table, Divider, Spin, message, Button } from "antd"
+import { Spin, message, Button } from "antd"
 import { PrinterOutlined, DownloadOutlined } from "@ant-design/icons"
 import Image from "next/image"
-import type { ColumnsType } from "antd/es/table"
 
 interface Leave {
   id: string
@@ -58,7 +57,7 @@ interface PayslipViewProps {
   onClose?: () => void
 }
 
-export function PayslipView({ payrollId, onClose }: PayslipViewProps) {
+export function PayslipView({ payrollId }: PayslipViewProps) {
   const [payslip, setPayslip] = useState<PayslipData | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -134,92 +133,6 @@ export function PayslipView({ payrollId, onClose }: PayslipViewProps) {
       </div>
     )
   }
-
-  // Leave columns
-  const leaveColumns: ColumnsType<Leave> = [
-    {
-      title: "Leave Type",
-      dataIndex: "leaveType",
-      key: "leaveType",
-    },
-    {
-      title: "Category",
-      dataIndex: "leaveCategory",
-      key: "leaveCategory",
-    },
-    {
-      title: "Start Date",
-      dataIndex: "startDate",
-      key: "startDate",
-      render: (date: string) => new Date(date).toLocaleDateString(),
-    },
-    {
-      title: "End Date",
-      dataIndex: "endDate",
-      key: "endDate",
-      render: (date: string) => new Date(date).toLocaleDateString(),
-    },
-    {
-      title: "Days in Month",
-      dataIndex: "daysInSelectedMonth",
-      key: "daysInSelectedMonth",
-      align: "center",
-    },
-    {
-      title: "Days After Rules",
-      dataIndex: "daysAfterRuleInMonth",
-      key: "daysAfterRuleInMonth",
-      align: "center",
-      render: (days: number, record: Leave) => (
-        <span>
-          {days.toFixed(1)}
-          {(record.onePlusTwoRuleApplied || record.sandwichRuleApplied) && (
-            <span className="text-xs text-orange-600 ml-1">
-              ({record.sandwichRuleApplied && '🥪'}
-              {record.onePlusTwoRuleApplied && '1+2'})
-            </span>
-          )}
-        </span>
-      ),
-    },
-    {
-      title: "Deduction",
-      dataIndex: "afterRuleDeduction",
-      key: "afterRuleDeduction",
-      align: "right",
-      render: (amount: number) => `₹${amount.toLocaleString()}`,
-    },
-  ]
-
-  // Adjustment columns
-  const adjustmentColumns: ColumnsType<Adjustment> = [
-    {
-      title: "Type",
-      dataIndex: "adjustmentType",
-      key: "adjustmentType",
-      render: (type: string) => (
-        <span className={type === "Addition" ? "text-green-600" : "text-red-600"}>
-          {type}
-        </span>
-      ),
-    },
-    {
-      title: "Description",
-      dataIndex: "adjustmentDescription",
-      key: "adjustmentDescription",
-    },
-    {
-      title: "Amount",
-      dataIndex: "adjustmentAmount",
-      key: "adjustmentAmount",
-      align: "right",
-      render: (amount: number, record: Adjustment) => (
-        <span className={record.adjustmentType === "Addition" ? "text-green-600" : "text-red-600"}>
-          {record.adjustmentType === "Addition" ? "+" : "-"}₹{Math.abs(amount).toLocaleString()}
-        </span>
-      ),
-    },
-  ]
 
   return (
     <div className="space-y-6">
