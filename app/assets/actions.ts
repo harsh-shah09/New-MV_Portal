@@ -226,27 +226,18 @@ export async function updateAssetAssignment(params: UpdateAssignmentParams) {
   const conn = await getSalesforceConnection();
   if (!conn) throw new Error("Salesforce connection failed");
 
-  // Validate bypass?
-  // User Prompt: "Bypass allowed only if Asset_Configuration__mdt.Bypass_Validation__c = Yes"
-  // BUT "Assigned Person ... Assigned Date ... Validations ... NO EXCEPTIONS for Assigned Person/Date (mostly)"
-  // Wait, "Assigned Date may still be enforced...". "Assigned Person ... can never be bypassed"
-  // So the bypass logic mainly applies to *Other* validations if they were intricate, OR maybe the overlap rule?
-  // "Validations (ALL MUST BE ENFORCED — NO EXCEPTIONS)" - this header seems to override the bypass for the listed items.
-  // Item 6 says "Bypass allowed only if...".
-  // This implies some checks (maybe product requirement?) can be bypassed.
-  // I will check the product requirement: "Product (AMS_Product__c) is required unless bypassed by configuration".
-  // Ah, that was in the Asset Creation Rules (Section 4). Update Assignment allows bypassing?
-  // Section 7.6: "Bypass allowed only if... Assigned Person validation is never bypassed".
-  // I will proceed with the strict checks currently implemented.
+  // Fetch Configuration
+  const config = await getAssetConfig();
+  const allowBypass = config.Bypass_Validation__c === 'Yes';
 
   // 1. Validations
   if (params.assignToNewPerson) {
-      if (!params.newAssigneeId) throw new Error("Please select an employee to assign the asset to.");
-      if (!params.assignedDate) throw new Error("Please select the Assignment Date.");
+      if (!params.newAssigneeId) throw new Error("Please select an employee to assign the asset to."); // Never bypassed
+      if (!params.assignedDate) throw new Error("Please select the Assignment Date."); // Never bypassed
   }
 
-  // Check overlaps
-  if (params.assignToNewPerson && params.assignedDate) {
+  // Check overlaps (Skippable via Configuration)
+  if (!allowBypass && params.assignToNewPerson && params.assignedDate) {
       const existingHistoryQuery = `
         SELECT AMS_Assigned_Date__c, AMS_Returned_Date__c 
         FROM AMS_Asset_Assignment_History__c 
