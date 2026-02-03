@@ -33,6 +33,7 @@ export async function GET(
         Id,
         Employee__c,
         Employee__r.Employee_Name__c,
+        Employee__r.Employee_Id__c,
         Employee__r.Employee_Email__c,
         Employee__r.Department__c,
         Employee__r.Role__c,
@@ -281,7 +282,7 @@ export async function GET(
     // Build payslip data
     const payslip = {
       id: payroll.Id,
-      employeeId: payroll.Employee__c,
+      employeeId: payroll.Employee__r?.Employee_Id__c || payroll.Employee__c || "",
       employeeName: payroll.Employee__r?.Employee_Name__c || "Unknown",
       email: payroll.Employee__r?.Employee_Email__c || "",
       department: payroll.Employee__r?.Department__c || "",

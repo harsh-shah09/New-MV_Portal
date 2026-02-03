@@ -274,7 +274,7 @@ export function PayslipView({ payrollId, onClose }: PayslipViewProps) {
                 </div>
                 <div className="flex">
                   <span className="text-gray-600 w-40">Employee ID</span>
-                  <span className="text-gray-900">: {payslip.employeeId.slice(0, 15)}</span>
+                  <span className="text-gray-900">: {payslip.employeeId}</span>
                 </div>
                 <div className="flex">
                   <span className="text-gray-600 w-40">Department</span>

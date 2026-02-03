@@ -364,6 +364,42 @@ export async function POST(request: NextRequest) {
 
     const conn = await getSalesforceConnection();
 
+    // Check for existing leaves that overlap with the requested dates
+    const existingLeavesQuery = await conn.query<any>(`
+      SELECT 
+        Id, 
+        Start_Date__c,
+        End_Date__c,
+        Status__c,
+        Leave_Type__c,
+        Leave_Category__c
+      FROM Leave__c
+      WHERE Employee__c = '${employeeId}'
+      AND Status__c IN ('Applied', 'Approved')
+      AND (
+        (Start_Date__c <= ${endDate} AND End_Date__c >= ${startDate})
+      )
+    `);
+
+    console.log("Existing leaves check:", existingLeavesQuery);
+
+    if (existingLeavesQuery.records && existingLeavesQuery.records.length > 0) {
+      const overlappingLeave = existingLeavesQuery.records[0];
+      return NextResponse.json({
+        error: "Leave already exists for the selected dates",
+        details: {
+          message: `You already have a ${overlappingLeave.Status__c?.toLowerCase()} leave from ${dayjs(overlappingLeave.Start_Date__c).format('DD MMM YYYY')} to ${dayjs(overlappingLeave.End_Date__c).format('DD MMM YYYY')}. Please choose different dates.`,
+          existingLeave: {
+            startDate: overlappingLeave.Start_Date__c,
+            endDate: overlappingLeave.End_Date__c,
+            status: overlappingLeave.Status__c,
+            leaveType: overlappingLeave.Leave_Type__c,
+            leaveCategory: overlappingLeave.Leave_Category__c
+          }
+        }
+      }, { status: 400 });
+    }
+
     // Fetch dynamic leave configurations
     const leaveConfig = await fetchLeaveConfigurations(conn);
 

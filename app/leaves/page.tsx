@@ -175,7 +175,9 @@ export default function LeavesPage() {
         }
 
         if (!response.ok) {
-          toast.error(result?.error || "Failed to submit leave request", { id: toastId })
+          // Check if there's a detailed message from the backend (e.g., duplicate leave)
+          const errorMessage = result?.details?.message || result?.error || "Failed to submit leave request"
+          toast.error(errorMessage, { id: toastId, duration: 6000 })
           return
         }
 
