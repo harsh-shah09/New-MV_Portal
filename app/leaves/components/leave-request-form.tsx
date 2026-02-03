@@ -307,10 +307,25 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
               <Form.Item 
                 name="reason" 
                 label="Leave Reason" 
-                rules={[{ required: true, message: 'Please provide reason for leave' }]}
-              >
-                  <TextArea rows={3} placeholder="Explain the reason for your leave..." />
-              </Form.Item>
+                rules={[
+                  { required: true, message: 'Please provide reason for leave' },
+                  { 
+                  validator: (_, value) => {
+                    if (!value) return Promise.resolve()
+                    const trimmedValue = value.trim()
+                    if (trimmedValue.length === 0) {
+                    return Promise.reject('Reason cannot be only spaces')
+                    }
+                    if (trimmedValue.length < 10) {
+                    return Promise.reject('Reason must be at least 10 characters')
+                    }
+                    return Promise.resolve()
+                  }
+                  }
+                ]}
+                >
+                  <TextArea rows={3} placeholder="Explain the reason for your leave (minimum 10 characters)..." />
+                </Form.Item>
             </>
           )}
 
@@ -338,13 +353,28 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
                 </Form.Item>
               </div>
               
-              <Form.Item 
+                <Form.Item 
                 name="reason" 
                 label="Reason" 
-                rules={[{ required: true, message: 'Please provide reason for extra day pay' }]}
-              >
-                  <TextArea rows={3} placeholder="Explain why you need extra day pay..." />
-              </Form.Item>
+                rules={[
+                  { required: true, message: 'Please provide reason for extra day pay' },
+                  { 
+                  validator: (_, value) => {
+                    if (!value) return Promise.resolve()
+                    const trimmedValue = value.trim()
+                    if (trimmedValue.length === 0) {
+                    return Promise.reject('Reason cannot be only spaces')
+                    }
+                    if (trimmedValue.length < 10) {
+                    return Promise.reject('Reason must be at least 10 characters')
+                    }
+                    return Promise.resolve()
+                  }
+                  }
+                ]}
+                >
+                  <TextArea rows={3} placeholder="Explain why you need extra day pay (minimum 10 characters)..." />
+                </Form.Item>
             </>
           )}
 
