@@ -144,7 +144,7 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
       return
     }
 
-    if (!values.reason) {
+    if (!values.reason.trim()) {
       toast.error("Please provide a reason for leave")
       return
     }

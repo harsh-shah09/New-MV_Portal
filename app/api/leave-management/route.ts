@@ -404,6 +404,7 @@ export async function POST(request: NextRequest) {
     // Check for consecutive dates with the same leave category
     const requestStartDate = dayjs(startDate);
     const requestEndDate = dayjs(endDate);
+    const isRequestHalfDay = sessionValue === "Session-1" || sessionValue === "Session-2";
     
     // Query for leaves that are consecutive (one day before or after the requested dates)
     const consecutiveLeavesQuery = await conn.query<any>(`
@@ -413,7 +414,8 @@ export async function POST(request: NextRequest) {
         End_Date__c,
         Status__c,
         Leave_Type__c,
-        Leave_Category__c
+        Leave_Category__c,
+        Session__c
       FROM Leave__c
       WHERE Employee__c = '${employeeId}'
       AND Status__c IN ('Applied', 'Approved')
@@ -426,31 +428,61 @@ export async function POST(request: NextRequest) {
       for (const existingLeave of consecutiveLeavesQuery.records) {
         const existingStart = dayjs(existingLeave.Start_Date__c);
         const existingEnd = dayjs(existingLeave.End_Date__c);
+        const existingSession = existingLeave.Session__c;
+        const isExistingHalfDay = existingSession === "Session-1" || existingSession === "Session-2";
         
-        // Check if the new leave is exactly one day before or after an existing leave
-        const isOneDayBefore = requestEndDate.add(1, 'day').isSame(existingStart, 'day');
-        const isOneDayAfter = requestStartDate.subtract(1, 'day').isSame(existingEnd, 'day');
-        
-        if (isOneDayBefore || isOneDayAfter) {
-          const combinedStart = isOneDayBefore ? requestStartDate : existingStart;
-          const combinedEnd = isOneDayAfter ? requestEndDate : existingEnd;
-          
-          return NextResponse.json({
-            error: "Consecutive leave dates detected",
-            details: {
-              message: `You have an existing ${existingLeave.Leave_Category__c} leave from ${existingStart.format('DD MMM YYYY')} to ${existingEnd.format('DD MMM YYYY')}. Please apply a single leave for consecutive dates from ${combinedStart.format('DD MMM YYYY')} to ${combinedEnd.format('DD MMM YYYY')} instead of multiple separate requests.`,
-              existingLeave: {
-                startDate: existingLeave.Start_Date__c,
-                endDate: existingLeave.End_Date__c,
-                status: existingLeave.Status__c,
-                leaveCategory: existingLeave.Leave_Category__c
-              },
-              suggestedDates: {
-                startDate: combinedStart.format('YYYY-MM-DD'),
-                endDate: combinedEnd.format('YYYY-MM-DD')
+        // Check if applying for the same date with same session (not allowed)
+        if (requestStartDate.isSame(existingStart, 'day') && requestEndDate.isSame(existingEnd, 'day')) {
+          // Same day - only allow if both are half-day and different sessions
+          if (isRequestHalfDay && isExistingHalfDay && sessionValue !== existingSession) {
+            // Different sessions on the same day - allowed
+            continue;
+          } else {
+            // Same day with same session or full day conflict
+            return NextResponse.json({
+              error: "Leave already exists for this date",
+              details: {
+                message: `You already have a ${existingSession || 'Full Day'} leave on ${existingStart.format('DD MMM YYYY')}. ${isRequestHalfDay && isExistingHalfDay ? 'You cannot apply for the same session twice.' : 'Please choose different dates.'}`,
+                existingLeave: {
+                  startDate: existingLeave.Start_Date__c,
+                  endDate: existingLeave.End_Date__c,
+                  status: existingLeave.Status__c,
+                  leaveCategory: existingLeave.Leave_Category__c,
+                  session: existingSession
+                }
               }
-            }
-          }, { status: 400 });
+            }, { status: 400 });
+          }
+        }
+        
+        // For full-day leaves, check if consecutive days should be combined
+        // Skip this check if either leave is half-day (sessions can be on consecutive days)
+        if (!isRequestHalfDay && !isExistingHalfDay) {
+          // Check if the new leave is exactly one day before or after an existing leave
+          const isOneDayBefore = requestEndDate.add(1, 'day').isSame(existingStart, 'day');
+          const isOneDayAfter = requestStartDate.subtract(1, 'day').isSame(existingEnd, 'day');
+          
+          if (isOneDayBefore || isOneDayAfter) {
+            const combinedStart = isOneDayBefore ? requestStartDate : existingStart;
+            const combinedEnd = isOneDayAfter ? requestEndDate : existingEnd;
+            
+            return NextResponse.json({
+              error: "Consecutive leave dates detected",
+              details: {
+                message: `You have an existing ${existingLeave.Leave_Category__c} leave from ${existingStart.format('DD MMM YYYY')} to ${existingEnd.format('DD MMM YYYY')}. Please apply a single leave for consecutive dates from ${combinedStart.format('DD MMM YYYY')} to ${combinedEnd.format('DD MMM YYYY')} instead of multiple separate requests.`,
+                existingLeave: {
+                  startDate: existingLeave.Start_Date__c,
+                  endDate: existingLeave.End_Date__c,
+                  status: existingLeave.Status__c,
+                  leaveCategory: existingLeave.Leave_Category__c
+                },
+                suggestedDates: {
+                  startDate: combinedStart.format('YYYY-MM-DD'),
+                  endDate: combinedEnd.format('YYYY-MM-DD')
+                }
+              }
+            }, { status: 400 });
+          }
         }
       }
     }
@@ -644,7 +676,21 @@ export async function POST(request: NextRequest) {
     // Sandwich applies if: non-working days are sandwiched inside OR there are non-working days both before and after
     const sandwichApplied = applySandwichRule && (hasNonWorkingInside || (preSandwich > 0 && postSandwich > 0));
     // Base leave days should be only working days when no sandwich, or all calendar days when sandwich applies
-    const rangeLeaveDays = sandwichApplied ? baseCalendarDays : workingDaysInRange;
+    let rangeLeaveDays = sandwichApplied ? baseCalendarDays : workingDaysInRange;
+    
+    console.log('[Half-Day Check] Before adjustment:', {
+      isHalfDay,
+      sessionValue,
+      workingDaysInRange,
+      rangeLeaveDays
+    });
+    
+    // For half-day leaves, calculate as 0.5 per day
+    if (isHalfDay) {
+      rangeLeaveDays = rangeLeaveDays * 0.5;
+      console.log('[Half-Day Check] After 0.5 multiplication:', rangeLeaveDays);
+    }
+    
     const sandwichExtra = sandwichApplied ? preSandwich + postSandwich : 0;
     const totalSandwichDeduction = rangeLeaveDays + sandwichExtra;
 
@@ -763,6 +809,7 @@ export async function POST(request: NextRequest) {
     };
 
     console.log("Prepared leave record:", leaveRecord);
+    console.log('[Critical] Total_Days__c value being stored:', leaveRecord.Total_Days__c, 'Type:', typeof leaveRecord.Total_Days__c);
 
     // Add fields based on leave category
     if (leaveCategory === 'loss-of-pay') {
@@ -785,6 +832,7 @@ export async function POST(request: NextRequest) {
 
     // Create the leave record in Salesforce
     const result = await conn.sobject('Leave__c').create(leaveRecord) as any;
+    console.log("Leave record creation result:", result);
 
     if (!result.success) {
       console.error("Failed to create leave record:", result);
