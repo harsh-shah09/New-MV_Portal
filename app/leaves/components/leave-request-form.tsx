@@ -114,6 +114,9 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
 
   // Disable dates function for loss-of-pay category
   const disabledDate = (current: Dayjs) => {
+    // to disable disableDate
+    // return false
+
     if (!current || leaveCategory !== 'loss-of-pay') {
       return false
     }
@@ -248,8 +251,8 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
             leaveCategory: '',
             leaveType: 'Planned Leave',
             session: 'Full Day',
-            startDate: dayjs().add(1, 'day'),
-            endDate: dayjs().add(1, 'day')
+            startDate: dayjs(),
+            endDate: dayjs()
         }}
         className="mt-4"
       >

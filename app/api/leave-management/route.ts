@@ -503,6 +503,35 @@ export async function POST(request: NextRequest) {
       const nonWorkingDays: string[] = [];
       let allNonWorking = true;
       let cursor = start.clone();
+      console.log('is same or before', cursor.isSame(end) || cursor.isBefore(end));
+
+      if(isNonWorking(start)) {
+        console.log('start is non working');
+        return NextResponse.json(
+          {
+            error: "Leave dates fall on weekends/holidays",
+            details: {
+              nonWorkingDays,
+              message: "Select start date which is not an holiday or weekend.",
+            },
+          },
+          { status: 400 }
+        );
+      }
+      if(isNonWorking(end)) {
+        console.log('end is non working');
+        return NextResponse.json(
+          {
+            error: "Leave dates fall on weekends/holidays",
+            details: {
+              nonWorkingDays,
+              message: "Select end date which is not an holiday or weekend.",
+            },
+          },
+          { status: 400 }
+        );
+      }
+
       while (cursor.isSame(end) || cursor.isBefore(end)) {
         const formatted = cursor.format("YYYY-MM-DD");
         if (isNonWorking(cursor)) {
