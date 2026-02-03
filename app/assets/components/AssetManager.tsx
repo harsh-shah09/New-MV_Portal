@@ -1,21 +1,17 @@
 "use client"
 
 import { useState } from 'react';
-import { Button, message, Input } from 'antd';
-import { PlusOutlined, SearchOutlined, ReloadOutlined, AppstoreOutlined, FileAddOutlined } from '@ant-design/icons';
+import { Button, Input, Modal } from 'antd';
+import { PlusOutlined, SearchOutlined, ReloadOutlined, AppstoreOutlined, FileAddOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { useRouter } from 'next/navigation';
 import { AssetTable } from './AssetTable';
 import { AssetAssignmentModal } from './AssetAssignmentModal';
 import { CreateAssetModal } from './CreateAssetModal';
 import { SalesforceAsset, AssignmentHistory } from '../types';
-import { getAssetById, getAssets } from '../actions';
+import { getAssetById, getAssets, updateAssetStatus } from '../actions';
+import { showToast } from './toast';
 
-// Responsive wrapper for Modal width
-const modalWidth = {
-  xs: '95%',
-  sm: '90%',
-  md: 600,
-};
+// ... (existing modalWidth)
 
 interface AssetManagerProps {
   initialAssets: SalesforceAsset[];
@@ -33,16 +29,13 @@ export function AssetManager({ initialAssets }: AssetManagerProps) {
   const [currentAssignment, setCurrentAssignment] = useState<AssignmentHistory | null>(null);
   const [selectedAsset, setSelectedAsset] = useState<SalesforceAsset | null>(null);
 
-
-
-
   const refreshAssets = async () => {
     setLoading(true);
     try {
       const data = await getAssets();
       setAssets(data);
     } catch (e) {
-      message.error("Failed to refresh assets");
+      showToast.error("Failed to refresh assets");
     } finally {
       setLoading(false);
     }
@@ -65,7 +58,52 @@ export function AssetManager({ initialAssets }: AssetManagerProps) {
         }
         setIsModalVisible(true);
     } catch (e) {
-        message.error("Failed to fetch assignment details");
+        showToast.error("Failed to fetch assignment details");
+    }
+  };
+  
+  const handleDiscard = async (asset: SalesforceAsset) => {
+    if (asset.AMS_Status__c === 'Discarded') {
+        showToast.warning("Asset Already Discarded", { 
+            description: "This asset has already been marked as discarded. No further action is required." 
+        });
+        return;
+    }
+
+    try {
+        const details = await getAssetById(asset.Id);
+        const active = details?.history?.find(h => !h.AMS_Returned_Date__c);
+
+        if (active) {
+            const assigneeName = active.AMS_Assigned_Person__r?.Employee_Name__c || active.AMS_Assigned_Person__r?.Name || 'Unknown';
+            showToast.warning("Active Assignment Found", {
+                description: `This asset has an active assignment record (${active.Name} with ${assigneeName}). Please ensure the asset is returned before proceeding.`
+            });
+            return;
+        }
+
+        Modal.confirm({
+            title: 'Confirm Discard',
+            icon: <ExclamationCircleOutlined />,
+            content: 'Consent Given to Discard? This action updates the status to Discarded.',
+            okText: 'Yes, Discard',
+            okType: 'danger',
+            cancelText: 'No',
+            onOk: async () => {
+                try {
+                    setLoading(true);
+                    await updateAssetStatus(asset.Id, 'Discarded');
+                    showToast.success('Asset Discarded', { description: 'The asset status has been updated to Discarded.' });
+                    await refreshAssets();
+                } catch (e: any) {
+                    showToast.error('Discard Failed', { description: e.message || 'Failed to discard asset' });
+                    setLoading(false);
+                }
+            }
+        });
+    } catch (e) {
+        console.error("Check Discard Error", e);
+        showToast.error("Verification Failed", { description: "Failed to verify asset details" });
     }
   };
 
@@ -84,7 +122,6 @@ export function AssetManager({ initialAssets }: AssetManagerProps) {
   return (
     <div className="space-y-6">
       {/* Header Actions */}
-      {/* Header Actions - Mobile Optimized */}
       <div className="flex flex-col lg:flex-row gap-4 justify-between items-stretch lg:items-center">
         <div className="relative w-full lg:w-96">
             <Input 
@@ -142,6 +179,7 @@ export function AssetManager({ initialAssets }: AssetManagerProps) {
         assets={filteredAssets} 
         loading={loading} 
         onManageAssignment={handleManageAssignment} 
+        onDiscard={handleDiscard}
       />
 
       {/* Assignment Modal */}

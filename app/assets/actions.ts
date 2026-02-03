@@ -306,3 +306,18 @@ export async function updateAssetAssignment(params: UpdateAssignmentParams) {
     throw new Error(error.message || "An error occurred during assignment update.");
   }
 }
+
+export async function updateAssetStatus(assetId: string, status: string) {
+  const conn = await getSalesforceConnection();
+  if (!conn) throw new Error("Salesforce connection failed");
+
+  const result = await conn.sobject('MVC_Internal_Asset__c').update({
+    Id: assetId,
+    AMS_Status__c: status
+  });
+
+  if (!result.success) {
+    throw new Error("Failed to update asset status: " + JSON.stringify(result.errors));
+  }
+  return { success: true };
+}

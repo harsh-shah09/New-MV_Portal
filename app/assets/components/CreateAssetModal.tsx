@@ -1,10 +1,11 @@
 "use client"
 
 import { useState, useEffect } from 'react';
-import { Modal, Form, Select, DatePicker, Input, Button, message } from 'antd';
+import { Modal, Form, Select, DatePicker, Input, Button } from 'antd';
 import { createAsset, getProducts } from '../actions';
 import { SalesforceProduct } from '../types';
 import dayjs from 'dayjs';
+import { showToast } from './toast';
 
 interface CreateAssetModalProps {
   visible: boolean;
@@ -47,10 +48,10 @@ export function CreateAssetModal({ visible, onCancel, onSuccess }: CreateAssetMo
             AMS_Warranty_Expiry_Date__c: values.AMS_Warranty_Expiry_Date__c ? values.AMS_Warranty_Expiry_Date__c.format('YYYY-MM-DD') : undefined,
             AMS_Purchase_Condition__c: values.AMS_Purchase_Condition__c,
         });
-        message.success("Asset created successfully!");
+        showToast.success("Asset Created", { description: "Asset created successfully!" });
         onSuccess();
     } catch (err: any) {
-        message.error("Failed to create asset: " + err.message);
+        showToast.error("Creation Failed", { description: err.message });
     } finally {
         setLoading(false);
     }

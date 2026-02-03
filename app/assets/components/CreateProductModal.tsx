@@ -1,7 +1,8 @@
 "use client"
 import { useState, useEffect } from 'react';
-import { Modal, Form, Input, Checkbox, Button, message, Select } from 'antd';
+import { Modal, Form, Input, Checkbox, Button, Select } from 'antd';
 import { createProduct, getProductCategories } from '../actions';
+import { showToast } from './toast';
 
 interface CreateProductModalProps {
   visible: boolean;
@@ -26,11 +27,11 @@ export function CreateProductModal({ visible, onCancel, onSuccess }: CreateProdu
         setLoading(true);
         try {
             await createProduct(values);
-            message.success("Product created successfully!");
+            showToast.success("Product Created", { description: "Product created successfully!" });
             onSuccess();
             form.resetFields();
         } catch (e: any) {
-            message.error(e.message);
+            showToast.error("Creation Failed", { description: e.message });
         } finally {
             setLoading(false);
         }

@@ -1,12 +1,13 @@
 "use client"
 
 import { useState, useEffect } from 'react';
-import { Modal, Form, Select, DatePicker, Input, Switch, Alert, Button, Divider, message } from 'antd';
+import { Modal, Form, Select, DatePicker, Input, Switch, Alert, Button, Divider } from 'antd';
 import { SalesforceAsset, AssignmentHistory } from '../types';
 import { updateAssetAssignment, getAllEmployeesForSelect, getAssetById } from '../actions';
 import dayjs from 'dayjs';
 import { UserOutlined, ClockCircleOutlined, SwapOutlined } from '@ant-design/icons';
 import { Timeline } from 'antd';
+import { showToast } from './toast';
 
 interface AssetAssignmentModalProps {
   visible: boolean;
@@ -69,7 +70,7 @@ export function AssetAssignmentModal({ visible, onCancel, onSuccess, asset, curr
 
     // Logic Check: If AssingToNewPerson is FALSE and NOT assigned, nothing to do
     if (!values.assignToNewPerson && !currentAssignment) {
-        message.info("No changes to make.");
+        showToast.info("No Changes", { description: "No changes to make." });
         return;
     }
 
@@ -87,10 +88,10 @@ export function AssetAssignmentModal({ visible, onCancel, onSuccess, asset, curr
             currentAssignmentId: currentAssignment?.Id,
             conditionOnReturn: values.conditionOnReturn, // For the OLD assignment
         });
-        message.success("Asset assignment updated successfully!");
+        showToast.success("Updated Successfully", { description: "Asset assignment updated successfully!" });
         onSuccess();
     } catch (err: any) {
-        message.error(err.message);
+        showToast.error("Update Failed", { description: err.message });
     } finally {
         setLoading(false);
     }

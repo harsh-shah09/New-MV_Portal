@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Modal, Form, Input, Select, DatePicker, InputNumber, Button, message } from "antd"
+import { Modal, Form, Input, Select, DatePicker, InputNumber, Button } from "antd"
 import dayjs from "dayjs"
 import type { Asset } from "@/types"
 

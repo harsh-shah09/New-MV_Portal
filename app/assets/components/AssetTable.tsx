@@ -2,7 +2,7 @@
 
 import { Table, Button, Tag, Space, Tooltip } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { EyeOutlined, EditOutlined, SwapOutlined } from '@ant-design/icons';
+import { EyeOutlined, EditOutlined, SwapOutlined, DeleteOutlined } from '@ant-design/icons';
 import { SalesforceAsset } from '../types';
 import Link from 'next/link';
 
@@ -11,9 +11,10 @@ interface AssetTableProps {
   loading?: boolean;
   onManageAssignment?: (asset: SalesforceAsset) => void;
   onViewDetails?: (asset: SalesforceAsset) => void;
+  onDiscard?: (asset: SalesforceAsset) => void;
 }
 
-export function AssetTable({ assets, loading, onManageAssignment, onViewDetails }: AssetTableProps) {
+export function AssetTable({ assets, loading, onManageAssignment, onViewDetails, onDiscard }: AssetTableProps) {
   const columns: ColumnsType<SalesforceAsset> = [
     {
       title: 'Asset ID',
@@ -37,6 +38,8 @@ export function AssetTable({ assets, loading, onManageAssignment, onViewDetails 
       dataIndex: 'AMS_Category__c',
       key: 'AMS_Category__c',
       responsive: ['md'],
+      filters: Array.from(new Set(assets.map(a => a.AMS_Category__c).filter(Boolean))).map(c => ({ text: c, value: c })),
+      onFilter: (value: any, record) => record.AMS_Category__c === value,
     },
     {
       title: 'Serial No.',
@@ -55,7 +58,13 @@ export function AssetTable({ assets, loading, onManageAssignment, onViewDetails 
       title: 'Status',
       dataIndex: 'AMS_Status__c',
       key: 'AMS_Status__c',
-      width: 100,
+      width: 120,
+      filters: [
+          { text: 'Assigned', value: 'Assigned' },
+          { text: 'Un-Assigned', value: 'Un-Assigned' },
+          { text: 'Discarded', value: 'Discarded' },
+      ],
+      onFilter: (value: any, record) => record.AMS_Status__c === value,
       render: (status) => {
         let color = 'default';
         if (status === 'Assigned') color = 'processing'; // Blue
@@ -67,18 +76,33 @@ export function AssetTable({ assets, loading, onManageAssignment, onViewDetails 
     {
       title: 'Action',
       key: 'actions',
-      width: 80,
-      render: (_, record) => (
-          <Tooltip title="Manage Assignment">
-            <Button 
-                icon={<SwapOutlined />} 
-                type="primary" 
-                ghost 
-                size="small"
-                onClick={() => onManageAssignment?.(record)}
-            />
-          </Tooltip>
-      )
+      width: 120,
+      render: (_, record) => {
+          if (record.AMS_Status__c === 'Discarded') {
+              return <span className="text-gray-400 text-xs italic">No actions available</span>;
+          }
+          return (
+            <div className="flex gap-2">
+                <Tooltip title="Manage Assignment">
+                    <Button 
+                        icon={<SwapOutlined />} 
+                        type="primary" 
+                        ghost 
+                        size="small"
+                        onClick={() => onManageAssignment?.(record)}
+                    />
+                </Tooltip>
+                <Tooltip title="Discard Asset">
+                    <Button 
+                        icon={<DeleteOutlined />} 
+                        danger
+                        size="small"
+                        onClick={() => onDiscard?.(record)}
+                    />
+                </Tooltip>
+            </div>
+          );
+      }
     }
   ];
 
