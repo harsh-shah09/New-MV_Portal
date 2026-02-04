@@ -467,15 +467,15 @@ async function recalculateSandwichOnWithdrawal(
         const baseDays = leaveData.Total_Days__c || 0;
         // Assuming OnePlusTwo doesn't change, just update sandwich portion
         const onePlusTwoDays = leaveData.OnePlusTwo_Rule__c ? 
-          ((leaveData.Total_Days_After_Rule__c || 0) - baseDays - oldSandwichDays) : 0;
+          ((leaveData.Total_Days_After_Rule__c || 0) - baseDays - oldTotalSandwichDays) : 0;
         
-        updateData.Total_Days_After_Rule__c = baseDays + newSandwichDays + onePlusTwoDays;
+        updateData.Total_Days_After_Rule__c = baseDays + newTotalSandwichDays + onePlusTwoDays;
       }
     }
 
     await conn.sobject('Leave__c').update(updateData);
     updatedLeaveIds.push(leave.Id);
-    console.log('[Sandwich Recalc] Updated leave:', leave.Id, 'New sandwich days:', newSandwichDays);
+    console.log('[Sandwich Recalc] Updated leave:', leave.Id, 'New sandwich days:', newTotalSandwichDays);
   }
 
   return { updatedLeaveIds, removedSandwichDays: totalRemovedDays };
