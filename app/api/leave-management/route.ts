@@ -91,8 +91,37 @@ async function fetchLeaveConfigurations(conn: any): Promise<LeaveConfig> {
 }
 
 /**
+ * Interface for sandwich detection result
+ */
+interface CrossRequestSandwichResult {
+  hasCrossRequestSandwich: boolean;
+  sandwichDays: number;
+  affectedLeaveIds: string[];
+  sandwichDetails: {
+    beforeLeaveId?: string;
+    afterLeaveId?: string;
+    gapDates: string[];
+    newRequestPosition: 'before' | 'after' | 'both' | 'none';
+  };
+}
+
+/**
+ * Interface for leave record in sandwich calculations
+ */
+interface LeaveRecordForSandwich {
+  Id: string;
+  Start_Date__c: string;
+  End_Date__c: string;
+  Status__c: string;
+  Leave_Category__c: string;
+  Leave_Type__c: string;
+  Session__c?: string;
+  Sandwich_Rule__c?: boolean;
+  Rule_Calculation_Details__c?: string; // JSON field storing all rule calculation details
+}
+
+/**
  * Interface for the rule calculation details JSON structure
- * Stores audit information about how leave days were calculated
  */
 interface RuleCalculationDetails {
   // Basic info
@@ -105,7 +134,7 @@ interface RuleCalculationDetails {
   baseCalendarDays: number;
   rangeLeaveDays: number;
   
-  // Same-request sandwich details (weekends/holidays within or around the leave)
+  // Same-request sandwich details
   sameRequestSandwich: {
     applied: boolean;
     preSandwichDates: string[];
@@ -113,7 +142,17 @@ interface RuleCalculationDetails {
     totalDays: number;
   };
   
-  // 1+2 rule details (penalty for short notice)
+  // Cross-request sandwich details
+  crossRequestSandwich: {
+    applied: boolean;
+    linkedLeaveIds: string[];
+    gapDates: string[];
+    totalDays: number;
+    beforeLeaveId?: string;
+    afterLeaveId?: string;
+  };
+  
+  // 1+2 rule details
   onePlusTwoRule: {
     applied: boolean;
     extraDays: number;
@@ -137,6 +176,385 @@ function createNonWorkingDayChecker(holidaySet: Set<string>) {
   };
   const isHoliday = (d: dayjs.Dayjs) => holidaySet.has(d.format("YYYY-MM-DD"));
   return (d: dayjs.Dayjs) => isWeekend(d) || isHoliday(d);
+}
+
+/**
+ * Detect cross-request sandwich scenarios
+ * This checks if the new leave request creates a sandwich with existing leaves
+ * 
+ * Scenarios handled:
+ * 1. New request after existing leave with non-working days in between
+ * 2. New request before existing leave with non-working days in between
+ * 3. New request filling a gap between two existing leaves
+ * 
+ * IMPORTANT: Dates already counted by same-request sandwich are excluded to avoid double-counting
+ */
+async function detectCrossRequestSandwich(
+  conn: any,
+  employeeId: string,
+  newStartDate: dayjs.Dayjs,
+  newEndDate: dayjs.Dayjs,
+  leaveCategory: string,
+  holidaySet: Set<string>,
+  excludeLeaveId?: string, // For recalculation scenarios
+  alreadyCountedDates?: Set<string> // Dates already counted by same-request sandwich
+): Promise<CrossRequestSandwichResult> {
+  const isNonWorking = createNonWorkingDayChecker(holidaySet);
+  const alreadyCounted = alreadyCountedDates || new Set<string>();
+  
+  const result: CrossRequestSandwichResult = {
+    hasCrossRequestSandwich: false,
+    sandwichDays: 0,
+    affectedLeaveIds: [],
+    sandwichDetails: {
+      gapDates: [],
+      newRequestPosition: 'none'
+    }
+  };
+
+  // Query all active leaves for the employee in the same category
+  const categoryForQuery = leaveCategory === 'loss-of-pay' ? 'Loss of Pay' : 'Extra Day Pay';
+  let query = `
+    SELECT Id, Start_Date__c, End_Date__c, Status__c, Leave_Category__c, Leave_Type__c, Session__c, 
+           Sandwich_Rule__c, Rule_Calculation_Details__c
+    FROM Leave__c
+    WHERE Employee__c = '${employeeId}'
+    AND Status__c IN ('Applied', 'Approved')
+    AND Leave_Category__c = '${categoryForQuery}'
+  `;
+  
+  if (excludeLeaveId) {
+    query += ` AND Id != '${excludeLeaveId}'`;
+  }
+  
+  query += ` ORDER BY Start_Date__c ASC`;
+
+  const existingLeavesQuery = await conn.query(query);
+  const existingLeaves = (existingLeavesQuery.records || []) as LeaveRecordForSandwich[];
+
+  if (existingLeaves.length === 0) {
+    return result;
+  }
+
+  console.log('[Cross-Sandwich] Checking against existing leaves:', existingLeaves.length);
+
+  // Find leaves that could create a sandwich with the new request
+  let closestBefore: LeaveRecordForSandwich | null = null;
+  let closestAfter: LeaveRecordForSandwich | null = null;
+  let gapBeforeDays: string[] = [];
+  let gapAfterDays: string[] = [];
+
+  for (const leave of existingLeaves) {
+    const leaveStart = dayjs(leave.Start_Date__c);
+    const leaveEnd = dayjs(leave.End_Date__c);
+
+    // Check if this leave ends before our new request starts
+    if (leaveEnd.isBefore(newStartDate)) {
+      // Check the gap between this leave and our new request
+      let cursor = leaveEnd.add(1, 'day');
+      let allNonWorking = true;
+      const gapDates: string[] = [];
+
+      while (cursor.isBefore(newStartDate)) {
+        if (!isNonWorking(cursor)) {
+          allNonWorking = false;
+          break;
+        }
+        const dateStr = cursor.format('YYYY-MM-DD');
+        // Only add if NOT already counted by same-request sandwich
+        if (!alreadyCounted.has(dateStr)) {
+          gapDates.push(dateStr);
+        }
+        cursor = cursor.add(1, 'day');
+      }
+
+      // If all days in the gap are non-working days, this could create a sandwich
+      // But only if there are NEW dates to count (not already counted)
+      if (allNonWorking && gapDates.length > 0) {
+        // Keep the closest leave before
+        if (!closestBefore || leaveEnd.isAfter(dayjs(closestBefore.End_Date__c))) {
+          closestBefore = leave;
+          gapBeforeDays = gapDates;
+        }
+      }
+    }
+
+    // Check if this leave starts after our new request ends
+    if (leaveStart.isAfter(newEndDate)) {
+      // Check the gap between our new request and this leave
+      let cursor = newEndDate.add(1, 'day');
+      let allNonWorking = true;
+      const gapDates: string[] = [];
+
+      while (cursor.isBefore(leaveStart)) {
+        if (!isNonWorking(cursor)) {
+          allNonWorking = false;
+          break;
+        }
+        const dateStr = cursor.format('YYYY-MM-DD');
+        // Only add if NOT already counted by same-request sandwich
+        if (!alreadyCounted.has(dateStr)) {
+          gapDates.push(dateStr);
+        }
+        cursor = cursor.add(1, 'day');
+      }
+
+      // If all days in the gap are non-working days, this could create a sandwich
+      // But only if there are NEW dates to count (not already counted)
+      if (allNonWorking && gapDates.length > 0) {
+        // Keep the closest leave after
+        if (!closestAfter || leaveStart.isBefore(dayjs(closestAfter.Start_Date__c))) {
+          closestAfter = leave;
+          gapAfterDays = gapDates;
+        }
+      }
+    }
+  }
+
+  // Determine the sandwich scenario
+  if (closestBefore && closestAfter) {
+    // New request is in the middle, creating sandwich on both sides
+    result.hasCrossRequestSandwich = true;
+    result.sandwichDays = gapBeforeDays.length + gapAfterDays.length;
+    result.affectedLeaveIds = [closestBefore.Id, closestAfter.Id];
+    result.sandwichDetails = {
+      beforeLeaveId: closestBefore.Id,
+      afterLeaveId: closestAfter.Id,
+      gapDates: [...gapBeforeDays, ...gapAfterDays],
+      newRequestPosition: 'both'
+    };
+  } else if (closestBefore) {
+    // New request is after an existing leave with non-working gap
+    result.hasCrossRequestSandwich = true;
+    result.sandwichDays = gapBeforeDays.length;
+    result.affectedLeaveIds = [closestBefore.Id];
+    result.sandwichDetails = {
+      beforeLeaveId: closestBefore.Id,
+      gapDates: gapBeforeDays,
+      newRequestPosition: 'after'
+    };
+  } else if (closestAfter) {
+    // New request is before an existing leave with non-working gap
+    result.hasCrossRequestSandwich = true;
+    result.sandwichDays = gapAfterDays.length;
+    result.affectedLeaveIds = [closestAfter.Id];
+    result.sandwichDetails = {
+      afterLeaveId: closestAfter.Id,
+      gapDates: gapAfterDays,
+      newRequestPosition: 'before'
+    };
+  }
+
+  console.log('[Cross-Sandwich] Detection result:', result);
+  return result;
+}
+
+/**
+ * Recalculate sandwich for affected leaves when a leave is withdrawn/cancelled
+ * This removes sandwich days from leaves that were connected to the withdrawn leave
+ */
+async function recalculateSandwichOnWithdrawal(
+  conn: any,
+  withdrawnLeaveId: string,
+  employeeId: string,
+  holidaySet: Set<string>
+): Promise<{ updatedLeaveIds: string[]; removedSandwichDays: number }> {
+  const isNonWorking = createNonWorkingDayChecker(holidaySet);
+  
+  // Find all leaves that have this withdrawn leave in their cross-sandwich relationship
+  // We check the Rule_Calculation_Details__c JSON field for linked leave IDs
+  const relatedLeavesQuery = await conn.query(
+    `SELECT Id, Start_Date__c, End_Date__c, Status__c, Leave_Category__c, Leave_Type__c, Session__c,
+           Sandwich_Rule__c, Rule_Calculation_Details__c
+    FROM Leave__c
+    WHERE Employee__c = '${employeeId}'
+    AND Status__c IN ('Applied', 'Approved')
+    AND Rule_Calculation_Details__c LIKE '%${withdrawnLeaveId}%'
+  `);
+
+  const relatedLeaves = (relatedLeavesQuery.records || []) as LeaveRecordForSandwich[];
+  const updatedLeaveIds: string[] = [];
+  let totalRemovedDays = 0;
+
+  console.log('[Sandwich Recalc] Found related leaves:', relatedLeaves.length);
+
+  for (const leave of relatedLeaves) {
+    // Parse existing rule calculation details
+    let existingDetails: RuleCalculationDetails | null = null;
+    try {
+      if (leave.Rule_Calculation_Details__c) {
+        existingDetails = JSON.parse(leave.Rule_Calculation_Details__c);
+      }
+    } catch (e) {
+      console.error('[Sandwich Recalc] Failed to parse Rule_Calculation_Details__c:', e);
+    }
+
+    // Remove the withdrawn leave ID from the cross-sandwich list
+    const oldLinkedIds = existingDetails?.crossRequestSandwich?.linkedLeaveIds || [];
+    const newLinkedIds = oldLinkedIds.filter((id: string) => id !== withdrawnLeaveId);
+
+    // Recalculate if this leave still has cross-sandwich relationships
+    const leaveStart = dayjs(leave.Start_Date__c);
+    const leaveEnd = dayjs(leave.End_Date__c);
+
+    // Re-detect sandwich for this leave (excluding the withdrawn leave)
+    const newSandwichResult = await detectCrossRequestSandwich(
+      conn,
+      employeeId,
+      leaveStart,
+      leaveEnd,
+      leave.Leave_Category__c === 'Loss of Pay' ? 'loss-of-pay' : 'extra-day-pay',
+      holidaySet,
+      withdrawnLeaveId // Exclude the withdrawn leave
+    );
+
+    // Calculate the difference using existing details or fallback
+    const oldCrossSandwichDays = existingDetails?.crossRequestSandwich?.totalDays || 0;
+    const oldSameSandwichDays = existingDetails?.sameRequestSandwich?.totalDays || 0;
+    const oldTotalSandwichDays = oldCrossSandwichDays + oldSameSandwichDays;
+    const newTotalSandwichDays = oldSameSandwichDays + newSandwichResult.sandwichDays;
+    const daysDifference = oldTotalSandwichDays - newTotalSandwichDays;
+
+    if (daysDifference > 0) {
+      totalRemovedDays += daysDifference;
+    }
+
+    // Update rule calculation details JSON
+    const updatedDetails: RuleCalculationDetails = existingDetails || {
+      requestedStartDate: leave.Start_Date__c,
+      requestedEndDate: leave.End_Date__c,
+      effectiveStartDate: leave.Start_Date__c,
+      effectiveEndDate: leave.End_Date__c,
+      baseCalendarDays: 0,
+      rangeLeaveDays: 0,
+      sameRequestSandwich: { applied: false, preSandwichDates: [], postSandwichDates: [], totalDays: 0 },
+      crossRequestSandwich: { applied: false, linkedLeaveIds: [], gapDates: [], totalDays: 0 },
+      onePlusTwoRule: { applied: false, extraDays: 0 },
+      totalSandwichDays: 0,
+      finalTotalAfterRules: 0,
+      calculatedAt: new Date().toISOString()
+    };
+
+    // Update cross-request sandwich section
+    updatedDetails.crossRequestSandwich = {
+      applied: newSandwichResult.hasCrossRequestSandwich,
+      linkedLeaveIds: newSandwichResult.affectedLeaveIds,
+      gapDates: newSandwichResult.sandwichDetails.gapDates,
+      totalDays: newSandwichResult.sandwichDays,
+      beforeLeaveId: newSandwichResult.sandwichDetails.beforeLeaveId,
+      afterLeaveId: newSandwichResult.sandwichDetails.afterLeaveId
+    };
+    updatedDetails.totalSandwichDays = newTotalSandwichDays;
+    updatedDetails.calculatedAt = new Date().toISOString();
+
+    // Update the leave record
+    const updateData: any = {
+      Id: leave.Id,
+      Sandwich_Rule__c: newSandwichResult.hasCrossRequestSandwich || (existingDetails?.sameRequestSandwich?.applied || false),
+      Rule_Calculation_Details__c: JSON.stringify(updatedDetails)
+    };
+
+    // Recalculate Total_Days_After_Rule__c if needed
+    // Note: This requires fetching the original Total_Days__c
+    if (daysDifference !== 0) {
+      const leaveDataQuery = await conn.query(`
+        SELECT Total_Days__c, Total_Days_After_Rule__c, OnePlusTwo_Rule__c
+        FROM Leave__c WHERE Id = '${leave.Id}'
+      `);
+      
+      if (leaveDataQuery.records && leaveDataQuery.records.length > 0) {
+        const leaveData = leaveDataQuery.records[0];
+        const baseDays = leaveData.Total_Days__c || 0;
+        // Assuming OnePlusTwo doesn't change, just update sandwich portion
+        const onePlusTwoDays = leaveData.OnePlusTwo_Rule__c ? 
+          ((leaveData.Total_Days_After_Rule__c || 0) - baseDays - oldTotalSandwichDays) : 0;
+        
+        updateData.Total_Days_After_Rule__c = baseDays + newTotalSandwichDays + onePlusTwoDays;
+      }
+    }
+
+    await conn.sobject('Leave__c').update(updateData);
+    updatedLeaveIds.push(leave.Id);
+    console.log('[Sandwich Recalc] Updated leave:', leave.Id, 'New sandwich days:', newTotalSandwichDays);
+  }
+
+  return { updatedLeaveIds, removedSandwichDays: totalRemovedDays };
+}
+
+/**
+ * Update linked leaves when a new cross-request sandwich is created
+ */
+async function updateLinkedLeavesForSandwich(
+  conn: any,
+  newLeaveId: string,
+  affectedLeaveIds: string[],
+  sandwichDays: number
+): Promise<void> {
+  for (const affectedId of affectedLeaveIds) {
+    // Fetch current rule calculation details
+    const leaveQuery = await conn.query(`
+      SELECT Id, Rule_Calculation_Details__c, Sandwich_Rule__c,
+             Total_Days__c, Total_Days_After_Rule__c
+      FROM Leave__c WHERE Id = '${affectedId}'
+    `);
+
+    if (leaveQuery.records && leaveQuery.records.length > 0) {
+      const leave = leaveQuery.records[0];
+      
+      // Parse existing details
+      let existingDetails: RuleCalculationDetails | null = null;
+      try {
+        if (leave.Rule_Calculation_Details__c) {
+          existingDetails = JSON.parse(leave.Rule_Calculation_Details__c);
+        }
+      } catch (e) {
+        console.error('[Sandwich Update] Failed to parse Rule_Calculation_Details__c:', e);
+      }
+
+      // Get existing linked IDs or initialize empty array
+      const existingIds = existingDetails?.crossRequestSandwich?.linkedLeaveIds || [];
+      
+      // Add the new leave ID if not already present
+      if (!existingIds.includes(newLeaveId)) {
+        existingIds.push(newLeaveId);
+      }
+
+      // Update the details
+      if (existingDetails) {
+        existingDetails.crossRequestSandwich.linkedLeaveIds = existingIds;
+        existingDetails.crossRequestSandwich.applied = true;
+        existingDetails.calculatedAt = new Date().toISOString();
+      } else {
+        // Create minimal details if none exist
+        existingDetails = {
+          requestedStartDate: '',
+          requestedEndDate: '',
+          effectiveStartDate: '',
+          effectiveEndDate: '',
+          baseCalendarDays: 0,
+          rangeLeaveDays: leave.Total_Days__c || 0,
+          sameRequestSandwich: { applied: false, preSandwichDates: [], postSandwichDates: [], totalDays: 0 },
+          crossRequestSandwich: { applied: true, linkedLeaveIds: existingIds, gapDates: [], totalDays: 0 },
+          onePlusTwoRule: { applied: false, extraDays: 0 },
+          totalSandwichDays: 0,
+          finalTotalAfterRules: leave.Total_Days_After_Rule__c || leave.Total_Days__c || 0,
+          calculatedAt: new Date().toISOString()
+        };
+      }
+
+      // Update the record
+      const updateData: any = {
+        Id: affectedId,
+        Sandwich_Rule__c: true,
+        Rule_Calculation_Details__c: JSON.stringify(existingDetails)
+      };
+
+      // Note: We don't add sandwich days to existing leaves because 
+      // the sandwich days are counted in the new request
+      await conn.sobject('Leave__c').update(updateData);
+      console.log('[Sandwich Update] Updated linked leave:', affectedId);
+    }
+  }
 }
 
 export async function GET(request: NextRequest) {
@@ -902,9 +1320,34 @@ export async function POST(request: NextRequest) {
     }
     const onePlusTwoRuleApplied = applyRules && onePlusTwoExtra > 0;
 
-    // Calculate totals (only same-request sandwich is applied)
-    const totalSandwichDays = sandwichExtra;
-    const anySandwichApplied = sandwichApplied;
+    // --- Cross-Request Sandwich Detection ---
+    // Check if this new request creates a sandwich with existing leaves
+    // Pass already-counted dates to avoid double-counting
+    let crossRequestSandwichResult: CrossRequestSandwichResult = {
+      hasCrossRequestSandwich: false,
+      sandwichDays: 0,
+      affectedLeaveIds: [],
+      sandwichDetails: { gapDates: [], newRequestPosition: 'none' }
+    };
+
+    if (applySandwichRule && !isHalfDay) {
+      crossRequestSandwichResult = await detectCrossRequestSandwich(
+        conn,
+        employeeId,
+        start,
+        end,
+        leaveCategory,
+        holidaySet,
+        undefined, // no excludeLeaveId for new requests
+        sameRequestSandwichDates // pass dates already counted by same-request sandwich
+      );
+      console.log('[Cross-Sandwich] Detection result:', crossRequestSandwichResult);
+      console.log('[Cross-Sandwich] Excluded dates (already in same-request):', Array.from(sameRequestSandwichDates));
+    }
+
+    // Combine same-request sandwich with cross-request sandwich
+    const totalSandwichDays = sandwichExtra + crossRequestSandwichResult.sandwichDays;
+    const anySandwichApplied = sandwichApplied || crossRequestSandwichResult.hasCrossRequestSandwich;
     const totalSandwichDeduction = rangeLeaveDays + totalSandwichDays;
     const finalTotalAfterRules = totalSandwichDeduction + onePlusTwoExtra;
 
@@ -932,6 +1375,8 @@ export async function POST(request: NextRequest) {
       applySandwichRule,
       rangeLeaveDays,
       sandwichExtra,
+      crossRequestSandwichDays: crossRequestSandwichResult.sandwichDays,
+      crossRequestSandwichApplied: crossRequestSandwichResult.hasCrossRequestSandwich,
       totalSandwichDays,
       anySandwichApplied,
       totalSandwichDeduction,
@@ -960,6 +1405,15 @@ export async function POST(request: NextRequest) {
         );
         effectiveEndDate = latestPostDate;
       }
+      // If cross-request sandwich with existing leave before
+      if (crossRequestSandwichResult.sandwichDetails.beforeLeaveId && crossRequestSandwichResult.sandwichDetails.gapDates.length > 0) {
+        const earliestGapDate = crossRequestSandwichResult.sandwichDetails.gapDates.reduce((earliest, date) => 
+          dayjs(date).isBefore(dayjs(earliest)) ? date : earliest
+        );
+        if (dayjs(earliestGapDate).isBefore(dayjs(effectiveStartDate))) {
+          effectiveStartDate = earliestGapDate;
+        }
+      }
     }
 
     if (applyRules && (anySandwichApplied || onePlusTwoRuleApplied) && !rulesAlreadyConfirmed) {
@@ -969,13 +1423,17 @@ export async function POST(request: NextRequest) {
           message: "Additional rules applied to your leave. Please confirm.",
           details: {
             sandwichApplied: anySandwichApplied,
+            sameRequestSandwich: sandwichApplied,
+            crossRequestSandwich: crossRequestSandwichResult.hasCrossRequestSandwich,
+            crossRequestSandwichDetails: crossRequestSandwichResult.sandwichDetails,
             onePlusTwoRuleApplied,
             baseCalendarDays,
             workingDaysInRange,
             nonWorkingDaysInRange,
             rangeLeaveDays,
-            sandwichDays: sandwichExtra,
-            sandwichDatesList: sandwichApplied ? [...preSandwichDates, ...postSandwichDates] : [],
+            sameRequestSandwichDays: sandwichExtra,
+            sameRequestSandwichDatesList: sandwichApplied ? [...preSandwichDates, ...postSandwichDates] : [],
+            crossRequestSandwichDays: crossRequestSandwichResult.sandwichDays,
             totalSandwichDays,
             totalSandwichDeduction,
             onePlusTwoExtra,
@@ -991,7 +1449,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Build rule calculation details JSON for audit
+    // Build rule calculation details JSON
     const ruleCalculationDetails: RuleCalculationDetails = {
       // Basic info
       requestedStartDate: startDate,
@@ -1003,7 +1461,7 @@ export async function POST(request: NextRequest) {
       baseCalendarDays,
       rangeLeaveDays,
       
-      // Same-request sandwich details (weekends/holidays within or around the leave)
+      // Same-request sandwich details
       sameRequestSandwich: {
         applied: sandwichApplied,
         preSandwichDates,
@@ -1011,7 +1469,17 @@ export async function POST(request: NextRequest) {
         totalDays: sandwichExtra
       },
       
-      // 1+2 rule details (penalty for short notice)
+      // Cross-request sandwich details
+      crossRequestSandwich: {
+        applied: crossRequestSandwichResult.hasCrossRequestSandwich,
+        linkedLeaveIds: crossRequestSandwichResult.affectedLeaveIds,
+        gapDates: crossRequestSandwichResult.sandwichDetails.gapDates,
+        totalDays: crossRequestSandwichResult.sandwichDays,
+        beforeLeaveId: crossRequestSandwichResult.sandwichDetails.beforeLeaveId,
+        afterLeaveId: crossRequestSandwichResult.sandwichDetails.afterLeaveId
+      },
+      
+      // 1+2 rule details
       onePlusTwoRule: {
         applied: onePlusTwoRuleApplied,
         extraDays: onePlusTwoExtra
@@ -1069,6 +1537,22 @@ export async function POST(request: NextRequest) {
     if (!result.success) {
       console.error("Failed to create leave record:", result);
       return NextResponse.json({ error: "Failed to create leave request" }, { status: 500 });
+    }
+
+    // Update linked leaves for cross-request sandwich
+    if (crossRequestSandwichResult.hasCrossRequestSandwich && crossRequestSandwichResult.affectedLeaveIds.length > 0) {
+      try {
+        await updateLinkedLeavesForSandwich(
+          conn,
+          result.id,
+          crossRequestSandwichResult.affectedLeaveIds,
+          crossRequestSandwichResult.sandwichDays
+        );
+        console.log('[Cross-Sandwich] Updated linked leaves successfully');
+      } catch (linkError) {
+        console.error('[Cross-Sandwich] Error updating linked leaves:', linkError);
+        // Don't fail the request, the main leave is created
+      }
     }
 
     // After Insert: Send email notification based on employee role/title
@@ -1224,11 +1708,14 @@ export async function POST(request: NextRequest) {
       totals: {
         baseCalendarDays,
         rangeLeaveDays,
-        sandwichDays: sandwichExtra,
+        sameRequestSandwichDays: sandwichExtra,
+        crossRequestSandwichDays: crossRequestSandwichResult.sandwichDays,
         totalSandwichDays,
         onePlusTwoExtra,
         finalTotalAfterRules,
         sandwichApplied: anySandwichApplied,
+        sameRequestSandwich: sandwichApplied,
+        crossRequestSandwich: crossRequestSandwichResult.hasCrossRequestSandwich,
         onePlusTwoRuleApplied,
       },
     });
@@ -1295,6 +1782,43 @@ export async function PATCH(request: NextRequest) {
         Id: leaveId,
         Status__c: 'Cancelled',
       });
+
+      // Recalculate sandwich for affected leaves if this leave had cross-sandwich relationships
+      // Parse Rule_Calculation_Details__c to check for linked leaves
+      let hasLinkedLeaves = false;
+      if (leave.Rule_Calculation_Details__c) {
+        try {
+          const details = JSON.parse(leave.Rule_Calculation_Details__c);
+          hasLinkedLeaves = (details.crossRequestSandwich?.linkedLeaveIds?.length > 0);
+        } catch (e) {
+          console.error('[Sandwich Recalc] Failed to parse Rule_Calculation_Details__c:', e);
+        }
+      }
+      
+      if (hasLinkedLeaves || leave.Sandwich_Rule__c) {
+        try {
+          // Fetch holidays for recalculation
+          const holidayQuery = await conn.query<any>(
+            "SELECT Name, Date__c, Day__c, Year__c FROM Holidays_List__c"
+          );
+          const holidayDates = (holidayQuery.records || [])
+            .map((h: any) => h?.Date__c)
+            .filter(Boolean)
+            .map((d: string) => dayjs(d).format("YYYY-MM-DD"));
+          const holidaySet = new Set(holidayDates);
+
+          const recalcResult = await recalculateSandwichOnWithdrawal(
+            conn,
+            leaveId,
+            employeeId,
+            holidaySet
+          );
+          console.log('[Sandwich Recalc] Cancelled leave recalculation:', recalcResult);
+        } catch (recalcError) {
+          console.error('[Sandwich Recalc] Error during cancellation:', recalcError);
+          // Don't fail the request
+        }
+      }
 
       // Send in-app notifications to TL and HR
       try {
@@ -1387,6 +1911,43 @@ export async function PATCH(request: NextRequest) {
         Id: leaveId,
         Status__c: 'Withdrawn',
       });
+
+      // Recalculate sandwich for affected leaves if this leave had cross-sandwich relationships
+      // Parse Rule_Calculation_Details__c to check for linked leaves
+      let hasLinkedLeavesWithdraw = false;
+      if (leave.Rule_Calculation_Details__c) {
+        try {
+          const details = JSON.parse(leave.Rule_Calculation_Details__c);
+          hasLinkedLeavesWithdraw = (details.crossRequestSandwich?.linkedLeaveIds?.length > 0);
+        } catch (e) {
+          console.error('[Sandwich Recalc] Failed to parse Rule_Calculation_Details__c:', e);
+        }
+      }
+      
+      if (hasLinkedLeavesWithdraw || leave.Sandwich_Rule__c) {
+        try {
+          // Fetch holidays for recalculation
+          const holidayQuery = await conn.query<any>(
+            "SELECT Name, Date__c, Day__c, Year__c FROM Holidays_List__c"
+          );
+          const holidayDates = (holidayQuery.records || [])
+            .map((h: any) => h?.Date__c)
+            .filter(Boolean)
+            .map((d: string) => dayjs(d).format("YYYY-MM-DD"));
+          const holidaySet = new Set(holidayDates);
+
+          const recalcResult = await recalculateSandwichOnWithdrawal(
+            conn,
+            leaveId,
+            employeeId,
+            holidaySet
+          );
+          console.log('[Sandwich Recalc] Withdrawn leave recalculation:', recalcResult);
+        } catch (recalcError) {
+          console.error('[Sandwich Recalc] Error during withdrawal:', recalcError);
+          // Don't fail the request
+        }
+      }
 
       // afterUpdate: Revert Leave Balance if leave was previously Approved
       if (oldStatus === 'Approved') {
