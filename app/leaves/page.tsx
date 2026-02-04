@@ -122,12 +122,31 @@ export default function LeavesPage() {
           toast.dismiss(toastId)
           const details = result.details || {}
           
+          // Format dates for display
+          const formatDate = (dateStr: string) => {
+            if (!dateStr) return '-';
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+          };
+          
           Modal.confirm({
             title: '⚠️ Leave Rules Applied',
-            width: 600,
+            width: 700,
             content: (
               <div className="space-y-3">
                 <p className="text-gray-700 mb-4">Additional rules have been applied to your leave request. Please review:</p>
+                
+                {/* Effective Leave Period - Show when sandwich is applied */}
+                {details.sandwichApplied && details.effectiveStartDate && details.effectiveEndDate && (
+                  <div className="bg-amber-50 p-3 rounded-lg border border-amber-200 mb-3">
+                    <div className="font-medium text-amber-800 mb-2">📅 Your Effective Leave Period:</div>
+                    <div className="text-sm text-amber-700">
+                      <div>You requested: <span className="font-semibold">{formatDate(details.requestedStartDate)}</span> to <span className="font-semibold">{formatDate(details.requestedEndDate)}</span></div>
+                      <div className="mt-1">Due to sandwich rule, your leave will be counted from: <span className="font-bold text-amber-900">{formatDate(details.effectiveStartDate)}</span> to <span className="font-bold text-amber-900">{formatDate(details.effectiveEndDate)}</span></div>
+                    </div>
+                  </div>
+                )}
+                
                 <div className="bg-blue-50 p-4 rounded-lg space-y-2">
                   <div className="flex justify-between">
                     <span className="font-medium">Original working days requested:</span>
@@ -135,14 +154,27 @@ export default function LeavesPage() {
                   </div>
                   {details.sandwichApplied && (
                     <>
-                      <div className="flex justify-between text-orange-700">
-                        <span className="font-medium">+ Non-working days in range:</span>
-                        <span className="font-semibold">{details.nonWorkingDaysInRange ?? 0}</span>
-                      </div>
-                      {(details.sandwichExtra ?? 0) > 0 && (
+                      {details.nonWorkingDaysInRange > 0 && (
                         <div className="flex justify-between text-orange-700">
-                          <span className="font-medium">+ Sandwich days (before/after):</span>
-                          <span className="font-semibold">{details.sandwichExtra}</span>
+                          <span className="font-medium">+ Non-working days in range:</span>
+                          <span className="font-semibold">{details.nonWorkingDaysInRange ?? 0}</span>
+                        </div>
+                      )}
+                      {(details.sameRequestSandwichDays ?? details.sandwichExtra ?? 0) > 0 && (
+                        <div className="flex justify-between text-orange-700">
+                          <span className="font-medium">+ Sandwich days (adjacent to request):</span>
+                          <span className="font-semibold">{details.sameRequestSandwichDays ?? details.sandwichExtra}</span>
+                        </div>
+                      )}
+                      {details.sameRequestSandwichDatesList?.length > 0 && (
+                        <div className="text-xs text-orange-600 pl-4">
+                          Dates: {details.sameRequestSandwichDatesList.map((d: string) => formatDate(d)).join(', ')}
+                        </div>
+                      )}
+                      {(details.crossRequestSandwichDays ?? 0) > 0 && (
+                        <div className="flex justify-between text-purple-700">
+                          <span className="font-medium">+ Cross-request sandwich days:</span>
+                          <span className="font-semibold">{details.crossRequestSandwichDays}</span>
                         </div>
                       )}
                     </>
@@ -160,9 +192,32 @@ export default function LeavesPage() {
                 </div>
                 <div className="text-sm bg-gray-50 p-3 rounded border border-gray-200">
                   <div className="font-medium mb-1">Rules Applied:</div>
-                  <div>• Sandwich rule: {details.sandwichApplied ? "✅ Applied - holidays/weekends between leave days counted" : "❌ Not applied"}</div>
+                  {details.sameRequestSandwich && (
+                    <div>• Same-request sandwich: ✅ Applied - holidays/weekends adjacent to your leave counted</div>
+                  )}
+                  {details.crossRequestSandwich && (
+                    <div>• Cross-request sandwich: ✅ Applied - this leave connects with your existing leave(s) via weekends/holidays</div>
+                  )}
+                  {!details.sameRequestSandwich && !details.crossRequestSandwich && details.sandwichApplied && (
+                    <div>• Sandwich rule: ✅ Applied - holidays/weekends between leave days counted</div>
+                  )}
+                  {!details.sandwichApplied && (
+                    <div>• Sandwich rule: ❌ Not applied</div>
+                  )}
                   <div>• One+Two penalty: {details.onePlusTwoRuleApplied ? "✅ Applied - less than 5 working days notice" : "❌ Not applied"}</div>
                 </div>
+                {details.crossRequestSandwichDetails?.gapDates?.length > 0 && (
+                  <div className="text-sm bg-purple-50 p-3 rounded border border-purple-200">
+                    <div className="font-medium mb-1 text-purple-700">Cross-Request Sandwich Details:</div>
+                    <div className="text-purple-600">
+                      The following weekend/holiday dates will be counted as leave because your new request 
+                      creates a sandwich with existing leave(s):
+                    </div>
+                    <div className="mt-1 text-purple-800 font-mono text-xs">
+                      {details.crossRequestSandwichDetails.gapDates.map((d: string) => formatDate(d)).join(', ')}
+                    </div>
+                  </div>
+                )}
               </div>
             ),
             okText: 'Confirm & Submit',
