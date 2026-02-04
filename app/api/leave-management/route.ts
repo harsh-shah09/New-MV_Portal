@@ -954,6 +954,93 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Fetch holidays early to check for sandwich scenario with separate leave records
+    const earlyHolidayQuery = await conn.query<any>(
+      "SELECT Name, Date__c, Day__c, Year__c FROM Holidays_List__c"
+    );
+    console.log("Fetched holidays:", earlyHolidayQuery);
+    const tempHolidayDates = (earlyHolidayQuery.records || [])
+      .map((h: any) => h?.Date__c)
+      .filter(Boolean)
+      .map((d: string) => dayjs(d).format("YYYY-MM-DD"));
+    const tempHolidaySet = new Set(tempHolidayDates);
+
+    const tempIsWeekend = (d: dayjs.Dayjs) => {
+      const day = d.day();
+      return day === 0 || day === 6;
+    };
+    const tempIsHoliday = (d: dayjs.Dayjs) => tempHolidaySet.has(d.format("YYYY-MM-DD"));
+    const tempIsNonWorking = (d: dayjs.Dayjs) => tempIsWeekend(d) || tempIsHoliday(d);
+
+    // Check for sandwich scenario: existing leave + non-working days + new leave
+    if (consecutiveLeavesQuery.records && consecutiveLeavesQuery.records.length > 0 && leaveCategory === 'loss-of-pay') {
+      for (const existingLeave of consecutiveLeavesQuery.records) {
+        const existingStart = dayjs(existingLeave.Start_Date__c);
+        const existingEnd = dayjs(existingLeave.End_Date__c);
+        const existingSession = existingLeave.Session__c;
+        const isExistingHalfDay = existingSession === "Session-1" || existingSession === "Session-2";
+        
+        // Skip half-day leaves for sandwich check
+        if (isRequestHalfDay || isExistingHalfDay) {
+          continue;
+        }
+
+        // Check if there are only non-working days between the two leaves
+        // Scenario: existing leave ends, then non-working day(s), then new leave starts
+        let daysBetween: dayjs.Dayjs[] = [];
+        let checkDate = existingEnd.add(1, 'day');
+        
+        // Check days between existing leave end and new leave start
+        while (checkDate.isBefore(requestStartDate)) {
+          daysBetween.push(checkDate.clone());
+          checkDate = checkDate.add(1, 'day');
+        }
+
+        // Also check days between new leave end and existing leave start
+        let daysBetweenReverse: dayjs.Dayjs[] = [];
+        let checkDateReverse = requestEndDate.add(1, 'day');
+        while (checkDateReverse.isBefore(existingStart)) {
+          daysBetweenReverse.push(checkDateReverse.clone());
+          checkDateReverse = checkDateReverse.add(1, 'day');
+        }
+
+        // Use whichever gap is found
+        if (daysBetweenReverse.length > 0) {
+          daysBetween = daysBetweenReverse;
+        }
+
+        // If there are days between and all are non-working days, this is a sandwich scenario
+        if (daysBetween.length > 0 && daysBetween.length <= 5) { // Reasonable gap limit
+          const allNonWorking = daysBetween.every(day => tempIsNonWorking(day));
+          
+          if (allNonWorking) {
+            const combinedStart = requestStartDate.isBefore(existingStart) ? requestStartDate : existingStart;
+            const combinedEnd = requestEndDate.isAfter(existingEnd) ? requestEndDate : existingEnd;
+            
+            const nonWorkingDaysList = daysBetween.map(d => d.format('DD MMM YYYY')).join(', ');
+            
+            return NextResponse.json({
+              error: "Sandwich rule violation detected",
+              details: {
+                message: `You have an existing leave from ${existingStart.format('DD MMM YYYY')} to ${existingEnd.format('DD MMM YYYY')}. There are non-working days (${nonWorkingDaysList}) between your existing leave and the requested leave. According to the sandwich rule, you must apply for a single combined leave from ${combinedStart.format('DD MMM YYYY')} to ${combinedEnd.format('DD MMM YYYY')}.`,
+                existingLeave: {
+                  startDate: existingLeave.Start_Date__c,
+                  endDate: existingLeave.End_Date__c,
+                  status: existingLeave.Status__c,
+                  leaveCategory: existingLeave.Leave_Category__c
+                },
+                nonWorkingDaysBetween: daysBetween.map(d => d.format('YYYY-MM-DD')),
+                suggestedDates: {
+                  startDate: combinedStart.format('YYYY-MM-DD'),
+                  endDate: combinedEnd.format('YYYY-MM-DD')
+                }
+              }
+            }, { status: 400 });
+          }
+        }
+      }
+    }
+
     // Fetch dynamic leave configurations
     const leaveConfig = await fetchLeaveConfigurations(conn);
 
