@@ -118,6 +118,42 @@ export default function LeavesPage() {
 
         const result = await response.json()
 
+        if (response.status === 409 && result?.requiresMerge) {
+          toast.dismiss(toastId)
+          const details = result.details || {}
+          const gapDates: string[] = details.nonWorkingDaysBetween || details.gapDates || []
+          const suggested = details.suggestedDates || {}
+
+          Modal.confirm({
+            title: '⚠️ Merge with existing leave',
+            width: 700,
+            content: (
+              <div className="space-y-3">
+                <p className="text-gray-700">We found an existing leave that will be merged with this request and re-submitted for approval.</p>
+                <div className="bg-blue-50 p-3 rounded border border-blue-200">
+                  <div className="font-medium text-blue-900">Existing leave</div>
+                  <div className="text-sm text-blue-800">{details?.existingLeave?.startDate} → {details?.existingLeave?.endDate} ({details?.existingLeave?.status})</div>
+                </div>
+                {gapDates.length > 0 && (
+                  <div className="bg-amber-50 p-3 rounded border border-amber-200 text-sm text-amber-900">
+                    Non-working gap between leaves: {gapDates.join(', ')}
+                  </div>
+                )}
+                <div className="bg-green-50 p-3 rounded border border-green-200 text-sm text-green-900">
+                  <div className="font-medium text-green-900">New merged dates</div>
+                  <div>{suggested.startDate} → {suggested.endDate}</div>
+                </div>
+              </div>
+            ),
+            okText: 'Merge & Resubmit',
+            cancelText: 'Cancel',
+            onOk: async () => {
+              await submit({ ...payload, confirmMerge: true, mergeExistingLeaveId: details.existingLeaveId }, confirmedRules)
+            },
+          })
+          return
+        }
+
         if (response.status === 409 && result?.requiresConfirmation) {
           toast.dismiss(toastId)
           const details = result.details || {}
@@ -171,12 +207,6 @@ export default function LeavesPage() {
                           Dates: {details.sameRequestSandwichDatesList.map((d: string) => formatDate(d)).join(', ')}
                         </div>
                       )}
-                      {(details.crossRequestSandwichDays ?? 0) > 0 && (
-                        <div className="flex justify-between text-purple-700">
-                          <span className="font-medium">+ Cross-request sandwich days:</span>
-                          <span className="font-semibold">{details.crossRequestSandwichDays}</span>
-                        </div>
-                      )}
                     </>
                   )}
                   {(details.onePlusTwoExtra ?? 0) > 0 && (
@@ -195,10 +225,7 @@ export default function LeavesPage() {
                   {details.sameRequestSandwich && (
                     <div>• Same-request sandwich: ✅ Applied - holidays/weekends adjacent to your leave counted</div>
                   )}
-                  {details.crossRequestSandwich && (
-                    <div>• Cross-request sandwich: ✅ Applied - this leave connects with your existing leave(s) via weekends/holidays</div>
-                  )}
-                  {!details.sameRequestSandwich && !details.crossRequestSandwich && details.sandwichApplied && (
+                  {!details.sameRequestSandwich && details.sandwichApplied && (
                     <div>• Sandwich rule: ✅ Applied - holidays/weekends between leave days counted</div>
                   )}
                   {!details.sandwichApplied && (
@@ -206,18 +233,6 @@ export default function LeavesPage() {
                   )}
                   <div>• One+Two penalty: {details.onePlusTwoRuleApplied ? "✅ Applied - less than 5 working days notice" : "❌ Not applied"}</div>
                 </div>
-                {details.crossRequestSandwichDetails?.gapDates?.length > 0 && (
-                  <div className="text-sm bg-purple-50 p-3 rounded border border-purple-200">
-                    <div className="font-medium mb-1 text-purple-700">Cross-Request Sandwich Details:</div>
-                    <div className="text-purple-600">
-                      The following weekend/holiday dates will be counted as leave because your new request 
-                      creates a sandwich with existing leave(s):
-                    </div>
-                    <div className="mt-1 text-purple-800 font-mono text-xs">
-                      {details.crossRequestSandwichDetails.gapDates.map((d: string) => formatDate(d)).join(', ')}
-                    </div>
-                  </div>
-                )}
               </div>
             ),
             okText: 'Confirm & Submit',
