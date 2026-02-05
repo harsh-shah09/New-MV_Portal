@@ -12,6 +12,8 @@ import { EmployeeFilters } from "./components/employee-filters"
 import { EmployeeDetail } from "./components/employee-detail"
 import { useEmployeeStore } from "@/store/employeeStore"
 import type { Employee } from "@/types"
+import { PageContainer } from "@/components/page-container"
+import { PageHeader } from "@/components/page-header"
 
 interface EmployeesClientProps {
   role: string
@@ -334,36 +336,18 @@ export default function EmployeesClient({ role }: EmployeesClientProps) {
   }
 
   return (
-    <div>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
-          <div>
-            <h1 className="text-3xl sm:text-4xl font-bold text-foreground">Employees</h1>
-            <p className="text-muted-foreground mt-1">Manage your workforce</p>
-          </div>
-          <div className="flex gap-2">
+    <PageContainer>
+      <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+        <PageHeader title="Employees" subtitle="Manage your workforce">
             <Tooltip title="Refresh Data">
               <Button 
                 icon={<RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />} 
                 onClick={() => refetch()} 
-              />
+              >
+                Refresh
+              </Button>
             </Tooltip>
-            {/* {isHR && (
-            <Button
-                type="primary"
-                size="large"
-                className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 h-10 px-6"
-                onClick={() => {
-                  setEditingEmployee(undefined)
-                  setShowForm(true)
-                }}
-            >
-                + Add Employee
-            </Button>
-          )} */}
-          </div>
-        </div>
+        </PageHeader>
 
         <EmployeeFilters
           searchTerm={searchTerm}
@@ -400,6 +384,6 @@ export default function EmployeesClient({ role }: EmployeesClientProps) {
 
 
       </div>
-    </div>
+    </PageContainer>
   )
 }

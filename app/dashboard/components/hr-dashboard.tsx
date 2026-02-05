@@ -9,6 +9,7 @@ import { RecentActivities } from "./hr/recent-activities"
 import { HRQuickActions } from "./hr/hr-quick-actions"
 import { EmployeesOnLeave } from "./hr/employees-on-leave"
 import { GoogleIntegration } from "./employee/google-integration"
+import { PageHeader } from "@/components/page-header"
 
 interface HRDashboardProps {
   data: any
@@ -31,10 +32,10 @@ export function HRDashboard({ data }: HRDashboardProps) {
   return (
     <div className="space-y-6">
       {/* Header Section */}
-      <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg p-6 text-white">
-        <h1 className="text-3xl font-bold mb-2">HR Dashboard</h1>
-        <p className="text-blue-100">Manage your organization's leave requests and employee data</p>
-      </div>
+      <PageHeader 
+        title="HR Dashboard" 
+        subtitle="Manage your organization's leave requests and employee data"
+      />
 
       {/* KPI Stats */}
       <HRKPIStats stats={stats} />

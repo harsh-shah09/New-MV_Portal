@@ -8,6 +8,7 @@ import { Menu } from "lucide-react"
 
 
 import { OnboardingWizard } from "@/components/onboarding-wizard";
+import { AnimatedBackground } from "@/components/animated-background";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
@@ -27,12 +28,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-screen bg-slate-50/50">
+    <div className="flex min-h-screen relative">
+      <AnimatedBackground />
       <OnboardingWizard />
       <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} />
-      <div className="flex-1 flex flex-col min-w-0 min-h-screen transition-all duration-300 ease-in-out"> 
+      <div className="flex-1 flex flex-col min-w-0 min-h-screen transition-all duration-300 ease-in-out relative z-10"> 
             <MobileHeader onMenuClick={() => setSidebarOpen(true)} />
-         <main className="flex-1 overflow-y-auto">
+         <main className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-200 hover:scrollbar-thumb-slate-300">
             {children}
          </main>
       </div>

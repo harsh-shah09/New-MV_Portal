@@ -11,6 +11,8 @@ import { useQuery } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { Modal, Select, Input, Card, Row, Col } from "antd"
 import { SearchOutlined } from "@ant-design/icons"
+import { PageContainer } from "@/components/page-container"
+import { PageHeader } from "@/components/page-header"
 
 export default function LeavesPage() {
   const router = useRouter()
@@ -597,37 +599,35 @@ export default function LeavesPage() {
 
   if (isLoading) {
     return (
-      <div>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="text-center">Loading...</div>
+      <PageContainer>
+        <div className="flex justify-center items-center h-64">
+           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>
-      </div>
+      </PageContainer>
     )
   }
 
   return (
-    <div>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-4xl font-bold text-gray-900">Leave Management</h1>
-            <p className="text-gray-600 mt-1">Manage leave requests and approvals</p>
-          </div>
+    <PageContainer>
+      <PageHeader
+        title="Leave Management"
+        subtitle="Manage leave requests and approvals"
+      >
           <button
             onClick={() => setShowForm(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition"
+            className="bg-primary hover:bg-primary/90 text-primary-foreground px-6 py-2 rounded-lg font-medium transition shadow-sm"
           >
             + Request Leave
           </button>
-        </div>
+      </PageHeader>
 
-        <div className="bg-white rounded-lg shadow mb-6">
-          <div className="flex border-b border-gray-200">
+        <div className="bg-card rounded-xl shadow-sm border border-border mb-6 overflow-hidden">
+          <div className="flex border-b border-border">
             <button
               onClick={() => setSelectedTab("my-requests")}
               className={`flex-1 px-6 py-4 text-center font-medium transition ${selectedTab === "my-requests"
-                ? "text-blue-600 border-b-2 border-blue-600"
-                : "text-gray-600 hover:text-gray-900"
+                ? "text-primary border-b-2 border-primary bg-primary/5"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                 }`}
             >
               My Requests
@@ -636,8 +636,8 @@ export default function LeavesPage() {
               <button
                 onClick={() => setSelectedTab("approvals")}
                 className={`flex-1 px-6 py-4 text-center font-medium transition ${selectedTab === "approvals"
-                  ? "text-blue-600 border-b-2 border-blue-600"
-                  : "text-gray-600 hover:text-gray-900"
+                  ? "text-primary border-b-2 border-primary bg-primary/5"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                   }`}
               >
                 Approvals
@@ -647,8 +647,8 @@ export default function LeavesPage() {
               <button
                 onClick={() => setSelectedTab("all-leaves")}
                 className={`flex-1 px-6 py-4 text-center font-medium transition ${selectedTab === "all-leaves"
-                  ? "text-blue-600 border-b-2 border-blue-600"
-                  : "text-gray-600 hover:text-gray-900"
+                  ? "text-primary border-b-2 border-primary bg-primary/5"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                   }`}
               >
                 All Leaves
@@ -1005,7 +1005,6 @@ export default function LeavesPage() {
             </div>
           </div>
         </Modal>
-      </div>
-    </div>
+    </PageContainer>
   )
 }

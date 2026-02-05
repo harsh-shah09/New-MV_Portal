@@ -84,7 +84,6 @@ export function PayrollSummaryList({ summaries, onSelectSummary, onDeleteSummary
           okText="Yes, Delete"
           cancelText="Cancel"
           okButtonProps={{ danger: true }}
-          onClick={(e) => e.stopPropagation()}
         >
           <Button 
             danger 
@@ -109,7 +108,7 @@ export function PayrollSummaryList({ summaries, onSelectSummary, onDeleteSummary
         onClick: () => onSelectSummary(record),
         style: { cursor: "pointer" },
       })}
-      className="bg-white rounded-lg shadow"
+      className="bg-card rounded-lg shadow-sm border border-border"
     />
   )
 }

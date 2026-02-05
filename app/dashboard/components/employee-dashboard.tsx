@@ -9,6 +9,7 @@ import { UpcomingLeavesHolidays } from "./employee/upcoming-leaves-holidays"
 import { LeaveUtilizationSummary } from "./employee/leave-utilization-summary"
 import { TeamOnLeave } from "./employee/team-on-leave"
 import { GoogleIntegration } from "./employee/google-integration"
+import { PageHeader } from "@/components/page-header"
 
 interface EmployeeDashboardProps {
   data: any
@@ -35,10 +36,10 @@ export function EmployeeDashboard({ data }: EmployeeDashboardProps) {
   return (
     <div className="space-y-6">
       {/* Header Section */}
-      <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg p-6 text-white">
-        <h1 className="text-3xl font-bold mb-2">Welcome Back, {data?.employeeName || 'Employee'}!</h1>
-        <p className="text-blue-100">Here's your leave management overview</p>
-      </div>
+      <PageHeader 
+        title={`Welcome Back, ${data?.employeeName || 'Employee'}!`}
+        subtitle="Here's your leave management overview"
+      />
 
       {/* Leave Balance Cards */}
       <LeaveBalanceCards 

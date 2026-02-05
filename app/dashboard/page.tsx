@@ -7,6 +7,7 @@ import { EmployeeDashboard } from "./components/employee-dashboard"
 import { HRDashboard } from "./components/hr-dashboard"
 import { useQuery } from "@tanstack/react-query"
 import { verifySession } from "@/lib/auth"
+import { PageContainer } from "@/components/page-container"
 
 
 export default function DashboardPage() {
@@ -53,14 +54,12 @@ export default function DashboardPage() {
   const isAdmin = role === 'Admin'
 
   return (
-    <div className="min-h-screen bg-slate-50/50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <PageContainer>
         {(isHR || isAdmin) ? (
           <HRDashboard data={data} />
         ) : (
           <EmployeeDashboard data={data} />
         )}
-      </div>
-    </div>
+    </PageContainer>
   )
 }

@@ -6,6 +6,8 @@ import { EyeOutlined, FileTextOutlined, DownloadOutlined } from "@ant-design/ico
 import { useQuery } from "@tanstack/react-query"
 import type { ColumnsType } from "antd/es/table"
 import { PayslipView } from "@/components/payslip-view"
+import { PageContainer } from "@/components/page-container"
+import { PageHeader } from "@/components/page-header"
 
 interface EmployeePayroll {
   id: string
@@ -138,21 +140,21 @@ export default function MyPayrollsPage() {
 
   if (selectedPayroll) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <PageContainer>
         <div className="mb-6">
           <Button onClick={() => setSelectedPayroll(null)}>← Back to My Payrolls</Button>
         </div>
         <PayslipView payrollId={selectedPayroll.id} />
-      </div>
+      </PageContainer>
     )
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="mb-8">
-        <h1 className="text-4xl font-bold text-gray-900 mb-2">My Payslips</h1>
-        <p className="text-gray-600">View your salary details and download payslips</p>
-      </div>
+    <PageContainer>
+      <PageHeader
+        title="My Payslips"
+        subtitle="View your salary details and download payslips"
+      />
 
       {isLoading ? (
         <div className="flex justify-center items-center py-12">
@@ -183,6 +185,6 @@ export default function MyPayrollsPage() {
           />
         </Card>
       )}
-    </div>
+    </PageContainer>
   )
 }

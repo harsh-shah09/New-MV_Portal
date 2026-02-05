@@ -4,6 +4,8 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useQuery } from "@tanstack/react-query"
 import { CalendarRange, Plus, Edit2, Trash2, X, Calendar, ChevronDown } from "lucide-react"
+import { PageContainer } from "@/components/page-container"
+import { PageHeader } from "@/components/page-header"
 
 interface Holiday {
   id: string
@@ -223,62 +225,60 @@ export default function HolidaysPage() {
 
   if (isLoading) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="text-center">Loading...</div>
-      </div>
+      <PageContainer>
+        <div className="flex justify-center items-center h-64">
+           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      </PageContainer>
     )
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
-        <div>
-          <h1 className="text-4xl font-bold text-gray-900 flex items-center gap-3">
-            <CalendarRange className="w-10 h-10 text-indigo-600" />
-            Holiday Calendar
-          </h1>
-          <p className="text-gray-600 mt-1">View and manage company holidays</p>
-        </div>
+    <PageContainer>
+      <PageHeader
+        title="Holiday Calendar"
+        subtitle="View and manage company holidays"
+      >
         <div className="flex items-center gap-3">
           {/* Year Filter */}
           <div className="relative">
             <select
               value={selectedYear}
               onChange={(e) => setSelectedYear(e.target.value)}
-              className="appearance-none bg-white border-2 border-gray-200 rounded-xl px-4 py-3 pr-10 font-semibold text-gray-700 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none cursor-pointer"
+              className="appearance-none bg-card border border-border rounded-lg px-4 py-2 pr-10 font-medium text-foreground focus:ring-2 focus:ring-primary focus:border-transparent outline-none cursor-pointer shadow-sm"
             >
               {availableYears.map(year => (
                 <option key={year} value={year}>{year}</option>
               ))}
             </select>
-            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
           </div>
 
           {isHR && (
             <button
               onClick={() => setShowBulkModal(true)}
-              className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-6 py-3 rounded-xl font-semibold transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 flex items-center gap-2 whitespace-nowrap"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-lg font-medium transition-all shadow-sm flex items-center gap-2 whitespace-nowrap"
             >
-              <Plus className="w-5 h-5" />
+              <Plus className="w-4 h-4" />
               Add Holidays
             </button>
           )}
         </div>
-      </div>
+      </PageHeader>
 
       {filteredHolidays.length === 0 ? (
-        <div className="text-center py-16 bg-white rounded-2xl shadow-sm">
-          <div className="w-24 h-24 mx-auto mb-4 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full flex items-center justify-center">
-            <Calendar className="w-12 h-12 text-gray-400" />
+        <div className="text-center py-16 bg-card rounded-xl shadow-sm border border-border">
+          <div className="w-24 h-24 mx-auto mb-4 bg-muted rounded-full flex items-center justify-center">
+            <Calendar className="w-12 h-12 text-muted-foreground" />
           </div>
-          <h3 className="text-xl font-bold text-gray-900 mb-2">No Holidays for {selectedYear}</h3>
-          <p className="text-gray-500">No holidays have been added for this year yet.</p>
+          <h3 className="text-xl font-bold text-foreground mb-2">No Holidays for {selectedYear}</h3>
+          <p className="text-muted-foreground">No holidays have been added for this year yet.</p>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
+        <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white">
+              <thead className="bg-muted text-muted-foreground">
                 <tr>
                   <th className="px-6 py-4 text-left text-sm font-bold uppercase tracking-wider">#</th>
                   <th className="px-6 py-4 text-left text-sm font-bold uppercase tracking-wider">Holiday Name</th>
@@ -289,7 +289,7 @@ export default function HolidaysPage() {
                   )}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
+              <tbody className="divide-y divide-border">
                 {filteredHolidays.map((holiday, index) => {
                   const holidayDate = new Date(holiday.date)
                   const formattedDate = holidayDate.toLocaleDateString('en-US', { 
@@ -299,18 +299,18 @@ export default function HolidaysPage() {
                   })
                   
                   return (
-                    <tr key={holiday.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 text-sm font-semibold text-gray-500">
+                    <tr key={holiday.id} className="hover:bg-muted/50 transition-colors">
+                      <td className="px-6 py-4 text-sm font-medium text-muted-foreground">
                         {index + 1}
                       </td>
                       <td className="px-6 py-4">
-                        <span className="text-base font-semibold text-gray-900">{holiday.name}</span>
+                        <span className="text-base font-semibold text-foreground">{holiday.name}</span>
                       </td>
                       <td className="px-6 py-4">
-                        <span className="text-sm text-gray-700">{formattedDate}</span>
+                        <span className="text-sm text-foreground">{formattedDate}</span>
                       </td>
                       <td className="px-6 py-4">
-                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
                           {holiday.day}
                         </span>
                       </td>
@@ -543,17 +543,17 @@ export default function HolidaysPage() {
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden transform transition-all">
-            <div className="p-6 bg-gradient-to-r from-red-500 to-rose-500">
-              <div className="flex items-center gap-3 text-white">
-                <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center">
-                  <Trash2 className="w-6 h-6" />
+          <div className="bg-card rounded-xl shadow-2xl max-w-md w-full overflow-hidden transform transition-all border border-border">
+            <div className="p-6 bg-destructive/10 border-b border-destructive/20">
+              <div className="flex items-center gap-3 text-destructive">
+                <div className="w-10 h-10 rounded-full bg-destructive/20 flex items-center justify-center">
+                  <Trash2 className="w-5 h-5" />
                 </div>
-                <h3 className="text-xl font-bold">Delete Holiday</h3>
+                <h3 className="text-lg font-bold">Delete Holiday</h3>
               </div>
             </div>
             <div className="p-6">
-              <p className="text-gray-700 text-base mb-6">
+              <p className="text-muted-foreground text-sm mb-6">
                 Are you sure you want to delete this holiday? This action cannot be undone.
               </p>
               <div className="flex gap-3">
@@ -562,13 +562,13 @@ export default function HolidaysPage() {
                     setShowDeleteConfirm(false)
                     setDeletingHolidayId(null)
                   }}
-                  className="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-semibold transition-colors"
+                  className="flex-1 px-4 py-2 bg-muted hover:bg-muted/80 text-foreground rounded-lg font-medium transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleDelete}
-                  className="flex-1 px-4 py-3 bg-gradient-to-r from-red-500 to-rose-500 hover:from-red-600 hover:to-rose-600 text-white rounded-xl font-semibold transition-all transform hover:scale-105"
+                  className="flex-1 px-4 py-2 bg-destructive hover:bg-destructive/90 text-destructive-foreground rounded-lg font-medium transition-colors"
                 >
                   Delete
                 </button>
@@ -577,6 +577,6 @@ export default function HolidaysPage() {
           </div>
         </div>
       )}
-    </div>
+    </PageContainer>
   )
 }

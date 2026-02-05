@@ -114,7 +114,7 @@ export function LeaveTable({ leaves, onCancel, onWithdraw, showActions = true }:
   }
 
   return (
-    <div className="bg-white rounded-lg shadow overflow-hidden">
+    <div className="bg-card rounded-lg shadow-sm border border-border overflow-hidden">
       <Table
         columns={columns}
         dataSource={leaves}

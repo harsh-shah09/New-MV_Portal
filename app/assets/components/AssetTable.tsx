@@ -107,7 +107,7 @@ export function AssetTable({ assets, loading, onManageAssignment, onViewDetails,
   ];
 
   return (
-    <div className="bg-white rounded-lg shadow border border-gray-100 overflow-hidden">
+    <div className="bg-card rounded-lg shadow-sm border border-border overflow-hidden">
         <Table 
             rowKey="Id"
             columns={columns} 

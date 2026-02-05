@@ -1,6 +1,9 @@
 import { getAssets } from './actions';
 import { AssetManager } from './components/AssetManager';
 
+import { PageContainer } from "@/components/page-container"
+import { PageHeader } from "@/components/page-header"
+
 export const dynamic = 'force-dynamic';
 
 export default async function AssetsPage() {
@@ -12,12 +15,12 @@ export default async function AssetsPage() {
   }
 
   return (
-    <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight text-gray-900">Asset Management</h1>
-        <p className="text-gray-500 mt-2">Manage company assets, assignments, and returns.</p>
-      </div>
+    <PageContainer>
+      <PageHeader 
+        title="Asset Management" 
+        subtitle="Manage company assets, assignments, and returns."
+      />
       <AssetManager initialAssets={assets} />
-    </div>
+    </PageContainer>
   )
 }

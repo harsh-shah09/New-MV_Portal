@@ -141,7 +141,7 @@ export function AssetManager({ initialAssets }: AssetManagerProps) {
                     icon={<ReloadOutlined />} 
                     onClick={refreshAssets} 
                     loading={loading}
-                    className="w-full sm:w-auto h-10 border-gray-200 text-gray-600 hover:text-blue-600 hover:border-blue-200"
+                    className="w-full sm:w-auto h-10"
                 >
                     Refresh
                 </Button>
@@ -149,7 +149,7 @@ export function AssetManager({ initialAssets }: AssetManagerProps) {
                 <Button 
                     icon={<AppstoreOutlined />} 
                     onClick={() => router.push('/assets/products')}
-                    className="w-full sm:w-auto h-10 border-gray-200 text-gray-600"
+                    className="w-full sm:w-auto h-10"
                 >
                     Catalog
                 </Button>
@@ -159,7 +159,7 @@ export function AssetManager({ initialAssets }: AssetManagerProps) {
                 type="primary" 
                 icon={<PlusOutlined />} 
                 onClick={() => setIsCreateModalVisible(true)}
-                className="w-full sm:w-auto h-10 bg-blue-600 hover:bg-blue-500 shadow-md shadow-blue-200"
+                className="w-full sm:w-auto h-10 shadow-md"
             >
                 New Asset
             </Button>
@@ -202,10 +202,11 @@ export function AssetManager({ initialAssets }: AssetManagerProps) {
 }
 
 function StatCard({ title, value, color }: { title: string, value: number, color: string }) {
+    // Map colors to theme-aware classes if needed, or keeping it simple for now
     return (
-        <div className={`p-4 rounded-xl bg-white border border-${color}-100 shadow-sm flex flex-col items-center justify-center`}>
-            <span className="text-gray-500 text-xs font-medium uppercase tracking-wider">{title}</span>
-            <span className={`text-2xl font-bold text-${color}-600`}>{value}</span>
+        <div className="p-4 rounded-xl bg-card border border-border shadow-sm flex flex-col items-center justify-center">
+            <span className="text-muted-foreground text-xs font-medium uppercase tracking-wider">{title}</span>
+            <span className="text-2xl font-bold text-foreground">{value}</span>
         </div>
     )
 }

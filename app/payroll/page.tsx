@@ -10,6 +10,8 @@ import { PayrollEmployeeList } from "./components/payroll-employee-list"
 import { PayrollEmployeeDetailView } from "./components/payroll-employee-detail"
 import { GeneratePayrollModal } from "./components/generate-payroll-modal"
 import type { PayrollSummary, PayrollEmployeeDetail } from "@/types"
+import { PageContainer } from "@/components/page-container"
+import { PageHeader } from "@/components/page-header"
 
 export default function PayrollPage() {
   const { data: user } = useQuery({
@@ -123,30 +125,27 @@ export default function PayrollPage() {
   // Show appropriate message if not HR/Admin
   if (!isHROrAdmin) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <PageContainer>
         <div className="text-center py-12">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">Payroll Management</h1>
-          <p className="text-gray-600">Access restricted to HR and Admin users only.</p>
+          <h1 className="text-4xl font-bold text-foreground mb-4">Payroll Management</h1>
+          <p className="text-muted-foreground">Access restricted to HR and Admin users only.</p>
         </div>
-      </div>
+      </PageContainer>
     )
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="mb-8">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-4xl font-bold text-gray-900">Payroll Management</h1>
-            <p className="text-gray-600 mt-1">Manage employee payrolls and generate monthly summaries</p>
-          </div>
+    <PageContainer>
+      <PageHeader 
+        title="Payroll Management" 
+        subtitle="Manage employee payrolls and generate monthly summaries"
+      >
           {view === "summary" && (
             <Button type="primary" icon={<PlusOutlined />} onClick={() => setIsGenerateModalOpen(true)} size="large">
               Generate Payroll
             </Button>
           )}
-        </div>
-      </div>
+      </PageHeader>
 
       {loadingSummaries ? (
         <div className="flex justify-center items-center py-12">
@@ -201,6 +200,6 @@ export default function PayrollPage() {
         onClose={() => setIsGenerateModalOpen(false)}
         onGenerate={handleGeneratePayroll}
       />
-    </div>
+    </PageContainer>
   )
 }
