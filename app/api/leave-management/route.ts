@@ -13,6 +13,10 @@ import {
   leaveApprovedFinal,
   leaveRejected,
   leaveWithdrawn,
+  withdrawalRequestSubmitted,
+  withdrawalRequestToHR,
+  withdrawalApproved,
+  withdrawalRejected,
 } from "@/lib/email-templates";
 import type { LeaveRequest } from "@/types";
 
@@ -235,7 +239,7 @@ export async function GET(request: NextRequest) {
           HR_Approval__c,
           Reason__c
         FROM Leave__c
-        WHERE Status__c = 'Applied'
+        WHERE Status__c IN ('Applied', 'Withdrawal Pending')
         AND Employee__r.Role__c = 'HR'
         ORDER BY Start_Date__c ASC
       `);
@@ -252,6 +256,7 @@ export async function GET(request: NextRequest) {
         endDate: record.End_Date__c || "",
         duration: record.Total_Days__c || 0,
         status: record.Status__c?.toLowerCase() || "pending",
+        isWithdrawalRequest: record.Status__c === 'Withdrawal Pending',
         approvedBy: record.Approved_By__c,
         approvalDate: record.Approved_Date__c,
         reason: record.Reason__c || '',
@@ -278,7 +283,7 @@ export async function GET(request: NextRequest) {
           HR_Approval__c,
           Reason__c
         FROM Leave__c
-        WHERE Status__c = 'Applied'
+        WHERE Status__c IN ('Applied', 'Withdrawal Pending')
         AND Employee__r.Role__c != 'HR'
         ORDER BY Start_Date__c ASC
       `);
@@ -295,6 +300,7 @@ export async function GET(request: NextRequest) {
         endDate: record.End_Date__c || "",
         duration: record.Total_Days__c || 0,
         status: record.Status__c?.toLowerCase() || "pending",
+        isWithdrawalRequest: record.Status__c === 'Withdrawal Pending',
         approvedBy: record.Approved_By__c,
         approvalDate: record.Approved_Date__c,
         reason: record.Reason__c || '',
@@ -321,7 +327,7 @@ export async function GET(request: NextRequest) {
           Reason__c
         FROM Leave__c
         WHERE Employee__r.Team_Lead__r.Employee_Name__c = '${name}'
-        AND Status__c = 'Applied'
+        AND Status__c IN ('Applied', 'Withdrawal Pending')
         ORDER BY Start_Date__c ASC
       `);
 
@@ -337,6 +343,7 @@ export async function GET(request: NextRequest) {
         endDate: record.End_Date__c || "",
         duration: record.Total_Days__c || 0,
         status: record.Status__c?.toLowerCase() || "pending",
+        isWithdrawalRequest: record.Status__c === 'Withdrawal Pending',
         approvedBy: record.Approved_By__c,
         approvalDate: record.Approved_Date__c,
         reason: record.Reason__c || '',
@@ -452,7 +459,7 @@ export async function POST(request: NextRequest) {
         Leave_Category__c
       FROM Leave__c
       WHERE Employee__c = '${employeeId}'
-      AND Status__c IN ('Applied', 'Approved')
+      AND Status__c IN ('Applied', 'Approved', 'Withdrawal Pending')
       AND (
         (Start_Date__c <= ${endDate} AND End_Date__c >= ${startDate})
       )
@@ -479,7 +486,7 @@ export async function POST(request: NextRequest) {
 
     // Check for consecutive dates with the same leave category
     const isRequestHalfDay = sessionValue === "Session-1" || sessionValue === "Session-2";
-    
+
     // Query for leaves that are consecutive (one day before or after the requested dates)
     const consecutiveLeavesQuery = await conn.query<any>(`
       SELECT 
@@ -504,7 +511,7 @@ export async function POST(request: NextRequest) {
         const existingEnd = dayjs(existingLeave.End_Date__c);
         const existingSession = existingLeave.Session__c;
         const isExistingHalfDay = existingSession === "Session-1" || existingSession === "Session-2";
-        
+
         // Check if applying for the same date with same session (not allowed)
         if (requestStartDate.isSame(existingStart, 'day') && requestEndDate.isSame(existingEnd, 'day')) {
           // Same day - only allow if both are half-day and different sessions
@@ -528,18 +535,18 @@ export async function POST(request: NextRequest) {
             }, { status: 400 });
           }
         }
-        
+
         // For full-day leaves, check if consecutive days should be combined
         // Skip this check if either leave is half-day (sessions can be on consecutive days)
         if (!isRequestHalfDay && !isExistingHalfDay) {
           // Check if the new leave is exactly one day before or after an existing leave
           const isOneDayBefore = requestEndDate.add(1, 'day').isSame(existingStart, 'day');
           const isOneDayAfter = requestStartDate.subtract(1, 'day').isSame(existingEnd, 'day');
-          
+
           if (isOneDayBefore || isOneDayAfter) {
             const combinedStart = isOneDayBefore ? requestStartDate : existingStart;
             const combinedEnd = isOneDayAfter ? requestEndDate : existingEnd;
-            
+
             return NextResponse.json({
               error: "Consecutive leave dates detected",
               details: {
@@ -586,7 +593,7 @@ export async function POST(request: NextRequest) {
         const existingEnd = dayjs(existingLeave.End_Date__c);
         const existingSession = existingLeave.Session__c;
         const isExistingHalfDay = existingSession === "Session-1" || existingSession === "Session-2";
-        
+
         // Skip half-day leaves for sandwich check
         if (isRequestHalfDay || isExistingHalfDay) {
           continue;
@@ -596,7 +603,7 @@ export async function POST(request: NextRequest) {
         // Scenario: existing leave ends, then non-working day(s), then new leave starts
         let daysBetween: dayjs.Dayjs[] = [];
         let checkDate = existingEnd.add(1, 'day');
-        
+
         // Check days between existing leave end and new leave start
         while (checkDate.isBefore(requestStartDate)) {
           daysBetween.push(checkDate.clone());
@@ -619,7 +626,7 @@ export async function POST(request: NextRequest) {
         // If there are days between and all are non-working days, this is a sandwich scenario
         if (daysBetween.length > 0 && daysBetween.length <= 5) { // Reasonable gap limit
           const allNonWorking = daysBetween.every(day => tempIsNonWorking(day));
-          
+
           if (allNonWorking) {
             const combinedStart = requestStartDate.isBefore(existingStart) ? requestStartDate : existingStart;
             const combinedEnd = requestEndDate.isAfter(existingEnd) ? requestEndDate : existingEnd;
@@ -713,7 +720,7 @@ export async function POST(request: NextRequest) {
       let cursor = start.clone();
       console.log('is same or before', cursor.isSame(end) || cursor.isBefore(end));
 
-      if(isNonWorking(start)) {
+      if (isNonWorking(start)) {
         console.log('start is non working');
         return NextResponse.json(
           {
@@ -726,7 +733,7 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
-      if(isNonWorking(end)) {
+      if (isNonWorking(end)) {
         console.log('end is non working');
         return NextResponse.json(
           {
@@ -795,7 +802,7 @@ export async function POST(request: NextRequest) {
     let workingDaysInRange = 0;
     let nonWorkingDaysInRange = 0;
     let cursor = start.clone();
-    
+
     while (cursor.isSame(end) || cursor.isBefore(end)) {
       if (isNonWorking(cursor)) {
         nonWorkingDaysInRange++;
@@ -812,7 +819,7 @@ export async function POST(request: NextRequest) {
       let foundWorkingBefore = false;
       let foundNonWorking = false;
       let foundWorkingAfter = false;
-      
+
       cursor = start.clone();
       while (cursor.isSame(end) || cursor.isBefore(end)) {
         if (!isNonWorking(cursor)) {
@@ -827,7 +834,7 @@ export async function POST(request: NextRequest) {
         }
         cursor = cursor.add(1, "day");
       }
-      
+
       hasNonWorkingInside = foundWorkingBefore && foundNonWorking && foundWorkingAfter;
     }
 
@@ -857,7 +864,7 @@ export async function POST(request: NextRequest) {
 
     // Sandwich applies if: non-working days are sandwiched inside OR there are non-working days both before and after
     const sandwichApplied = applySandwichRule && (hasNonWorkingInside || (preSandwich > 0 && postSandwich > 0));
-    
+
     // If sandwich is applied, add all those dates to the set for cross-request exclusion
     if (sandwichApplied) {
       preSandwichDates.forEach(d => sameRequestSandwichDates.add(d));
@@ -871,27 +878,27 @@ export async function POST(request: NextRequest) {
         innerCursor = innerCursor.add(1, "day");
       }
     }
-    
+
     console.log('[Same-Request Sandwich] Pre-sandwich dates:', preSandwichDates);
     console.log('[Same-Request Sandwich] Post-sandwich dates:', postSandwichDates);
     console.log('[Same-Request Sandwich] All counted dates:', Array.from(sameRequestSandwichDates));
-    
+
     // Base leave days should be only working days when no sandwich, or all calendar days when sandwich applies
     let rangeLeaveDays = sandwichApplied ? baseCalendarDays : workingDaysInRange;
-    
+
     console.log('[Half-Day Check] Before adjustment:', {
       isHalfDay,
       sessionValue,
       workingDaysInRange,
       rangeLeaveDays
     });
-    
+
     // For half-day leaves, calculate as 0.5 per day
     if (isHalfDay) {
       rangeLeaveDays = rangeLeaveDays * 0.5;
       console.log('[Half-Day Check] After 0.5 multiplication:', rangeLeaveDays);
     }
-    
+
     const sandwichExtra = sandwichApplied ? preSandwich + postSandwich : 0;
 
     // Server-side One+Two rule calculation (planned leave within minimum working day notice period)
@@ -921,7 +928,7 @@ export async function POST(request: NextRequest) {
       const endPenalty = end.startOf("day");
       console.log(`[One+Two Rule] Today: ${today.format('YYYY-MM-DD')}, Start: ${start.format('YYYY-MM-DD')}, End: ${end.format('YYYY-MM-DD')}`);
       console.log(`[One+Two Rule] Min notice period: ${leaveConfig.minWorkingDayNoticePeriod} working days, Penalty per day: ${penaltyMultiplier}`);
-      
+
       while (cursorPenalty.isSame(endPenalty) || cursorPenalty.isBefore(endPenalty)) {
         // Only apply penalty if this is a working day
         if (!isNonWorking(cursorPenalty)) {
@@ -982,19 +989,19 @@ export async function POST(request: NextRequest) {
     // Calculate effective leave period for display
     let effectiveStartDate = finalStartDateStr;
     let effectiveEndDate = finalEndDateStr;
-    
+
     // If sandwich is applied, find the actual effective start/end
     if (anySandwichApplied) {
       // If pre-sandwich days exist, the effective start is earlier
       if (preSandwichDates.length > 0) {
-        const earliestPreDate = preSandwichDates.reduce((earliest, date) => 
+        const earliestPreDate = preSandwichDates.reduce((earliest, date) =>
           dayjs(date).isBefore(dayjs(earliest)) ? date : earliest
         );
         effectiveStartDate = earliestPreDate;
       }
       // If post-sandwich days exist, the effective end is later
       if (postSandwichDates.length > 0) {
-        const latestPostDate = postSandwichDates.reduce((latest, date) => 
+        const latestPostDate = postSandwichDates.reduce((latest, date) =>
           dayjs(date).isAfter(dayjs(latest)) ? date : latest
         );
         effectiveEndDate = latestPostDate;
@@ -1038,11 +1045,11 @@ export async function POST(request: NextRequest) {
       requestedEndDate: requestedEndDateStr,
       effectiveStartDate,
       effectiveEndDate,
-      
+
       // Days breakdown
       baseCalendarDays,
       rangeLeaveDays,
-      
+
       // Same-request sandwich details
       sameRequestSandwich: {
         applied: sandwichApplied,
@@ -1050,17 +1057,17 @@ export async function POST(request: NextRequest) {
         postSandwichDates,
         totalDays: sandwichExtra
       },
-      
+
       // 1+2 rule details
       onePlusTwoRule: {
         applied: onePlusTwoRuleApplied,
         extraDays: onePlusTwoExtra
       },
-      
+
       // Totals
       totalSandwichDays,
       finalTotalAfterRules,
-      
+
       // Merge audit
       mergeInfo: mergeContext ? {
         merged: true,
@@ -1073,7 +1080,7 @@ export async function POST(request: NextRequest) {
         mergedBy: email || employeeId || name,
         gapDates: mergeContext.gapDates,
       } : { merged: false },
-      
+
       // Timestamp
       calculatedAt: new Date().toISOString()
     };
@@ -1376,7 +1383,7 @@ export async function PATCH(request: NextRequest) {
       // Send in-app notifications to TL and HR
       try {
         const empData = await conn.query<any>(`
-          SELECT Id, Employee_Name__c, Role__c, Title__c, Team_Lead__c
+          SELECT Id, Name, Employee_Name__c, Role__c, Title__c, Team_Lead__c
           FROM Employee__c
           WHERE Id = '${leave.Employee__c}'
           LIMIT 1
@@ -1384,7 +1391,7 @@ export async function PATCH(request: NextRequest) {
 
         if (empData.records && empData.records.length > 0) {
           const emp = empData.records[0];
-          const employeeName = emp.Employee_Name__c || 'Employee';
+          const employeeName = emp.Employee_Name__c || emp.Name || 'Employee';
           const employeeRole = emp.Role__c;
           const employeeTitle = emp.Title__c;
           const notificationRecipients: string[] = [];
@@ -1437,6 +1444,9 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Handle withdraw action
+    // In the PATCH function, replace the "withdraw" action block and add new actions
+
+    // Handle withdraw action - REQUEST withdrawal approval from HR
     if (action === "withdraw") {
       // Verify the leave belongs to the current user
       const leaveRecordQuery = await conn.query<any>(`
@@ -1459,152 +1469,350 @@ export async function PATCH(request: NextRequest) {
         return NextResponse.json({ error: "Unauthorized to withdraw this leave" }, { status: 403 });
       }
 
+      // Only approved leaves can be withdrawn
+      if (oldStatus !== 'Approved') {
+        return NextResponse.json({ error: "Only approved leaves can be withdrawn" }, { status: 400 });
+      }
+
+      // Update the status to Withdrawal Pending in Salesforce
+      await conn.sobject('Leave__c').update({
+        Id: leaveId,
+        Status__c: 'Withdrawal Pending',
+        Withdrawal_Requested_Date__c: new Date().toISOString(),
+      });
+
+      // Send notifications to HR for withdrawal approval
+      try {
+        const empData = await conn.query<any>(`
+          SELECT Id, Name, Employee_Email__c, Employee_Name__c, Role__c, Title__c,
+                 Team_Lead__c, Team_Lead__r.Employee_Name__c, Team_Lead__r.Employee_Email__c
+          FROM Employee__c
+          WHERE Id = '${leave.Employee__c}'
+          LIMIT 1
+        `);
+
+        if (empData.records && empData.records.length > 0) {
+          const emp = empData.records[0];
+          const employeeName = emp.Employee_Name__c || emp.Name || 'Employee';
+          const employeeRole = emp.Role__c;
+          const employeeTitle = emp.Title__c;
+
+          const notificationRecipients: string[] = [];
+
+          // Send notification to HR for all employees except Admin
+          if (employeeRole !== 'Admin') {
+            const hrQuery = await conn.query<any>(`
+              SELECT Id, Employee_Email__c
+              FROM Employee__c
+              WHERE Role__c = 'HR' AND Active__c = true AND Title__c = 'Senior'
+              LIMIT 1
+            `);
+            if (hrQuery.records && hrQuery.records.length > 0) {
+              const hr = hrQuery.records[0];
+              notificationRecipients.push(hr.Id);
+
+              // Send email to HR
+              if (hr.Employee_Email__c) {
+                const emailData = withdrawalRequestToHR({
+                  recipientName: 'HR Team',
+                  employeeName: employeeName,
+                  leaveType: leave.Leave_Type__c || leave.Leave_Category__c,
+                  startDate: dayjs(leave.Start_Date__c).format('DD MMM YYYY'),
+                  endDate: dayjs(leave.End_Date__c).format('DD MMM YYYY'),
+                  duration: leave.Total_Days__c
+                });
+                sendEmailAsync({
+                  to: hr.Employee_Email__c,
+                  subject: emailData.subject,
+                  body: emailData.html
+                });
+              }
+            }
+          }
+
+          // Send notification to Admin if employee is HR
+          if (employeeRole === 'HR') {
+            const adminQuery = await conn.query<any>(`
+              SELECT Id, Employee_Email__c
+              FROM Employee__c
+              WHERE Role__c = 'Admin'
+              LIMIT 1
+            `);
+            if (adminQuery.records && adminQuery.records.length > 0) {
+              const admin = adminQuery.records[0];
+              notificationRecipients.push(admin.Id);
+
+              // Send email to Admin
+              if (admin.Employee_Email__c) {
+                const emailData = withdrawalRequestToHR({
+                  recipientName: 'Admin',
+                  employeeName: employeeName,
+                  leaveType: leave.Leave_Type__c || leave.Leave_Category__c,
+                  startDate: dayjs(leave.Start_Date__c).format('DD MMM YYYY'),
+                  endDate: dayjs(leave.End_Date__c).format('DD MMM YYYY'),
+                  duration: leave.Total_Days__c
+                });
+                sendEmailAsync({
+                  to: admin.Employee_Email__c,
+                  subject: emailData.subject,
+                  body: emailData.html
+                });
+              }
+            }
+          }
+
+          // Send in-app notifications
+          if (notificationRecipients.length > 0) {
+            await sendInAppNotifications(
+              notificationRecipients,
+              `${employeeName} has requested to withdraw their approved leave from ${dayjs(leave.Start_Date__c).format('DD MMM YYYY')} to ${dayjs(leave.End_Date__c).format('DD MMM YYYY')}. Please review and approve/reject.`,
+              'Leave',
+              true
+            );
+          }
+
+          // Notify employee that withdrawal request is pending
+          if (emp.Employee_Email__c) {
+            const emailData = withdrawalRequestSubmitted({
+              recipientName: employeeName,
+              leaveType: leave.Leave_Type__c || leave.Leave_Category__c,
+              startDate: dayjs(leave.Start_Date__c).format('DD MMM YYYY'),
+              endDate: dayjs(leave.End_Date__c).format('DD MMM YYYY'),
+              duration: leave.Total_Days__c
+            });
+            sendEmailAsync({
+              to: emp.Employee_Email__c,
+              subject: emailData.subject,
+              body: emailData.html
+            });
+          }
+        }
+      } catch (emailError) {
+        console.error('Error sending withdrawal request notification:', emailError);
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: "Withdrawal request submitted. Awaiting HR approval.",
+        status: 'Withdrawal Pending'
+      });
+    }
+
+    // Handle approve_withdrawal action (HR or Admin only)
+    if (action === "approve_withdrawal") {
+      const { role, title } = payload;
+
+      // Check if user can approve withdrawal (HR or Admin only)
+      const isHR = role === 'HR';
+      const isAdmin = role === 'Admin';
+
+      if (!isHR && !isAdmin) {
+        return NextResponse.json({ error: "Only HR or Admin can approve withdrawal requests" }, { status: 403 });
+      }
+
+      const leaveRecordQuery = await conn.query<any>(`
+        SELECT Id, Employee__c, Status__c, Leave_Category__c, Leave_Type__c, Total_Days__c, Total_Days_After_Rule__c, 
+               Start_Date__c, End_Date__c, Sandwich_Rule__c, Rule_Calculation_Details__c
+        FROM Leave__c
+        WHERE Id = '${leaveId}'
+        LIMIT 1
+      `);
+
+      if (leaveRecordQuery.records.length === 0) {
+        return NextResponse.json({ error: "Leave not found" }, { status: 404 });
+      }
+
+      const leave = leaveRecordQuery.records[0];
+
+      // Verify the leave is in withdrawal pending status
+      if (leave.Status__c !== 'Withdrawal Pending') {
+        return NextResponse.json({ error: "Leave is not pending withdrawal approval" }, { status: 400 });
+      }
+
       // Update the status to Withdrawn in Salesforce
       await conn.sobject('Leave__c').update({
         Id: leaveId,
         Status__c: 'Withdrawn',
+        Withdrawal_Result_Date__c: new Date().toISOString(),
       });
 
-      // afterUpdate: Revert Leave Balance if leave was previously Approved
-      if (oldStatus === 'Approved') {
-        await updateLeaveBalance(conn, leave, 'revert');
+      // Revert Leave Balance since the leave was approved earlier
+      await updateLeaveBalance(conn, leave, 'revert');
 
-        // Send email notification about withdrawal
-        try {
-          const empData = await conn.query<any>(`
-            SELECT Id, Employee_Email__c, Employee_Name__c, Role__c, Title__c,
-                   Team_Lead__c, Team_Lead__r.Employee_Name__c, Team_Lead__r.Employee_Email__c
-            FROM Employee__c
-            WHERE Id = '${leave.Employee__c}'
-            LIMIT 1
-          `);
+      // Send notification emails
+      try {
+        const empData = await conn.query<any>(`
+          SELECT Id, Name, Employee_Email__c, Employee_Name__c, Role__c, Title__c,
+                 Team_Lead__c, Team_Lead__r.Employee_Name__c, Team_Lead__r.Employee_Email__c
+          FROM Employee__c
+          WHERE Id = '${leave.Employee__c}'
+          LIMIT 1
+        `);
 
-          if (empData.records && empData.records.length > 0) {
-            const emp = empData.records[0];
-            const employeeName = emp.Employee_Name__c || 'Employee';
-            const employeeRole = emp.Role__c;
-            const employeeTitle = emp.Title__c;
+        console.log("Employee data for withdrawal approval notification:", empData);
 
-            const notificationRecipients: string[] = [];
+        if (empData.records && empData.records.length > 0) {
+          const emp = empData.records[0];
+          const employeeName = emp.Employee_Name__c || emp.Name || 'Employee';
+          console.log("Notifying employee:", employeeName);
+          const employeeRole = emp.Role__c;
+          const employeeTitle = emp.Title__c;
 
-            // Send email to employee
-            if (emp.Employee_Email__c) {
-              const emailTemplate = leaveWithdrawn({
-                recipientName: employeeName,
-                leaveType: leave.Leave_Type__c || leave.Leave_Category__c || 'N/A',
-                startDate: leave.Start_Date__c || 'N/A',
-                endDate: leave.End_Date__c || 'N/A',
-                duration: leave.Total_Days__c || 0
-              });
-              sendEmailAsync({
-                to: emp.Employee_Email__c,
-                subject: emailTemplate.subject,
-                body: emailTemplate.html
-              });
-            }
+          const notificationRecipients: string[] = [];
 
-            // Send notification to Team Lead (for regular employees)
-            if (employeeRole !== 'HR' && employeeRole !== 'Admin' && !(employeeRole === 'Developer' && employeeTitle === 'Team Lead')) {
-              const teamLeadEmail = emp.Team_Lead__r?.Employee_Email__c;
-              const teamLeadName = emp.Team_Lead__r?.Employee_Name__c;
+          // Send email to employee
+          if (emp.Employee_Email__c) {
+            const approverTitle = isAdmin ? 'Admin' : 'HR';
+            const emailData = withdrawalApproved({
+              recipientName: employeeName,
+              leaveType: leave.Leave_Type__c || leave.Leave_Category__c,
+              startDate: dayjs(leave.Start_Date__c).format('DD MMM YYYY'),
+              endDate: dayjs(leave.End_Date__c).format('DD MMM YYYY'),
+              duration: leave.Total_Days__c,
+              approverTitle: approverTitle
+            });
+            sendEmailAsync({
+              to: emp.Employee_Email__c,
+              subject: emailData.subject,
+              body: emailData.html
+            });
+          }
 
-              if (emp.Team_Lead__c) {
-                notificationRecipients.push(emp.Team_Lead__c);
-              }
+          // Send in-app notification to employee
+          await sendInAppNotifications(
+            [leave.Employee__c],
+            `Your withdrawal request for leave from ${dayjs(leave.Start_Date__c).format('DD MMM YYYY')} to ${dayjs(leave.End_Date__c).format('DD MMM YYYY')} has been approved. Your leave balance has been restored.`,
+            'Leave',
+            false
+          );
 
-              if (teamLeadEmail) {
-                const tlEmailTemplate = leaveWithdrawn({
-                  recipientName: teamLeadName || 'Team Lead',
-                  employeeName,
-                  leaveType: leave.Leave_Type__c || leave.Leave_Category__c || 'N/A',
-                  startDate: leave.Start_Date__c || 'N/A',
-                  endDate: leave.End_Date__c || 'N/A',
-                  duration: leave.Total_Days__c || 0
+          // Send notification to Team Lead (for regular employees)
+          if (employeeRole !== 'HR' && employeeRole !== 'Admin' && !(employeeRole === 'Developer' && employeeTitle === 'Team Lead')) {
+            if (emp.Team_Lead__c) {
+              notificationRecipients.push(emp.Team_Lead__c);
+
+              if (emp.Team_Lead__r?.Employee_Email__c) {
+                const emailData = withdrawalApproved({
+                  recipientName: emp.Team_Lead__r.Employee_Name__c,
+                  employeeName: employeeName,
+                  leaveType: leave.Leave_Type__c || leave.Leave_Category__c,
+                  startDate: dayjs(leave.Start_Date__c).format('DD MMM YYYY'),
+                  endDate: dayjs(leave.End_Date__c).format('DD MMM YYYY'),
+                  duration: leave.Total_Days__c,
+                  approverTitle: 'HR'
                 });
                 sendEmailAsync({
-                  to: teamLeadEmail,
-                  subject: `Leave Withdrawn - ${employeeName}`,
-                  body: tlEmailTemplate.html
+                  to: emp.Team_Lead__r.Employee_Email__c,
+                  subject: `Withdrawal Approved: ${employeeName} - Leave from ${dayjs(leave.Start_Date__c).format('DD MMM YYYY')} to ${dayjs(leave.End_Date__c).format('DD MMM YYYY')}`,
+                  body: emailData.html
                 });
               }
             }
 
-            // Send notification to HR (for all employees except Admin)
-            if (employeeRole !== 'Admin') {
-              const hrQuery = await conn.query<any>(`
-                SELECT Id FROM Employee__c
-                WHERE Role__c = 'HR' AND Active__c = true
-                LIMIT 1
-              `);
-              if (hrQuery.records && hrQuery.records.length > 0) {
-                notificationRecipients.push(hrQuery.records[0].Id);
-              }
-
-              const hrEmailTemplate = leaveWithdrawn({
-                recipientName: 'HR Team',
-                employeeName,
-                leaveType: leave.Leave_Type__c || leave.Leave_Category__c || 'N/A',
-                startDate: leave.Start_Date__c || 'N/A',
-                endDate: leave.End_Date__c || 'N/A',
-                duration: leave.Total_Days__c || 0
-              });
-              sendEmailAsync({
-                to: getHREmail(),
-                subject: `Leave Withdrawn - ${employeeName}`,
-                body: hrEmailTemplate.html
-              });
-            }
-
-            // Send notification to Admin (if employee is HR)
-            if (employeeRole === 'HR') {
-              const adminQuery = await conn.query<any>(`
-                SELECT Id, Employee_Name__c, Employee_Email__c
-                FROM Employee__c
-                WHERE Role__c = 'Admin'
-                LIMIT 1
-              `);
-
-              if (adminQuery.records && adminQuery.records.length > 0) {
-                const admin = adminQuery.records[0];
-                const adminEmail = admin.Employee_Email__c;
-                const adminName = admin.Employee_Name__c;
-
-                notificationRecipients.push(admin.Id);
-
-                if (adminEmail) {
-                  const adminEmailTemplate = leaveWithdrawn({
-                    recipientName: adminName || 'Admin',
-                    employeeName,
-                    leaveType: leave.Leave_Type__c || leave.Leave_Category__c || 'N/A',
-                    startDate: leave.Start_Date__c || 'N/A',
-                    endDate: leave.End_Date__c || 'N/A',
-                    duration: leave.Total_Days__c || 0
-                  });
-                  sendEmailAsync({
-                    to: adminEmail,
-                    subject: `Leave Withdrawn - ${employeeName} (HR)`,
-                    body: adminEmailTemplate.html
-                  });
-                }
-              }
-            }
-
-            // Send in-app notifications
             if (notificationRecipients.length > 0) {
               await sendInAppNotifications(
                 notificationRecipients,
-                `${employeeName} has withdrawn their approved leave from ${dayjs(leave.Start_Date__c).format('DD MMM YYYY')} to ${dayjs(leave.End_Date__c).format('DD MMM YYYY')}.`,
+                `${employeeName}'s withdrawal request has been approved. Leave from ${dayjs(leave.Start_Date__c).format('DD MMM YYYY')} to ${dayjs(leave.End_Date__c).format('DD MMM YYYY')} has been withdrawn.`,
                 'Leave',
                 false
               );
             }
           }
-        } catch (emailError) {
-          console.error('Error sending withdrawal notification:', emailError);
         }
+      } catch (emailError) {
+        console.error('Error sending withdrawal approval notification:', emailError);
       }
 
-      return NextResponse.json({ success: true, message: "Leave withdrawn successfully" });
+      return NextResponse.json({ success: true, message: "Withdrawal request approved successfully" });
+    }
+
+    // Handle reject_withdrawal action (HR or Admin only)
+    if (action === "reject_withdrawal") {
+      const { role, title } = payload;
+      const { reason } = body;
+
+      // Check if user can reject withdrawal (HR or Admin only)
+      const isHR = role === 'HR';
+      const isAdmin = role === 'Admin';
+
+      if (!isHR && !isAdmin) {
+        return NextResponse.json({ error: "Only HR or Admin can reject withdrawal requests" }, { status: 403 });
+      }
+
+      const leaveRecordQuery = await conn.query<any>(`
+        SELECT Id, Employee__c, Status__c, Leave_Category__c, Leave_Type__c, Total_Days__c, 
+               Start_Date__c, End_Date__c
+        FROM Leave__c
+        WHERE Id = '${leaveId}'
+        LIMIT 1
+      `);
+
+      if (leaveRecordQuery.records.length === 0) {
+        return NextResponse.json({ error: "Leave not found" }, { status: 404 });
+      }
+
+      const leave = leaveRecordQuery.records[0];
+
+      // Verify the leave is in withdrawal pending status
+      if (leave.Status__c !== 'Withdrawal Pending') {
+        return NextResponse.json({ error: "Leave is not pending withdrawal approval" }, { status: 400 });
+      }
+
+      // Update the status back to Approved and store rejection reason
+      await conn.sobject('Leave__c').update({
+        Id: leaveId,
+        Status__c: 'Approved',
+        Withdrawal_Rejection_Reason__c: reason || '',
+        Withdrawal_Result_Date__c: new Date().toISOString(),
+      });
+
+      // Send notification emails
+      try {
+        const empData = await conn.query<any>(`
+          SELECT Id, Name, Employee_Email__c, Employee_Name__c, Role__c, Title__c,
+                 Team_Lead__c, Team_Lead__r.Employee_Name__c
+          FROM Employee__c
+          WHERE Id = '${leave.Employee__c}'
+          LIMIT 1
+        `);
+
+        if (empData.records && empData.records.length > 0) {
+          const emp = empData.records[0];
+          const employeeName = emp.Employee_Name__c || emp.Name || 'Employee';
+
+          // Send email to employee
+          if (emp.Employee_Email__c) {
+            const approverTitle = isAdmin ? 'Admin' : 'HR';
+            const emailData = withdrawalRejected({
+              recipientName: employeeName,
+              leaveType: leave.Leave_Type__c || leave.Leave_Category__c,
+              startDate: dayjs(leave.Start_Date__c).format('DD MMM YYYY'),
+              endDate: dayjs(leave.End_Date__c).format('DD MMM YYYY'),
+              duration: leave.Total_Days__c,
+              approverTitle: approverTitle,
+              reason: reason || 'No reason provided'
+            });
+            sendEmailAsync({
+              to: emp.Employee_Email__c,
+              subject: emailData.subject,
+              body: emailData.html
+            });
+          }
+
+          // Send in-app notification to employee
+          const reasonText = reason ? ` Reason: ${reason}` : '';
+          await sendInAppNotifications(
+            [leave.Employee__c],
+            `Your withdrawal request for leave from ${dayjs(leave.Start_Date__c).format('DD MMM YYYY')} to ${dayjs(leave.End_Date__c).format('DD MMM YYYY')} has been rejected.${reasonText}`,
+            'Leave',
+            false
+          );
+        }
+      } catch (emailError) {
+        console.error('Error sending withdrawal rejection notification:', emailError);
+      }
+
+      return NextResponse.json({ success: true, message: "Withdrawal request rejected successfully" });
     }
 
     // Handle approve action (HR, Team Lead, or Admin)

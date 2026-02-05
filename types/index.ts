@@ -68,7 +68,8 @@ export interface LeaveRequest {
   endDate: string
   duration: number
   reason?: string
-  status: "pending" | "approved" | "rejected" | "cancelled" | "applied" | "withdrawn"
+  status: "pending" | "approved" | "rejected" | "cancelled" | "applied" | "withdrawn" | "withdrawal pending"
+  isWithdrawalRequest?: boolean
   approvedBy?: string
   approvalDate?: string
   tlApproved?: string

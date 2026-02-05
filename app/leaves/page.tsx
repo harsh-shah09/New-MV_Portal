@@ -350,7 +350,7 @@ export default function LeavesPage() {
               <div><strong>Duration:</strong> {leave.duration} day(s)</div>
             </div>
           </div>
-          <p className="mt-3 text-sm text-gray-600">Your leave balance will be restored.</p>
+          <p className="mt-3 text-sm text-gray-600">Leave Withdraw Request Submitted to HR.</p>
         </div>
       ),
       okText: 'Yes, Withdraw',
@@ -376,12 +376,15 @@ export default function LeavesPage() {
             return
           }
 
+          const data = await response.json()
+
           // Update local state
           updateLeave({
             ...leave,
-            status: "withdrawn",
+            status: data.status || "withdrawal pending",
+            isWithdrawalRequest: true
           })
-          toast.success("Leave withdrawn successfully. Balance restored.", { id: toastId })
+          toast.success(data.message || "Withdrawal request submitted. Awaiting HR approval.", { id: toastId })
         } catch (error) {
           console.error("Error withdrawing leave:", error)
           toast.error("Failed to withdraw leave. Please try again.", { id: toastId })
@@ -479,9 +482,93 @@ export default function LeavesPage() {
     }
   }
 
-  const openRejectModal = (leaveId: string) => {
+  const handleApproveWithdrawal = async (leaveId: string) => {
+    const leave = pendingApprovals.find((l) => l.id === leaveId)
+    
+    Modal.confirm({
+      title: '⚠️ Approve Withdrawal Request',
+      content: leave ? (
+        <div>
+          <p className="mb-3">Are you sure you want to approve this withdrawal request?</p>
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded">
+            <div className="text-sm space-y-1">
+              <div><strong>Employee:</strong> {leave.employeeName}</div>
+              <div><strong>Type:</strong> {leave.leaveType || leave.leaveCategory}</div>
+              <div><strong>Dates:</strong> {leave.startDate} to {leave.endDate}</div>
+              <div><strong>Duration:</strong> {leave.duration} day(s)</div>
+            </div>
+          </div>
+          <p className="mt-3 text-sm text-amber-700">⚠️ The leave will be withdrawn and leave balance will be restored.</p>
+        </div>
+      ) : 'Are you sure you want to approve this withdrawal request?',
+      okText: 'Approve Withdrawal',
+      cancelText: 'Cancel',
+      okButtonProps: { style: { backgroundColor: '#f59e0b' } },
+      onOk: async () => {
+        const toastId = toast.loading("Approving withdrawal request...")
+        try {
+          const response = await fetch("/api/leave-management", {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              leaveId,
+              action: "approve_withdrawal",
+            }),
+          })
+
+          if (!response.ok) {
+            const error = await response.json()
+            toast.error(error.error || "Failed to approve withdrawal", { id: toastId })
+            return
+          }
+
+          refetch()
+          toast.success("Withdrawal approved successfully! ✅ Leave balance restored.", { id: toastId, duration: 4000 })
+        } catch (error) {
+          console.error("Error approving withdrawal:", error)
+          toast.error("Failed to approve withdrawal. Please try again.", { id: toastId })
+        }
+      },
+    })
+  }
+
+  const handleRejectWithdrawal = async (leaveId: string, reason: string) => {
+    const toastId = toast.loading("Rejecting withdrawal request...")
+    try {
+      const response = await fetch("/api/leave-management", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          leaveId,
+          action: "reject_withdrawal",
+          reason,
+        }),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        toast.error(error.error || "Failed to reject withdrawal", { id: toastId })
+        return
+      }
+
+      refetch()
+      toast.success("Withdrawal rejected. ✉️ Leave remains approved.", { id: toastId, duration: 4000 })
+    } catch (error) {
+      console.error("Error rejecting withdrawal:", error)
+      toast.error("Failed to reject withdrawal. Please try again.", { id: toastId })
+    }
+  }
+
+  const [isWithdrawalRejection, setIsWithdrawalRejection] = useState(false)
+
+  const openRejectModal = (leaveId: string, isWithdrawal = false) => {
     setRejectingLeaveId(leaveId)
     setRejectReason("")
+    setIsWithdrawalRejection(isWithdrawal)
     setRejectModalVisible(true)
   }
 
@@ -497,7 +584,11 @@ export default function LeavesPage() {
     }
     
     if (rejectingLeaveId) {
-      await handleReject(rejectingLeaveId, rejectReason)
+      if (isWithdrawalRejection) {
+        await handleRejectWithdrawal(rejectingLeaveId, rejectReason)
+      } else {
+        await handleReject(rejectingLeaveId, rejectReason)
+      }
       setRejectModalVisible(false)
       setRejectingLeaveId(null)
       setRejectReason("")
@@ -612,7 +703,8 @@ export default function LeavesPage() {
                         const tlRejected = leave.tlApproved === 'Rejected'
                         const hrApproved = leave.hrApproval === 'Approved'
                         const hrRejected = leave.hrApproval === 'Rejected'
-                        const alreadyActioned = isTeamLead ? (tlApproved || tlRejected) : (hrApproved || hrRejected)
+                        // For withdrawal requests, always show action buttons regardless of previous approval status
+                        const alreadyActioned = leave.isWithdrawalRequest ? false : (isTeamLead ? (tlApproved || tlRejected) : (hrApproved || hrRejected))
 
                         return (
                           <div key={leave.id} className="bg-gradient-to-r from-slate-50 to-blue-50 border border-gray-200 rounded-lg hover:border-blue-300 hover:shadow-md transition-all">
@@ -627,13 +719,34 @@ export default function LeavesPage() {
                                     <h3 className="text-base font-semibold text-gray-900">{leave.employeeName}</h3>
                                     <p className="text-xs text-gray-500">ID: {leave.employeeId}</p>
                                   </div>
-                                  <span className="px-4 py-2 rounded-full text-xs font-medium bg-amber-100 text-amber-700 border border-amber-200">
-                                    {leave.status.charAt(0).toUpperCase() + leave.status.slice(1)}
+                                  <span className={`px-4 py-2 rounded-full text-xs font-medium border ${
+                                    leave.isWithdrawalRequest 
+                                      ? 'bg-orange-100 text-orange-700 border-orange-200' 
+                                      : 'bg-amber-100 text-amber-700 border-amber-200'
+                                  }`}>
+                                    {leave.isWithdrawalRequest ? 'Withdrawal Pending' : leave.status.charAt(0).toUpperCase() + leave.status.slice(1)}
                                   </span>
                                 </div>
 
                                 {/* Action Buttons */}
-                                {!alreadyActioned ? (
+                                {leave.isWithdrawalRequest ? (
+                                  // Withdrawal request buttons - always show for withdrawal requests
+                                  <div className="flex gap-3">
+                                    <button
+                                      onClick={() => handleApproveWithdrawal(leave.id)}
+                                      className="flex-1 bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
+                                    >
+                                      Approve
+                                    </button>
+                                    <button
+                                      onClick={() => openRejectModal(leave.id, true)}
+                                      className="flex-1 bg-white hover:bg-gray-50 text-red-600 px-4 py-2 rounded-md text-sm font-medium border border-red-200 transition-colors"
+                                    >
+                                      Reject
+                                    </button>
+                                  </div>
+                                ) : !alreadyActioned ? (
+                                  // Regular approval buttons
                                   <div className="flex gap-3">
                                     <button
                                       onClick={() => handleApprove(leave.id)}
@@ -642,7 +755,7 @@ export default function LeavesPage() {
                                       Approve
                                     </button>
                                     <button
-                                      onClick={() => openRejectModal(leave.id)}
+                                      onClick={() => openRejectModal(leave.id, false)}
                                       className="flex-1 bg-white hover:bg-gray-50 text-red-600 px-4 py-2 rounded-md text-sm font-medium border border-red-200 transition-colors"
                                     >
                                       Reject
