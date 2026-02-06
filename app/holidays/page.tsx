@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useQuery } from "@tanstack/react-query"
+import { Spin } from "antd"
 import { CalendarRange, Plus, Edit2, Trash2, X, Calendar, ChevronDown } from "lucide-react"
 import { PageContainer } from "@/components/page-container"
 import { PageHeader } from "@/components/page-header"
@@ -226,8 +227,8 @@ export default function HolidaysPage() {
   if (isLoading) {
     return (
       <PageContainer>
-        <div className="flex justify-center items-center h-64">
-           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <div className="flex justify-center items-center py-12">
+          <Spin size="large" />
         </div>
       </PageContainer>
     )
