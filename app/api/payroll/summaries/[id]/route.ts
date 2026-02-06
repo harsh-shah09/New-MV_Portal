@@ -59,7 +59,7 @@ export async function DELETE(
 
     // Step 2: Fetch all Payroll__c records associated with this summary
     const payrollQuery = `
-      SELECT Id, Employee__c 
+      SELECT Id, Employee__c, Employee__r.Name 
       FROM Payroll__c 
       WHERE Payroll_Summary__c = '${id}'
     `
@@ -76,7 +76,7 @@ export async function DELETE(
     }
 
     for (const payroll of payrollRecords) {
-      const employeeId = (payroll as any).Employee__c
+      const employeeId = (payroll as any).Employee__r?.Name
 
       if (employeeId) {
         // Delete Document__c record

@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
       
       return {
         Payroll_Summary__c: summaryId,
-        Employee__c: emp.employeeId,
+        Employee__c: emp.id,
         Payroll_Month__c: month,
         Basic_Salary__c: emp.baseSalary || emp.basicSalary || 0,
         Bonus__c: totalBonus,
@@ -166,7 +166,7 @@ export async function POST(request: NextRequest) {
             Document_Category__c: 'Payslip',
             Document_Type__c: 'Payslip',
             Status__c: 'Uploaded',
-            Employee__c: emp.employeeId,
+            Employee__c: emp.id,
             File_URL__c: s3Url,
           }
           
@@ -204,7 +204,7 @@ export async function POST(request: NextRequest) {
 
     // Send in-app notifications to all employees about payslip generation
     try {
-      const employeeIds = employees.map((emp: any) => emp.employeeId).filter(Boolean);
+      const employeeIds = employees.map((emp: any) => emp.id).filter(Boolean);
       
       if (employeeIds.length > 0) {
         await sendInAppNotifications(

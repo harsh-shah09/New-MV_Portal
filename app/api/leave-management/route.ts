@@ -883,14 +883,22 @@ export async function POST(request: NextRequest) {
     console.log('[Same-Request Sandwich] Post-sandwich dates:', postSandwichDates);
     console.log('[Same-Request Sandwich] All counted dates:', Array.from(sameRequestSandwichDates));
 
-    // Base leave days should be only working days when no sandwich, or all calendar days when sandwich applies
-    let rangeLeaveDays = sandwichApplied ? baseCalendarDays : workingDaysInRange;
+    // Base leave days calculation:
+    // - For Extra Day Pay: Always use calendar days (weekends/holidays are the purpose)
+    // - For Loss of Pay: Use working days when no sandwich, or all calendar days when sandwich applies
+    let rangeLeaveDays: number;
+    if (leaveCategory === 'extra-day-pay') {
+      rangeLeaveDays = baseCalendarDays;
+    } else {
+      rangeLeaveDays = sandwichApplied ? baseCalendarDays : workingDaysInRange;
+    }
 
     console.log('[Half-Day Check] Before adjustment:', {
       isHalfDay,
       sessionValue,
       workingDaysInRange,
-      rangeLeaveDays
+      rangeLeaveDays,
+      leaveCategory
     });
 
     // For half-day leaves, calculate as 0.5 per day

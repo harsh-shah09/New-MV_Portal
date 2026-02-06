@@ -167,6 +167,7 @@ export async function POST(request: NextRequest) {
     const employeeRecords = await conn.query<any>(`
       SELECT 
         Id,
+        Name,
         Employee_Name__c,
         Employee_Email__c,
         Base_Salary__c,
@@ -694,7 +695,7 @@ export async function POST(request: NextRequest) {
 
       return {
         id: emp.Id,
-        employeeId: emp.Id,
+        employeeId: emp.Name || emp.Id,
         employeeName: emp.Employee_Name__c || "Unknown",
         email: emp.Employee_Email__c || "",
         department: emp.Department__c || "",

@@ -66,7 +66,8 @@ export default function LeavesPage() {
         if (response.ok) {
           const data = await response.json()
           setAllLeaves(data.allLeaves || [])
-          toast.success('All leaves refreshed successfully')
+          // toast.success('All leaves refreshed successfully')
+          console.log('All leaves refreshed successfully')
         }
       } catch (error) {
         console.error('Error fetching all leaves:', error)

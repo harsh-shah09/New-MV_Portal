@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { cookies } from "next/headers"
 import { verifyToken } from "@/lib/auth-utils"
-import { generatePayslipPDF } from "@/lib/pdf-generator"
+import { getSalesforceConnection } from "@/lib/salesforce"
 
 export async function GET(
   request: NextRequest,
@@ -22,36 +22,72 @@ export async function GET(
 
     const { payrollId } = await params
 
-    // Fetch the payslip data using the existing API endpoint
-    const baseUrl = request.url.replace('/download', '')
-    const payslipResponse = await fetch(baseUrl, {
-      headers: {
-        Cookie: `session=${session}`,
-      },
-    })
-
-    if (!payslipResponse.ok) {
-      return NextResponse.json({ error: "Failed to fetch payslip data" }, { status: 500 })
+    const conn = await getSalesforceConnection()
+    if (!conn) {
+      return NextResponse.json({ error: "Failed to connect to Salesforce" }, { status: 500 })
     }
 
-    const { payslip } = await payslipResponse.json()
+    // Fetch payroll record to get employee and period details
+    const payrollResult = await conn.query<any>(`
+      SELECT 
+        Id,
+        Employee__c,
+        Employee__r.Employee_Name__c,
+        Employee__r.Name,
+        Payroll_Summary__r.Payroll_Month__c,
+        Payroll_Summary__r.Payroll_Year__c,
+        Payroll_Month__c
+      FROM Payroll__c
+      WHERE Id = '${payrollId}'
+      LIMIT 1
+    `)
 
-    // Generate PDF
-    const pdfBuffer = await generatePayslipPDF(payslip)
+    if (!payrollResult.records || payrollResult.records.length === 0) {
+      return NextResponse.json({ error: "Payroll record not found" }, { status: 404 })
+    }
 
-    // Create filename
-    const filename = `Payslip_${payslip.employeeName.replace(/\s+/g, '_')}_${payslip.payrollMonth}_${payslip.payrollYear}.pdf`
+    const payroll = payrollResult.records[0]
+    const employeeId = payroll.Employee__r?.Name
+    const employeeName = payroll.Employee__r?.Employee_Name__c || "Unknown"
+    const payrollMonth = payroll.Payroll_Summary__r?.Payroll_Month__c || payroll.Payroll_Month__c
+    const payrollYear = payroll.Payroll_Summary__r?.Payroll_Year__c || new Date().getFullYear()
+
+    // Fetch the payslip PDF URL from Document__c
+    const documentName = `Payslip_${employeeId}_${payrollMonth}_${payrollYear}`
+    const documentResult = await conn.query<any>(`
+      SELECT File_URL__c 
+      FROM Document__c 
+      WHERE Name = '${documentName}' 
+      AND Document_Category__c = 'Payslip'
+      LIMIT 1
+    `)
+
+    if (!documentResult.records || documentResult.records.length === 0) {
+      return NextResponse.json({ error: "Payslip PDF not found" }, { status: 404 })
+    }
+
+    const pdfUrl = documentResult.records[0].File_URL__c
+
+    // Fetch the PDF from S3
+    const pdfResponse = await fetch(pdfUrl)
+    
+    if (!pdfResponse.ok) {
+      return NextResponse.json({ error: "Failed to fetch PDF from S3" }, { status: 500 })
+    }
+
+    const pdfBuffer = await pdfResponse.arrayBuffer()
+    const filename = `Payslip_${employeeName.replace(/\s+/g, '_')}_${payrollMonth}_${payrollYear}.pdf`
 
     // Return PDF as downloadable file
     return new NextResponse(pdfBuffer, {
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Disposition': `attachment; filename="${filename}"`,
-        'Content-Length': pdfBuffer.length.toString(),
+        'Content-Length': pdfBuffer.byteLength.toString(),
       },
     })
   } catch (error) {
-    console.error("Error generating PDF:", error)
-    return NextResponse.json({ error: "Failed to generate PDF" }, { status: 500 })
+    console.error("Error downloading PDF:", error)
+    return NextResponse.json({ error: "Failed to download PDF" }, { status: 500 })
   }
 }

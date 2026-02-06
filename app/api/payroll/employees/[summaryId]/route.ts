@@ -37,6 +37,7 @@ export async function GET(
       SELECT 
         Id,
         Employee__c,
+        Employee__r.Name,
         Employee__r.Employee_Name__c,
         Employee__r.Employee_Email__c,
         Employee__r.Department__c,
@@ -69,7 +70,7 @@ export async function GET(
 
       return {
         id: record.Id,
-        employeeId: record.Employee__c,
+        employeeId: record.Employee__r?.Name || record.Employee__c,
         employeeName: record.Employee__r?.Employee_Name__c || "Unknown",
         email: record.Employee__r?.Employee_Email__c || "",
         department: record.Employee__r?.Department__c || "",
