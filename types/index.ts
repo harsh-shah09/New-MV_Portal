@@ -74,6 +74,8 @@ export interface LeaveRequest {
   approvalDate?: string
   tlApproved?: string
   hrApproval?: string
+  confirmMerge ?: boolean
+  mergeExistingLeaveId ?: string
 }
 
 export interface LeavePolicy {
