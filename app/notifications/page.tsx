@@ -3,14 +3,14 @@
 
 import { useQuery } from "@tanstack/react-query"
 import { Card, List, Tag, Button, Spin, Empty, Typography } from "antd"
-import { Bell, CheckCircle, AlertCircle, Info, Clock } from "lucide-react"
+import { Bell, CheckCircle, AlertCircle, Info, Clock, RefreshCw } from "lucide-react"
 import { formatDistanceToNow } from 'date-fns'
 
 const { Title, Text } = Typography;
 
 export default function NotificationsPage() {
 
-    const { data: notifications, isLoading } = useQuery({
+    const { data: notifications, isLoading, isFetching, refetch } = useQuery({
         queryKey: ['notifications'],
         queryFn: async () => {
              const res = await fetch('/api/notifications');
@@ -30,13 +30,22 @@ export default function NotificationsPage() {
     return (
         <div className="min-h-screen bg-slate-50 p-6 lg:p-10">
             <div className="max-w-4xl mx-auto space-y-6">
-                 <div>
-                    <h1 className="text-3xl font-extrabold text-slate-900">Notifications</h1>
-                    <p className="text-slate-500">Stay updated with your latest alerts and tasks.</p>
+                 <div className="flex justify-between items-start">
+                    <div>
+                        <h1 className="text-3xl font-extrabold text-slate-900">Notifications</h1>
+                        <p className="text-slate-500">Stay updated with your latest alerts and tasks.</p>
+                    </div>
+                    <Button 
+                        icon={<RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />} 
+                        onClick={() => refetch()}
+                        className="mt-1"
+                    >
+                        Refresh
+                    </Button>
                 </div>
 
                 <Card className="shadow-sm border-slate-100 rounded-2xl bg-white/80 backdrop-blur-sm">
-                    {isLoading ? (
+                    {isLoading || isFetching ? (
                         <div className="flex justify-center py-10"><Spin size="large" /></div>
                     ) : (
                         <List

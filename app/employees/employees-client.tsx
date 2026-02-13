@@ -3,7 +3,8 @@
 import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useQuery } from "@tanstack/react-query"
-import { Skeleton, Card, Space, Result, Button } from "antd"
+import { Skeleton, Card, Space, Result, Button, message, Tooltip } from "antd"
+import { RefreshCw } from "lucide-react"
 
 import { EmployeeForm } from "./components/employee-form"
 import { EmployeeTable } from "./components/employee-table"
@@ -11,6 +12,8 @@ import { EmployeeFilters } from "./components/employee-filters"
 import { EmployeeDetail } from "./components/employee-detail"
 import { useEmployeeStore } from "@/store/employeeStore"
 import type { Employee } from "@/types"
+import { PageContainer } from "@/components/page-container"
+import { PageHeader } from "@/components/page-header"
 
 interface EmployeesClientProps {
   role: string
@@ -25,11 +28,14 @@ export default function EmployeesClient({ role }: EmployeesClientProps) {
   const [department, setDepartment] = useState("")
   const [status, setStatus] = useState("")
   
-  const isHR = role === 'HR';
+  const [accountStatus, setAccountStatus] = useState("")
+  
+  const isHR = role === 'HR' || role === 'Admin';
 
   const { addEmployee, updateEmployee, deleteEmployee } = useEmployeeStore()
 
-  const { data: employees = [], isLoading, isError, refetch } = useQuery({
+  /* handleUpdateEmployee implementation and queryFn fix */
+  const { data: employees = [], isLoading, isFetching, isError, refetch } = useQuery({
     queryKey: ['employees'],
     queryFn: async () => {
       const res = await fetch('/api/employees');
@@ -37,32 +43,63 @@ export default function EmployeesClient({ role }: EmployeesClientProps) {
       const rawData = await res.json();
       
       // Map Salesforce data to Employee type
-      return rawData.map((record: any) => ({
-        id: record.Id,
-        firstName: record.Employee_Name__c?.split(' ')[0] || '',
-        lastName: record.Employee_Name__c?.split(' ').slice(1).join(' ') || '',
-        email: record.Employee_Email__c || '',
-        phone: record.Employee_Phone__c || '',
-        department: record.Department__c || 'Unassigned',
-        position: record.Role__c || '',
-        joinDate: record.Joining_Date__c || '',
-        status: record.Status__c || 'inactive',
-        salary: record.Base_Salary__c || 0,
-        // Add other fields as needed for detail view if Employee type supports them
-        // or extends the type. For now mapping core fields.
-        profilePhoto: record.Profile_Photo__c,
-        emergencyContact: record.Emergency_Contact_Name__c,
-        emergencyPhone: record.Emergency_Contact_Number__c,
-        address: record.Employee_Address__c,
-        city : record.Employee_Address__c?.city,
-        state : record.Employee_Address__c?.state || 'State',
-        zipCode : record.Employee_Address__c?.postalCode ,
-        nationality : record.Employee_Address__c?.country,
-        gender: record.Gender__c,
-        experience: record.Experience__c,
-        employeeId: record.Employee_ID__c,
-        ctc: record.Salary_CTC__c,
-      })) as Employee[];
+      // Map Salesforce data to Employee type
+      return rawData.map((record: any) => {
+        // Parse Address
+        let addressStr = record.Employee_Address__c || '';
+        let street = '', city = '', state = '', zipCode = '', country = '';
+        
+        try {
+            const parsed = JSON.parse(addressStr);
+            if (typeof parsed === 'object' && parsed !== null) {
+                street = parsed.street || '';
+                city = parsed.city || '';
+                state = parsed.state || '';
+                country = parsed.country || '';
+                zipCode = parsed.postalCode || '';
+            }
+        } catch (e) {
+            // Fallback to comma split
+            if (addressStr.includes(',')) {
+                const parts = addressStr.split(',').map((s: string) => s.trim());
+                if (parts.length >= 1) street = parts[0];
+                if (parts.length >= 2) city = parts[1];
+                if (parts.length >= 3) state = parts[2];
+                if (parts.length >= 4) country = parts[3];
+                if (parts.length >= 5) zipCode = parts[parts.length - 1];
+            } else {
+                street = addressStr;
+            }
+        }
+
+        return {
+            id: record.Id,
+            firstName: record.Employee_Name__c?.split(' ')[0] || '',
+            lastName: record.Employee_Name__c?.split(' ').slice(1).join(' ') || '',
+            email: record.Employee_Email__c || '',
+            phone: record.Employee_Phone__c || '',
+            department: record.Department__c || 'Un-Assigned',
+            position: record.Role__c || '',
+            joinDate: record.Joining_Date__c || '',
+            status: record.Status__c || 'inactive',
+            active: record.Active__c,
+            salary: record.Base_Salary__c || 0,
+            profilePhoto: record.Profile_Photo__c,
+            personalDetails: {
+                address: street,
+                city : city,
+                state : state,
+                zipCode : zipCode,
+                nationality : country,
+                emergencyContact: record.Emergency_Contact_Name__c,
+                emergencyPhone: record.Emergency_Contact_Number__c,
+            },
+            gender: record.Gender__c,
+            experience: record.Experience__c,
+            employeeId: record.Name,
+            ctc: record.Salary_CTC__c,
+        };
+      }) as Employee[];
     }
   });
 
@@ -76,24 +113,62 @@ export default function EmployeesClient({ role }: EmployeesClientProps) {
 
     const matchesDepartment = !department || emp.department === department
     const matchesStatus = !status || emp.status.toLowerCase() === status
+    
+    // Account Status Filter
+    let matchesAccountStatus = true;
+    if (accountStatus === 'active') matchesAccountStatus = !!emp.active;
+    if (accountStatus === 'inactive') matchesAccountStatus = !emp.active;
 
-    return matchesSearch && matchesDepartment && matchesStatus
+    return matchesSearch && matchesDepartment && matchesStatus && matchesAccountStatus
   })
 
   const handleAddEmployee = (data: Employee) => {
-    // In a real app, this should call API
-    // addEmployee(data) 
-    // For now keeping store update but usually we refill query
     console.log("Add not implemented fully via API yet", data);
+    message.info("Add Employee feature coming soon via API");
     setShowForm(false)
   }
 
-  const handleUpdateEmployee = (data: Employee) => {
-     // In a real app, this should call API
-    // updateEmployee(data)
-     console.log("Update not implemented fully via API yet", data);
-    setEditingEmployee(undefined)
-    setShowForm(false)
+  const handleUpdateEmployee = async (data: Employee) => {
+     try {
+        message.loading({ content: 'Updating...', key: 'update' });
+
+        const salesforceData: any = {
+            Employee_Name__c: `${data.firstName} ${data.lastName}`,
+            Employee_Email__c: data.email,
+            Employee_Phone__c: data.phone,
+            Department__c: data.department,
+            Role__c: data.position,
+            Joining_Date__c: data.joinDate,
+            Base_Salary__c: data.salary,
+            Status__c: data.status,
+            // Store structured address object (API will JSON.stringify it)
+            Employee_Address__c: {
+                street: data.personalDetails?.address || '',
+                city: data.personalDetails?.city || '',
+                state: data.personalDetails?.state || '',
+                postalCode: data.personalDetails?.zipCode || '',
+                country: data.personalDetails?.nationality || ''
+            },
+            Emergency_Contact_Name__c: data.personalDetails?.emergencyContact,
+            Emergency_Contact_Number__c: data.personalDetails?.emergencyPhone,
+        };
+
+        const res = await fetch(`/api/employees/${data.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(salesforceData),
+        });
+
+        if (!res.ok) throw new Error('Failed to update');
+
+        message.success({ content: 'Employee updated successfully!', key: 'update' });
+        await refetch();
+        setEditingEmployee(undefined)
+        setShowForm(false)
+     } catch (error) {
+         console.error("Update failed", error);
+         message.error({ content: 'Failed to update employee', key: 'update' });
+     }
   }
 
   const handleDeleteEmployee = (id: string) => {
@@ -261,28 +336,18 @@ export default function EmployeesClient({ role }: EmployeesClientProps) {
   }
 
   return (
-    <div>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
-          <div>
-            <h1 className="text-3xl sm:text-4xl font-bold text-foreground">Employees</h1>
-            <p className="text-muted-foreground mt-1">Manage your workforce</p>
-          </div>
-          {isHR && (
-            <Button
-                type="primary"
-                size="large"
-                className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 h-10 px-6"
-                onClick={() => {
-                  setEditingEmployee(undefined)
-                  setShowForm(true)
-                }}
-            >
-                + Add Employee
-            </Button>
-          )}
-        </div>
+    <PageContainer>
+      <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+        <PageHeader title="Employees" subtitle="Manage your workforce">
+            <Tooltip title="Refresh Data">
+              <Button 
+                icon={<RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />} 
+                onClick={() => refetch()} 
+              >
+                Refresh
+              </Button>
+            </Tooltip>
+        </PageHeader>
 
         <EmployeeFilters
           searchTerm={searchTerm}
@@ -291,17 +356,20 @@ export default function EmployeesClient({ role }: EmployeesClientProps) {
           onDepartmentChange={setDepartment}
           status={status}
           onStatusChange={setStatus}
+          accountStatus={accountStatus}
+          onAccountStatusChange={setAccountStatus}
         />
 
-        <EmployeeTable
-          employees={filteredEmployees}
-          onEdit={isHR ? (emp) => {
-            setEditingEmployee(emp)
-            setShowForm(true)
-          } : undefined}
-          onDelete={isHR ? handleDeleteEmployee : undefined}
-          onView={isHR ? (emp) => router.push(`/employees/${emp.id}`) : undefined}
-        />
+        <div className="bg-card rounded-xl shadow-sm border border-border p-4 sm:p-6 mb-8 overflow-hidden">
+          <EmployeeTable 
+            employees={filteredEmployees}
+            onView={(emp) => router.push(`/employees/${emp.id}`)}
+            // onEdit={setEditingEmployee}
+            // onDelete={handleDeleteEmployee} 
+            loading={isFetching}
+            isHR={isHR}
+          />
+        </div>
 
         {showForm && isHR && (
           <EmployeeForm
@@ -316,6 +384,6 @@ export default function EmployeesClient({ role }: EmployeesClientProps) {
 
 
       </div>
-    </div>
+    </PageContainer>
   )
 }

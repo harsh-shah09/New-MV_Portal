@@ -5,7 +5,7 @@ import { useEffect, useState, useActionState } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
 import { motion } from "framer-motion"
-import { Mail, Lock, ArrowRight, Loader2, CheckCircle2 } from "lucide-react"
+import { Mail, Lock, ArrowRight, Loader2, CheckCircle2, Ban } from "lucide-react"
 
 export default function LoginPage() {
   const [state, action, pending] = useActionState(loginAction, {})
@@ -48,7 +48,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen w-full flex overflow-hidden bg-slate-50">
+    <div className="min-h-screen w-full flex overflow-hidden bg-slate-50 flex-row-reverse">
       {/* Left Side - Visual Showcase */}
       <div className="hidden lg:flex lg:w-1/2 relative bg-slate-900 overflow-hidden items-center justify-center">
         <div className="absolute inset-0 z-0">
@@ -119,7 +119,42 @@ export default function LoginPage() {
                         </motion.div>
                     )}
 
-                    {state.twoFactorRequired ? (
+                    {state.accountInactive ? (
+                        <motion.div 
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            className="text-center space-y-6 py-4"
+                        >
+                            <div className="relative w-24 h-24 mx-auto">
+                                <div className="absolute inset-0 bg-red-100 rounded-full animate-ping opacity-20 duration-1000"></div>
+                                <div className="relative bg-red-50 w-full h-full rounded-full flex items-center justify-center border-2 border-red-100">
+                                    <Ban className="w-10 h-10 text-red-500" />
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <h3 className="text-2xl font-bold text-slate-900">Access Revoked</h3>
+                                <p className="text-slate-500 mt-2 max-w-xs mx-auto">
+                                    Your account access has been temporarily suspended by the administrator.
+                                </p>
+                            </div>
+
+                            <div className="bg-slate-50 rounded-xl p-4 text-sm text-slate-600 border border-slate-100">
+                                <p>Please contact your HR representative or IT support to resolve this issue.</p>
+                                <div className="mt-3 font-medium text-slate-800 bg-white py-2 px-3 rounded-lg border border-slate-200 inline-block">
+                                    support@mvportal.com
+                                </div>
+                            </div>
+
+                            <button 
+                                type="button"
+                                onClick={() => window.location.reload()}
+                                className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-3.5 rounded-xl transition-colors flex items-center justify-center gap-2"
+                            >
+                                Back to Login
+                            </button>
+                        </motion.div>
+                    ) : state.twoFactorRequired ? (
                          <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
                              <input type="hidden" name="employeeId" value={state.employeeId} />
                              

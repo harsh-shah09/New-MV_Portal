@@ -20,6 +20,7 @@ export type LoginState = {
   twoFactorRequired?: boolean;
   employeeId?: string;
   email?: string; // For display
+  accountInactive?: boolean;
 };
 
 export async function loginAction(
@@ -40,6 +41,15 @@ export async function loginAction(
     console.log(employee);
     if (!employee) {
       return { error: 'Invalid credentials' };
+    }
+
+    // Check if account is active
+    if (!employee.Active__c) {
+       return { 
+         error: 'Account Deactivated',
+         accountInactive: true,
+         email: employee.Employee_Email__c
+       };
     }
 
     // Verify password
@@ -210,7 +220,6 @@ export async function forgotPasswordAction(identifier: string) {
         pass: process.env.GMAIL_APP_PASSWORD,
       },
     });
-
     try {
         await transporter.sendMail({
             from: process.env.GMAIL_USER,

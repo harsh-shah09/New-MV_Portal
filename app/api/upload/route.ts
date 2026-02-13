@@ -1,7 +1,7 @@
 
 import { NextResponse } from 'next/server';
 import { uploadFileToS3 } from '@/lib/s3';
-import { createDocumentRecord, updateEmployee } from '@/lib/salesforce';
+import { getEmployeeById, createDocumentRecord, updateEmployee, deleteDocument } from '@/lib/salesforce';
 
 export async function POST(request: Request) {
   try {
@@ -19,13 +19,22 @@ export async function POST(request: Request) {
     const fileName = file.name;
     const contentType = file.type;
 
-    // Upload to S3
+    // Get Employee Name for Folder
+    const employee = await getEmployeeById(employeeId);
+    if (!employee) {
+         return NextResponse.json({ error: 'Employee not found' }, { status: 404 });
+    }
+    const empName = employee.Employee_Name__c || employee.Name || 'Unknown';
+    // Sanitize folder name: remove special chars, replace spaces with underscores
+    const safeEmpName = empName.replace(/[^a-zA-Z0-9 ]/g, "").replace(/\s+/g, "_");
+    
+    // Upload to S3 with dynamic folder
     const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'application/pdf'];
     if (!allowedTypes.includes(contentType)) {
         // return NextResponse.json({ error: 'Invalid file type' }, { status: 400 });
     }
 
-    const s3Url = await uploadFileToS3(buffer, fileName, contentType);
+    const s3Url = await uploadFileToS3(buffer, fileName, contentType, safeEmpName);
 
     // Create Document__c record in Salesforce
     // Fields: Employee__c, Document_Type__c, Document_category__c, File_ID__c, File_URL__c, Status__c
@@ -58,4 +67,22 @@ export async function POST(request: Request) {
     console.error('Upload error:', error);
     return NextResponse.json({ error: 'Upload failed' }, { status: 500 });
   }
+}
+
+export async function DELETE(request: Request) {
+    try {
+        const { searchParams } = new URL(request.url);
+        const docId = searchParams.get('docId');
+
+        if (!docId) {
+            return NextResponse.json({ error: 'Document ID is required' }, { status: 400 });
+        }
+
+        await deleteDocument(docId);
+
+        return NextResponse.json({ success: true });
+    } catch (error) {
+        console.error('Error deleting document:', error);
+        return NextResponse.json({ error: 'Failed to delete document' }, { status: 500 });
+    }
 }

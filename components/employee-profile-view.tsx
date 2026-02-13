@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import Image from "next/image"
 import { 
@@ -23,23 +23,36 @@ import {
   Building2,
   CheckCircle2,
   Shield,
-  Lock
+  Lock,
+  Power,
+  AlertTriangle,
+  Laptop,
+  History,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react"
-import { generate2FASecretAction, verifyAndEnable2FAAction, disable2FAAction } from "@/app/employees/[id]/actions"
-import { message, Spin, Select } from "antd"
+import { generate2FASecretAction, verifyAndEnable2FAAction, disable2FAAction, getEmployeeTitles } from "@/app/employees/[id]/actions"
+import { message, Spin, Select, Modal } from "antd"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { cn } from "@/lib/utils"
 import { Field } from "./field-component"
 
 interface ViewProps {
   employeeId: string;
+  currentUserRole?: string;
 }
 
-export function EmployeeProfileView({ employeeId }: ViewProps) {
-  const [activeTab, setActiveTab] = useState<"personal" | "employment" | "bank" | "documents" | "security">("personal")
+export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }: ViewProps) {
+  const [activeTab, setActiveTab] = useState<"personal" | "employment" | "bank" | "documents" | "security" | "assets">("personal")
+  const [showAssetHistory, setShowAssetHistory] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const queryClient = useQueryClient()
+  const [titles, setTitles] = useState<{ label: string, value: string }[]>([])
+
+  useEffect(() => {
+    getEmployeeTitles().then(setTitles).catch(console.error)
+  }, [])
 
   // --- Data Fetching ---
   const { data: employee, isLoading } = useQuery({
@@ -111,54 +124,111 @@ export function EmployeeProfileView({ employeeId }: ViewProps) {
 
   // --- Handlers ---
   const [formData, setFormData] = useState<any>({})
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [warningMsg, setWarningMsg] = useState<string | null>(null)
 
-    const handleEditToggle = () => {
-        if (isEditing) {
-             // Cancel
-             setIsEditing(false)
-             setFormData({})
-        } else {
-             // Start Edit - Flatten data for form
-             setFormData({
-                 Employee_Name__c: employee.Employee_Name__c,
-                 Employee_Email__c: employee.Employee_Email__c,
-                 Employee_Phone__c: employee.Employee_Phone__c,
-                 Birthdate__c: employee.Birthdate__c,
-                 Gender__c: employee.Gender__c,
-                //  Employee_Address__c: employee.Employee_Address__c, // Assuming object or text. 
-                 // If composite, we might need nested updates or flat keys. 
-                 // For now, let's assume we read/write the whole object or handle components in Field if needed.
-                 // But Field comp expects string usually.
-                 // If Employee_Address__c is an object, we need to flatten for the form or handle specific address fields.
-                 
-                 // Let's assume we bind specific address fields to the 'Employee_Address__c' components if possible.
-                 // or mapped fields.
-                 // Let's use separate state for address components if needed or map them here?
-                 // User said "Employee_Address__c which contains...".
-                 // I will attempt to map distinct keys for form if the UI breaks them down.
-                //  Employee_Address__Street__s: employee.Employee_Address__c?.street,
-                //  Employee_Address__City__s: employee.Employee_Address__c?.city,
-                //  Employee_Address__State__s: employee.Employee_Address__c?.state,
-                //  Employee_Address__PostalCode__s: employee.Employee_Address__c?.postalCode,
-                //  Employee_Address__Country__s: employee.Employee_Address__c?.country,
-
-                 Emergency_Contact_Name__c: employee.Emergency_Contact_Name__c,
-                 Emergency_Contact_Number__c: employee.Emergency_Contact_Number__c,
-                 Experience__c: employee.Experience__c,
-                 Department__c: employee.Department__c,
-                 Role__c: employee.Role__c,
-                 Title__c: employee.Title__c,
-                 Team_Lead__c: employee.Team_Lead__c,
-                 Joining_Date__c: employee.Joining_Date__c,
-                 Base_Salary__c: employee.Base_Salary__c,
-                 Salary_CTC__c: employee.Salary_CTC__c
-             })
-             setIsEditing(true)
-        }
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {}
+    
+    // Basic Text & Email Validation
+    if (formData.Employee_Email__c && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.Employee_Email__c)) {
+      newErrors.Employee_Email__c = "Please enter a valid email address"
     }
 
+    if (formData.Employee_Phone__c && !/^\+?[\d\s-]{10,}$/.test(formData.Employee_Phone__c)) {
+      newErrors.Employee_Phone__c = "Please enter a valid phone number (min 10 digits)"
+    }
+
+    if (formData.Emergency_Contact_Number__c && !/^\+?[\d\s-]{10,}$/.test(formData.Emergency_Contact_Number__c)) {
+      newErrors.Emergency_Contact_Number__c = "Please enter a valid emergency contact number"
+    }
+
+    // Date Validation
+    if (formData.Birthdate__c) {
+      const dob = new Date(formData.Birthdate__c)
+      if (dob > new Date()) {
+        newErrors.Birthdate__c = "Date of birth cannot be in the future"
+      }
+    }
+
+    if (formData.Joining_Date__c && formData.Birthdate__c) {
+        if (new Date(formData.Joining_Date__c) < new Date(formData.Birthdate__c)) {
+            newErrors.Joining_Date__c = "Joining date cannot be before birth date"
+        }
+    }
+    
+    // Required Fields (Example)
+    if (!formData.Employee_Name__c) newErrors.Employee_Name__c = "Name is required"
+    if (!formData.Role__c) newErrors.Role__c = "Role is required"
+    if (!formData.Department__c) newErrors.Department__c = "Department is required"
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
+  const handleEditToggle = () => {
+    if (isEditing) {
+        setIsEditing(false)
+        setFormData({})
+        setErrors({})
+        setWarningMsg(null)
+    } else {
+        setFormData({
+             Employee_Name__c: employee.Employee_Name__c,
+             Employee_Email__c: employee.Employee_Email__c,
+             Employee_Phone__c: employee.Employee_Phone__c,
+             Birthdate__c: employee.Birthdate__c,
+             Gender__c: employee.Gender__c,
+             
+             Employee_Address__c: employee.Employee_Address__c || {}, 
+    
+             Employee_Address__Street__s: employee.Employee_Address__c?.street || '',
+             Employee_Address__City__s: employee.Employee_Address__c?.city || '',
+             Employee_Address__StateCode__s: employee.Employee_Address__c?.state || '',
+             Employee_Address__PostalCode__s: employee.Employee_Address__c?.postalCode || '',
+             Employee_Address__CountryCode__s: employee.Employee_Address__c?.country || '',
+
+             Emergency_Contact_Name__c: employee.Emergency_Contact_Name__c,
+             Emergency_Contact_Number__c: employee.Emergency_Contact_Number__c,
+             Experience__c: employee.Experience__c,
+             Department__c: employee.Department__c,
+             Role__c: employee.Role__c,
+             Title__c: employee.Title__c,
+             Team_Lead__c: employee.Team_Lead__c,
+             Joining_Date__c: employee.Joining_Date__c,
+             Base_Salary__c: employee.Base_Salary__c,
+             Salary_CTC__c: employee.Salary_CTC__c
+          })
+          setIsEditing(true)
+    }
+  }
+
   const handleSave = () => {
-      updateMutation.mutate(formData)
+      if (validateForm()) {
+        setWarningMsg(null)
+        
+        // Prepare payload with Address Object
+        const payload = { ...formData };
+        payload.Employee_Address__c = {
+            street: formData.Employee_Address__Street__s,
+            city: formData.Employee_Address__City__s,
+            state: formData.Employee_Address__StateCode__s,
+            postalCode: formData.Employee_Address__PostalCode__s,
+            country: formData.Employee_Address__CountryCode__s
+        };
+        
+        // Remove flattened address fields from payload
+        delete payload.Employee_Address__Street__s;
+        delete payload.Employee_Address__City__s;
+        delete payload.Employee_Address__StateCode__s;
+        delete payload.Employee_Address__PostalCode__s;
+        delete payload.Employee_Address__CountryCode__s;
+
+        updateMutation.mutate(payload)
+      } else {
+        setWarningMsg("Please fix the validation errors before saving.")
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+      }
   }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -176,11 +246,68 @@ export function EmployeeProfileView({ employeeId }: ViewProps) {
       IFSC__c: '',
       Primary_Account__c: false
   })
+  const [bankErrors, setBankErrors] = useState<Record<string, string>>({})
 
   const [showDocModal, setShowDocModal] = useState(false)
   const [docFile, setDocFile] = useState<File | null>(null)
   const [docCategory, setDocCategory] = useState("Intern Docs")
   const [docType, setDocType] = useState("Resume")
+
+  // --- Admin Configs ---
+  const { data: adminConfigs } = useQuery({
+    queryKey: ["admin-configs"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/configurations")
+      if (!res.ok) throw new Error("Failed to fetch configs")
+      return res.json()
+    },
+    staleTime: 1000 * 60 * 5 // 5 minutes
+  })
+
+  // Grouped Document Configs: Category -> Types
+  const docConfigMap = adminConfigs?.documents?.reduce((acc: any, doc: any) => {
+      const category = doc.MasterLabel; 
+      const rawType = doc.Value__c || "";
+      const types = rawType.split(',').map((t: string) => t.trim()).filter(Boolean);
+      
+      if (!acc[category]) acc[category] = [];
+      if (types.length > 0) acc[category].push(...types);
+      return acc;
+  }, {}) || {};
+  
+  const docCategories = Object.keys(docConfigMap);
+
+  // Auto-select Category based on Role
+  useEffect(() => {
+    if (showDocModal && employee?.Role__c && docCategories.length > 0) {
+        const role = employee.Role__c.toLowerCase();
+        // Check if any category includes the role or vice versa
+        const matchingCategory = docCategories.find(cat => 
+            cat.toLowerCase().includes(role) || role.includes(cat.toLowerCase())
+        );
+
+        if (matchingCategory) {
+            setDocCategory(matchingCategory);
+            const types = docConfigMap[matchingCategory];
+            if (types && types.length > 0) setDocType(types[0]);
+        } else if (!docCategory && docCategories.length > 0) {
+             // Default to first if nothing selected
+             setDocCategory(docCategories[0]);
+             const types = docConfigMap[docCategories[0]];
+             if (types && types.length > 0) setDocType(types[0]);
+        }
+    }
+  }, [showDocModal, employee, adminConfigs]);
+
+  // Update types when category changes manually
+  useEffect(() => {
+     if (docCategory && docConfigMap[docCategory]) {
+         const types = docConfigMap[docCategory];
+         if (!types.includes(docType)) {
+             setDocType(types[0] || "");
+         }
+     }
+  }, [docCategory, adminConfigs]);
 
   // --- 2FA States ---
   const [show2FAModal, setShow2FAModal] = useState(false)
@@ -261,17 +388,61 @@ export function EmployeeProfileView({ employeeId }: ViewProps) {
           message.success("Bank account added")
           setShowBankForm(false)
           setBankFormData({ Name: '', Bank_Branch_Name__c: '', Bank_Account_Number__c: '', IFSC__c: '', Primary_Account__c: false })
+          setBankErrors({})
           queryClient.invalidateQueries({ queryKey: ["employee", employeeId] })
       },
       onError: () => message.error("Failed to add bank account")
   })
 
+  // --- Delete Bank Mutation ---
+  const deleteBankMutation = useMutation({
+      mutationFn: async (bankId: string) => {
+          const res = await fetch(`/api/employees/${employeeId}/bank?bankId=${bankId}`, {
+              method: 'DELETE'
+          })
+          if (!res.ok) throw new Error("Failed to delete bank")
+          return res.json()
+      },
+      onSuccess: () => {
+          message.success("Bank account removed")
+          queryClient.invalidateQueries({ queryKey: ["employee", employeeId] })
+      },
+      onError: () => message.error("Failed to remove bank account")
+  })
+
   const handleAddBank = () => {
-      if(!bankFormData.Name || !bankFormData.Bank_Account_Number__c) {
-          message.error("Bank Name and Account Number are required")
-          return;
+      const newErrors: Record<string, string> = {}
+    
+      if(!bankFormData.Name) newErrors.Name = "Bank Name is required"
+      if(!bankFormData.Bank_Branch_Name__c) newErrors.Bank_Branch_Name__c = "Branch Name is required"
+    
+      if(!bankFormData.Bank_Account_Number__c) {
+          newErrors.Bank_Account_Number__c = "Account Number is required"
+      } else if(!/^\d{9,18}$/.test(bankFormData.Bank_Account_Number__c)) {
+          newErrors.Bank_Account_Number__c = "Invalid account number (9-18 digits)"
       }
-      addBankMutation.mutate(bankFormData)
+
+      if(!bankFormData.IFSC__c) {
+          newErrors.IFSC__c = "IFSC Code is required"
+      } else if(!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(bankFormData.IFSC__c)) {
+          newErrors.IFSC__c = "Invalid IFSC Code format"
+      }
+
+      // Check Primary Validation
+      if (bankFormData.Primary_Account__c) {
+          const existingPrimary = employee.bankDetails?.find((b: any) => b.Primary_Account__c === true);
+          if (existingPrimary) {
+               message.warning("A primary account already exists. Only one account can be primary.");
+               // We prevent submission
+               return; 
+          }
+      }
+
+      setBankErrors(newErrors)
+
+      if (Object.keys(newErrors).length === 0) {
+          addBankMutation.mutate(bankFormData)
+      }
   }
 
   // --- Document Upload Handler override ---
@@ -280,6 +451,15 @@ export function EmployeeProfileView({ employeeId }: ViewProps) {
           message.error("Please select a file")
           return;
       }
+      
+      // Max file size 10MB (10 * 1024 * 1024 bytes)
+      if (docFile.size > 10 * 1024 * 1024) {
+          setDocWarning("File size exceeds the 10MB limit. Please upload a smaller file.");
+          return;
+      }
+      
+      setDocWarning(null);
+
       // Use existing uploadMutation but pass extras
       const formData = new FormData()
       formData.append("file", docFile)
@@ -288,15 +468,10 @@ export function EmployeeProfileView({ employeeId }: ViewProps) {
       formData.append("category", docCategory)
       formData.append("docType", docType)
       
-      // We need to bypass the standard mutation call which expects specific args
-      // So we'll call API directly or create a new mutation. 
-      // Actually simpler to just add a specific mutation for docs with metadata
-      // Or modify the existing one. Let's create a specialized one here for clarity or use provided one if flexible.
-      // The current uploadMutation takes {file, type}.
-      // Let's make a new one or cast payload.
-      
       customDocMutation.mutate(formData)
   }
+
+  const [docWarning, setDocWarning] = useState<string | null>(null)
 
   const customDocMutation = useMutation({
       mutationFn: async (formData: FormData) => {
@@ -311,9 +486,26 @@ export function EmployeeProfileView({ employeeId }: ViewProps) {
           message.success("Document uploaded")
           setShowDocModal(false)
           setDocFile(null)
+          setDocWarning(null)
           queryClient.invalidateQueries({ queryKey: ["employee", employeeId] })
       },
       onError: () => message.error("Upload failed")
+  })
+
+  // --- Delete Document Mutation ---
+  const deleteDocumentMutation = useMutation({
+      mutationFn: async (docId: string) => {
+          const res = await fetch(`/api/upload?docId=${docId}`, {
+              method: 'DELETE'
+          })
+          if (!res.ok) throw new Error("Failed to delete document")
+          return res.json()
+      },
+      onSuccess: () => {
+          message.success("Document removed")
+          queryClient.invalidateQueries({ queryKey: ["employee", employeeId] })
+      },
+      onError: () => message.error("Failed to remove document")
   })
 
 
@@ -327,7 +519,7 @@ export function EmployeeProfileView({ employeeId }: ViewProps) {
       <div className="relative bg-white rounded-3xl p-8 border border-slate-100 shadow-xl overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-r from-cyan-500 to-blue-600"></div>
         
-        <div className="relative flex flex-col md:flex-row gap-6 items-end md:items-center mt-12">
+        <div className="relative flex flex-col md:flex-row gap-6 items-center md:items-center mt-12">
            {/* Avatar */}
            <div className="relative group">
               <div className="w-32 h-32 rounded-full border-4 border-white shadow-lg bg-slate-200 flex items-center justify-center overflow-hidden">
@@ -354,13 +546,53 @@ export function EmployeeProfileView({ employeeId }: ViewProps) {
                <div className="flex flex-col md:flex-row md:items-center gap-4 justify-between">
                    <div>
                        <h1 className="text-3xl font-bold text-slate-900">{employee.Employee_Name__c}</h1>
-                       <div className="flex items-center gap-3 text-slate-500 mt-1">
+                       <div className="flex items-center justify-center gap-3 text-slate-500 mt-1">
                           <span className="flex items-center gap-1"><Briefcase className="w-4 h-4" /> {employee.Role__c || "Role not set"}</span>
                           <span className="w-1 h-1 rounded-full bg-slate-300"></span>
-                          <span className="flex items-center gap-1"><MapPin className="w-4 h-4" /> {employee.Employee_Address__c?.city || "Location not set"}</span>
+                          <span className="flex items-center gap-1"><MapPin className="w-4 h-4" /> {employee.Employee_Address__c.city || "Location not set"}</span>
                        </div>
                    </div>
-                   <div className="flex gap-3">
+                   <div className="flex gap-3 justify-center items-center">
+                       {['HR', 'Admin'].includes(currentUserRole) && (
+                           <button
+                             onClick={() => {
+                                 const isActivating = !employee.Active__c;
+                                 Modal.confirm({
+                                     title: `Are you sure you want to ${isActivating ? 'activate' : 'deactivate'} this user?`,
+                                     content: isActivating 
+                                         ? 'By activating this user, a welcome email with account setup instructions will be sent automatically.' 
+                                         : 'Deactivating this user will prevent them from logging in.',
+                                     okText: isActivating ? 'Activate & Send Email' : 'Deactivate',
+                                     okType: isActivating ? 'primary' : 'danger',
+                                     cancelText: 'Cancel',
+                                     onOk: async () => {
+                                         try {
+                                             const res = await fetch(`/api/employees/${employeeId}/toggle-active`, {
+                                                 method: 'POST',
+                                                 headers: { 'Content-Type': 'application/json' },
+                                                 body: JSON.stringify({ active: isActivating })
+                                             });
+                                             if (!res.ok) throw new Error('Failed');
+                                             message.success(`User ${isActivating ? 'activated' : 'deactivated'} successfully`);
+                                             queryClient.invalidateQueries({ queryKey: ["employee", employeeId] });
+                                         } catch (e) {
+                                             message.error("Failed to update status");
+                                         }
+                                     }
+                                 });
+                             }}
+                             className={cn(
+                                 "flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold transition border",
+                                 employee.Active__c 
+                                     ? "bg-red-50 text-red-600 border-red-100 hover:bg-red-100" 
+                                     : "bg-green-50 text-green-600 border-green-100 hover:bg-green-100"
+                             )}
+                         >
+                             <Power className="w-4 h-4" /> 
+                             {employee.Active__c ? 'Deactivate' : 'Activate'}
+                         </button>
+                       )}
+
                        {(!isEditing) ? (
                            <button 
                              onClick={handleEditToggle}
@@ -390,6 +622,19 @@ export function EmployeeProfileView({ employeeId }: ViewProps) {
         </div>
       </div>
 
+      {warningMsg && (
+          <div className="bg-orange-50 border-l-4 border-orange-500 p-4 rounded-r-lg shadow-sm flex items-start gap-4 animate-in slide-in-from-top-2">
+             <AlertTriangle className="w-5 h-5 text-orange-600 shrink-0 mt-0.5" />
+             <div>
+                 <h4 className="font-bold text-orange-800">Please check your inputs</h4>
+                 <p className="text-sm text-orange-700 mt-1">{warningMsg}</p>
+             </div>
+             <button onClick={() => setWarningMsg(null)} className="ml-auto text-orange-400 hover:text-orange-600">
+                 <X className="w-4 h-4" />
+             </button>
+          </div>
+      )}
+
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           
@@ -399,6 +644,7 @@ export function EmployeeProfileView({ employeeId }: ViewProps) {
                  {[
                      { id: "personal", label: "Personal Details", icon: User },
                      { id: "employment", label: "Employment Info", icon: Building2 },
+                     { id: "assets", label: "Assets", icon: Laptop },
                      { id: "bank", label: "Bank Details", icon: CreditCard },
                      { id: "documents", label: "Documents", icon: FileText },
                      { id: "security", label: "Security", icon: Lock },
@@ -456,11 +702,11 @@ export function EmployeeProfileView({ employeeId }: ViewProps) {
                                           <User className="w-5 h-5 text-blue-500" /> Basic Information
                                       </h2>
                                       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-                                          <Field label="Employee Name" value={employee.Employee_Name__c} fieldKey="Employee_Name__c" isEditing={isEditing} formData={formData} setFormData={setFormData} />
-                                          <Field label="Email Address" value={employee.Employee_Email__c} fieldKey="Employee_Email__c" type="email" isEditing={isEditing} formData={formData} setFormData={setFormData} />
-                                          <Field label="Phone Number" value={employee.Employee_Phone__c} fieldKey="Employee_Phone__c" type="tel" isEditing={isEditing} formData={formData} setFormData={setFormData} />
-                                          <Field label="Date of Birth" value={employee.Birthdate__c} fieldKey="Birthdate__c" type="date" isEditing={isEditing} formData={formData} setFormData={setFormData} />
-                                          <Field label="Gender" value={employee.Gender__c} fieldKey="Gender__c" isEditing={isEditing} formData={formData} setFormData={setFormData} />
+                                          <Field label="Employee Name" value={employee.Employee_Name__c} fieldKey="Employee_Name__c" isEditing={isEditing} formData={formData} setFormData={setFormData} error={errors.Employee_Name__c} placeholder="e.g. John Doe" />
+                                          <Field label="Email Address" value={employee.Employee_Email__c} fieldKey="Employee_Email__c" type="email" isEditing={isEditing} formData={formData} setFormData={setFormData} error={errors.Employee_Email__c} placeholder="e.g. john@example.com" />
+                                          <Field label="Phone Number" value={employee.Employee_Phone__c} fieldKey="Employee_Phone__c" type="tel" isEditing={isEditing} formData={formData} setFormData={setFormData} error={errors.Employee_Phone__c} placeholder="+91 9876543210" />
+                                          <Field label="Date of Birth" value={employee.Birthdate__c} fieldKey="Birthdate__c" type="date" isEditing={isEditing} formData={formData} setFormData={setFormData} error={errors.Birthdate__c} />
+                                          <Field label="Gender" value={employee.Gender__c} fieldKey="Gender__c" isEditing={isEditing} formData={formData} setFormData={setFormData} options={[{label: 'Male', value:'Male'}, {label:'Female', value:'Female'}, {label:'Other', value:'Other'}]} type="select" />
                                       </div>
                                   </div>
 
@@ -469,13 +715,21 @@ export function EmployeeProfileView({ employeeId }: ViewProps) {
                                           <MapPin className="w-5 h-5 text-indigo-500" /> Address
                                       </h2>
                                       <div className="grid grid-cols-1 gap-y-6">
-                                          <Field label="Street" value={employee.Employee_Address__c?.street} fieldKey="street" isEditing={isEditing} formData={formData} setFormData={setFormData} />
-                                          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                             <Field label="City" value={employee.Employee_Address__c?.city} fieldKey="city" isEditing={isEditing} formData={formData} setFormData={setFormData} />
-                                             <Field label="State" value={employee.Employee_Address__c?.state} fieldKey="state" isEditing={isEditing} formData={formData} setFormData={setFormData} />
-                                             <Field label="Zip / Postal" value={employee.Employee_Address__c?.postalCode} fieldKey="postalCode" isEditing={isEditing} formData={formData} setFormData={setFormData} />
-                                          </div>
-                                          <Field label="Country" value={employee.Employee_Address__c?.country} fieldKey="country" isEditing={isEditing} formData={formData} setFormData={setFormData} />
+                                          <Field label="Street" value={employee.Employee_Address__c?.street} fieldKey="Employee_Address__Street__s" isEditing={isEditing} formData={formData} setFormData={setFormData} />
+                                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                              <Field label="City" value={employee.Employee_Address__c?.city} fieldKey="Employee_Address__City__s" isEditing={isEditing} formData={formData} setFormData={setFormData} />
+                                              <Field label="State" value={employee.Employee_Address__c?.state} fieldKey="Employee_Address__StateCode__s" isEditing={isEditing} formData={formData} setFormData={setFormData} />
+                                           </div>
+                                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                              <Field label="Zip / Postal" value={employee.Employee_Address__c?.postalCode} fieldKey="Employee_Address__PostalCode__s" isEditing={isEditing} formData={formData} setFormData={setFormData} />
+                                              <Field label="Country" value={employee.Employee_Address__c?.country} fieldKey="Employee_Address__CountryCode__s" isEditing={isEditing} formData={formData} setFormData={setFormData} />
+                                           </div>
+                                          {/* Coordinates & Accuracy */}
+                                          {/* <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                             <Field label="Latitude" value={employee.Employee_Address__Latitude__s} fieldKey="Employee_Address__Latitude__s" type="number" isEditing={isEditing} formData={formData} setFormData={setFormData} />
+                                             <Field label="Longitude" value={employee.Employee_Address__Longitude__s} fieldKey="Employee_Address__Longitude__s" type="number" isEditing={isEditing} formData={formData} setFormData={setFormData} />
+                                             <Field label="Geocode Accuracy" value={employee.Employee_Address__GeocodeAccuracy__s} fieldKey="Employee_Address__GeocodeAccuracy__s" isEditing={isEditing} formData={formData} setFormData={setFormData} />
+                                          </div> */}
                                       </div>
                                   </div>
 
@@ -484,8 +738,8 @@ export function EmployeeProfileView({ employeeId }: ViewProps) {
                                           <Phone className="w-5 h-5 text-red-500" /> Emergency Contact
                                       </h2>
                                       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-                                          <Field label="Contact Name" value={employee.Emergency_Contact_Name__c} fieldKey="Emergency_Contact_Name__c" isEditing={isEditing} formData={formData} setFormData={setFormData} />
-                                          <Field label="Contact Number" value={employee.Emergency_Contact_Number__c} fieldKey="Emergency_Contact_Number__c" isEditing={isEditing} formData={formData} setFormData={setFormData} pattern = '^(?:(?:\\+|0{0,2})91(\\s*[\\-]\\s*)?|?)?\\d{9}$' type = 'tel'  />
+                                          <Field label="Contact Name" value={employee.Emergency_Contact_Name__c} fieldKey="Emergency_Contact_Name__c" isEditing={isEditing} formData={formData} setFormData={setFormData} error={errors.Emergency_Contact_Name__c} />
+                                          <Field label="Contact Number" value={employee.Emergency_Contact_Number__c} fieldKey="Emergency_Contact_Number__c" isEditing={isEditing} formData={formData} setFormData={setFormData} pattern = '^(?:(?:\\+|0{0,2})91(\\s*[\\-]\\s*)?|?)?\\d{9}$' type = 'tel' error={errors.Emergency_Contact_Number__c} />
                                       </div>
                                   </div>
                               </div>
@@ -498,14 +752,59 @@ export function EmployeeProfileView({ employeeId }: ViewProps) {
                                           <Briefcase className="w-5 h-5 text-blue-500" /> Employment Details
                                       </h2>
                                       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-                                          <Field label="Department" value={employee.Department__c} fieldKey="Department__c" isEditing={isEditing} formData={formData} setFormData={setFormData} />
-                                          <Field label="Role" value={employee.Role__c} fieldKey="Role__c" isEditing={isEditing} formData={formData} setFormData={setFormData} />
-                                          <Field label="Job Title" value={employee.Title__c} fieldKey="Title__c" isEditing={isEditing} formData={formData} setFormData={setFormData} />
-                                          <Field label="Joining Date" value={employee.Joining_Date__c} fieldKey="Joining_Date__c" type="date" isEditing={isEditing} formData={formData} setFormData={setFormData} />
-                                          <Field label="Total Experience" value={employee.Experience__c} fieldKey="Experience__c" isEditing={isEditing} formData={formData} setFormData={setFormData} />
+                                          <Field 
+                                            label="Department" 
+                                            value={employee.Department__c} 
+                                            fieldKey="Department__c" 
+                                            isEditing={isEditing && ['HR', 'Admin'].includes(currentUserRole)} 
+                                            formData={formData} 
+                                            setFormData={setFormData}
+                                            error={errors.Department__c}
+                                            type="select" 
+                                            options={[
+                                                {label: 'HR', value: 'HR'},
+                                                {label: 'IT', value: 'IT'},
+                                                {label: 'Finance', value: 'Finance'},
+                                                {label: 'Marketing', value: 'Marketing'},
+                                                {label: 'Admin', value: 'Admin'},
+                                            ]} 
+                                          />
+                                          <Field 
+                                            label="Role" 
+                                            value={employee.Role__c} 
+                                            fieldKey="Role__c" 
+                                            isEditing={isEditing && ['HR', 'Admin'].includes(currentUserRole)} 
+                                            formData={formData} 
+                                            setFormData={setFormData}
+                                            error={errors.Role__c}
+                                            type="select"
+                                            options={[
+                                                {label: 'Intern', value: 'Intern'},
+                                                {label: 'Developer', value: 'Developer'},
+                                                {label: 'Manager', value: 'Manager'},
+                                                {label: 'HR', value: 'HR'},
+                                                {label: 'Admin', value: 'Admin'},
+                                                {label: 'BDE', value: 'BDE'},
+                                                {label: 'Marketing', value: 'Marketing'},
+                                                {label: 'Finance', value: 'Finance'},
+                                            ]}
+                                          />
+                                          <Field 
+                                            label="Job Title" 
+                                            value={employee.Title__c} 
+                                            fieldKey="Title__c" 
+                                            isEditing={isEditing && ['HR', 'Admin'].includes(currentUserRole)} 
+                                            formData={formData} 
+                                            setFormData={setFormData}
+                                            type="select"
+                                            options={titles}
+                                            placeholder="Select Job Title" 
+                                          />
+                                          <Field label="Joining Date" value={employee.Joining_Date__c} fieldKey="Joining_Date__c" type="date" isEditing={isEditing && ['HR', 'Admin'].includes(currentUserRole)} formData={formData} setFormData={setFormData} error={errors.Joining_Date__c} />
+                                          <Field label="Total Experience" value={employee.Experience__c} fieldKey="Experience__c" isEditing={isEditing && ['HR', 'Admin'].includes(currentUserRole)} formData={formData} setFormData={setFormData} placeholder="e.g. 5 Years" />
                                           <div className="space-y-1 flex flex-col">
                                               <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">Manager / Team Lead</label>
-                                              {isEditing ? (
+                                              {isEditing && ['HR', 'Admin'].includes(currentUserRole) ? (
                                                   loadingEmployeesList ? (
                                                       <div className="py-2"><Spin /></div>
                                                   ) : (
@@ -533,8 +832,8 @@ export function EmployeeProfileView({ employeeId }: ViewProps) {
                                           <CreditCard className="w-5 h-5 text-green-500" /> Compensation
                                       </h2>
                                       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-                                          <Field label="Base Salary" value={employee.Base_Salary__c} fieldKey="Base_Salary__c" type="number" isEditing={isEditing} formData={formData} setFormData={setFormData} />
-                                          <Field label="CTC" value={employee.Salary_CTC__c} fieldKey="Salary_CTC__c" type="number" isEditing={isEditing} formData={formData} setFormData={setFormData} />
+                                          <Field label="Base Salary" value={employee.Base_Salary__c} fieldKey="Base_Salary__c" type="number" isEditing={isEditing && ['HR', 'Admin'].includes(currentUserRole)} formData={formData} setFormData={setFormData} />
+                                          <Field label="CTC" value={employee.Salary_CTC__c} fieldKey="Salary_CTC__c" type="number" isEditing={isEditing && ['HR', 'Admin'].includes(currentUserRole)} formData={formData} setFormData={setFormData} />
                                       </div>
                                   </div>
                                </div>
@@ -556,12 +855,12 @@ export function EmployeeProfileView({ employeeId }: ViewProps) {
 
                                   {showBankForm && (
                                       <div className="mb-6 p-6 bg-slate-50 border border-blue-100 rounded-xl animate-in fade-in slide-in-from-top-2">
-                                          <h3 className="font-semibold text-slate-800 mb-4">Add New Bank Account</h3>
+                                          <h3 className="font-semibold text-slate-800 mb-4 flex items-center gap-2"><CreditCard className="w-4 h-4"/> Account Details</h3>
                                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                                              <input placeholder="Bank Name" className="input-std" value={bankFormData.Name} onChange={e => setBankFormData({...bankFormData, Name: e.target.value})} />
-                                              <input placeholder="Branch Name" className="input-std" value={bankFormData.Bank_Branch_Name__c} onChange={e => setBankFormData({...bankFormData, Bank_Branch_Name__c: e.target.value})} />
-                                              <input placeholder="Account Number" className="input-std" value={bankFormData.Bank_Account_Number__c} onChange={e => setBankFormData({...bankFormData, Bank_Account_Number__c: e.target.value})} />
-                                              <input placeholder="IFSC Code" className="input-std" value={bankFormData.IFSC__c} onChange={e => setBankFormData({...bankFormData, IFSC__c: e.target.value})} />
+                                              <Field label="Bank Name" value={bankFormData.Name} fieldKey="Name" isEditing={true} formData={bankFormData} setFormData={setBankFormData} placeholder="e.g. HDFC Bank" error={bankErrors.Name} />
+                                              <Field label="Branch Name" value={bankFormData.Bank_Branch_Name__c} fieldKey="Bank_Branch_Name__c" isEditing={true} formData={bankFormData} setFormData={setBankFormData} placeholder="e.g. Koramangala" error={bankErrors.Bank_Branch_Name__c} />
+                                              <Field label="Account Number" value={bankFormData.Bank_Account_Number__c} fieldKey="Bank_Account_Number__c" isEditing={true} formData={bankFormData} setFormData={setBankFormData} type="password" placeholder="Enter Account Number" error={bankErrors.Bank_Account_Number__c} />
+                                              <Field label="IFSC Code" value={bankFormData.IFSC__c} fieldKey="IFSC__c" isEditing={true} formData={bankFormData} setFormData={setBankFormData} placeholder="e.g. HDFC0001234" error={bankErrors.IFSC__c} />
                                           </div>
                                           <div className="flex items-center gap-2 mb-4">
                                               <input type="checkbox" id="primary" checked={bankFormData.Primary_Account__c} onChange={e => setBankFormData({...bankFormData, Primary_Account__c: e.target.checked})} />
@@ -583,9 +882,22 @@ export function EmployeeProfileView({ employeeId }: ViewProps) {
                                                           <h4 className="font-bold text-slate-800">{bank.Name}</h4>
                                                           <p className="text-sm text-slate-500">{bank.Bank_Branch_Name__c}</p>
                                                       </div>
-                                                      {bank.Primary_Account__c && (
-                                                          <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-bold">Primary</span>
-                                                      )}
+                                                      <div className="flex items-center gap-2">
+                                                          {bank.Primary_Account__c && <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full font-medium">Primary</span>}
+                                                          {currentUserRole === 'Admin' && (
+                                                              <button 
+                                                                  onClick={() => {
+                                                                      if(confirm("Are you sure you want to delete this bank account?")) {
+                                                                          deleteBankMutation.mutate(bank.Id)
+                                                                      }
+                                                                  }}
+                                                                  className="text-slate-400 hover:text-red-500 p-1"
+                                                                  title="Remove Account"
+                                                              >
+                                                                  <Trash2 className="w-4 h-4" />
+                                                              </button>
+                                                          )}
+                                                      </div>
                                                   </div>
                                                   <div className="grid grid-cols-2 gap-4 mt-4 opacity-80">
                                                       <div>
@@ -629,21 +941,14 @@ export function EmployeeProfileView({ employeeId }: ViewProps) {
                                     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in">
                                        <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md space-y-4">
                                            <h3 className="text-lg font-bold text-slate-800">Upload Document</h3>
-                                           
-                                           <div className="space-y-3">
-                                               <div>
-                                                   <label className="block text-sm font-medium text-slate-700 mb-1">Document Category</label>
-                                                   <select 
-                                                      className="w-full p-2 border border-slate-200 rounded-lg text-sm bg-slate-50"
-                                                      value={docCategory}
-                                                      onChange={(e) => setDocCategory(e.target.value)}
-                                                   >
-                                                       <option value="Intern Docs">Intern Docs</option>
-                                                       <option value="Fresher Docs">Fresher Docs</option>
-                                                       <option value="Experience Docs">Experience Docs</option>
-                                                       <option value="Personal">Personal Docs</option>
-                                                   </select>
+                                           {docWarning && (
+                                               <div className="p-3 bg-red-50 text-red-600 rounded-lg text-sm flex items-start gap-2">
+                                                   <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                                                   <p>{docWarning}</p>
                                                </div>
+                                           )}
+                                           <div className="space-y-3">
+
                                                <div>
                                                    <label className="block text-sm font-medium text-slate-700 mb-1">Document Type</label>
                                                    <select 
@@ -651,12 +956,20 @@ export function EmployeeProfileView({ employeeId }: ViewProps) {
                                                       value={docType}
                                                       onChange={(e) => setDocType(e.target.value)}
                                                    >
-                                                       <option value="Resume">Resume</option>
-                                                       <option value="Offer Letter">Offer Letter</option>
-                                                       <option value="ID Proof">ID Proof</option>
-                                                       <option value="Certificate">Certificate</option>
-                                                       <option value="Payslip">Payslip</option>
-                                                       <option value="Other">Other</option>
+                                                       {docConfigMap[docCategory] ? (
+                                                           docConfigMap[docCategory].map((type: string) => (
+                                                               <option key={type} value={type}>{type}</option>
+                                                           ))
+                                                       ) : (
+                                                           <>
+                                                               <option value="Resume">Resume</option>
+                                                               <option value="Offer Letter">Offer Letter</option>
+                                                               <option value="ID Proof">ID Proof</option>
+                                                               <option value="Certificate">Certificate</option>
+                                                               <option value="Payslip">Payslip</option>
+                                                               <option value="Other">Other</option>
+                                                           </>
+                                                       )}
                                                    </select>
                                                </div>
                                                <div>
@@ -664,8 +977,12 @@ export function EmployeeProfileView({ employeeId }: ViewProps) {
                                                    <input 
                                                       type="file" 
                                                       className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" 
-                                                      onChange={(e) => setDocFile(e.target.files?.[0] || null)}
+                                                      onChange={(e) => {
+                                                          setDocFile(e.target.files?.[0] || null)
+                                                          setDocWarning(null)
+                                                      }}
                                                    />
+                                                   <p className="text-xs text-slate-400 mt-1 pl-1">Max file size: 10MB</p>
                                                </div>
                                            </div>
 
@@ -705,6 +1022,18 @@ export function EmployeeProfileView({ employeeId }: ViewProps) {
                                                       >
                                                           <Download className="w-3 h-3" /> View
                                                       </a>
+                                                      {['HR', 'Admin'].includes(currentUserRole) && (
+                                                          <button 
+                                                            onClick={() => {
+                                                                if(confirm("Are you sure you want to delete this document?")) {
+                                                                    deleteDocumentMutation.mutate(doc.Id)
+                                                                }
+                                                            }}
+                                                            className="flex-1 bg-white border border-red-100 text-red-500 text-xs font-semibold py-2 rounded-lg flex items-center justify-center gap-2 hover:bg-red-50 transition"
+                                                          >
+                                                              <Trash2 className="w-3 h-3" /> Delete
+                                                          </button>
+                                                      )}
                                                   </div>
                                               </div>
                                           ))}
@@ -828,6 +1157,136 @@ export function EmployeeProfileView({ employeeId }: ViewProps) {
                                           </div>
                                       </div>
                                   )}
+                              </div>
+                          )}
+                          
+                          {activeTab === "assets" && (
+                              <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
+                                  <div>
+                                      <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+                                          <Laptop className="w-5 h-5 text-indigo-600" /> Active Assets
+                                      </h2>
+                                      
+                                      {(() => {
+                                          const historyList = employee.assetHistory || [];
+                                          const activeAssets = historyList.filter((h: any) => !h.AMS_Returned_Date__c);
+                                          const returnedAssets = historyList.filter((h: any) => h.AMS_Returned_Date__c);
+
+                                          return (
+                                              <div className="space-y-8">
+                                                  {/* Active Assets */}
+                                                  {activeAssets.length > 0 ? (
+                                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                          {activeAssets.map((history: any) => {
+                                                              const asset = history.AMS_Asset__r || {};
+                                                              return (
+                                                                  <div key={history.Id} className="bg-white border border-slate-200 rounded-xl p-5 hover:shadow-md transition group shadow-sm">
+                                                                      <div className="flex justify-between items-start mb-3">
+                                                                          <div className="flex items-center gap-3">
+                                                                              <div className="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                                                                                  <Laptop className="w-5 h-5" />
+                                                                              </div>
+                                                                              <div>
+                                                                                  <h3 className="font-semibold text-slate-800">{asset.Name || "Asset"}</h3>
+                                                                                  <p className="text-xs text-slate-500">{asset.AMS_Product__r?.Name || "Unknown Product"}</p>
+                                                                              </div>
+                                                                          </div>
+                                                                          <span className="px-2.5 py-1 rounded-full text-xs font-medium border bg-green-50 text-green-700 border-green-100">
+                                                                              Active
+                                                                          </span>
+                                                                      </div>
+                                                                      
+                                                                      <div className="grid grid-cols-2 gap-y-2 text-sm mt-4 pt-4 border-t border-slate-100">
+                                                                          <div>
+                                                                              <p className="text-slate-400 text-xs uppercase tracking-wider mb-0.5">Serial Number</p>
+                                                                              <p className="font-mono text-slate-700">{asset.AMS_Asset_Serial_Number__c || "-"}</p>
+                                                                          </div>
+                                                                          <div>
+                                                                              <p className="text-slate-400 text-xs uppercase tracking-wider mb-0.5">Category</p>
+                                                                              <p className="text-slate-700">{asset.AMS_Product__r?.AMS_Category__c || "-"}</p>
+                                                                          </div>
+                                                                          <div>
+                                                                              <p className="text-slate-400 text-xs uppercase tracking-wider mb-0.5">Assigned Date</p>
+                                                                              <p className="text-slate-700">{history.AMS_Assigned_Date__c ? new Date(history.AMS_Assigned_Date__c).toLocaleDateString() : "-"}</p>
+                                                                          </div>
+                                                                           <div>
+                                                                              <p className="text-slate-400 text-xs uppercase tracking-wider mb-0.5">Warranty</p>
+                                                                              <p className="text-slate-700">{asset.AMS_Warranty_Expiry_Date__c ? new Date(asset.AMS_Warranty_Expiry_Date__c).toLocaleDateString() : "-"}</p>
+                                                                          </div>
+                                                                      </div>
+                                                                  </div>
+                                                              )
+                                                          })}
+                                                      </div>
+                                                  ) : (
+                                                      <div className="text-center py-10 bg-slate-50 rounded-xl border-dashed border-2 border-slate-200">
+                                                          <Laptop className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+                                                          <p className="text-slate-500 text-sm">No active assets currently assigned.</p>
+                                                      </div>
+                                                  )}
+
+                                                  {/* History Section */}
+                                                  {returnedAssets.length > 0 && (
+                                                      <div className="border border-slate-200 rounded-2xl overflow-hidden">
+                                                          <button 
+                                                              onClick={() => setShowAssetHistory(!showAssetHistory)}
+                                                              className="w-full flex items-center justify-between p-4 bg-slate-50 hover:bg-slate-100 transition text-left"
+                                                          >
+                                                              <div className="flex items-center gap-2 font-semibold text-slate-700">
+                                                                  <History className="w-5 h-5 text-slate-500" />
+                                                                  <span>Asset History ({returnedAssets.length})</span>
+                                                              </div>
+                                                              {showAssetHistory ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
+                                                          </button>
+                                                          
+                                                          {showAssetHistory && (
+                                                              <div className="p-4 bg-slate-50/50 border-t border-slate-200 animate-in slide-in-from-top-2">
+                                                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                                      {returnedAssets.map((history: any) => {
+                                                                          const asset = history.AMS_Asset__r || {};
+                                                                          return (
+                                                                              <div key={history.Id} className="bg-white border border-slate-200/60 rounded-xl p-5 opacity-90 hover:opacity-100 hover:shadow-sm transition">
+                                                                                  <div className="flex justify-between items-start mb-3">
+                                                                                      <div className="flex items-center gap-3">
+                                                                                          <div className="w-10 h-10 rounded-lg bg-slate-100 text-slate-500 flex items-center justify-center">
+                                                                                              <Laptop className="w-5 h-5" />
+                                                                                          </div>
+                                                                                          <div>
+                                                                                              <h3 className="font-semibold text-slate-700">{asset.Name || "Asset"}</h3>
+                                                                                              <p className="text-xs text-slate-500">{asset.AMS_Product__r?.Name || "Unknown Product"}</p>
+                                                                                          </div>
+                                                                                      </div>
+                                                                                      <span className="px-2.5 py-1 rounded-full text-xs font-medium border bg-slate-100 text-slate-600 border-slate-200">
+                                                                                          Returned
+                                                                                      </span>
+                                                                                  </div>
+                                                                                  
+                                                                                  <div className="grid grid-cols-2 gap-y-2 text-sm mt-4 pt-4 border-t border-slate-100">
+                                                                                      <div>
+                                                                                          <p className="text-slate-400 text-xs uppercase tracking-wider mb-0.5">Serial Number</p>
+                                                                                          <p className="font-mono text-slate-600">{asset.AMS_Asset_Serial_Number__c || "-"}</p>
+                                                                                      </div>
+                                                                                      <div>
+                                                                                          <p className="text-slate-400 text-xs uppercase tracking-wider mb-0.5">Assigned Date</p>
+                                                                                          <p className="text-slate-600">{history.AMS_Assigned_Date__c ? new Date(history.AMS_Assigned_Date__c).toLocaleDateString() : "-"}</p>
+                                                                                      </div>
+                                                                                      <div>
+                                                                                          <p className="text-slate-400 text-xs uppercase tracking-wider mb-0.5">Returned Date</p>
+                                                                                          <p className="text-slate-600">{history.AMS_Returned_Date__c ? new Date(history.AMS_Returned_Date__c).toLocaleDateString() : "-"}</p>
+                                                                                      </div>
+                                                                                  </div>
+                                                                              </div>
+                                                                          )
+                                                                      })}
+                                                                  </div>
+                                                              </div>
+                                                          )}
+                                                      </div>
+                                                  )}
+                                              </div>
+                                          )
+                                      })()}
+                                  </div>
                               </div>
                           )}
                       </motion.div>

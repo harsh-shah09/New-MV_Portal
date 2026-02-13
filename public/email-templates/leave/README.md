@@ -4,6 +4,7 @@ This directory contains professional HTML email templates for all leave-related 
 
 ## Templates
 
+### Leave Request Flow
 1. **new-request-to-team-lead.html** - Sent to Team Lead when an employee submits a new leave request
 2. **team-lead-request-to-hr.html** - Sent to HR when a Team Lead submits a leave request
 3. **hr-request-to-admin.html** - Sent to Admin when an HR employee submits a leave request
@@ -11,13 +12,25 @@ This directory contains professional HTML email templates for all leave-related 
 5. **leave-approved-by-tl.html** - Sent to employee when their leave is approved by Team Lead
 6. **leave-approved-final.html** - Sent to employee when their leave receives final HR/Admin approval
 7. **leave-rejected.html** - Sent to employee when their leave request is rejected
-8. **leave-withdrawn.html** - Sent to employee when they withdraw a leave request
+
+### Leave Withdrawal Flow
+8. **withdrawal-request-submitted.html** - Sent to employee confirming their withdrawal request submission
+9. **withdrawal-request-to-hr.html** - Sent to HR when an employee requests to withdraw approved leave
+10. **withdrawal-approved.html** - Sent to employee when HR approves the withdrawal request
+11. **withdrawal-rejected.html** - Sent to employee when HR rejects the withdrawal request
+
+### Legacy
+12. **leave-withdrawn.html** - Legacy template for direct withdrawals (no approval needed)
 
 ## Features
 
 - **Modern, responsive design** - Works perfectly on desktop and mobile devices
 - **Professional styling** - Clean, corporate look with gradient headers and card-based layouts
-- **Color-coded headers** - Different colors for different types of notifications
+- **Color-coded headers** - Different colors for different types of notifications:
+  - 🟢 Green - Approvals and success
+  - 🔴 Red - Rejections
+  - 🟠 Orange - Withdrawal requests (action required)
+  - 🔵 Blue - Pending/Information
 - **Mobile-optimized** - Fully responsive with mobile-friendly layouts
 - **Accessible** - High contrast and clear typography for readability
 - **Consistent branding** - MV Clouds branding throughout all templates
@@ -43,6 +56,14 @@ These templates are loaded by the `lib/email-templates.ts` file, which:
 1. Reads the HTML template file
 2. Replaces placeholders with actual data
 3. Returns the formatted HTML for email sending
+
+## Withdrawal Workflow
+
+The withdrawal workflow requires HR approval:
+1. Employee requests withdrawal → `withdrawal-request-submitted.html` sent to employee
+2. HR receives notification → `withdrawal-request-to-hr.html` sent to HR
+3. HR approves → `withdrawal-approved.html` sent to employee, balance restored
+4. HR rejects → `withdrawal-rejected.html` sent to employee, leave remains approved
 
 ## Customization
 

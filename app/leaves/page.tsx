@@ -9,16 +9,27 @@ import { useLeaveStore } from "@/store/leaveStore"
 import type { LeaveRequest } from "@/types"
 import { useQuery } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { Modal } from "antd"
+import { Modal, Select, Input, Card, Row, Col, Spin } from "antd"
+import { SearchOutlined } from "@ant-design/icons"
+import { PageContainer } from "@/components/page-container"
+import { PageHeader } from "@/components/page-header"
 
 export default function LeavesPage() {
   const router = useRouter()
   const [showForm, setShowForm] = useState(false)
-  const [selectedTab, setSelectedTab] = useState<"my-requests" | "approvals">("my-requests")
+  const [selectedTab, setSelectedTab] = useState<"my-requests" | "approvals" | "all-leaves">("my-requests")
   const [currentUser, setCurrentUser] = useState<{ employeeId: string; email?: string; recordId: string; role?: string; title?: string } | null>(null)
   const [rejectModalVisible, setRejectModalVisible] = useState(false)
   const [rejectingLeaveId, setRejectingLeaveId] = useState<string | null>(null)
   const [rejectReason, setRejectReason] = useState("")
+  const [allLeaves, setAllLeaves] = useState<LeaveRequest[]>([])
+  const [filteredLeaves, setFilteredLeaves] = useState<LeaveRequest[]>([])
+  const [isRefreshingAllLeaves, setIsRefreshingAllLeaves] = useState(false)
+  const [filters, setFilters] = useState({
+    status: "",
+    leaveType: "",
+    employeeName: "",
+  })
   
   console.log("Current User:", currentUser)
   const { leaves, pendingApprovals, setLeaves, setPendingApprovals, updateLeave } = useLeaveStore()
@@ -46,6 +57,55 @@ export default function LeavesPage() {
     }
   }, [data, setLeaves, setPendingApprovals])
 
+  // Fetch all leaves for HR/Admin
+  const fetchAllLeaves = async () => {
+    if (currentUser?.role === 'HR' || currentUser?.role === 'Admin') {
+      setIsRefreshingAllLeaves(true)
+      try {
+        const response = await fetch('/api/leave-management/all')
+        if (response.ok) {
+          const data = await response.json()
+          setAllLeaves(data.allLeaves || [])
+          // toast.success('All leaves refreshed successfully')
+          console.log('All leaves refreshed successfully')
+        }
+      } catch (error) {
+        console.error('Error fetching all leaves:', error)
+        toast.error('Failed to refresh all leaves')
+      } finally {
+        setIsRefreshingAllLeaves(false)
+      }
+    }
+  }
+
+  useEffect(() => {
+    fetchAllLeaves()
+  }, [currentUser])
+
+  // Apply filters
+  useEffect(() => {
+    let filtered = [...allLeaves]
+
+    if (filters.status && filters.status !== "") {
+      filtered = filtered.filter(leave => leave.status === filters.status)
+    }
+
+    if (filters.leaveType && filters.leaveType !== "") {
+      filtered = filtered.filter(leave => {
+        const displayType = leave.leaveCategory === 'Extra Day Pay' ? 'Extra Day Pay' : leave.leaveType
+        return displayType === filters.leaveType
+      })
+    }
+
+    if (filters.employeeName) {
+      filtered = filtered.filter(leave => 
+        leave.employeeName.toLowerCase().includes(filters.employeeName.toLowerCase())
+      )
+    }
+
+    setFilteredLeaves(filtered)
+  }, [allLeaves, filters])
+
   const handleSubmitRequest = async (data: Partial<LeaveRequest>) => {
     const submit = async (payload: Partial<LeaveRequest>, confirmedRules = false): Promise<void> => {
       const toastId = toast.loading("Submitting leave request...")
@@ -61,41 +121,120 @@ export default function LeavesPage() {
 
         const result = await response.json()
 
+        if (response.status === 409 && result?.requiresMerge) {
+          toast.dismiss(toastId)
+          const details = result.details || {}
+          const gapDates: string[] = details.nonWorkingDaysBetween || details.gapDates || []
+          const suggested = details.suggestedDates || {}
+
+          Modal.confirm({
+            title: '⚠️ Merge with existing leave',
+            width: 700,
+            content: (
+              <div className="space-y-3">
+                <p className="text-gray-700">We found an existing leave that will be merged with this request and re-submitted for approval.</p>
+                <div className="bg-blue-50 p-3 rounded border border-blue-200">
+                  <div className="font-medium text-blue-900">Existing leave</div>
+                  <div className="text-sm text-blue-800">{details?.existingLeave?.startDate} → {details?.existingLeave?.endDate} ({details?.existingLeave?.status})</div>
+                </div>
+                {gapDates.length > 0 && (
+                  <div className="bg-amber-50 p-3 rounded border border-amber-200 text-sm text-amber-900">
+                    Non-working gap between leaves: {gapDates.join(', ')}
+                  </div>
+                )}
+                <div className="bg-green-50 p-3 rounded border border-green-200 text-sm text-green-900">
+                  <div className="font-medium text-green-900">New merged dates</div>
+                  <div>{suggested.startDate} → {suggested.endDate}</div>
+                </div>
+              </div>
+            ),
+            okText: 'Merge & Resubmit',
+            cancelText: 'Cancel',
+            onOk: async () => {
+              await submit({ ...payload, confirmMerge: true, mergeExistingLeaveId: details.existingLeaveId }, confirmedRules)
+            },
+          })
+          return
+        }
+
         if (response.status === 409 && result?.requiresConfirmation) {
           toast.dismiss(toastId)
           const details = result.details || {}
           
+          // Format dates for display
+          const formatDate = (dateStr: string) => {
+            if (!dateStr) return '-';
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+          };
+          
           Modal.confirm({
             title: '⚠️ Leave Rules Applied',
-            width: 600,
+            width: 700,
             content: (
               <div className="space-y-3">
                 <p className="text-gray-700 mb-4">Additional rules have been applied to your leave request. Please review:</p>
+                
+                {/* Effective Leave Period - Show when sandwich is applied */}
+                {details.sandwichApplied && details.effectiveStartDate && details.effectiveEndDate && (
+                  <div className="bg-amber-50 p-3 rounded-lg border border-amber-200 mb-3">
+                    <div className="font-medium text-amber-800 mb-2">📅 Your Effective Leave Period:</div>
+                    <div className="text-sm text-amber-700">
+                      <div>You requested: <span className="font-semibold">{formatDate(details.requestedStartDate)}</span> to <span className="font-semibold">{formatDate(details.requestedEndDate)}</span></div>
+                      <div className="mt-1">Due to sandwich rule, your leave will be counted from: <span className="font-bold text-amber-900">{formatDate(details.effectiveStartDate)}</span> to <span className="font-bold text-amber-900">{formatDate(details.effectiveEndDate)}</span></div>
+                    </div>
+                  </div>
+                )}
+                
                 <div className="bg-blue-50 p-4 rounded-lg space-y-2">
                   <div className="flex justify-between">
-                    <span className="font-medium">Requested leave days:</span>
-                    <span className="font-semibold text-blue-600">{payload.duration ?? "-"}</span>
+                    <span className="font-medium">Original working days requested:</span>
+                    <span className="font-semibold text-blue-600">{details.workingDaysInRange ?? payload.duration ?? "-"}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="font-medium">Leave span (calendar):</span>
-                    <span className="font-semibold">{details.rangeLeaveDays ?? "-"}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="font-medium">Sandwich extra days:</span>
-                    <span className="font-semibold text-orange-600">{details.sandwichExtra ?? 0}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="font-medium">One+Two penalty days:</span>
-                    <span className="font-semibold text-red-600">{details.onePlusTwoExtra ?? 0}</span>
-                  </div>
+                  {details.sandwichApplied && (
+                    <>
+                      {details.nonWorkingDaysInRange > 0 && (
+                        <div className="flex justify-between text-orange-700">
+                          <span className="font-medium">+ Non-working days in range:</span>
+                          <span className="font-semibold">{details.nonWorkingDaysInRange ?? 0}</span>
+                        </div>
+                      )}
+                      {(details.sameRequestSandwichDays ?? details.sandwichExtra ?? 0) > 0 && (
+                        <div className="flex justify-between text-orange-700">
+                          <span className="font-medium">+ Sandwich days (adjacent to request):</span>
+                          <span className="font-semibold">{details.sameRequestSandwichDays ?? details.sandwichExtra}</span>
+                        </div>
+                      )}
+                      {details.sameRequestSandwichDatesList?.length > 0 && (
+                        <div className="text-xs text-orange-600 pl-4">
+                          Dates: {details.sameRequestSandwichDatesList.map((d: string) => formatDate(d)).join(', ')}
+                        </div>
+                      )}
+                    </>
+                  )}
+                  {(details.onePlusTwoExtra ?? 0) > 0 && (
+                    <div className="flex justify-between text-red-700">
+                      <span className="font-medium">+ One+Two penalty days:</span>
+                      <span className="font-semibold">{details.onePlusTwoExtra}</span>
+                    </div>
+                  )}
                   <div className="border-t border-blue-200 pt-2 mt-2 flex justify-between">
-                    <span className="font-bold">Total after rules:</span>
-                    <span className="font-bold text-lg text-blue-700">{details.finalTotalAfterRules ?? "-"}</span>
+                    <span className="font-bold">Total deduction:</span>
+                    <span className="font-bold text-lg text-blue-700">{details.finalTotalAfterRules ?? "-"} days</span>
                   </div>
                 </div>
-                <div className="text-sm text-gray-600 mt-3">
-                  <div>• Sandwich rule: {details.sandwichApplied ? "✅ Applied" : "❌ Not applied"}</div>
-                  <div>• One+Two penalty: {details.onePlusTwoRuleApplied ? "✅ Applied" : "❌ Not applied"}</div>
+                <div className="text-sm bg-gray-50 p-3 rounded border border-gray-200">
+                  <div className="font-medium mb-1">Rules Applied:</div>
+                  {details.sameRequestSandwich && (
+                    <div>• Same-request sandwich: ✅ Applied - holidays/weekends adjacent to your leave counted</div>
+                  )}
+                  {!details.sameRequestSandwich && details.sandwichApplied && (
+                    <div>• Sandwich rule: ✅ Applied - holidays/weekends between leave days counted</div>
+                  )}
+                  {!details.sandwichApplied && (
+                    <div>• Sandwich rule: ❌ Not applied</div>
+                  )}
+                  <div>• One+Two penalty: {details.onePlusTwoRuleApplied ? "✅ Applied - less than 5 working days notice" : "❌ Not applied"}</div>
                 </div>
               </div>
             ),
@@ -109,7 +248,9 @@ export default function LeavesPage() {
         }
 
         if (!response.ok) {
-          toast.error(result?.error || "Failed to submit leave request", { id: toastId })
+          // Check if there's a detailed message from the backend (e.g., duplicate leave)
+          const errorMessage = result?.details?.message || result?.error || "Failed to submit leave request"
+          toast.error(errorMessage, { id: toastId, duration: 6000 })
           return
         }
 
@@ -212,7 +353,7 @@ export default function LeavesPage() {
               <div><strong>Duration:</strong> {leave.duration} day(s)</div>
             </div>
           </div>
-          <p className="mt-3 text-sm text-gray-600">Your leave balance will be restored.</p>
+          <p className="mt-3 text-sm text-gray-600">Leave Withdraw Request Submitted to HR.</p>
         </div>
       ),
       okText: 'Yes, Withdraw',
@@ -238,12 +379,15 @@ export default function LeavesPage() {
             return
           }
 
+          const data = await response.json()
+
           // Update local state
           updateLeave({
             ...leave,
-            status: "withdrawn",
+            status: data.status || "withdrawal pending",
+            isWithdrawalRequest: true
           })
-          toast.success("Leave withdrawn successfully. Balance restored.", { id: toastId })
+          toast.success(data.message || "Withdrawal request submitted. Awaiting HR approval.", { id: toastId })
         } catch (error) {
           console.error("Error withdrawing leave:", error)
           toast.error("Failed to withdraw leave. Please try again.", { id: toastId })
@@ -266,6 +410,12 @@ export default function LeavesPage() {
               <div><strong>Type:</strong> {leave.leaveType || leave.leaveCategory}</div>
               <div><strong>Dates:</strong> {leave.startDate} to {leave.endDate}</div>
               <div><strong>Duration:</strong> {leave.duration} day(s)</div>
+              {leave.reason && (
+                <div className="mt-2 pt-2 border-t border-green-300">
+                  <strong>Reason:</strong> 
+                  <p className="mt-1 text-gray-700">{leave.reason}</p>
+                </div>
+              )}
             </div>
           </div>
           <p className="mt-3 text-sm text-green-700">✓ Email notification will be sent to the employee</p>
@@ -335,9 +485,93 @@ export default function LeavesPage() {
     }
   }
 
-  const openRejectModal = (leaveId: string) => {
+  const handleApproveWithdrawal = async (leaveId: string) => {
+    const leave = pendingApprovals.find((l) => l.id === leaveId)
+    
+    Modal.confirm({
+      title: '⚠️ Approve Withdrawal Request',
+      content: leave ? (
+        <div>
+          <p className="mb-3">Are you sure you want to approve this withdrawal request?</p>
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded">
+            <div className="text-sm space-y-1">
+              <div><strong>Employee:</strong> {leave.employeeName}</div>
+              <div><strong>Type:</strong> {leave.leaveType || leave.leaveCategory}</div>
+              <div><strong>Dates:</strong> {leave.startDate} to {leave.endDate}</div>
+              <div><strong>Duration:</strong> {leave.duration} day(s)</div>
+            </div>
+          </div>
+          <p className="mt-3 text-sm text-amber-700">⚠️ The leave will be withdrawn and leave balance will be restored.</p>
+        </div>
+      ) : 'Are you sure you want to approve this withdrawal request?',
+      okText: 'Approve Withdrawal',
+      cancelText: 'Cancel',
+      okButtonProps: { style: { backgroundColor: '#f59e0b' } },
+      onOk: async () => {
+        const toastId = toast.loading("Approving withdrawal request...")
+        try {
+          const response = await fetch("/api/leave-management", {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              leaveId,
+              action: "approve_withdrawal",
+            }),
+          })
+
+          if (!response.ok) {
+            const error = await response.json()
+            toast.error(error.error || "Failed to approve withdrawal", { id: toastId })
+            return
+          }
+
+          refetch()
+          toast.success("Withdrawal approved successfully! ✅ Leave balance restored.", { id: toastId, duration: 4000 })
+        } catch (error) {
+          console.error("Error approving withdrawal:", error)
+          toast.error("Failed to approve withdrawal. Please try again.", { id: toastId })
+        }
+      },
+    })
+  }
+
+  const handleRejectWithdrawal = async (leaveId: string, reason: string) => {
+    const toastId = toast.loading("Rejecting withdrawal request...")
+    try {
+      const response = await fetch("/api/leave-management", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          leaveId,
+          action: "reject_withdrawal",
+          reason,
+        }),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        toast.error(error.error || "Failed to reject withdrawal", { id: toastId })
+        return
+      }
+
+      refetch()
+      toast.success("Withdrawal rejected. ✉️ Leave remains approved.", { id: toastId, duration: 4000 })
+    } catch (error) {
+      console.error("Error rejecting withdrawal:", error)
+      toast.error("Failed to reject withdrawal. Please try again.", { id: toastId })
+    }
+  }
+
+  const [isWithdrawalRejection, setIsWithdrawalRejection] = useState(false)
+
+  const openRejectModal = (leaveId: string, isWithdrawal = false) => {
     setRejectingLeaveId(leaveId)
     setRejectReason("")
+    setIsWithdrawalRejection(isWithdrawal)
     setRejectModalVisible(true)
   }
 
@@ -353,7 +587,11 @@ export default function LeavesPage() {
     }
     
     if (rejectingLeaveId) {
-      await handleReject(rejectingLeaveId, rejectReason)
+      if (isWithdrawalRejection) {
+        await handleRejectWithdrawal(rejectingLeaveId, rejectReason)
+      } else {
+        await handleReject(rejectingLeaveId, rejectReason)
+      }
       setRejectModalVisible(false)
       setRejectingLeaveId(null)
       setRejectReason("")
@@ -362,63 +600,101 @@ export default function LeavesPage() {
 
   if (isLoading) {
     return (
-      <div>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="text-center">Loading...</div>
-        </div>
-      </div>
+      <PageContainer>
+        {/* <div className="flex justify-center items-center h-64">
+           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div> */}
+        <div className="flex justify-center items-center py-12">
+                  <Spin size="large" />
+                </div>
+      </PageContainer>
     )
   }
 
   return (
-    <div>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-4xl font-bold text-gray-900">Leave Management</h1>
-            <p className="text-gray-600 mt-1">Manage leave requests and approvals</p>
-          </div>
+    <PageContainer>
+      <PageHeader
+        title="Leave Management"
+        subtitle="Manage leave requests and approvals"
+      >
           <button
             onClick={() => setShowForm(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition"
+            className="bg-primary hover:bg-primary/90 text-primary-foreground px-6 py-2 rounded-lg font-medium transition shadow-sm"
           >
             + Request Leave
           </button>
-        </div>
+      </PageHeader>
 
-        <div className="bg-white rounded-lg shadow mb-6">
-          <div className="flex border-b border-gray-200">
+        <div className="bg-card rounded-xl shadow-sm border border-border mb-6 overflow-hidden">
+          <div className="flex border-b border-border">
             <button
               onClick={() => setSelectedTab("my-requests")}
               className={`flex-1 px-6 py-4 text-center font-medium transition ${selectedTab === "my-requests"
-                ? "text-blue-600 border-b-2 border-blue-600"
-                : "text-gray-600 hover:text-gray-900"
+                ? "text-primary border-b-2 border-primary bg-primary/5"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                 }`}
             >
               My Requests
             </button>
-            <button
-              onClick={() => setSelectedTab("approvals")}
-              className={`flex-1 px-6 py-4 text-center font-medium transition ${selectedTab === "approvals"
-                ? "text-blue-600 border-b-2 border-blue-600"
-                : "text-gray-600 hover:text-gray-900"
-                }`}
-            >
-              Approvals
-            </button>
+            {(currentUser?.role === 'HR' || currentUser?.role === 'Admin' || currentUser?.title === 'Team Lead') && (
+              <button
+                onClick={() => setSelectedTab("approvals")}
+                className={`flex-1 px-6 py-4 text-center font-medium transition ${selectedTab === "approvals"
+                  ? "text-primary border-b-2 border-primary bg-primary/5"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                  }`}
+              >
+                Approvals
+              </button>
+            )}
+            {(currentUser?.role === 'HR' || currentUser?.role === 'Admin') && (
+              <button
+                onClick={() => setSelectedTab("all-leaves")}
+                className={`flex-1 px-6 py-4 text-center font-medium transition ${selectedTab === "all-leaves"
+                  ? "text-primary border-b-2 border-primary bg-primary/5"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                  }`}
+              >
+                All Leaves
+              </button>
+            )}
           </div>
 
           <div className="p-6">
             {selectedTab === "my-requests" && (
               <div>
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">My Leave Requests</h2>
+                <div className="flex items-center gap-2 mb-4">
+                  <h2 className="text-lg font-semibold text-gray-900">My Leave Requests</h2>
+                  <button
+                    onClick={() => refetch()}
+                    disabled={isLoading}
+                    className="p-1.5 hover:bg-gray-100 rounded-full transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Refresh"
+                  >
+                    <svg className={`w-4 h-4 text-gray-600 ${isLoading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                  </button>
+                </div>
                 <LeaveTable leaves={leaves} onCancel={handleCancel} onWithdraw={handleWithdraw} />
               </div>
             )}
 
             {selectedTab === "approvals" && (
               <div>
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">Pending Approvals</h2>
+                <div className="flex items-center gap-2 mb-4">
+                  <h2 className="text-lg font-semibold text-gray-900">Pending Approvals</h2>
+                  <button
+                    onClick={() => refetch()}
+                    disabled={isLoading}
+                    className="p-1.5 hover:bg-gray-100 rounded-full transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Refresh"
+                  >
+                    <svg className={`w-4 h-4 text-gray-600 ${isLoading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                  </button>
+                </div>
                 {(currentUser?.role === 'HR' || currentUser?.role === 'Admin' || (currentUser?.role === 'Developer' && currentUser?.title === 'Team Lead')) ? (
                   pendingApprovals.length > 0 ? (
                     <div className="space-y-4">
@@ -431,7 +707,8 @@ export default function LeavesPage() {
                         const tlRejected = leave.tlApproved === 'Rejected'
                         const hrApproved = leave.hrApproval === 'Approved'
                         const hrRejected = leave.hrApproval === 'Rejected'
-                        const alreadyActioned = isTeamLead ? (tlApproved || tlRejected) : (hrApproved || hrRejected)
+                        // For withdrawal requests, always show action buttons regardless of previous approval status
+                        const alreadyActioned = leave.isWithdrawalRequest ? false : (isTeamLead ? (tlApproved || tlRejected) : (hrApproved || hrRejected))
 
                         return (
                           <div key={leave.id} className="bg-gradient-to-r from-slate-50 to-blue-50 border border-gray-200 rounded-lg hover:border-blue-300 hover:shadow-md transition-all">
@@ -446,13 +723,34 @@ export default function LeavesPage() {
                                     <h3 className="text-base font-semibold text-gray-900">{leave.employeeName}</h3>
                                     <p className="text-xs text-gray-500">ID: {leave.employeeId}</p>
                                   </div>
-                                  <span className="px-4 py-2 rounded-full text-xs font-medium bg-amber-100 text-amber-700 border border-amber-200">
-                                    {leave.status.charAt(0).toUpperCase() + leave.status.slice(1)}
+                                  <span className={`px-4 py-2 rounded-full text-xs font-medium border ${
+                                    leave.isWithdrawalRequest 
+                                      ? 'bg-orange-100 text-orange-700 border-orange-200' 
+                                      : 'bg-amber-100 text-amber-700 border-amber-200'
+                                  }`}>
+                                    {leave.isWithdrawalRequest ? 'Withdrawal Pending' : leave.status.charAt(0).toUpperCase() + leave.status.slice(1)}
                                   </span>
                                 </div>
 
                                 {/* Action Buttons */}
-                                {!alreadyActioned ? (
+                                {leave.isWithdrawalRequest ? (
+                                  // Withdrawal request buttons - always show for withdrawal requests
+                                  <div className="flex gap-3">
+                                    <button
+                                      onClick={() => handleApproveWithdrawal(leave.id)}
+                                      className="flex-1 bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
+                                    >
+                                      Approve
+                                    </button>
+                                    <button
+                                      onClick={() => openRejectModal(leave.id, true)}
+                                      className="flex-1 bg-white hover:bg-gray-50 text-red-600 px-4 py-2 rounded-md text-sm font-medium border border-red-200 transition-colors"
+                                    >
+                                      Reject
+                                    </button>
+                                  </div>
+                                ) : !alreadyActioned ? (
+                                  // Regular approval buttons
                                   <div className="flex gap-3">
                                     <button
                                       onClick={() => handleApprove(leave.id)}
@@ -461,7 +759,7 @@ export default function LeavesPage() {
                                       Approve
                                     </button>
                                     <button
-                                      onClick={() => openRejectModal(leave.id)}
+                                      onClick={() => openRejectModal(leave.id, false)}
                                       className="flex-1 bg-white hover:bg-gray-50 text-red-600 px-4 py-2 rounded-md text-sm font-medium border border-red-200 transition-colors"
                                     >
                                       Reject
@@ -500,6 +798,16 @@ export default function LeavesPage() {
                                 </div>
                               </div>
 
+                              {/* Leave Reason */}
+                              {leave.reason && (
+                                <div className="mb-4">
+                                  <div className="bg-white/70 rounded-md p-3 border border-gray-100">
+                                    <p className="text-xs text-gray-500 mb-2 font-medium">Leave Reason</p>
+                                    <p className="text-sm text-gray-900">{leave.reason}</p>
+                                  </div>
+                                </div>
+                              )}
+
                               {/* Approval Status */}
                               {(leave.tlApproved || leave.hrApproval) && (
                                 <div className="flex items-center gap-4 mb-4 text-sm bg-white/70 rounded-md p-3 border border-gray-100">
@@ -533,6 +841,100 @@ export default function LeavesPage() {
                   )
                 ) : (
                   <div className="text-center py-8 text-gray-500">Only HR, Admin, and Team Leads can view pending approvals</div>
+                )}
+              </div>
+            )}
+
+            {selectedTab === "all-leaves" && (
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <h2 className="text-lg font-semibold text-gray-900">All Leave Records</h2>
+                  <button
+                    onClick={() => fetchAllLeaves()}
+                    disabled={isRefreshingAllLeaves}
+                    className="p-1.5 hover:bg-gray-100 rounded-full transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Refresh"
+                  >
+                    <svg className={`w-4 h-4 text-gray-600 ${isRefreshingAllLeaves ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                  </button>
+                </div>
+                
+                {/* Filters */}
+                <Card className="rounded-xl shadow-sm border-border bg-card text-card-foreground mb-6" bodyStyle={{ padding: '16px' }}>
+                  <Row gutter={[16, 16]}>
+                    <Col xs={24} md={8}>
+                      <label className="block text-sm font-medium text-muted-foreground mb-1.5">
+                        Status
+                      </label>
+                      <Select
+                        value={filters.status || undefined}
+                        onChange={(value) => setFilters({ ...filters, status: value || "" })}
+                        placeholder="All Status"
+                        allowClear
+                        style={{ width: '100%' }}
+                        size="large"
+                        className="rounded-lg"
+                      >
+                        <Select.Option value="applied">Applied</Select.Option>
+                        <Select.Option value="approved">Approved</Select.Option>
+                        <Select.Option value="rejected">Rejected</Select.Option>
+                        <Select.Option value="cancelled">Cancelled</Select.Option>
+                        <Select.Option value="withdrawn">Withdrawn</Select.Option>
+                      </Select>
+                    </Col>
+
+                    <Col xs={24} md={8}>
+                      <label className="block text-sm font-medium text-muted-foreground mb-1.5">
+                        Leave Type
+                      </label>
+                      <Select
+                        value={filters.leaveType || undefined}
+                        onChange={(value) => setFilters({ ...filters, leaveType: value || "" })}
+                        placeholder="All Types"
+                        allowClear
+                        style={{ width: '100%' }}
+                        size="large"
+                        className="rounded-lg"
+                      >
+                        <Select.Option value="Planned Leave">Planned Leave</Select.Option>
+                        <Select.Option value="Sick Leave">Sick Leave</Select.Option>
+                        <Select.Option value="Emergency Leave">Emergency Leave</Select.Option>
+                        <Select.Option value="Extra Day Pay">Extra Day Pay</Select.Option>
+                      </Select>
+                    </Col>
+
+                    <Col xs={24} md={8}>
+                      <label className="block text-sm font-medium text-muted-foreground mb-1.5">
+                        Employee Name
+                      </label>
+                      <Input
+                        prefix={<SearchOutlined className="text-muted-foreground" />}
+                        value={filters.employeeName}
+                        onChange={(e) => setFilters({ ...filters, employeeName: e.target.value })}
+                        placeholder="Search by name..."
+                        allowClear
+                        size="large"
+                        className="rounded-lg"
+                      />
+                    </Col>
+                  </Row>
+                  
+                  <div className="mt-3">
+                    <span className="text-sm text-gray-600">
+                      Showing {filteredLeaves.length} of {allLeaves.length} records
+                    </span>
+                  </div>
+                </Card>
+
+                {/* Leave Table */}
+                {filteredLeaves.length > 0 ? (
+                  <LeaveTable leaves={filteredLeaves} onCancel={handleCancel} onWithdraw={handleWithdraw} showActions={false} />
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    {allLeaves.length === 0 ? 'No leave records found' : 'No leaves match the selected filters'}
+                  </div>
                 )}
               </div>
             )}
@@ -607,7 +1009,6 @@ export default function LeavesPage() {
             </div>
           </div>
         </Modal>
-      </div>
-    </div>
+    </PageContainer>
   )
 }

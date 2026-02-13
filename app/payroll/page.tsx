@@ -1,145 +1,205 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect } from "react"
+import { Button, message, Spin } from "antd"
+import { PlusOutlined, ArrowLeftOutlined } from "@ant-design/icons"
+import { useQuery } from "@tanstack/react-query"
 
-import { SalaryCalculator } from "./components/salary-calculator"
-import { PayrollTable } from "./components/payroll-table"
-import { BankFileGenerator } from "./components/bank-file-generator"
-import { usePayrollStore } from "@/store/payrollStore"
-import type { Payroll } from "@/types"
-
-const mockPayrolls: Payroll[] = [
-  {
-    id: "1",
-    employeeId: "1",
-    employeeName: "John Doe",
-    month: "June",
-    year: 2024,
-    basicSalary: 120000,
-    allowances: 15000,
-    deductions: 5000,
-    taxAmount: 18000,
-    netSalary: 112000,
-    status: "paid",
-    paymentDate: "2024-06-30",
-  },
-  {
-    id: "2",
-    employeeId: "2",
-    employeeName: "Jane Smith",
-    month: "June",
-    year: 2024,
-    basicSalary: 95000,
-    allowances: 12000,
-    deductions: 4000,
-    taxAmount: 14250,
-    netSalary: 88750,
-    status: "paid",
-    paymentDate: "2024-06-30",
-  },
-  {
-    id: "3",
-    employeeId: "3",
-    employeeName: "Mike Johnson",
-    month: "July",
-    year: 2024,
-    basicSalary: 75000,
-    allowances: 8000,
-    deductions: 3000,
-    taxAmount: 11250,
-    netSalary: 68750,
-    status: "processed",
-  },
-  {
-    id: "4",
-    employeeId: "4",
-    employeeName: "Sarah Williams",
-    month: "July",
-    year: 2024,
-    basicSalary: 85000,
-    allowances: 10000,
-    deductions: 3500,
-    taxAmount: 12750,
-    netSalary: 78750,
-    status: "draft",
-  },
-]
-
-import { message } from "antd"
-
-// ... imports
+import { PayrollSummaryList } from "./components/payroll-summary-list"
+import { PayrollEmployeeList } from "./components/payroll-employee-list"
+import { PayrollEmployeeDetailView } from "./components/payroll-employee-detail"
+import { GeneratePayrollModal } from "./components/generate-payroll-modal"
+import type { PayrollSummary, PayrollEmployeeDetail } from "@/types"
+import { PageContainer } from "@/components/page-container"
+import { PageHeader } from "@/components/page-header"
 
 export default function PayrollPage() {
-  const router = useRouter()
-  const [payrolls, setPayrolls] = useState<Payroll[]>([])
-  const { setPayrolls: setStorePayrolls } = usePayrollStore()
-  const handleProcessPayroll = (id: string) => {
-    setPayrolls((prev) =>
-      prev.map((p) =>
-        p.id === id
-          ? {
-              ...p,
-              status: "paid" as const,
-              paymentDate: new Date().toISOString().split("T")[0],
-            }
-          : p,
-      ),
-    )
-  }
+  const { data: user } = useQuery({
+    queryKey: ["me"],
+    queryFn: async () => {
+      const res = await fetch("/api/me")
+      if (!res.ok) return null
+      return res.json()
+    },
+  })
 
-  const handleDeletePayroll = (id: string) => {
-    if (confirm("Are you sure you want to delete this payroll record?")) {
-      setPayrolls((prev) => prev.filter((p) => p.id !== id))
+  // State for HR/Admin view
+  const [view, setView] = useState<"summary" | "employees" | "detail">("summary")
+  const [selectedSummary, setSelectedSummary] = useState<PayrollSummary | null>(null)
+  const [employeePayrolls, setEmployeePayrolls] = useState<PayrollEmployeeDetail[]>([])
+  const [selectedEmployee, setSelectedEmployee] = useState<PayrollEmployeeDetail | null>(null)
+  const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false)
+  const [loadingEmployees, setLoadingEmployees] = useState(false)
+
+  // Fetch payroll summaries
+  const { data: summariesData, isLoading: loadingSummaries, refetch: refetchSummaries } = useQuery({
+    queryKey: ["payroll-summaries"],
+    queryFn: async () => {
+      const res = await fetch("/api/payroll/summaries")
+      if (!res.ok) throw new Error("Failed to fetch payroll summaries")
+      return res.json()
+    },
+    enabled: user?.role === "Admin" || user?.role === "HR",
+  })
+
+  const payrollSummaries = summariesData?.summaries || []
+
+  const isHROrAdmin = user?.role === "Admin" || user?.role === "HR"
+
+  const handleSelectSummary = async (summary: PayrollSummary) => {
+    setSelectedSummary(summary)
+    setLoadingEmployees(true)
+    
+    try {
+      const res = await fetch(`/api/payroll/employees/${summary.id}`)
+      if (!res.ok) throw new Error("Failed to fetch employee payrolls")
+      
+      const data = await res.json()
+      setEmployeePayrolls(data.employees || [])
+      setView("employees")
+    } catch (error) {
+      console.error("Error fetching employee payrolls:", error)
+      message.error("Failed to load employee payrolls")
+      setEmployeePayrolls([])
+    } finally {
+      setLoadingEmployees(false)
     }
   }
 
-  const handleCalculateSalary = (breakdown: any) => {
-    console.log("Salary calculated:", breakdown)
+  const handleSelectEmployee = (employee: PayrollEmployeeDetail) => {
+    setSelectedEmployee(employee)
+    setView("detail")
   }
 
-  const totalPayroll = payrolls.reduce((sum, p) => sum + p.netSalary, 0)
-  const paidPayroll = payrolls.filter((p) => p.status === "paid").reduce((sum, p) => sum + p.netSalary, 0)
-  const pendingPayroll = payrolls.filter((p) => p.status !== "paid").reduce((sum, p) => sum + p.netSalary, 0)
+  const handleBackToEmployees = () => {
+    setSelectedEmployee(null)
+    setView("employees")
+  }
+
+  const handleBackToSummary = () => {
+    setSelectedSummary(null)
+    setEmployeePayrolls([])
+    setView("summary")
+  }
+
+  const handleGeneratePayroll = async (month: string, year: number, employees: PayrollEmployeeDetail[]) => {
+    // Payroll is already saved by the modal, just refresh the list
+    message.success(`Payroll saved for ${month} ${year} - ${employees.length} employees`)
+    
+    // Refetch summaries to show the newly created one
+    await refetchSummaries()
+    
+    // If we're still on the summary view, the list will update automatically
+    // If we had selected a summary, go back to summary view
+    setView("summary")
+  }
+
+  const handleDeleteSummary = async (summaryId: string) => {
+    try {
+      const res = await fetch(`/api/payroll/summaries/${summaryId}`, {
+        method: "DELETE",
+      })
+
+      if (!res.ok) {
+        const error = await res.json()
+        throw new Error(error.error || "Failed to delete payroll summary")
+      }
+
+      const result = await res.json()
+      message.success(`Payroll summary for ${result.summary.month} ${result.summary.year} deleted successfully`)
+      
+      // Refetch summaries to update the list
+      await refetchSummaries()
+      
+      // If we're viewing employees from this summary, go back to summary view
+      if (selectedSummary?.id === summaryId) {
+        handleBackToSummary()
+      }
+    } catch (error: any) {
+      console.error("Error deleting payroll summary:", error)
+      message.error(error.message || "Failed to delete payroll summary")
+      throw error // Re-throw to let the component know deletion failed
+    }
+  }
+
+  // Show appropriate message if not HR/Admin
+  if (!isHROrAdmin) {
+    return (
+      <PageContainer>
+        <div className="text-center py-12">
+          <h1 className="text-4xl font-bold text-foreground mb-4">Payroll Management</h1>
+          <p className="text-muted-foreground">Access restricted to HR and Admin users only.</p>
+        </div>
+      </PageContainer>
+    )
+  }
 
   return (
-    <div>
+    <PageContainer>
+      <PageHeader 
+        title="Payroll Management" 
+        subtitle="Manage employee payrolls and generate monthly summaries"
+      >
+          {view === "summary" && (
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => setIsGenerateModalOpen(true)} size="large">
+              Generate Payroll
+            </Button>
+          )}
+      </PageHeader>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div>
-          <h1 className="text-4xl font-bold text-gray-900">Payroll Management</h1>
-          <p className="text-gray-600 mt-1">Process salaries and manage employee payments</p>
+      {loadingSummaries ? (
+        <div className="flex justify-center items-center py-12">
+          <Spin size="large" />
         </div>
+      ) : (
+        <>
+          {view === "summary" && (
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">Payroll Summaries</h2>
+              <PayrollSummaryList 
+                summaries={payrollSummaries} 
+                onSelectSummary={handleSelectSummary}
+                onDeleteSummary={handleDeleteSummary}
+              />
+            </div>
+          )}
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8 mb-6">
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="text-sm text-gray-600 mb-2">Total Payroll</div>
-            <div className="text-3xl font-bold text-blue-600">${totalPayroll.toLocaleString()}</div>
-            <div className="text-xs text-gray-500 mt-2">All payroll records</div>
-          </div>
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="text-sm text-gray-600 mb-2">Paid</div>
-            <div className="text-3xl font-bold text-green-600">${paidPayroll.toLocaleString()}</div>
-            <div className="text-xs text-gray-500 mt-2">Processed payments</div>
-          </div>
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="text-sm text-gray-600 mb-2">Pending</div>
-            <div className="text-3xl font-bold text-amber-600">${pendingPayroll.toLocaleString()}</div>
-            <div className="text-xs text-gray-500 mt-2">Draft & processed</div>
-          </div>
-        </div>
+          {view === "employees" && selectedSummary && (
+            <div className="space-y-6">
+              <div className="flex items-center gap-4">
+                <Button icon={<ArrowLeftOutlined />} onClick={handleBackToSummary}>
+                  Back to Summaries
+                </Button>
+                <h2 className="text-2xl font-bold text-gray-900">
+                  {selectedSummary.month} {selectedSummary.year} - Employee Payrolls
+                </h2>
+              </div>
+              {loadingEmployees ? (
+                <div className="flex justify-center items-center py-12">
+                  <Spin size="large" />
+                </div>
+              ) : (
+                <PayrollEmployeeList
+                  employees={employeePayrolls}
+                  month={selectedSummary.month}
+                  year={selectedSummary.year}
+                  onSelectEmployee={handleSelectEmployee}
+                />
+              )}
+            </div>
+          )}
 
-        <SalaryCalculator onCalculate={handleCalculateSalary} />
+          {view === "detail" && selectedEmployee && (
+            <PayrollEmployeeDetailView employee={selectedEmployee} onBack={handleBackToEmployees} />
+          )}
+        </>
+      )}
 
-        <div className="mb-6">
-          <BankFileGenerator payrolls={payrolls} />
-        </div>
-
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">Payroll Records</h2>
-          <PayrollTable payrolls={payrolls} onProcess={handleProcessPayroll} onDelete={handleDeletePayroll} />
-        </div>
-      </div>
-    </div>
+      <GeneratePayrollModal
+        open={isGenerateModalOpen}
+        onClose={() => setIsGenerateModalOpen(false)}
+        onGenerate={handleGeneratePayroll}
+      />
+    </PageContainer>
   )
 }

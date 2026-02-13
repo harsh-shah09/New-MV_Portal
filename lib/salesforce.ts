@@ -118,6 +118,7 @@ export interface Employee {
   Emergency_Contact_Relation__c?: string;
   Gender__c?: string;
   Is2FAEnabled__c?: boolean;
+  Active__c?: boolean;
   
   // Standard fields
   Name?: string; // Standard name field often exists, but we rely on Employee_Name__c
@@ -139,11 +140,12 @@ export const findEmployee = async (identifier: string): Promise<Employee | null>
   const escapedIdentifier = identifier.replace(/'/g, "\\'");
   // Updated query to fetch fields from Employee__c directly
   const query = `
-    SELECT Id, Employee_Name__c, Employee_Email__c, Password__c, Role__c, Title__c, Is2FAEnabled__c, Name 
+    SELECT Id , Employee_Name__c, Employee_Email__c, Password__c, Role__c, Title__c, Is2FAEnabled__c, Name, Active__c
     FROM Employee__c 
-    WHERE ${isEmail ? 'Employee_Email__c' : 'Employee_Name__c'} = '${escapedIdentifier}' 
+    WHERE ${isEmail ? 'Employee_Email__c' : 'Name'} = '${escapedIdentifier}' 
     LIMIT 1
   `;
+  console.log(query)
   // Note: Searching by 'Name' standard field might still be safer if Employee_Name__c isn't unique or standardized for login. 
   // But user said "Employee_Name__c ... use this only". I'll try to match user intent. 
   // If login fails, user might need to adjust valid identifiers.
@@ -159,7 +161,7 @@ export const getAllEmployees = async (): Promise<any[]> => {
   if (!conn) return [];
 
   const query = `
-    SELECT Id, Joining_Date__c, Base_Salary__c, Status__c, Salary_CTC__c, Profile_Photo__c, 
+    SELECT Id, Name, Joining_Date__c, Base_Salary__c, Status__c, Salary_CTC__c, Profile_Photo__c, Active__c,
            Employee_Name__c, Employee_Email__c, Employee_Phone__c, Birthdate__c, Gender__c, 
            Employee_Address__c,
            Emergency_Contact_Name__c, Emergency_Contact_Number__c, Emergency_Contact_Relation__c, 
@@ -176,8 +178,8 @@ export const getDashboardData = async (): Promise<DashboardData> => {
 
   // 1️⃣ Employee totals + department-wise count (single query using WITH ROLLUP)
   // Updated group by Department__c on Employee__c
-  const employeeAgg = await conn.query<any>(`SELECT Department__c dept, COUNT(Id) cnt FROM Employee__c GROUP BY ROLLUP(Department__c)`);
-
+  // const employeeAgg = await conn.query<any>(`SELECT Department__c dept, COUNT(Id) cnt FROM Employee__c GROUP BY ROLLUP(Department__c)`);
+  const employeeAgg = { records : []}
   let totalEmployees = 0;
 
   // Mock budget distribution
@@ -199,17 +201,17 @@ export const getDashboardData = async (): Promise<DashboardData> => {
   // ROLLUP row (grand total) comes where dept == null
   const totalRow = employeeAgg.records.find((r: any) => r.dept == null);
   if (totalRow) {
-    totalEmployees = totalRow.cnt;
+    totalEmployees = totalRow || 0;
   }
 
   // 2️⃣ Active + Pending leaves snapshot
-  const leaveAgg = await conn.query<any>(`
-    SELECT Status__c status, COUNT(Id) cnt
-    FROM Leave__c
-    WHERE Status__c IN ('Approved','Applied')
-    GROUP BY Status__c
-  `);
-
+  // const leaveAgg = await conn.query<any>(`
+  //   SELECT Status__c status, COUNT(Id) cnt
+  //   FROM Leave__c
+  //   WHERE Status__c IN ('Approved','Applied')
+  //   GROUP BY Status__c
+  // `);
+  const leaveAgg = {records:[]}
   let activeLeaves = 0;
   let pendingApprovals = 0;
 
@@ -219,13 +221,13 @@ export const getDashboardData = async (): Promise<DashboardData> => {
   });
 
   // 3️⃣ Leave Request Trends
-  const leaveTrendQuery = `
-    SELECT CreatedDate, Status__c 
-    FROM Leave__c 
-    WHERE CreatedDate = THIS_YEAR
-    ORDER BY CreatedDate ASC
-  `;
-  const leaveTrendsRaw = await conn.query<any>(leaveTrendQuery);
+  // const leaveTrendQuery = `
+  //   SELECT CreatedDate, Status__c 
+  //   FROM Leave__c 
+  //   WHERE CreatedDate = THIS_YEAR
+  //   ORDER BY CreatedDate ASC
+  // `;
+  // const leaveTrendsRaw = await conn.query<any>(leaveTrendQuery);
   
   const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const trendsMap = new Map<string, { month: string, approved: number, pending: number, rejected: number }>();
@@ -233,16 +235,16 @@ export const getDashboardData = async (): Promise<DashboardData> => {
   // Initialize current year months
   monthNames.forEach(m => trendsMap.set(m, { month: m, approved: 0, pending: 0, rejected: 0 }));
 
-  leaveTrendsRaw.records.forEach((r: any) => {
-      const date = new Date(r.CreatedDate);
-      const month = monthNames[date.getMonth()];
-      const stat = trendsMap.get(month);
-      if (stat) {
-          if (r.Status__c === 'Approved') stat.approved++;
-          else if (r.Status__c === 'Applied' || r.Status__c === 'Pending') stat.pending++;
-          else if (r.Status__c === 'Rejected') stat.rejected++;
-      }
-  });
+  // leaveTrendsRaw.records.forEach((r: any) => {
+  //     const date = new Date(r.CreatedDate);
+  //     const month = monthNames[date.getMonth()];
+  //     const stat = trendsMap.get(month);
+  //     if (stat) {
+  //         if (r.Status__c === 'Approved') stat.approved++;
+  //         else if (r.Status__c === 'Applied' || r.Status__c === 'Pending') stat.pending++;
+  //         else if (r.Status__c === 'Rejected') stat.rejected++;
+  //     }
+  // });
   
   const currentMonthIndex = new Date().getMonth();
   const leaveTrends = Array.from(trendsMap.values()).slice(0, currentMonthIndex + 1);
@@ -255,7 +257,8 @@ export const getDashboardData = async (): Promise<DashboardData> => {
     ORDER BY CreatedDate DESC 
     LIMIT 5
   `;
-  const recentLeaves = await conn.query<any>(recentLeavesQuery);
+  // const recentLeaves = await conn.query<any>(recentLeavesQuery);
+  const recentLeaves = {records:[]}
   const recentActivities = recentLeaves.records.map((r: any) => ({
       title: `${r.Employee__r?.Employee_Name__c || 'Employee'} - ${r.Status__c}`,
       value: new Date(r.CreatedDate).toLocaleDateString(),
@@ -291,7 +294,7 @@ export const getEmployeeById = async (id: string): Promise<any | null> => {
 
     // 1. Fetch Employee Details (All component fields directly)
     const empQuery = `
-      SELECT Id, Employee_Id__c , Employee_Name__c, Employee_Email__c, Joining_Date__c, Base_Salary__c, Salary_CTC__c, Status__c, Profile_Photo__c, Team_Lead__c, Password__c, Is2FAEnabled__c,
+      SELECT Id, Name,Employee_Id__c , Employee_Name__c, Employee_Email__c, Joining_Date__c, Base_Salary__c, Salary_CTC__c, Status__c, Active__c, Profile_Photo__c, Team_Lead__c, Password__c, Is2FAEnabled__c,
              Employee_Phone__c, Birthdate__c, Gender__c, Employee_Address__c, 
              Emergency_Contact_Name__c, Emergency_Contact_Number__c, Emergency_Contact_Relation__c, 
              Experience__c, Department__c, Role__c, Title__c
@@ -320,28 +323,33 @@ export const getEmployeeById = async (id: string): Promise<any | null> => {
     `;
     const docResult = await conn.query(docQuery);
 
+    // 4. Fetch Asset Assignment History (Current & Past)
+    const historyQuery = `
+      SELECT Id, AMS_Assigned_Date__c, AMS_Returned_Date__c, 
+             AMS_Asset__r.Name, AMS_Asset__r.AMS_Asset_Serial_Number__c, 
+             AMS_Asset__r.AMS_Product__r.Name, AMS_Asset__r.AMS_Product__r.AMS_Category__c, 
+             AMS_Asset__r.AMS_Status__c, AMS_Asset__r.AMS_Warranty_Expiry_Date__c
+      FROM AMS_Asset_Assignment_History__c
+      WHERE AMS_Assigned_Person__c = '${id}'
+      ORDER BY AMS_Assigned_Date__c DESC
+    `;
+    const historyResult = await conn.query(historyQuery);
+
     // Map to a clean structure
     return {
         ...empRecord, 
         // No more separate contact object, everything is on top level
         bankDetails: bankResult.records,
-        documents: docResult.records
+        documents: docResult.records,
+        assetHistory: historyResult.records
     };
 };
 
 export const updateEmployee = async (id: string, data: any) => {
     const conn = await getSalesforceConnection();
     if (!conn) throw new Error("No Salesforce connection");
-
-    // All fields are on Employee__c now.
-    // We can just filter out fields that are NOT part of the object if we want to be safe, 
-    // or assume 'data' contains valid keys.
-    // Excluding nested objects or read-only if any.
-    
-    // Safety: ensure Id is set
     const updateData: any = { Id: id, ...data };
     console.log('Updated data',updateData)
-    // Remove "contactId" if it was passed by legacy code
     delete updateData.contactId;
 
     await conn.sobject("Employee__c").update(updateData);
@@ -366,12 +374,63 @@ export const updateBankDetail = async (bankData: any) => {
     return await conn.sobject("Bank_Detail__c").update(bankData);
 };
 
+export const deleteBankDetail = async (bankId: string) => {
+    const conn = await getSalesforceConnection();
+    if (!conn) throw new Error("No Salesforce connection");
+    return await conn.sobject("Bank_Detail__c").destroy(bankId);
+};
+
 // --- Notifications ---
 
 export const createNotification = async (notifData: any) => {
     const conn = await getSalesforceConnection();
     if (!conn) throw new Error("No Salesforce connection");
     return await conn.sobject("MV_Notification__c").create(notifData);
+}
+
+/**
+ * Helper function to send in-app notifications to multiple recipients
+ * @param recipients - Array of employee IDs to notify
+ * @param message - Notification message
+ * @param type - Type of notification (Leave, Payroll, etc.)
+ * @param actionRequired - Whether action is required from recipient
+ */
+export const sendInAppNotifications = async (
+    recipients: string[],
+    message: string,
+    type: string = 'General',
+    actionRequired: boolean = false
+) => {
+    try {
+        const conn = await getSalesforceConnection();
+        if (!conn) {
+            console.error("No Salesforce connection for sending notifications");
+            return;
+        }
+
+        // Filter out null/undefined recipients
+        const validRecipients = recipients.filter(r => r);
+        
+        if (validRecipients.length === 0) {
+            console.warn("No valid recipients for notification");
+            return;
+        }
+
+        const notifications = validRecipients.map(employeeId => ({
+            Employee__c: employeeId,
+            Message__c: message,
+            Notification_Type__c: type,
+            Action_Required__c: actionRequired,
+            Is_Read__c: false,
+            Status__c: 'Unread'
+        }));
+
+        await conn.sobject("MV_Notification__c").create(notifications);
+        console.log(`✓ In-app notifications sent to ${validRecipients.length} recipient(s)`);
+    } catch (error) {
+        console.error('Error sending in-app notifications:', error);
+        // Don't throw error to prevent breaking the main flow
+    }
 }
 
 // --- Documents ---
@@ -408,6 +467,27 @@ export const updateDocument = async (docData: any) => {
     const conn = await getSalesforceConnection();
     if (!conn) throw new Error("No Salesforce connection");
     return await conn.sobject("Document__c").update(docData);
+}
+
+export const deleteDocument = async (docId: string) => {
+    const conn = await getSalesforceConnection();
+    if (!conn) throw new Error("No Salesforce connection");
+    return await conn.sobject("Document__c").destroy(docId);
+}
+
+export const getHandbookDocuments = async () => {
+    const conn = await getSalesforceConnection();
+    if (!conn) throw new Error("No Salesforce connection");
+    
+    // Fetch documents with Category 'Handbook'
+    const query = `
+      SELECT Id, Name, Document_Type__c, Document_Category__c, File_URL__c, Status__c, CreatedDate
+      FROM Document__c
+      WHERE Document_Category__c = 'Handbook'
+      ORDER BY CreatedDate DESC
+    `;
+    const result = await conn.query(query);
+    return result.records;
 }
 
 export const getNotifications = async (employeeId: string) => {

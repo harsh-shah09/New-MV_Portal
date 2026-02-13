@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Leave Withdrawal Approved</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      line-height: 1.6;
+      color: #1f2937;
+      background-color: #f3f4f6;
+      padding: 20px;
+    }
+    .email-wrapper {
+      max-width: 600px;
+      margin: 0 auto;
+      background-color: #ffffff;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    .header {
+      background: linear-gradient(135deg, #059669 0%, #047857 100%);
+      color: #ffffff;
+      padding: 30px 20px;
+      text-align: center;
+    }
+    .header h1 {
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .header .icon {
+      font-size: 48px;
+      margin-bottom: 10px;
+    }
+    .header p {
+      font-size: 16px;
+      opacity: 0.95;
+      font-weight: 400;
+    }
+    .content {
+      padding: 25px 20px;
+      background-color: #ffffff;
+    }
+    .greeting {
+      font-size: 16px;
+      margin-bottom: 15px;
+      color: #374151;
+    }
+    .message {
+      font-size: 15px;
+      color: #4b5563;
+      margin-bottom: 20px;
+      line-height: 1.6;
+    }
+    .success-box {
+      background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+      margin: 20px 0;
+      border: 2px solid #10b981;
+    }
+    .success-box h2 {
+      color: #047857;
+      font-size: 22px;
+      margin-bottom: 6px;
+    }
+    .success-box p {
+      color: #065f46;
+      font-size: 15px;
+    }
+    .info-card {
+      background: linear-gradient(to right, #ecfdf5, #ffffff);
+      border: 1px solid #d1fae5;
+      border-left: 4px solid #10b981;
+      border-radius: 8px;
+      padding: 20px;
+      margin: 18px 0;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+    .info-card h3 {
+      color: #059669;
+      font-size: 17px;
+      margin-bottom: 12px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid #f3f4f6;
+    }
+    .info-row:last-child {
+      border-bottom: none;
+    }
+    .info-label {
+      font-weight: 600;
+      color: #6b7280;
+      font-size: 14px;
+    }
+    .info-value {
+      color: #111827;
+      font-weight: 500;
+      text-align: right;
+      font-size: 14px;
+    }
+    .alert {
+      padding: 14px 16px;
+      border-radius: 8px;
+      margin: 18px 0;
+      font-size: 14px;
+      line-height: 1.5;
+      border-left: 4px solid;
+    }
+    .alert-success {
+      background-color: #d1fae5;
+      border-left-color: #10b981;
+      color: #065f46;
+    }
+    .alert strong {
+      font-weight: 700;
+    }
+    .footer {
+      background-color: #1f2937;
+      color: #9ca3af;
+      padding: 20px;
+      text-align: center;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .footer p {
+      margin: 5px 0;
+    }
+    .divider {
+      height: 1px;
+      background: linear-gradient(to right, transparent, #e5e7eb, transparent);
+      margin: 20px 0;
+    }
+    @media only screen and (max-width: 600px) {
+      .email-wrapper {
+        border-radius: 0;
+      }
+      .header, .content, .footer {
+        padding: 20px 15px;
+      }
+      .info-row {
+        flex-direction: column;
+        gap: 4px;
+      }
+      .info-value {
+        text-align: left;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="email-wrapper">
+    <div class="header">
+      <div class="icon">✅</div>
+      <h1>Withdrawal Approved</h1>
+      <p>Leave Successfully Withdrawn</p>
+    </div>
+    
+    <div class="content">
+      <div class="greeting">
+        Dear <strong>{{employeeName}}</strong>,
+      </div>
+      
+      <div class="success-box">
+        <h2>✓ Request Approved</h2>
+        <p>Your withdrawal request has been approved</p>
+      </div>
+      
+      <div class="message">
+        Your withdrawal request has been <strong style="color: #10b981;">approved</strong> by {{approverTitle}}. The leave has been successfully withdrawn and your leave balance has been restored.
+      </div>
+      
+      <div class="info-card">
+        <h3>📋 Withdrawn Leave Details</h3>
+        <div class="info-row">
+          <span class="info-label">Leave Type</span>
+          <span class="info-value">{{leaveType}}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Start Date</span>
+          <span class="info-value">{{startDate}}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">End Date</span>
+          <span class="info-value">{{endDate}}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Total Days</span>
+          <span class="info-value"><strong>{{duration}}</strong></span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Approved By</span>
+          <span class="info-value">{{approverTitle}}</span>
+        </div>
+      </div>
+      
+      <div class="alert alert-success">
+        <strong>✓ Balance Restored:</strong> Your leave balance has been automatically updated in the system. You can view your current leave balance in the HRMS portal.
+      </div>
+      
+      <div class="divider"></div>
+      
+      <div class="message" style="margin-bottom: 0; text-align: center; color: #6b7280; font-size: 14px;">
+        If you have any questions, please contact HR.
+      </div>
+    </div>
+    
+    <div class="footer">
+      <p>© {{year}} MV Clouds Private Limited. All rights reserved.</p>
+      <p>D-404, The First Synthesis, B/H Keshav Baugh Party Plot</p>
+      <p>Shivalik High-Street, Ahmedabad - 380015</p>
+      <p style="margin-top: 10px;">
+        <a href="mailto:info@mvclouds.com" style="color: #60a5fa; text-decoration: none;">info@mvclouds.com</a>
+        |
+        <a href="http://www.mvclouds.com" target="_blank" style="color: #60a5fa; text-decoration: none;">www.mvclouds.com</a>
+      </p>
+    </div>
+  </div>
+</body>
+</html>

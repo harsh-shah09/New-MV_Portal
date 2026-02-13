@@ -141,3 +141,69 @@
     @apply bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white shadow-lg shadow-cyan-500/20 transition-all duration-300;
   }
 }
+
+/* Holiday highlighting in DatePicker */
+.ant-picker-cell .ant-picker-cell-inner {
+  position: relative;
+}
+
+.ant-picker-dropdown .ant-picker-cell-holiday {
+  background: #fee2e2 !important;
+  color: #dc2626 !important;
+  font-weight: bold;
+  border-radius: 4px;
+}
+
+.ant-picker-dropdown .ant-picker-cell-holiday:hover {
+  background: #fecaca !important;
+}
+
+/* Print styles for payslip */
+@media print {
+  @page {
+    margin: 1cm;
+    size: A4;
+  }
+  
+  body {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+  
+  .print\:hidden {
+    display: none !important;
+  }
+  
+  .print\:shadow-none {
+    box-shadow: none !important;
+  }
+  
+  /* Hide navigation, sidebar, and other UI elements */
+  nav,
+  aside,
+  .ant-layout-sider,
+  button:not(.print-btn),
+  .no-print {
+    display: none !important;
+  }
+  
+  /* Ensure tables fit on page */
+  table {
+    page-break-inside: auto;
+  }
+  
+  tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+  
+  thead {
+    display: table-header-group;
+  }
+  
+  /* Better spacing for print */
+  .ant-card {
+    box-shadow: none !important;
+    page-break-inside: avoid;
+  }
+}

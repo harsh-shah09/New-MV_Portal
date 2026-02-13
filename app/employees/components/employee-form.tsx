@@ -103,8 +103,8 @@ export function EmployeeForm({ employee, onSubmit, onCancel }: EmployeeFormProps
       label: "Personal Details",
       children: (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-           <Form.Item name={['personalDetails', 'address']} label="Address">
-             <Input placeholder="123 Main St" />
+           <Form.Item name={['personalDetails', 'address']} label="House / Street">
+             <Input placeholder="123 Main St, Apt 4" />
            </Form.Item>
            <Form.Item name={['personalDetails', 'city']} label="City">
              <Input placeholder="New York" />

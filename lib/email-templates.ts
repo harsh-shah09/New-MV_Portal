@@ -138,3 +138,63 @@ export function leaveWithdrawn(data: LeaveEmailData): { subject: string; html: s
   
   return { subject, html, text };
 }
+
+/**
+ * Template: Withdrawal Request Submitted (to Employee)
+ */
+export function withdrawalRequestSubmitted(data: LeaveEmailData): { subject: string; html: string; text: string } {
+  const subject = `Withdrawal Request Submitted - Pending HR Approval`;
+  const html = loadTemplate('withdrawal-request-submitted', data);
+  const text = `Dear ${data.recipientName},\n\nYour request to withdraw the approved leave has been successfully submitted and is now pending HR approval.\n\nLeave Details:\n- Leave Type: ${data.leaveType}\n- Start Date: ${data.startDate}\n- End Date: ${data.endDate}\n- Duration: ${data.duration} day(s)\n\nYou will be notified once HR reviews your request.\n\nRegards,\nHRMS System`;
+  
+  return { subject, html, text };
+}
+
+/**
+ * Template: Withdrawal Request to HR
+ */
+export function withdrawalRequestToHR(data: LeaveEmailData): { subject: string; html: string; text: string } {
+  const subject = `Withdrawal Request: ${data.employeeName} - Leave from ${data.startDate} to ${data.endDate}`;
+  const html = loadTemplate('withdrawal-request-to-hr', data);
+  const text = `Dear HR Team,\n\n${data.employeeName} has requested to withdraw their approved leave.\n\nLeave Details:\n- Employee: ${data.employeeName}\n- Leave Type: ${data.leaveType}\n- Start Date: ${data.startDate}\n- End Date: ${data.endDate}\n- Duration: ${data.duration} day(s)\n\nPlease review and approve or reject this withdrawal request through the HRMS portal.\n\nRegards,\nHRMS System`;
+  
+  return { subject, html, text };
+}
+
+/**
+ * Template: Withdrawal Approved (to Employee)
+ */
+export function withdrawalApproved(data: LeaveEmailData): { subject: string; html: string; text: string } {
+  const subject = `Withdrawal Approved - Leave from ${data.startDate} to ${data.endDate}`;
+  const html = loadTemplate('withdrawal-approved', data);
+  const text = `Dear ${data.recipientName},\n\nYour withdrawal request has been approved by ${data.approverTitle}. The leave has been successfully withdrawn and your leave balance has been restored.\n\nLeave Details:\n- Leave Type: ${data.leaveType}\n- Start Date: ${data.startDate}\n- End Date: ${data.endDate}\n- Duration: ${data.duration} day(s)\n\nRegards,\nHRMS System`;
+  
+  return { subject, html, text };
+}
+
+/**
+ * Template: Withdrawal Rejected (to Employee)
+ */
+export function withdrawalRejected(data: LeaveEmailData): { subject: string; html: string; text: string } {
+  const subject = `Withdrawal Rejected - Leave from ${data.startDate} to ${data.endDate}`;
+  const html = loadTemplate('withdrawal-rejected', data);
+  const text = `Dear ${data.recipientName},\n\nYour withdrawal request has been rejected by ${data.approverTitle}. Your leave remains approved and active.\n\n${data.reason ? `Reason: ${data.reason}\n\n` : ''}Leave Details:\n- Leave Type: ${data.leaveType}\n- Start Date: ${data.startDate}\n- End Date: ${data.endDate}\n- Duration: ${data.duration} day(s)\n\nRegards,\nHRMS System`;
+  
+  return { subject, html, text };
+}
+
+/**
+ * Template: Welcome Email
+ */
+export function welcomeEmail(data: { recipientName: string; setupLink: string }): { subject: string; html: string; text: string } {
+    const subject = `Welcome to MV Clouds Team!`;
+    const templatePath = path.join(process.cwd(), 'public', 'email-templates', 'leave', 'welcome-email.html');
+    let html = fs.readFileSync(templatePath, 'utf-8');
+
+    html = html.replace(/{{recipientName}}/g, data.recipientName);
+    html = html.replace(/{{setupLink}}/g, data.setupLink);
+    html = html.replace(/{{year}}/g, new Date().getFullYear().toString());
+    
+    const text = `Dear ${data.recipientName},\n\nWelcome to MV Clouds! Please set up your account here: ${data.setupLink}`;
+    return { subject, html, text };
+}

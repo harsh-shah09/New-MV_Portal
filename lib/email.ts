@@ -39,12 +39,8 @@ export async function sendEmail({ to, subject, body, contentType = 'text/plain' 
       to,
       subject,
     };
-
-    if (contentType === 'text/html') {
-      mailOptions.html = body;
-    } else {
-      mailOptions.text = body;
-    }
+    
+    mailOptions.html = body;
 
     await transporter.sendMail(mailOptions);
     

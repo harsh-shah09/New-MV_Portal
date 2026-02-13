@@ -8,7 +8,7 @@ export async function GET() {
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     // In a real app, verify `session.role === 'HR'` here.
-    
+    if (session.role !== 'HR') return NextResponse.json({ error: 'No Content Found' }, { status: 403 });
     try {
         const docs = await getPendingDocuments();
         return NextResponse.json(docs);

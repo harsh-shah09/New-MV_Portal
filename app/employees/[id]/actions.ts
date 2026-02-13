@@ -1,8 +1,26 @@
 'use server'
 
 import { generateTwoFactorSecret, generateQRCode, verifyTwoFactorToken } from '@/lib/two-factor';
-import { saveTwoFactorSecret, updateEmployee2FAStatus, getEmployeeById } from '@/lib/salesforce';
+import { saveTwoFactorSecret, updateEmployee2FAStatus, getEmployeeById, getSalesforceConnection } from '@/lib/salesforce';
 import { revalidatePath } from 'next/cache';
+
+export async function getEmployeeTitles() {
+    const conn = await getSalesforceConnection();
+    if (!conn) throw new Error("Salesforce connection failed");
+
+    try {
+        const describe = await conn.describe('Employee__c');
+        const titleField = describe.fields.find((f: any) => f.name === 'Title__c');
+        if (titleField && titleField.picklistValues) {
+            return titleField.picklistValues.filter((v: any) => v.active).map((v: any) => ({ label: v.label, value: v.value }));
+        }
+        return [];
+    } catch (e) {
+        console.warn("Failed to fetch Employee describe information", e);
+        return [];
+    }
+}
+
 
 export async function generate2FASecretAction(employeeId: string) {
     // Ideally check session here to ensure user is editing their own profile or is admin

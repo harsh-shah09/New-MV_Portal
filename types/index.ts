@@ -2,7 +2,7 @@ export interface User {
   id: string
   name: string
   email: string
-  role: "admin" | "manager" | "employee"
+  role: "admin" | "hr" | "manager" | "employee"
   department?: string
   avatar?: string
 }
@@ -17,6 +17,7 @@ export interface Employee {
   position: string
   joinDate: string
   status: "active" | "intern" | "on_notice" | "resigned" | "terminated"
+  active?: boolean
   salary: number
   manager?: string
   bankDetails?: BankDetails
@@ -67,11 +68,14 @@ export interface LeaveRequest {
   endDate: string
   duration: number
   reason?: string
-  status: "pending" | "approved" | "rejected" | "cancelled" | "applied" | "withdrawn"
+  status: "pending" | "approved" | "rejected" | "cancelled" | "applied" | "withdrawn" | "withdrawal pending"
+  isWithdrawalRequest?: boolean
   approvedBy?: string
   approvalDate?: string
   tlApproved?: string
   hrApproval?: string
+  confirmMerge ?: boolean
+  mergeExistingLeaveId ?: string
 }
 
 export interface LeavePolicy {
@@ -168,6 +172,59 @@ export interface Payroll {
   netSalary: number
   status: "draft" | "processed" | "paid"
   paymentDate?: string
+}
+
+export interface PayrollSummary {
+  id: string
+  month: string
+  year: number
+  totalEmployees: number
+  netTotalSalary: number
+  status: "draft" | "processed" | "paid"
+  createdAt: string
+}
+
+export interface PayrollEmployeeDetail {
+  id: string
+  employeeId: string
+  employeeName: string
+  payrollMonth?: string
+  email?: string
+  department?: string
+  role?: string
+  year?: number
+  basicSalary?: number
+  baseSalary?: number
+  totalAdditions?: number
+  totalDeductions?: number
+  companySecurityDeduction?: number
+  anniversaryBonus?: number
+  totalLeaveDays?: number
+  bonus?: number
+  netSalary?: number
+  leaves?: PayrollLeaveDetail[]
+  adjustments?: PayrollAdjustment[]
+}
+
+export interface PayrollAdjustment {
+  id?: string
+  adjustmentType: "Addition" | "Deduction"
+  adjustmentAmount: number
+  adjustmentDescription: string
+}
+
+export interface PayrollLeaveDetail {
+  id: string
+  leaveType: string
+  leaveCategory: string
+  startDate: string
+  endDate: string
+  totalDays: number
+  totalDaysAfterRule: number
+  daysInSelectedMonth: number
+  status: string
+  actualDeduction: number
+  afterRuleDeduction: number
 }
 
 export interface CalendarEvent {
