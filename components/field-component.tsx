@@ -18,6 +18,7 @@ export interface FieldProps {
   error?: string
   className?: string
   locked?: boolean
+  required?: boolean
 }
 
 export const Field = ({ 
@@ -33,7 +34,8 @@ export const Field = ({
   options,
   error,
   className,
-  locked
+  locked,
+  required
 }: FieldProps) => {
   const [showPassword, setShowPassword] = useState(false)
   const isPasswordType = type === "password" || type === "confidential"
@@ -48,7 +50,10 @@ export const Field = ({
   return (
     <div className={cn("space-y-1.5", className)}>
       <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 flex justify-between">
+        <div>
         {label}
+        {required && <span className="text-red-500 normal-case tracking-normal font-medium animate-pulse"> *</span>}
+        </div>
         {error && isEditing && <span className="text-red-500 text-[10px] normal-case tracking-normal font-medium animate-pulse">{error}</span>}
       </label>
       
@@ -85,6 +90,7 @@ export const Field = ({
                 )}
                 pattern={pattern}
                 placeholder={placeholder}
+                required={required}
               />
               {isPasswordType && (
                 <button

@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { MainNav } from "@/components/main-nav"
 import { LeaveRequestForm } from "./components/leave-request-form"
 import { LeaveTable } from "./components/leave-table"
 import { useLeaveStore } from "@/store/leaveStore"
