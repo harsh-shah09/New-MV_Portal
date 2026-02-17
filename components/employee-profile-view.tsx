@@ -857,17 +857,31 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                       <div className="mb-6 p-6 bg-slate-50 border border-blue-100 rounded-xl animate-in fade-in slide-in-from-top-2">
                                           <h3 className="font-semibold text-slate-800 mb-4 flex items-center gap-2"><CreditCard className="w-4 h-4"/> Account Details</h3>
                                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                                              <Field label="Bank Name" value={bankFormData.Name} fieldKey="Name" isEditing={true} formData={bankFormData} setFormData={setBankFormData} placeholder="e.g. HDFC Bank" error={bankErrors.Name} />
-                                              <Field label="Branch Name" value={bankFormData.Bank_Branch_Name__c} fieldKey="Bank_Branch_Name__c" isEditing={true} formData={bankFormData} setFormData={setBankFormData} placeholder="e.g. Koramangala" error={bankErrors.Bank_Branch_Name__c} />
-                                              <Field label="Account Number" value={bankFormData.Bank_Account_Number__c} fieldKey="Bank_Account_Number__c" isEditing={true} formData={bankFormData} setFormData={setBankFormData} type="password" placeholder="Enter Account Number" error={bankErrors.Bank_Account_Number__c} />
-                                              <Field label="IFSC Code" value={bankFormData.IFSC__c} fieldKey="IFSC__c" isEditing={true} formData={bankFormData} setFormData={setBankFormData} placeholder="e.g. HDFC0001234" error={bankErrors.IFSC__c} />
+                                              <Field label="Bank Name" value={bankFormData.Name} fieldKey="Name" isEditing={true} formData={bankFormData} setFormData={setBankFormData} placeholder="e.g. HDFC Bank" error={bankErrors.Name} required />
+                                              <Field label="Branch Name" value={bankFormData.Bank_Branch_Name__c} fieldKey="Bank_Branch_Name__c" isEditing={true} formData={bankFormData} setFormData={setBankFormData} placeholder="e.g. Koramangala" error={bankErrors.Bank_Branch_Name__c} required />
+                                              <Field label="Account Number" value={bankFormData.Bank_Account_Number__c} fieldKey="Bank_Account_Number__c" isEditing={true} formData={bankFormData} setFormData={setBankFormData} type="password" placeholder="Enter Account Number" error={bankErrors.Bank_Account_Number__c} required />
+                                              <Field label="IFSC Code" value={bankFormData.IFSC__c} fieldKey="IFSC__c" isEditing={true} formData={bankFormData} setFormData={setBankFormData} placeholder="e.g. HDFC0001234" error={bankErrors.IFSC__c} required />
                                           </div>
                                           <div className="flex items-center gap-2 mb-4">
                                               <input type="checkbox" id="primary" checked={bankFormData.Primary_Account__c} onChange={e => setBankFormData({...bankFormData, Primary_Account__c: e.target.checked})} />
                                               <label htmlFor="primary" className="text-sm text-slate-700">Set as Primary Account</label>
                                           </div>
                                           <div className="flex justify-end gap-3">
-                                              <button onClick={() => setShowBankForm(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-200 rounded-lg text-sm">Cancel</button>
+                                              <button onClick={() => { 
+                                                setBankFormData({
+                                                    Name: "",
+                                                    Bank_Branch_Name__c: "",
+                                                    Bank_Account_Number__c: "",
+                                                    IFSC__c: "",
+                                                    Primary_Account__c: false
+                                                })
+                                                setBankErrors({
+                                                    Name: "",
+                                                    Bank_Branch_Name__c: "",
+                                                    Bank_Account_Number__c: "",
+                                                    IFSC__c: ""
+                                                })
+                                                setShowBankForm(false)}} className="px-4 py-2 text-slate-600 hover:bg-slate-200 rounded-lg text-sm">Cancel</button>
                                               <button onClick={handleAddBank} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">Save Account</button>
                                           </div>
                                       </div>

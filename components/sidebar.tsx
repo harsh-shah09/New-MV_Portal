@@ -55,12 +55,12 @@ export function Sidebar({
     { href: "/leaves", label: "Leave", icon: CalendarDays },
     { href: "/holidays", label: "Holidays", icon: CalendarRange },
     // { href: "/training", label: "Training", icon: BookOpen },
-    { href: "/assets", label: "Assets", icon: Tag },
     // { href: "/documents", label: "Documents", icon: FileText },
   ];
 
   if(user?.role?.includes('HR') || user?.role?.includes('Admin')) {
     navItems.push({ href: "/employees", label: "Employees", icon: Users });
+    navItems.push({ href: "/assets", label: "Assets", icon: Tag });
   }
   // Add Payroll and My Payslips based on role
   if (user?.role?.includes('HR') || user?.role?.includes('Admin')) {
