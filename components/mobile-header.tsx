@@ -12,6 +12,7 @@ export function MobileHeader({ onMenuClick }: { onMenuClick: () => void }) {
     const router = useRouter()
     const queryClient = useQueryClient()
     const [isProfileOpen, setIsProfileOpen] = useState(false)
+    const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
     const profileRef = useRef<HTMLDivElement>(null)
 
     const { data: user } = useQuery({
@@ -38,6 +39,11 @@ export function MobileHeader({ onMenuClick }: { onMenuClick: () => void }) {
     const unreadCount = notifications?.filter((n: any) => !n.Is_Read__c)?.length || 0;
 
     const handleLogout = async () => {
+        setShowLogoutConfirm(true)
+        setIsProfileOpen(false)
+    }
+
+    const confirmLogout = async () => {
         await logout()
         queryClient.clear()
         router.push("/auth/login")
@@ -55,7 +61,8 @@ export function MobileHeader({ onMenuClick }: { onMenuClick: () => void }) {
     }, [])
 
     return (
-        <div className="lg:hidden px-4 py-3 bg-white/80 backdrop-blur-xl border-b border-slate-200/60 sticky top-0 z-30 supports-[backdrop-filter]:bg-white/60">
+        <>
+            <div className="lg:hidden px-4 py-3 bg-white/80 backdrop-blur-xl border-b border-slate-200/60 sticky top-0 z-30 supports-[backdrop-filter]:bg-white/60">
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                     <button
@@ -139,6 +146,50 @@ export function MobileHeader({ onMenuClick }: { onMenuClick: () => void }) {
                             )}
                         </AnimatePresence>
                     </div>
+                </div>
+            </div>
+        </div>
+        <LogoutConfirmModal 
+            open={showLogoutConfirm} 
+            onClose={() => setShowLogoutConfirm(false)} 
+            onConfirm={confirmLogout} 
+        />
+        </>
+    )
+}
+
+function LogoutConfirmModal({ open, onClose, onConfirm }: { open: boolean; onClose: () => void; onConfirm: () => void }) {
+    if (!open) return null
+
+    return (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden transform transition-all border border-gray-100">
+                <div className="p-6">
+                    <div className="flex items-start gap-4">
+                        <div className="flex-shrink-0 w-12 h-12 rounded-full bg-red-50 flex items-center justify-center">
+                            <LogOut className="w-6 h-6 text-red-500" />
+                        </div>
+                        <div className="flex-1">
+                            <h3 className="text-lg font-bold text-gray-900 mb-2">Logout Confirmation</h3>
+                            <p className="text-sm text-gray-600">
+                                Are you sure you want to logout? You will need to login again to access your account.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <div className="px-6 py-4 bg-gray-50 flex gap-3">
+                    <button
+                        onClick={onClose}
+                        className="flex-1 px-4 py-2.5 bg-white hover:bg-gray-50 text-gray-700 rounded-lg font-medium transition-colors border border-gray-300"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={onConfirm}
+                        className="flex-1 px-4 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-lg font-medium transition-colors"
+                    >
+                        Yes, Logout
+                    </button>
                 </div>
             </div>
         </div>

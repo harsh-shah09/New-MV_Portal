@@ -495,14 +495,12 @@ export const getNotifications = async (employeeId: string) => {
     if (!conn) throw new Error("No Salesforce connection");
     
     const query = `
-      SELECT Id, Name, Message__c, Action_Required__c, Status__c, Notification_Type__c, CreatedDate, Is_Read__c,
-             Employee__c
+      SELECT Id, Employee__c, Message__c, Status__c, Notification_Type__c, Is_Read__c, CreatedDate
       FROM MV_Notification__c
       WHERE Employee__c = '${employeeId}'
       ORDER BY CreatedDate DESC
       LIMIT 100
     `;
-    // console.log(query)
     const result = await conn.query(query);
     return result.records;
 }

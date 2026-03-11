@@ -41,6 +41,7 @@ export function Sidebar({
   const router = useRouter()
   const queryClient = useQueryClient()
   const [isMobile, setIsMobile] = useState(false)
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
 
   const { data: user } = useQuery({
     queryKey: ['me'],
@@ -102,6 +103,10 @@ export function Sidebar({
   }, [])
 
   const handleLogout = async () => {
+    setShowLogoutConfirm(true)
+  }
+
+  const confirmLogout = async () => {
     await logout()
     // Clear all React Query cache
     queryClient.clear()
@@ -256,44 +261,101 @@ export function Sidebar({
           </div>
         </div>
       </div>
+      <LogoutConfirmModal 
+        open={showLogoutConfirm} 
+        onClose={() => setShowLogoutConfirm(false)} 
+        onConfirm={confirmLogout} 
+      />
     </div>
   )
 
   if (isMobile) {
     return (
-      <AnimatePresence>
-        {open && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setOpen?.(false)}
-              className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 lg:hidden"
-            />
-            <motion.div
-              initial={{ x: "-100%" }}
-              animate={{ x: 0 }}
-              exit={{ x: "-100%" }}
-              transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              className="fixed inset-y-0 left-0 w-72 bg-white z-50 lg:hidden shadow-2xl"
-            >
-              <div className="absolute right-4 top-4 z-50">
-                <button onClick={() => setOpen?.(false)} className="text-slate-500 hover:text-slate-800">
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
-              <SidebarContent />
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+      <>
+        <AnimatePresence>
+          {open && (
+            <>
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setOpen?.(false)}
+                className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 lg:hidden"
+              />
+              <motion.div
+                initial={{ x: "-100%" }}
+                animate={{ x: 0 }}
+                exit={{ x: "-100%" }}
+                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                className="fixed inset-y-0 left-0 w-72 bg-white z-50 lg:hidden shadow-2xl"
+              >
+                <div className="absolute right-4 top-4 z-50">
+                  <button onClick={() => setOpen?.(false)} className="text-slate-500 hover:text-slate-800">
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
+                <SidebarContent />
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
+        <LogoutConfirmModal 
+          open={showLogoutConfirm} 
+          onClose={() => setShowLogoutConfirm(false)} 
+          onConfirm={confirmLogout} 
+        />
+      </>
     )
   }
 
   return (
-    <div className="hidden lg:block w-72 h-screen sticky top-0 shadow-xl shadow-slate-200/50 z-40">
-      <SidebarContent />
+    <>
+      <div className="hidden lg:block w-72 h-screen sticky top-0 shadow-xl shadow-slate-200/50 z-40">
+        <SidebarContent />
+      </div>
+      <LogoutConfirmModal 
+        open={showLogoutConfirm} 
+        onClose={() => setShowLogoutConfirm(false)} 
+        onConfirm={confirmLogout} 
+      />
+    </>
+  )
+}
+
+function LogoutConfirmModal({ open, onClose, onConfirm }: { open: boolean; onClose: () => void; onConfirm: () => void }) {
+  if (!open) return null
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden transform transition-all border border-gray-100">
+        <div className="p-6">
+          <div className="flex items-start gap-4">
+            <div className="flex-shrink-0 w-12 h-12 rounded-full bg-red-50 flex items-center justify-center">
+              <LogOut className="w-6 h-6 text-red-500" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-lg font-bold text-gray-900 mb-2">Logout Confirmation</h3>
+              <p className="text-sm text-gray-600">
+                Are you sure you want to logout? You will need to login again to access your account.
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="px-6 py-4 bg-gray-50 flex gap-3">
+          <button
+            onClick={onClose}
+            className="flex-1 px-4 py-2.5 bg-white hover:bg-gray-50 text-gray-700 rounded-lg font-medium transition-colors border border-gray-300"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="flex-1 px-4 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-lg font-medium transition-colors"
+          >
+            Yes, Logout
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

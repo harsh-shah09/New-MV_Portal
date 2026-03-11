@@ -8,10 +8,11 @@ import { useLeaveStore } from "@/store/leaveStore"
 import type { LeaveRequest } from "@/types"
 import { useQuery } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { Modal, Select, Input, Card, Row, Col, Spin } from "antd"
+import { Modal, Select, Input, Card, Row, Col, Spin, DatePicker } from "antd"
 import { SearchOutlined } from "@ant-design/icons"
 import { PageContainer } from "@/components/page-container"
 import { PageHeader } from "@/components/page-header"
+import dayjs from "dayjs"
 
 export default function LeavesPage() {
   const router = useRouter()
@@ -340,6 +341,10 @@ export default function LeavesPage() {
     const leave = leaves.find((l) => l.id === leaveId)
     if (!leave) return
 
+    let selectedWithdrawalStart = leave.startDate
+    let selectedWithdrawalEnd = leave.endDate
+    const isSingleDayLeave = leave.startDate === leave.endDate
+
     Modal.confirm({
       title: '⚠️ Withdraw Approved Leave',
       content: (
@@ -351,6 +356,28 @@ export default function LeavesPage() {
               <div><strong>Dates:</strong> {leave.startDate} to {leave.endDate}</div>
               <div><strong>Duration:</strong> {leave.duration} day(s)</div>
             </div>
+          </div>
+          <div className="mt-4">
+            <p className="text-sm font-medium mb-2">Withdrawal Date Range</p>
+            <DatePicker.RangePicker
+              className="w-full"
+              allowClear={false}
+              disabled={isSingleDayLeave}
+              defaultValue={[dayjs(leave.startDate), dayjs(leave.endDate)]}
+              minDate={dayjs(leave.startDate)}
+              maxDate={dayjs(leave.endDate)}
+              onChange={(value) => {
+                if (value && value[0] && value[1]) {
+                  selectedWithdrawalStart = value[0].format('YYYY-MM-DD')
+                  selectedWithdrawalEnd = value[1].format('YYYY-MM-DD')
+                }
+              }}
+            />
+            <p className="text-xs text-gray-600 mt-2">
+              {isSingleDayLeave
+                ? 'Single-day leave will be fully withdrawn.'
+                : 'Pick full range for complete withdrawal, or a subset for partial withdrawal.'}
+            </p>
           </div>
           <p className="mt-3 text-sm text-gray-600">Leave Withdraw Request Submitted to HR.</p>
         </div>
@@ -369,6 +396,8 @@ export default function LeavesPage() {
             body: JSON.stringify({
               leaveId,
               action: "withdraw",
+              withdrawalStartDate: selectedWithdrawalStart,
+              withdrawalEndDate: selectedWithdrawalEnd,
             }),
           })
 
@@ -497,6 +526,9 @@ export default function LeavesPage() {
               <div><strong>Employee:</strong> {leave.employeeName}</div>
               <div><strong>Type:</strong> {leave.leaveType || leave.leaveCategory}</div>
               <div><strong>Dates:</strong> {leave.startDate} to {leave.endDate}</div>
+              {leave.withdrawalStartDate && leave.withdrawalEndDate && (
+                <div><strong>Requested Withdrawal:</strong> {leave.withdrawalStartDate} to {leave.withdrawalEndDate}</div>
+              )}
               <div><strong>Duration:</strong> {leave.duration} day(s)</div>
             </div>
           </div>
@@ -706,6 +738,14 @@ export default function LeavesPage() {
                         const tlRejected = leave.tlApproved === 'Rejected'
                         const hrApproved = leave.hrApproval === 'Approved'
                         const hrRejected = leave.hrApproval === 'Rejected'
+                        const hasRequestedWithdrawalRange = Boolean(
+                          leave.isWithdrawalRequest && leave.withdrawalStartDate && leave.withdrawalEndDate
+                        )
+                        const displayStartDate = hasRequestedWithdrawalRange ? leave.withdrawalStartDate! : leave.startDate
+                        const displayEndDate = hasRequestedWithdrawalRange ? leave.withdrawalEndDate! : leave.endDate
+                        const displayDuration = hasRequestedWithdrawalRange
+                          ? dayjs(displayEndDate).diff(dayjs(displayStartDate), 'day') + 1
+                          : leave.duration
                         // For withdrawal requests, always show action buttons regardless of previous approval status
                         const alreadyActioned = leave.isWithdrawalRequest ? false : (isTeamLead ? (tlApproved || tlRejected) : (hrApproved || hrRejected))
 
@@ -784,16 +824,31 @@ export default function LeavesPage() {
                                   <p className="text-sm font-medium text-gray-900 capitalize">{leave.leaveType || leave.leaveCategory}</p>
                                 </div>
                                 <div className="bg-white/70 rounded-md p-3 border border-gray-100">
-                                  <p className="text-xs text-gray-500 mb-1">Duration</p>
-                                  <p className="text-sm font-medium text-gray-900">{leave.duration} {leave.duration === 1 ? 'Day' : 'Days'}</p>
+                                    <p className="text-xs text-gray-500 mb-1">
+                                      {hasRequestedWithdrawalRange ? 'Requested Duration' : 'Duration'}
+                                    </p>
+                                    <p className="text-sm font-medium text-gray-900">{displayDuration} {displayDuration === 1 ? 'Day' : 'Days'}</p>
+                                    {hasRequestedWithdrawalRange && (
+                                      <p className="text-xs text-gray-500 mt-1">Original: {leave.duration} {leave.duration === 1 ? 'Day' : 'Days'}</p>
+                                    )}
                                 </div>
                                 <div className="bg-white/70 rounded-md p-3 border border-gray-100">
-                                  <p className="text-xs text-gray-500 mb-1">Start Date</p>
-                                  <p className="text-sm font-medium text-gray-900">{new Date(leave.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                                    <p className="text-xs text-gray-500 mb-1">
+                                      {hasRequestedWithdrawalRange ? 'Requested Start Date' : 'Start Date'}
+                                    </p>
+                                    <p className="text-sm font-medium text-gray-900">{new Date(displayStartDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                                    {hasRequestedWithdrawalRange && (
+                                      <p className="text-xs text-gray-500 mt-1">Original: {new Date(leave.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                                    )}
                                 </div>
                                 <div className="bg-white/70 rounded-md p-3 border border-gray-100">
-                                  <p className="text-xs text-gray-500 mb-1">End Date</p>
-                                  <p className="text-sm font-medium text-gray-900">{new Date(leave.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                                    <p className="text-xs text-gray-500 mb-1">
+                                      {hasRequestedWithdrawalRange ? 'Requested End Date' : 'End Date'}
+                                    </p>
+                                    <p className="text-sm font-medium text-gray-900">{new Date(displayEndDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                                    {hasRequestedWithdrawalRange && (
+                                      <p className="text-xs text-gray-500 mt-1">Original: {new Date(leave.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                                    )}
                                 </div>
                               </div>
 
