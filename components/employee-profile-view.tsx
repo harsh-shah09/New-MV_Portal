@@ -275,7 +275,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
       Bank_Branch_Name__c: '',
       Bank_Account_Number__c: '',
       IFSC__c: '',
-      Primary_Account__c: false
+      Primary_Account__c: true
   })
   const [bankErrors, setBankErrors] = useState<Record<string, string>>({})
 
@@ -539,6 +539,28 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
       onError: () => message.error("Failed to remove bank account")
   })
 
+  const setPrimaryBankMutation = useMutation({
+      mutationFn: async (bankId: string) => {
+          const res = await fetch(`/api/employees/${employeeId}/bank`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ bankId, primaryAccount: true })
+          })
+          if (!res.ok) {
+              const data = await res.json().catch(() => ({}))
+              throw new Error(data?.error || 'Failed to update primary account')
+          }
+          return res.json()
+      },
+      onSuccess: () => {
+          message.success("Primary account updated")
+          queryClient.invalidateQueries({ queryKey: ["employee", employeeId] })
+      },
+      onError: (error: any) => {
+          message.error(error?.message || "Failed to update primary account")
+      }
+  })
+
   const canManageBankAccounts = ['HR', 'Admin'].includes(currentUserRole)
 
   const handleAddBank = () => {
@@ -667,6 +689,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
         updateMutation.isPending ||
         uploadMutation.isPending ||
         addBankMutation.isPending ||
+        setPrimaryBankMutation.isPending ||
         deleteBankMutation.isPending ||
         customDocMutation.isPending ||
         deleteDocumentMutation.isPending ||
@@ -676,6 +699,14 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
 
   if (isLoading) return <div className="flex h-screen items-center justify-center"><Spin size="large" /></div>
   if (!employee) return <div className="flex h-screen items-center justify-center text-red-500">Employee not found</div>
+
+    const viewedEmployeeRole = (employee.Role__c || "").trim()
+    const canToggleUserActive =
+        currentUserRole === 'Admin'
+            ? true
+            : currentUserRole === 'HR'
+            ? !['HR', 'Admin'].includes(viewedEmployeeRole)
+            : false
 
   return (
     <div className="max-w-7xl mx-auto p-6 lg:p-10 space-y-8 animate-in fade-in duration-500 relative">
@@ -726,7 +757,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                        </div>
                    </div>
                    <div className="flex gap-3 justify-center items-center">
-                       {['HR', 'Admin'].includes(currentUserRole) && (
+                                             {canToggleUserActive && (
                            <button
                              onClick={() => {
                                  const isActivating = !employee.Active__c;
@@ -766,29 +797,6 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                          </button>
                        )}
 
-                       {(!isEditing) ? (
-                           <button 
-                             onClick={handleEditToggle}
-                             className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold transition"
-                           >
-                             <Edit3 className="w-4 h-4" /> Edit Profile
-                           </button>
-                       ) : (
-                           <>
-                             <button 
-                               onClick={handleEditToggle}
-                               className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold transition"
-                             >
-                               <X className="w-4 h-4" /> Cancel
-                             </button>
-                             <button 
-                               onClick={handleSave}
-                               className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold transition shadow-lg shadow-blue-500/20"
-                             >
-                               {updateMutation.isPending ? <Spin size="small" /> : <Save className="w-4 h-4" />} Save Changes
-                             </button>
-                           </>
-                       )}
                    </div>
                </div>
            </div>
@@ -871,6 +879,31 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                           {activeTab === "personal" && (
                               <div className="space-y-8">
                                   <div>
+                                      <div className="flex justify-end mb-4">
+                                          {!isEditing ? (
+                                              <button
+                                                  onClick={handleEditToggle}
+                                                  className="flex items-center gap-2 px-5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold transition"
+                                              >
+                                                  <Edit3 className="w-4 h-4" /> Edit Personal Details
+                                              </button>
+                                          ) : (
+                                              <div className="flex items-center gap-2">
+                                                  <button
+                                                      onClick={handleEditToggle}
+                                                      className="flex items-center gap-2 px-5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold transition"
+                                                  >
+                                                      <X className="w-4 h-4" /> Cancel
+                                                  </button>
+                                                  <button
+                                                      onClick={handleSave}
+                                                      className="flex items-center gap-2 px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold transition shadow-lg shadow-blue-500/20"
+                                                  >
+                                                      {updateMutation.isPending ? <Spin size="small" /> : <Save className="w-4 h-4" />} Save Changes
+                                                  </button>
+                                              </div>
+                                          )}
+                                      </div>
                                       <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
                                           <User className="w-5 h-5 text-blue-500" /> Basic Information
                                       </h2>
@@ -921,6 +954,33 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                           {activeTab === "employment" && (
                                <div className="space-y-8">
                                   <div>
+                                      {['HR', 'Admin'].includes(currentUserRole) && (
+                                          <div className="flex justify-end mb-4">
+                                              {!isEditing ? (
+                                                  <button
+                                                      onClick={handleEditToggle}
+                                                      className="flex items-center gap-2 px-5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold transition"
+                                                  >
+                                                      <Edit3 className="w-4 h-4" /> Edit Employment Info
+                                                  </button>
+                                              ) : (
+                                                  <div className="flex items-center gap-2">
+                                                      <button
+                                                          onClick={handleEditToggle}
+                                                          className="flex items-center gap-2 px-5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold transition"
+                                                      >
+                                                          <X className="w-4 h-4" /> Cancel
+                                                      </button>
+                                                      <button
+                                                          onClick={handleSave}
+                                                          className="flex items-center gap-2 px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold transition shadow-lg shadow-blue-500/20"
+                                                      >
+                                                          {updateMutation.isPending ? <Spin size="small" /> : <Save className="w-4 h-4" />} Save Changes
+                                                      </button>
+                                                  </div>
+                                              )}
+                                          </div>
+                                      )}
                                       <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
                                           <Briefcase className="w-5 h-5 text-blue-500" /> Employment Details
                                       </h2>
@@ -1048,7 +1108,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                                     Bank_Branch_Name__c: "",
                                                     Bank_Account_Number__c: "",
                                                     IFSC__c: "",
-                                                    Primary_Account__c: false
+                                                    Primary_Account__c: true
                                                 })
                                                 setBankErrors({
                                                     Name: "",
@@ -1080,6 +1140,16 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                                       </div>
                                                       <div className="flex items-center gap-2">
                                                           {bank.Primary_Account__c && <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full font-medium">Primary</span>}
+                                                          {canManageBankAccounts && !bank.Primary_Account__c && (
+                                                              <button
+                                                                  onClick={() => setPrimaryBankMutation.mutate(bank.Id)}
+                                                                  disabled={setPrimaryBankMutation.isPending}
+                                                                  className="text-xs px-2 py-1 rounded-md border border-blue-100 text-blue-600 hover:bg-blue-50 disabled:opacity-50"
+                                                                  title="Set as Primary"
+                                                              >
+                                                                  Set Primary
+                                                              </button>
+                                                          )}
                                                           {currentUserRole === 'Admin' && (
                                                               <button 
                                                                   onClick={() => {

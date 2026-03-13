@@ -26,13 +26,29 @@ export function PayslipView({ payrollId }: PayslipViewProps) {
   const fetchPayslip = async () => {
     setLoading(true)
     try {
+      console.info("[PayslipView] Fetching payslip metadata", { payrollId })
       const res = await fetch(`/api/payroll/payslips/${payrollId}`)
-      if (!res.ok) throw new Error("Failed to fetch payslip")
+      if (!res.ok) {
+        const errorText = await res.text().catch(() => "")
+        console.error("[PayslipView] Metadata fetch failed", {
+          payrollId,
+          status: res.status,
+          statusText: res.statusText,
+          body: errorText,
+        })
+        throw new Error(`Failed to fetch payslip (${res.status})`)
+      }
       
       const data = await res.json()
+      console.info("[PayslipView] Metadata fetch success", {
+        payrollId,
+        hasPdfUrl: Boolean(data?.payslip?.pdfUrl),
+        payrollMonth: data?.payslip?.payrollMonth,
+        payrollYear: data?.payslip?.payrollYear,
+      })
       setPayslip(data.payslip)
     } catch (error) {
-      console.error("Error fetching payslip:", error)
+      console.error("[PayslipView] Error fetching payslip", { payrollId, error })
       message.error("Failed to load payslip")
     } finally {
       setLoading(false)
@@ -42,12 +58,20 @@ export function PayslipView({ payrollId }: PayslipViewProps) {
   const handleDownload = async () => {
     try {
       message.loading({ content: "Downloading PDF...", key: "pdf-download" })
+      console.info("[PayslipView] Download requested", { payrollId, payrollMonth: payslip?.payrollMonth, payrollYear: payslip?.payrollYear })
       
       // Use the download API route to avoid CORS issues
       const response = await fetch(`/api/payroll/payslips/${payrollId}/download`)
       
       if (!response.ok) {
-        throw new Error("Failed to download PDF")
+        const errorText = await response.text().catch(() => "")
+        console.error("[PayslipView] Download failed", {
+          payrollId,
+          status: response.status,
+          statusText: response.statusText,
+          body: errorText,
+        })
+        throw new Error(`Failed to download PDF (${response.status})`)
       }
 
       const blob = await response.blob()
@@ -68,7 +92,7 @@ export function PayslipView({ payrollId }: PayslipViewProps) {
       
       message.success({ content: "PDF downloaded successfully!", key: "pdf-download" })
     } catch (error) {
-      console.error("Error downloading PDF:", error)
+      console.error("[PayslipView] Error downloading PDF", { payrollId, error })
       message.error({ content: "Failed to download PDF. Please try again.", key: "pdf-download" })
     }
   }

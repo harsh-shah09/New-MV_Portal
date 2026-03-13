@@ -31,6 +31,36 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Month, year, and employees are required" }, { status: 400 })
     }
 
+    const monthIndex = [
+      "January",
+      "February",
+      "March",
+      "April",
+      "May",
+      "June",
+      "July",
+      "August",
+      "September",
+      "October",
+      "November",
+      "December",
+    ].indexOf(month)
+
+    if (monthIndex < 0) {
+      return NextResponse.json({ error: "Invalid month" }, { status: 400 })
+    }
+
+    const selectedPeriod = new Date(Number(year), monthIndex, 1)
+    const currentDate = new Date()
+    const currentPeriod = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)
+
+    if (selectedPeriod > currentPeriod) {
+      return NextResponse.json(
+        { error: "Payroll cannot be saved for a future month" },
+        { status: 400 }
+      )
+    }
+
     const conn = await getSalesforceConnection()
     if (!conn) {
       return NextResponse.json({ error: "Failed to connect to Salesforce" }, { status: 500 })

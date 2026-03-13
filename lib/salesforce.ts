@@ -391,6 +391,28 @@ export const createBankDetail = async (bankData: any) => {
 export const updateBankDetail = async (bankData: any) => {
     const conn = await getSalesforceConnection();
     if (!conn) throw new Error("No Salesforce connection");
+
+    if (bankData?.Primary_Account__c === true && bankData?.Employee__c && bankData?.Id) {
+      const existingPrimaryQuery = `
+        SELECT Id
+        FROM Bank_Detail__c
+        WHERE Employee__c = '${bankData.Employee__c}'
+          AND Primary_Account__c = true
+          AND Id != '${bankData.Id}'
+      `;
+
+      const existingPrimaryResult = await conn.query(existingPrimaryQuery);
+
+      if (existingPrimaryResult.records.length > 0) {
+        const updates = existingPrimaryResult.records.map((record: any) => ({
+          Id: record.Id,
+          Primary_Account__c: false
+        }));
+
+        await conn.sobject("Bank_Detail__c").update(updates);
+      }
+    }
+
     return await conn.sobject("Bank_Detail__c").update(bankData);
 };
 
