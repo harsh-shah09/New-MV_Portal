@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { LeaveRequestForm } from "./components/leave-request-form"
 import { LeaveTable } from "./components/leave-table"
 import { useLeaveStore } from "@/store/leaveStore"
@@ -16,6 +16,7 @@ import dayjs from "dayjs"
 
 export default function LeavesPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [showForm, setShowForm] = useState(false)
   const [selectedTab, setSelectedTab] = useState<"my-requests" | "approvals" | "all-leaves">("my-requests")
   const [currentUser, setCurrentUser] = useState<{ employeeId: string; email?: string; recordId: string; role?: string; title?: string } | null>(null)
@@ -24,6 +25,7 @@ export default function LeavesPage() {
   const [rejectReason, setRejectReason] = useState("")
   const [allLeaves, setAllLeaves] = useState<LeaveRequest[]>([])
   const [filteredLeaves, setFilteredLeaves] = useState<LeaveRequest[]>([])
+  const [filteredMyLeaves, setFilteredMyLeaves] = useState<LeaveRequest[]>([])
   const [isRefreshingAllLeaves, setIsRefreshingAllLeaves] = useState(false)
   const [filters, setFilters] = useState({
     status: "",
@@ -33,6 +35,45 @@ export default function LeavesPage() {
   
   console.log("Current User:", currentUser)
   const { leaves, pendingApprovals, setLeaves, setPendingApprovals, updateLeave } = useLeaveStore()
+
+  // Handle URL parameters for filtering
+  useEffect(() => {
+    const typeParam = searchParams.get('type')
+    const statusParam = searchParams.get('status')
+    const tabParam = searchParams.get('tab')
+    
+    if (tabParam === 'approvals') {
+      setSelectedTab('approvals')
+    } else if (typeParam || statusParam) {
+      setSelectedTab('my-requests')
+    }
+    
+    if (typeParam || statusParam) {
+      setFilters(prev => ({
+        ...prev,
+        leaveType: typeParam || "",
+        status: statusParam || ""
+      }))
+    }
+  }, [searchParams])
+
+  // Apply filters to my leaves
+  useEffect(() => {
+    let filtered = [...leaves]
+
+    if (filters.leaveType && filters.leaveType !== "") {
+      filtered = filtered.filter(leave => {
+        const displayType = leave.leaveCategory === 'Extra Day Pay' ? 'Extra Day Pay' : leave.leaveType
+        return displayType === filters.leaveType
+      })
+    }
+
+    if (filters.status && filters.status !== "") {
+      filtered = filtered.filter(leave => leave.status.toLowerCase() === filters.status.toLowerCase())
+    }
+
+    setFilteredMyLeaves(filtered)
+  }, [leaves, filters.leaveType, filters.status])
 
   // Fetch current user and their leaves
   const { data, isLoading, error, refetch } = useQuery({
@@ -694,20 +735,52 @@ export default function LeavesPage() {
           <div className="p-6">
             {selectedTab === "my-requests" && (
               <div>
-                <div className="flex items-center gap-2 mb-4">
-                  <h2 className="text-lg font-semibold text-gray-900">My Leave Requests</h2>
-                  <button
-                    onClick={() => refetch()}
-                    disabled={isLoading}
-                    className="p-1.5 hover:bg-gray-100 rounded-full transition disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Refresh"
-                  >
-                    <svg className={`w-4 h-4 text-gray-600 ${isLoading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                  </button>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-lg font-semibold text-gray-900">My Leave Requests</h2>
+                    <button
+                      onClick={() => refetch()}
+                      disabled={isLoading}
+                      className="p-1.5 hover:bg-gray-100 rounded-full transition disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Refresh"
+                    >
+                      <svg className={`w-4 h-4 text-gray-600 ${isLoading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Select
+                      placeholder="Filter by Leave Type"
+                      style={{ width: 200 }}
+                      value={filters.leaveType || undefined}
+                      onChange={(value) => setFilters({ ...filters, leaveType: value || "" })}
+                      allowClear
+                    >
+                      <Select.Option value="">All Leaves</Select.Option>
+                      <Select.Option value="Annual Leave">Annual Leave</Select.Option>
+                      <Select.Option value="Sick Leave">Sick Leave</Select.Option>
+                      <Select.Option value="Emergency Leave">Emergency Leave</Select.Option>
+                      <Select.Option value="Planned Leave">Planned Leave</Select.Option>
+                      <Select.Option value="Extra Day Pay">Extra Day Pay</Select.Option>
+                    </Select>
+                    <Select
+                      placeholder="Filter by Status"
+                      style={{ width: 180 }}
+                      value={filters.status || undefined}
+                      onChange={(value) => setFilters({ ...filters, status: value || "" })}
+                      allowClear
+                    >
+                      <Select.Option value="">All Status</Select.Option>
+                      <Select.Option value="applied">Applied</Select.Option>
+                      <Select.Option value="approved">Approved</Select.Option>
+                      <Select.Option value="rejected">Rejected</Select.Option>
+                      <Select.Option value="cancelled">Cancelled</Select.Option>
+                      <Select.Option value="pending">Pending</Select.Option>
+                    </Select>
+                  </div>
                 </div>
-                <LeaveTable leaves={leaves} onCancel={handleCancel} onWithdraw={handleWithdraw} />
+                <LeaveTable leaves={filteredMyLeaves} onCancel={handleCancel} onWithdraw={handleWithdraw} />
               </div>
             )}
 
