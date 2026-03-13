@@ -1,5 +1,6 @@
 
 import { NextResponse } from 'next/server';
+import { verifySession } from '@/lib/auth';
 import { createBankDetail, deleteBankDetail } from '@/lib/salesforce';
 
 export async function POST(
@@ -7,6 +8,15 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await verifySession();
+    if (!session || !session.employeeId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (!['HR', 'Admin'].includes(session.role)) {
+      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+    }
+
     const { id } = await params;
     const body = await request.json();
     

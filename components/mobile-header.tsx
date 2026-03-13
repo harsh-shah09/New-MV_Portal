@@ -36,7 +36,7 @@ export function MobileHeader({ onMenuClick }: { onMenuClick: () => void }) {
         }
     })
 
-    const unreadCount = notifications?.filter((n: any) => !n.Is_Read__c)?.length || 0;
+    const unreadCount = notifications?.filter((n: any) => !n.Is_Read__c && n.Status__c === 'Unread')?.length || 0;
 
     const handleLogout = async () => {
         setShowLogoutConfirm(true)

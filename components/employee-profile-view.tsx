@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import Image from "next/image"
 import { 
@@ -20,6 +20,7 @@ import {
   Plus, 
   Trash2,
   Download,
+    Eye,
   Building2,
   CheckCircle2,
   Shield,
@@ -283,6 +284,63 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
   const [docCategory, setDocCategory] = useState("Intern Docs")
   const [docType, setDocType] = useState("Resume")
 
+  // Tile-based document upload state
+  const [selectedDocTile, setSelectedDocTile] = useState<string | null>(null)
+  const [tileUploadFile, setTileUploadFile] = useState<File | null>(null)
+  const tileFileInputRef = useRef<HTMLInputElement>(null)
+    const [isDocPreviewOpen, setIsDocPreviewOpen] = useState(false)
+    const [docPreviewUrl, setDocPreviewUrl] = useState<string | null>(null)
+    const [docPreviewTitle, setDocPreviewTitle] = useState<string>("Document Preview")
+
+    const openDocumentPreview = (url?: string, title?: string) => {
+        if (!url) {
+            message.error("Document URL not available")
+            return
+        }
+        setDocPreviewUrl(url)
+        setDocPreviewTitle(title || "Document Preview")
+        setIsDocPreviewOpen(true)
+    }
+
+    const handleDocumentDownload = async (documentId?: string, title?: string) => {
+        if (!documentId) {
+            message.error("Document ID not available")
+            return
+        }
+
+        const toastKey = `doc-download-${Date.now()}`
+        message.loading({ content: "Preparing download...", key: toastKey, duration: 0 })
+
+        try {
+            const params = new URLSearchParams({
+                documentId,
+                filename: title || "document"
+            })
+
+            const response = await fetch(`/api/documents/download?${params.toString()}`)
+            if (!response.ok) throw new Error("Failed to download file")
+
+            const blob = await response.blob()
+            const contentDisposition = response.headers.get("content-disposition") || ""
+            const filenameMatch = contentDisposition.match(/filename="?([^";]+)"?/i)
+            const fallbackTitle = (title || "document").trim().replace(/[^a-zA-Z0-9._-]+/g, "_") || "document"
+            const filename = filenameMatch?.[1] || fallbackTitle
+
+            const objectUrl = URL.createObjectURL(blob)
+            const link = document.createElement("a")
+            link.href = objectUrl
+            link.download = filename
+            document.body.appendChild(link)
+            link.click()
+            document.body.removeChild(link)
+            URL.revokeObjectURL(objectUrl)
+
+            message.success({ content: "Download started", key: toastKey })
+        } catch {
+            message.error({ content: "Unable to download this document", key: toastKey })
+        }
+    }
+
   // --- Admin Configs ---
   const { data: adminConfigs } = useQuery({
     queryKey: ["admin-configs"],
@@ -338,6 +396,47 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
          }
      }
   }, [docCategory, adminConfigs]);
+
+  // --- Required Document Tiles ---
+  // Determine which role-specific MDT config applies for this employee
+  const getRoleDocCategory = (): string | null => {
+    if (!employee) return null;
+    const role       = (employee.Role__c   || '').toLowerCase();
+    const experience = employee.Experience__c;
+
+    // 1. Intern — role explicitly says "intern"
+    if (role.includes('intern')) return 'Intern_Documents';
+
+    // 2. Fresher — experience is 0 or absent
+    const expNum = parseFloat(experience);
+    if (experience === null || experience === undefined || experience === '' || expNum === 0 || isNaN(expNum)) {
+      return 'Freshers_Documents';
+    }
+
+    // 3. Experienced — experience > 0
+    if (expNum > 0) return 'Experience_Documents';
+
+    return null;
+  };
+
+  const requiredDocTiles: string[] = useMemo(() => {
+    if (!adminConfigs?.documents) return [];
+    const allDocs = adminConfigs.documents as any[];
+    const commonRecord = allDocs.find((d: any) => d.DeveloperName === 'Common_Documents');
+    const commonDocs: string[] = commonRecord
+      ? (commonRecord.Value__c || '').split(',').map((s: string) => s.trim()).filter(Boolean)
+      : [];
+    const roleCategory = getRoleDocCategory();
+    let roleDocs: string[] = [];
+    if (roleCategory) {
+      const roleRecord = allDocs.find((d: any) => d.DeveloperName === roleCategory);
+      if (roleRecord) {
+        roleDocs = (roleRecord.Value__c || '').split(',').map((s: string) => s.trim()).filter(Boolean);
+      }
+    }
+    // Merge, dedup
+    return Array.from(new Set([...commonDocs, ...roleDocs]));
+  }, [adminConfigs, employee]);
 
   // --- 2FA States ---
   const [show2FAModal, setShow2FAModal] = useState(false)
@@ -440,7 +539,14 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
       onError: () => message.error("Failed to remove bank account")
   })
 
+  const canManageBankAccounts = ['HR', 'Admin'].includes(currentUserRole)
+
   const handleAddBank = () => {
+      if (!canManageBankAccounts) {
+          message.error("Only HR or Admin can add bank accounts")
+          return
+      }
+
       const newErrors: Record<string, string> = {}
     
       if(!bankFormData.Name) newErrors.Name = "Bank Name is required"
@@ -465,29 +571,38 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
       }
   }
 
-  // --- Document Upload Handler override ---
-  const handleDocUploadSubmit = () => {
-      if (!docFile) {
-          message.error("Please select a file")
-          return;
-      }
-      
-      // Max file size 10MB (10 * 1024 * 1024 bytes)
-      if (docFile.size > 10 * 1024 * 1024) {
-          setDocWarning("File size exceeds the 10MB limit. Please upload a smaller file.");
-          return;
-      }
-      
-      setDocWarning(null);
+  // Maps MDT DeveloperName → Salesforce Document_Category__c picklist value
+  const MDT_TO_PICKLIST: Record<string, string> = {
+      Common_Documents:     'Personal',
+      Intern_Documents:     'Intern Docs',
+      Freshers_Documents:   'Fresher Docs',
+      Experience_Documents: 'Experience Docs',
+  }
 
-      // Use existing uploadMutation but pass extras
+  // --- Tile-based document upload handler ---
+  const handleTileFileSelected = (file: File, docName: string) => {
+      if (file.size > 10 * 1024 * 1024) {
+          message.error("File size exceeds 10MB limit.")
+          return
+      }
+      setTileUploadFile(file)
+      setSelectedDocTile(docName)
+
+      // Determine which MDT category this doc belongs to (Common or role-specific)
+      const allDocs = adminConfigs?.documents as any[] || []
+      const commonRecord = allDocs.find((d: any) => d.DeveloperName === 'Common_Documents')
+      const commonDocs: string[] = commonRecord
+          ? (commonRecord.Value__c || '').split(',').map((s: string) => s.trim()).filter(Boolean)
+          : []
+      const mdtKey = commonDocs.includes(docName) ? 'Common_Documents' : (getRoleDocCategory() || 'Common_Documents')
+      const category = MDT_TO_PICKLIST[mdtKey] ?? 'Personal'
+
       const formData = new FormData()
-      formData.append("file", docFile)
+      formData.append("file", file)
       formData.append("employeeId", employeeId)
-      formData.append("type", "document") // Generic type for API logic
-      formData.append("category", docCategory)
-      formData.append("docType", docType)
-      
+      formData.append("type", "document")
+      formData.append("category", category)
+      formData.append("docType", docName)
       customDocMutation.mutate(formData)
   }
 
@@ -528,12 +643,50 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
       onError: () => message.error("Failed to remove document")
   })
 
+  const verifyDocumentMutation = useMutation({
+      mutationFn: async ({ docId, action }: { docId: string, action: 'approve' | 'reject' }) => {
+          const res = await fetch('/api/documents/verify', {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ documentId: docId, action })
+          })
+          const data = await res.json()
+          if (!res.ok) throw new Error(data.error || 'Failed to verify document')
+          return data
+      },
+      onSuccess: (_data, variables) => {
+          message.success(`Document ${variables.action === 'approve' ? 'approved' : 'rejected'} successfully`)
+          queryClient.invalidateQueries({ queryKey: ["employee", employeeId] })
+      },
+      onError: (error: any) => {
+          message.error(error?.message || 'Failed to verify document')
+      }
+  })
+
+    const isScreenActionLoading =
+        updateMutation.isPending ||
+        uploadMutation.isPending ||
+        addBankMutation.isPending ||
+        deleteBankMutation.isPending ||
+        customDocMutation.isPending ||
+        deleteDocumentMutation.isPending ||
+        verifyDocumentMutation.isPending ||
+        is2FALoading
+
 
   if (isLoading) return <div className="flex h-screen items-center justify-center"><Spin size="large" /></div>
   if (!employee) return <div className="flex h-screen items-center justify-center text-red-500">Employee not found</div>
 
   return (
     <div className="max-w-7xl mx-auto p-6 lg:p-10 space-y-8 animate-in fade-in duration-500 relative">
+            {isScreenActionLoading && (
+                <div className="fixed inset-0 z-[999] bg-black/35 backdrop-blur-sm flex items-center justify-center">
+                    <div className="bg-white rounded-xl shadow-xl px-6 py-5 flex items-center gap-3 border border-slate-100">
+                        <Spin size="large" />
+                        <span className="text-sm font-semibold text-slate-700">Processing...</span>
+                    </div>
+                </div>
+            )}
       
       {/* Header Profile Card */}
       <div className="relative bg-white rounded-3xl p-8 border border-slate-100 shadow-xl overflow-hidden">
@@ -865,15 +1018,17 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                       <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
                                           <Building2 className="w-5 h-5 text-purple-500" /> Bank Accounts
                                       </h2>
-                                      <button 
-                                        onClick={() => setShowBankForm(true)}
-                                        className="text-sm font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1"
-                                      >
-                                          <Plus className="w-4 h-4" /> Add Account
-                                      </button>
+                                      {canManageBankAccounts && (
+                                          <button 
+                                            onClick={() => setShowBankForm(true)}
+                                            className="text-sm font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                                          >
+                                              <Plus className="w-4 h-4" /> Add Account
+                                          </button>
+                                      )}
                                   </div>
 
-                                  {showBankForm && (
+                                  {showBankForm && canManageBankAccounts && (
                                       <div className="mb-6 p-6 bg-slate-50 border border-blue-100 rounded-xl animate-in fade-in slide-in-from-top-2">
                                           <h3 className="font-semibold text-slate-800 mb-4 flex items-center gap-2"><CreditCard className="w-4 h-4"/> Account Details</h3>
                                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -965,126 +1120,187 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                           )}
 
                           {activeTab === "documents" && (
-                              <div>
-                                   <div className="flex justify-between items-center mb-6">
-                                      <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                                          <FileText className="w-5 h-5 text-orange-500" /> Documents
+                              <div className="space-y-8">
+
+                                  {/* ── Required Documents Tiles ── */}
+                                  <div>
+                                      <h2 className="text-xl font-bold text-slate-800 mb-1 flex items-center gap-2">
+                                          <FileText className="w-5 h-5 text-orange-500" /> Required Documents
                                       </h2>
-                                      <button 
-                                        onClick={() => setShowDocModal(true)}
-                                        className="text-sm font-semibold bg-blue-50 text-blue-600 hover:bg-blue-100 px-4 py-2 rounded-lg flex items-center gap-2 transition"
-                                      >
-                                          <Upload className="w-4 h-4" /> Upload Document
-                                      </button>
+                                      <p className="text-sm text-slate-500 mb-5">Click on a tile to upload the corresponding document.</p>
+
+                                      {requiredDocTiles.length === 0 ? (
+                                          <div className="text-center py-10 bg-slate-50 rounded-xl border-dashed border-2 border-slate-200">
+                                              <FileText className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+                                              <p className="text-slate-400 text-sm">No document requirements configured yet.</p>
+                                          </div>
+                                      ) : (
+                                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                                              {requiredDocTiles.map((docName) => {
+                                                  const uploaded = employee.documents?.find(
+                                                      (d: any) => d.Document_Type__c?.trim().toLowerCase() === docName.trim().toLowerCase()
+                                                  )
+                                                  const tileStatus = uploaded?.Status__c || 'Uploaded'
+                                                  const tileStatusLower = String(tileStatus).toLowerCase()
+                                                  const tileStatusClass = tileStatusLower === 'rejected'
+                                                      ? 'text-red-600'
+                                                      : tileStatusLower === 'verified' || tileStatusLower === 'approved'
+                                                      ? 'text-green-600'
+                                                      : 'text-blue-600'
+                                                  const isUploading = customDocMutation.isPending && selectedDocTile === docName
+                                                  return (
+                                                      <label
+                                                          key={docName}
+                                                          className={`relative flex flex-col items-center justify-center gap-2 p-4 rounded-2xl border-2 cursor-pointer transition-all select-none
+                                                              ${isUploading
+                                                                  ? 'border-blue-300 bg-blue-50 opacity-80 cursor-wait'
+                                                                  : uploaded
+                                                                  ? 'border-green-300 bg-green-50 hover:border-green-400'
+                                                                  : 'border-dashed border-slate-300 bg-white hover:border-blue-400 hover:bg-blue-50/40'
+                                                              }`}
+                                                      >
+                                                          <input
+                                                              type="file"
+                                                              className="sr-only"
+                                                              disabled={isUploading || customDocMutation.isPending}
+                                                              onChange={(e) => {
+                                                                  const file = e.target.files?.[0]
+                                                                  if (file) handleTileFileSelected(file, docName)
+                                                                  e.target.value = ''
+                                                              }}
+                                                          />
+                                                          {isUploading ? (
+                                                              <Spin size="default" />
+                                                          ) : uploaded ? (
+                                                              <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+                                                                  <CheckCircle2 className="w-6 h-6 text-green-600" />
+                                                              </div>
+                                                          ) : (
+                                                              <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center">
+                                                                  <Upload className="w-5 h-5 text-orange-500" />
+                                                              </div>
+                                                          )}
+                                                          <span className="text-xs font-semibold text-center text-slate-700 leading-tight">{docName}</span>
+                                                          {uploaded && (
+                                                              <span className={`text-[10px] font-medium ${tileStatusClass}`}>{tileStatus}</span>
+                                                          )}
+                                                          {!uploaded && !isUploading && (
+                                                              <span className="text-[10px] text-slate-400">Click to upload</span>
+                                                          )}
+                                                          {/* View link for uploaded docs */}
+                                                          {uploaded && uploaded.File_URL__c && (
+                                                              <button
+                                                                  type="button"
+                                                                  onClick={(e) => {
+                                                                      e.stopPropagation()
+                                                                      openDocumentPreview(uploaded.File_URL__c, uploaded.Document_Type__c || docName)
+                                                                  }}
+                                                                  className="text-[10px] text-blue-500 hover:underline font-medium inline-flex items-center gap-1"
+                                                              >
+                                                                  <Eye className="w-3 h-3" /> View
+                                                              </button>
+                                                          )}
+                                                      </label>
+                                                  )
+                                              })}
+                                          </div>
+                                      )}
                                   </div>
 
-                                  {showDocModal && (
-                                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in">
-                                       <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md space-y-4">
-                                           <h3 className="text-lg font-bold text-slate-800">Upload Document</h3>
-                                           {docWarning && (
-                                               <div className="p-3 bg-red-50 text-red-600 rounded-lg text-sm flex items-start gap-2">
-                                                   <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-                                                   <p>{docWarning}</p>
-                                               </div>
-                                           )}
-                                           <div className="space-y-3">
-
-                                               <div>
-                                                   <label className="block text-sm font-medium text-slate-700 mb-1">Document Type</label>
-                                                   <select 
-                                                      className="w-full p-2 border border-slate-200 rounded-lg text-sm bg-slate-50"
-                                                      value={docType}
-                                                      onChange={(e) => setDocType(e.target.value)}
-                                                   >
-                                                       {docConfigMap[docCategory] ? (
-                                                           docConfigMap[docCategory].map((type: string) => (
-                                                               <option key={type} value={type}>{type}</option>
-                                                           ))
-                                                       ) : (
-                                                           <>
-                                                               <option value="Resume">Resume</option>
-                                                               <option value="Offer Letter">Offer Letter</option>
-                                                               <option value="ID Proof">ID Proof</option>
-                                                               <option value="Certificate">Certificate</option>
-                                                               <option value="Payslip">Payslip</option>
-                                                               <option value="Other">Other</option>
-                                                           </>
-                                                       )}
-                                                   </select>
-                                               </div>
-                                               <div>
-                                                   <label className="block text-sm font-medium text-slate-700 mb-1">File</label>
-                                                   <input 
-                                                      type="file" 
-                                                      className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" 
-                                                      onChange={(e) => {
-                                                          setDocFile(e.target.files?.[0] || null)
-                                                          setDocWarning(null)
-                                                      }}
-                                                   />
-                                                   <p className="text-xs text-slate-400 mt-1 pl-1">Max file size: 10MB</p>
-                                               </div>
-                                           </div>
-
-                                           <div className="flex justify-end gap-3 mt-6">
-                                               <button onClick={() => {setShowDocModal(false); setDocFile(null)}} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg text-sm">Cancel</button>
-                                               <button 
-                                                  onClick={handleDocUploadSubmit} 
-                                                  disabled={!docFile || customDocMutation.isPending}
-                                                  className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
-                                               >
-                                                  {customDocMutation.isPending && <Spin size="small" className="text-white" />} Upload
-                                               </button>
-                                           </div>
-                                       </div>
-                                    </div>
-                                  )}
-
-                                  {employee.documents?.length > 0 ? (
-                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                          {employee.documents.map((doc: any) => (
-                                              <div key={doc.Id} className="group p-4 border border-slate-200 rounded-xl hover:border-blue-300 hover:bg-blue-50/10 transition relative">
-                                                  <div className="flex items-start gap-3">
-                                                      <div className="w-10 h-10 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center shrink-0">
-                                                          <FileText className="w-5 h-5" />
+                                  {/* ── All Uploaded Documents ── */}
+                                  <div className="border-t border-slate-100 pt-6">
+                                      <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                          <Download className="w-4 h-4 text-slate-500" /> All Uploaded Documents
+                                      </h3>
+                                      {(() => {
+                                          const nonPayslipDocs = (employee.documents || []).filter(
+                                              (doc: any) => doc.Document_Type__c?.trim().toLowerCase() !== 'payslip'
+                                          )
+                                          return nonPayslipDocs.length > 0 ? (
+                                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                              {nonPayslipDocs.map((doc: any) => (
+                                                  <div key={doc.Id} className="group p-4 border border-slate-200 rounded-xl hover:border-blue-300 hover:bg-blue-50/10 transition relative">
+                                                      {/* Top row: icon + name + approve/reject */}
+                                                      <div className="flex items-start gap-3">
+                                                          <div className="w-10 h-10 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center shrink-0">
+                                                              <FileText className="w-5 h-5" />
+                                                          </div>
+                                                          <div className="flex-1 min-w-0">
+                                                              <h4 className="font-semibold text-slate-800 truncate" title={doc.Document_Type__c}>{doc.Document_Type__c}</h4>
+                                                              <p className="text-xs text-slate-500">{doc.Document_Category__c} • {doc.Status__c}</p>
+                                                          </div>
+                                                          {/* Approve / Reject — top right */}
+                                                          {doc.Status__c === 'Uploaded' &&
+                                                              ((currentUserRole === 'HR' && employee.Role__c !== 'HR') || (currentUserRole === 'Admin' && employee.Role__c === 'HR')) && (
+                                                                  <div className="flex items-center gap-1.5 shrink-0">
+                                                                      <button
+                                                                          onClick={() => verifyDocumentMutation.mutate({ docId: doc.Id, action: 'approve' })}
+                                                                          disabled={verifyDocumentMutation.isPending}
+                                                                          className="bg-white border border-green-200 text-green-600 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-green-50 transition disabled:opacity-50"
+                                                                      >
+                                                                          Approve
+                                                                      </button>
+                                                                      <button
+                                                                          onClick={() => verifyDocumentMutation.mutate({ docId: doc.Id, action: 'reject' })}
+                                                                          disabled={verifyDocumentMutation.isPending}
+                                                                          className="bg-white border border-amber-200 text-amber-600 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-amber-50 transition disabled:opacity-50"
+                                                                      >
+                                                                          Reject
+                                                                      </button>
+                                                                  </div>
+                                                              )
+                                                          }
                                                       </div>
-                                                      <div className="flex-1 min-w-0">
-                                                          <h4 className="font-semibold text-slate-800 truncate" title={doc.Document_Type__c}>{doc.Document_Type__c}</h4>
-                                                          <p className="text-xs text-slate-500">{doc.Document_Category__c} • {doc.Status__c}</p>
-                                                      </div>
-                                                  </div>
-                                                  <div className="mt-4 flex gap-2">
-                                                      <a 
-                                                        href={doc.File_URL__c} 
-                                                        target="_blank" 
-                                                        rel="noopener noreferrer"
-                                                        className="flex-1 bg-white border border-slate-200 text-slate-600 text-xs font-semibold py-2 rounded-lg flex items-center justify-center gap-2 hover:bg-slate-50 transition"
-                                                      >
-                                                          <Download className="w-3 h-3" /> View
-                                                      </a>
-                                                      {['HR', 'Admin'].includes(currentUserRole) && (
-                                                          <button 
-                                                            onClick={() => {
-                                                                if(confirm("Are you sure you want to delete this document?")) {
-                                                                    deleteDocumentMutation.mutate(doc.Id)
-                                                                }
-                                                            }}
-                                                            className="flex-1 bg-white border border-red-100 text-red-500 text-xs font-semibold py-2 rounded-lg flex items-center justify-center gap-2 hover:bg-red-50 transition"
+                                                      {/* Bottom row: View / Download / Delete */}
+                                                      <div className="mt-4 flex gap-2">
+                                                          <button
+                                                              type="button"
+                                                              onClick={() => openDocumentPreview(doc.File_URL__c, doc.Document_Type__c)}
+                                                              className="flex-1 bg-white border border-slate-200 text-slate-600 text-xs font-semibold py-2 rounded-lg flex items-center justify-center gap-2 hover:bg-slate-50 transition"
                                                           >
-                                                              <Trash2 className="w-3 h-3" /> Delete
+                                                              <Eye className="w-3 h-3" /> View
                                                           </button>
-                                                      )}
+                                                          {doc.File_URL__c && (
+                                                              <button
+                                                                  type="button"
+                                                                  onClick={() => handleDocumentDownload(doc.Id, doc.Document_Type__c)}
+                                                                  className="flex-1 bg-white border border-slate-200 text-slate-600 text-xs font-semibold py-2 rounded-lg flex items-center justify-center gap-2 hover:bg-slate-50 transition"
+                                                              >
+                                                                  <Download className="w-3 h-3" /> Download
+                                                              </button>
+                                                          )}
+                                                          {['HR', 'Admin'].includes(currentUserRole) && (
+                                                              <button
+                                                                  onClick={() => {
+                                                                      Modal.confirm({
+                                                                          title: 'Delete this document?',
+                                                                          content: 'This action cannot be undone. The document will be permanently removed.',
+                                                                          okText: 'Delete',
+                                                                          okType: 'danger',
+                                                                          cancelText: 'Cancel',
+                                                                          centered: true,
+                                                                          onOk: async () => {
+                                                                              deleteDocumentMutation.mutate(doc.Id)
+                                                                          }
+                                                                      })
+                                                                  }}
+                                                                  className="flex-1 bg-white border border-red-100 text-red-500 text-xs font-semibold py-2 rounded-lg flex items-center justify-center gap-2 hover:bg-red-50 transition"
+                                                              >
+                                                                  <Trash2 className="w-3 h-3" /> Delete
+                                                              </button>
+                                                          )}
+                                                      </div>
                                                   </div>
-                                              </div>
-                                          ))}
-                                      </div>
-                                  ) : (
-                                       <div className="text-center py-12 bg-slate-50 rounded-xl border-dashed border-2 border-slate-200">
-                                          <FileText className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-                                          <p className="text-slate-500">No documents uploaded yet.</p>
-                                      </div>
-                                  )}
+                                              ))}
+                                          </div>
+                                      ) : (
+                                          <div className="text-center py-10 bg-slate-50 rounded-xl border-dashed border-2 border-slate-200">
+                                              <FileText className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+                                              <p className="text-slate-500 text-sm">No documents uploaded yet.</p>
+                                          </div>
+                                      )
+                                      })()}
+                                  </div>
                               </div>
                           )}
 
@@ -1335,6 +1551,30 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
               </div>
           </div>
       </div>
+            <Modal
+                title={docPreviewTitle}
+                open={isDocPreviewOpen}
+                onCancel={() => {
+                    setIsDocPreviewOpen(false)
+                    setDocPreviewUrl(null)
+                }}
+                footer={null}
+                width="80vw"
+                style={{ top: 20 }}
+                destroyOnHidden
+            >
+                {docPreviewUrl && /\.(png|jpg|jpeg|gif|webp|svg)(\?|$)/i.test(docPreviewUrl) ? (
+                    <div className="w-full max-h-[75vh] overflow-auto flex justify-center bg-slate-50 rounded-lg p-2">
+                        <img src={docPreviewUrl} alt={docPreviewTitle} className="max-w-full max-h-[72vh] object-contain" />
+                    </div>
+                ) : (
+                    <iframe
+                        src={docPreviewUrl || undefined}
+                        title={docPreviewTitle}
+                        className="w-full h-[75vh] rounded-lg border border-slate-200"
+                    />
+                )}
+            </Modal>
       <style jsx global>{`
         .input-std {
             @apply w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none transition;
