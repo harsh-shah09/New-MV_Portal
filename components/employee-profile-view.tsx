@@ -126,21 +126,48 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
   const [formData, setFormData] = useState<any>({})
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [warningMsg, setWarningMsg] = useState<string | null>(null)
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    const phonePattern = /^(?:\+91\d{10}|\d{10})$/
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
+        const employeeName = formData.Employee_Name__c?.trim()
+        const email = formData.Employee_Email__c?.trim()
+        const phone = formData.Employee_Phone__c?.trim()
+        const normalizedPhone = phone?.replace(/[\s-]/g, "")
+        const emergencyPhone = formData.Emergency_Contact_Number__c?.trim()
+        const normalizedEmergencyPhone = emergencyPhone?.replace(/[\s-]/g, "")
+        const gender = formData.Gender__c?.trim()
     
-    // Basic Text & Email Validation
-    if (formData.Employee_Email__c && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.Employee_Email__c)) {
+        // Required Basic Information
+        if (!employeeName) {
+            newErrors.Employee_Name__c = "Employee name is required"
+        }
+
+        if (!email) {
+            newErrors.Employee_Email__c = "Email address is required"
+        } else if (!emailPattern.test(email)) {
       newErrors.Employee_Email__c = "Please enter a valid email address"
     }
 
-    if (formData.Employee_Phone__c && !/^\+?[\d\s-]{10,}$/.test(formData.Employee_Phone__c)) {
-      newErrors.Employee_Phone__c = "Please enter a valid phone number (min 10 digits)"
+        if (!phone) {
+            newErrors.Employee_Phone__c = "Phone number is required"
+        } else if (!normalizedPhone || !phonePattern.test(normalizedPhone)) {
+            newErrors.Employee_Phone__c = "Phone must be 10 digits or +91 followed by 10 digits"
+        }
+
+        if (!formData.Birthdate__c) {
+            newErrors.Birthdate__c = "Date of birth is required"
+        }
+
+        if (!gender) {
+            newErrors.Gender__c = "Gender is required"
+        } else if (!["Male", "Female"].includes(gender)) {
+            newErrors.Gender__c = "Please select a valid gender"
     }
 
-    if (formData.Emergency_Contact_Number__c && !/^\+?[\d\s-]{10,}$/.test(formData.Emergency_Contact_Number__c)) {
-      newErrors.Emergency_Contact_Number__c = "Please enter a valid emergency contact number"
+        if (emergencyPhone && (!normalizedEmergencyPhone || !phonePattern.test(normalizedEmergencyPhone))) {
+            newErrors.Emergency_Contact_Number__c = "Emergency contact must be 10 digits or +91 followed by 10 digits"
     }
 
     // Date Validation
@@ -157,8 +184,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
         }
     }
     
-    // Required Fields (Example)
-    if (!formData.Employee_Name__c) newErrors.Employee_Name__c = "Name is required"
+    // Required Employment Fields
     if (!formData.Role__c) newErrors.Role__c = "Role is required"
     if (!formData.Department__c) newErrors.Department__c = "Department is required"
 
@@ -209,6 +235,10 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
         
         // Prepare payload with Address Object
         const payload = { ...formData };
+                payload.Employee_Name__c = payload.Employee_Name__c?.trim();
+                payload.Employee_Email__c = payload.Employee_Email__c?.trim();
+                payload.Employee_Phone__c = payload.Employee_Phone__c?.trim()?.replace(/[\s-]/g, '');
+        payload.Emergency_Contact_Number__c = payload.Emergency_Contact_Number__c?.trim()?.replace(/[\s-]/g, '');
         payload.Employee_Address__c = {
             street: formData.Employee_Address__Street__s,
             city: formData.Employee_Address__City__s,
@@ -426,16 +456,6 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
           newErrors.IFSC__c = "IFSC Code is required"
       } else if(!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(bankFormData.IFSC__c)) {
           newErrors.IFSC__c = "Invalid IFSC Code format"
-      }
-
-      // Check Primary Validation
-      if (bankFormData.Primary_Account__c) {
-          const existingPrimary = employee.bankDetails?.find((b: any) => b.Primary_Account__c === true);
-          if (existingPrimary) {
-               message.warning("A primary account already exists. Only one account can be primary.");
-               // We prevent submission
-               return; 
-          }
       }
 
       setBankErrors(newErrors)
@@ -702,11 +722,11 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                           <User className="w-5 h-5 text-blue-500" /> Basic Information
                                       </h2>
                                       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-                                          <Field label="Employee Name" value={employee.Employee_Name__c} fieldKey="Employee_Name__c" isEditing={isEditing} formData={formData} setFormData={setFormData} error={errors.Employee_Name__c} placeholder="e.g. John Doe" />
-                                          <Field label="Email Address" value={employee.Employee_Email__c} fieldKey="Employee_Email__c" type="email" isEditing={isEditing} formData={formData} setFormData={setFormData} error={errors.Employee_Email__c} placeholder="e.g. john@example.com" />
-                                          <Field label="Phone Number" value={employee.Employee_Phone__c} fieldKey="Employee_Phone__c" type="tel" isEditing={isEditing} formData={formData} setFormData={setFormData} error={errors.Employee_Phone__c} placeholder="+91 9876543210" />
-                                          <Field label="Date of Birth" value={employee.Birthdate__c} fieldKey="Birthdate__c" type="date" isEditing={isEditing} formData={formData} setFormData={setFormData} error={errors.Birthdate__c} />
-                                          <Field label="Gender" value={employee.Gender__c} fieldKey="Gender__c" isEditing={isEditing} formData={formData} setFormData={setFormData} options={[{label: 'Male', value:'Male'}, {label:'Female', value:'Female'}, {label:'Other', value:'Other'}]} type="select" />
+                                          <Field label="Employee Name" value={employee.Employee_Name__c} fieldKey="Employee_Name__c" isEditing={isEditing} formData={formData} setFormData={setFormData} error={errors.Employee_Name__c} placeholder="e.g. John Doe" required />
+                                          <Field label="Email Address" value={employee.Employee_Email__c} fieldKey="Employee_Email__c" type="email" isEditing={isEditing} formData={formData} setFormData={setFormData} error={errors.Employee_Email__c} placeholder="e.g. john@example.com" required />
+                                          <Field label="Phone Number" value={employee.Employee_Phone__c} fieldKey="Employee_Phone__c" type="tel" isEditing={isEditing} formData={formData} setFormData={setFormData} error={errors.Employee_Phone__c} placeholder="+919876543210 or 9876543210" required />
+                                          <Field label="Date of Birth" value={employee.Birthdate__c} fieldKey="Birthdate__c" type="date" isEditing={isEditing} formData={formData} setFormData={setFormData} error={errors.Birthdate__c} required />
+                                          <Field label="Gender" value={employee.Gender__c} fieldKey="Gender__c" isEditing={isEditing} formData={formData} setFormData={setFormData} options={[{label: 'Male', value:'Male'}, {label:'Female', value:'Female'}]} type="select" error={errors.Gender__c} required />
                                       </div>
                                   </div>
 
@@ -739,7 +759,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                       </h2>
                                       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                                           <Field label="Contact Name" value={employee.Emergency_Contact_Name__c} fieldKey="Emergency_Contact_Name__c" isEditing={isEditing} formData={formData} setFormData={setFormData} error={errors.Emergency_Contact_Name__c} />
-                                          <Field label="Contact Number" value={employee.Emergency_Contact_Number__c} fieldKey="Emergency_Contact_Number__c" isEditing={isEditing} formData={formData} setFormData={setFormData} pattern = '^(?:(?:\\+|0{0,2})91(\\s*[\\-]\\s*)?|?)?\\d{9}$' type = 'tel' error={errors.Emergency_Contact_Number__c} />
+                                          <Field label="Contact Number" value={employee.Emergency_Contact_Number__c} fieldKey="Emergency_Contact_Number__c" isEditing={isEditing} formData={formData} setFormData={setFormData} pattern="^(?:\\+91\\d{10}|\\d{10})$" type="tel" error={errors.Emergency_Contact_Number__c} placeholder="+919876543210 or 9876543210" />
                                       </div>
                                   </div>
                               </div>
@@ -882,7 +902,14 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                                     IFSC__c: ""
                                                 })
                                                 setShowBankForm(false)}} className="px-4 py-2 text-slate-600 hover:bg-slate-200 rounded-lg text-sm">Cancel</button>
-                                              <button onClick={handleAddBank} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">Save Account</button>
+                                                                                            <button
+                                                                                                onClick={handleAddBank}
+                                                                                                disabled={addBankMutation.isPending}
+                                                                                                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center gap-2"
+                                                                                            >
+                                                                                                {addBankMutation.isPending && <Spin size="small" />}
+                                                                                                {addBankMutation.isPending ? "Saving..." : "Save Account"}
+                                                                                            </button>
                                           </div>
                                       </div>
                                   )}

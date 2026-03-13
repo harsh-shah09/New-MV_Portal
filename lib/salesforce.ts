@@ -364,6 +364,26 @@ export const createDocumentRecord = async (docData: any) => {
 export const createBankDetail = async (bankData: any) => {
     const conn = await getSalesforceConnection();
     if (!conn) throw new Error("No Salesforce connection");
+
+  if (bankData?.Primary_Account__c === true && bankData?.Employee__c) {
+    const existingPrimaryQuery = `
+      SELECT Id
+      FROM Bank_Detail__c
+      WHERE Employee__c = '${bankData.Employee__c}' AND Primary_Account__c = true
+    `;
+
+    const existingPrimaryResult = await conn.query(existingPrimaryQuery);
+
+    if (existingPrimaryResult.records.length > 0) {
+      const updates = existingPrimaryResult.records.map((record: any) => ({
+        Id: record.Id,
+        Primary_Account__c: false
+      }));
+
+      await conn.sobject("Bank_Detail__c").update(updates);
+    }
+  }
+
     return await conn.sobject("Bank_Detail__c").create(bankData);
 };
 
