@@ -3,10 +3,11 @@
 
 import { useQuery } from "@tanstack/react-query"
 import { Card, List, Tag, Button, Spin, Empty } from "antd"
-import { CheckCircle, AlertCircle, Info, Clock, RefreshCw, X, Trash2 } from "lucide-react"
+import { CheckCircle, AlertCircle, Info, Clock, X, Trash2 } from "lucide-react"
 import { formatDistanceToNow } from 'date-fns'
 import { useState } from "react"
 import { toast } from "sonner"
+import { RefreshButton } from "@/components/refresh-button"
 
 export default function NotificationsPage() {
     const [showAll, setShowAll] = useState(false)
@@ -122,13 +123,11 @@ export default function NotificationsPage() {
                         >
                             Clear All
                         </Button>
-                        <Button 
-                            icon={<RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />} 
-                            onClick={() => refetch()}
+                        <RefreshButton
+                            onClick={refetch}
+                            loading={isFetching}
                             className="mt-1"
-                        >
-                            Refresh
-                        </Button>
+                        />
                     </div>
                 </div>
 

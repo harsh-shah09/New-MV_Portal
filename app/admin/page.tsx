@@ -17,7 +17,6 @@ import {
     XCircle,
     Workflow,
     Check,
-    RefreshCw,
     Trash2,
     DollarSign,
     Package
@@ -27,6 +26,7 @@ import { message, Modal, Spin } from "antd";
 import EmailEditor from "@/components/admin/email-editor";
 import SafeHTMLPreview from "@/components/safe-html-preview";
 import { RoleGuard } from "@/components/role-guard";
+import { RefreshButton } from "@/components/refresh-button";
 
 const formatLabel = (str: string) => {
     return str.replace(/_/g, ' ').replace(/([A-Z])/g, ' $1').trim();
@@ -653,9 +653,7 @@ export default function AdminConsole() {
                                                     <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
                                                         <Workflow className="w-5 h-5 text-orange-500" /> Google Connected Users
                                                     </h2>
-                                                    <button onClick={fetchConnectedUsers} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500">
-                                                        <RefreshCw className="w-4 h-4" />
-                                                    </button>
+                                                    <RefreshButton onClick={fetchConnectedUsers} loading={loadingIntegrations} />
                                                 </div>
 
                                                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">

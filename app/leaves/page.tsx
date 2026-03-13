@@ -12,6 +12,7 @@ import { Modal, Select, Input, Card, Row, Col, Spin, DatePicker } from "antd"
 import { SearchOutlined } from "@ant-design/icons"
 import { PageContainer } from "@/components/page-container"
 import { PageHeader } from "@/components/page-header"
+import { RefreshButton } from "@/components/refresh-button"
 import dayjs from "dayjs"
 
 export default function LeavesPage() {
@@ -738,18 +739,9 @@ export default function LeavesPage() {
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
                     <h2 className="text-lg font-semibold text-gray-900">My Leave Requests</h2>
-                    <button
-                      onClick={() => refetch()}
-                      disabled={isLoading}
-                      className="p-1.5 hover:bg-gray-100 rounded-full transition disabled:opacity-50 disabled:cursor-not-allowed"
-                      title="Refresh"
-                    >
-                      <svg className={`w-4 h-4 text-gray-600 ${isLoading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                      </svg>
-                    </button>
                   </div>
                   <div className="flex items-center gap-2">
+                    <RefreshButton onClick={refetch} loading={isLoading} />
                     <Select
                       placeholder="Filter by Leave Type"
                       style={{ width: 200 }}
@@ -786,18 +778,9 @@ export default function LeavesPage() {
 
             {selectedTab === "approvals" && (
               <div>
-                <div className="flex items-center gap-2 mb-4">
+                <div className="flex items-center justify-between gap-2 mb-4">
                   <h2 className="text-lg font-semibold text-gray-900">Pending Approvals</h2>
-                  <button
-                    onClick={() => refetch()}
-                    disabled={isLoading}
-                    className="p-1.5 hover:bg-gray-100 rounded-full transition disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Refresh"
-                  >
-                    <svg className={`w-4 h-4 text-gray-600 ${isLoading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                  </button>
+                  <RefreshButton onClick={refetch} loading={isLoading} />
                 </div>
                 {(currentUser?.role === 'HR' || currentUser?.role === 'Admin' || (currentUser?.role === 'Developer' && currentUser?.title === 'Team Lead')) ? (
                   pendingApprovals.length > 0 ? (
@@ -974,18 +957,9 @@ export default function LeavesPage() {
 
             {selectedTab === "all-leaves" && (
               <div>
-                <div className="flex items-center gap-2 mb-4">
+                <div className="flex items-center justify-between gap-2 mb-4">
                   <h2 className="text-lg font-semibold text-gray-900">All Leave Records</h2>
-                  <button
-                    onClick={() => fetchAllLeaves()}
-                    disabled={isRefreshingAllLeaves}
-                    className="p-1.5 hover:bg-gray-100 rounded-full transition disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Refresh"
-                  >
-                    <svg className={`w-4 h-4 text-gray-600 ${isRefreshingAllLeaves ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                  </button>
+                  <RefreshButton onClick={fetchAllLeaves} loading={isRefreshingAllLeaves} />
                 </div>
                 
                 {/* Filters */}
