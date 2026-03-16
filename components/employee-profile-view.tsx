@@ -617,51 +617,6 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
       }
   }
 
-<<<<<<< HEAD
-
-  // --- Document Upload Logic ---
-  const [uploadingType, setUploadingType] = useState<string | null>(null)
-
-  const handleDirectUpload = (e: React.ChangeEvent<HTMLInputElement>, type: string, category: string) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      
-      // Max file size 10MB
-      if (file.size > 10 * 1024 * 1024) {
-          message.error("File size exceeds 10MB limit");
-          return;
-      }
-
-      setUploadingType(type);
-
-      const formData = new FormData()
-      formData.append("file", file)
-      formData.append("employeeId", employeeId)
-      formData.append("type", "document") 
-      formData.append("category", category)
-      formData.append("docType", type)
-      
-      customDocMutation.mutate(formData)
-      
-      // Reset input
-      e.target.value = ""
-  }
-
-  // Kept for backward compatibility if needed, but UI is changing
-  const handleDocUploadSubmit = () => {
-      if (!docFile) {
-          message.error("Please select a file")
-          return;
-      }
-      
-      // Max file size 10MB (10 * 1024 * 1024 bytes)
-      if (docFile.size > 10 * 1024 * 1024) {
-          setDocWarning("File size exceeds the 10MB limit. Please upload a smaller file.");
-          return;
-      }
-      
-      setDocWarning(null);
-=======
   // Maps MDT DeveloperName → Salesforce Document_Category__c picklist value
   const MDT_TO_PICKLIST: Record<string, string> = {
       Common_Documents:     'Personal',
@@ -687,7 +642,6 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
           : []
       const mdtKey = commonDocs.includes(docName) ? 'Common_Documents' : (getRoleDocCategory() || 'Common_Documents')
       const category = MDT_TO_PICKLIST[mdtKey] ?? 'Personal'
->>>>>>> dade4d7be5e710293536495ea4bb0337d36943df
 
       const formData = new FormData()
       formData.append("file", file)
@@ -714,12 +668,12 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
           setShowDocModal(false)
           setDocFile(null)
           setDocWarning(null)
-          setUploadingType(null) // Reset loading state
+        //   setUploadingType(null) // Reset loading state
           queryClient.invalidateQueries({ queryKey: ["employee", employeeId] })
       },
       onError: () => {
           message.error("Upload failed")
-          setUploadingType(null)
+        //   setUploadingType(null)
       }
   })
 
@@ -1264,249 +1218,6 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                           )}
 
                           {activeTab === "documents" && (
-<<<<<<< HEAD
-                              <div className="space-y-10 animate-in fade-in">
-                                  {/* Header */}
-                                  <div className="flex justify-between items-center">
-                                      <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                                          <FileText className="w-5 h-5 text-orange-500" /> Documents
-                                      </h2>
-                                      {/* <button 
-                                        onClick={() => setShowDocModal(true)}
-                                        className="text-sm font-semibold bg-blue-50 text-blue-600 hover:bg-blue-100 px-4 py-2 rounded-lg flex items-center gap-2 transition"
-                                      >
-                                          <Upload className="w-4 h-4" /> Upload Document
-                                      </button> */}
-                                  </div>
-
-                                  {showDocModal && (
-                                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in">
-                                       <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md space-y-4">
-                                           <h3 className="text-lg font-bold text-slate-800">Upload Document</h3>
-                                           {docWarning && (
-                                               <div className="p-3 bg-red-50 text-red-600 rounded-lg text-sm flex items-start gap-2">
-                                                   <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-                                                   <p>{docWarning}</p>
-                                               </div>
-                                           )}
-                                           <div className="space-y-3">
-                                               <div>
-                                                   <label className="block text-sm font-medium text-slate-700 mb-1">Document Category</label>
-                                                   <select 
-                                                      className="w-full p-2 border border-slate-200 rounded-lg text-sm bg-slate-50"
-                                                      value={docCategory}
-                                                      onChange={(e) => setDocCategory(e.target.value)}
-                                                   >
-                                                       {displayCategories.map(cat => (
-                                                           <option key={cat} value={cat}>{cat}</option>
-                                                       ))}
-                                                   </select>
-                                               </div>
-
-                                               <div>
-                                                   <label className="block text-sm font-medium text-slate-700 mb-1">Document Type</label>
-                                                   <select 
-                                                      className="w-full p-2 border border-slate-200 rounded-lg text-sm bg-slate-50"
-                                                      value={docType}
-                                                      onChange={(e) => setDocType(e.target.value)}
-                                                   >
-                                                       {docConfigMap[docCategory] ? (
-                                                           docConfigMap[docCategory].map((type: string) => (
-                                                               <option key={type} value={type}>{type}</option>
-                                                           ))
-                                                       ) : (
-                                                           <option value="">Select Category First</option>
-                                                       )}
-                                                   </select>
-                                               </div>
-                                               <div>
-                                                   <label className="block text-sm font-medium text-slate-700 mb-1">File</label>
-                                                   <input 
-                                                      type="file" 
-                                                      className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" 
-                                                      onChange={(e) => {
-                                                          setDocFile(e.target.files?.[0] || null)
-                                                          setDocWarning(null)
-                                                      }}
-                                                   />
-                                                   <p className="text-xs text-slate-400 mt-1 pl-1">Max file size: 10MB</p>
-                                               </div>
-                                           </div>
-
-                                           <div className="flex justify-end gap-3 mt-6">
-                                               <button onClick={() => {setShowDocModal(false); setDocFile(null)}} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg text-sm">Cancel</button>
-                                               <button 
-                                                  onClick={handleDocUploadSubmit} 
-                                                  disabled={!docFile || customDocMutation.isPending}
-                                                  className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
-                                               >
-                                                  {customDocMutation.isPending && <Spin size="small" className="text-white" />} Upload
-                                               </button>
-                                           </div>
-                                       </div>
-                                    </div>
-                                  )}
-
-                                  {/* Render Sections for each Category */}
-                                  {displayCategories.map(category => (
-                                      <div key={category} className="space-y-4">
-                                          <div className="flex items-center gap-4">
-                                              <span className="text-xs font-bold uppercase tracking-widest text-slate-400 bg-slate-50 px-2 py-1 rounded">{category}</span>
-                                              <div className="h-px bg-slate-100 flex-1"></div>
-                                          </div>
-
-                                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                                              {(() => {
-                                                  const requiredDocs = docConfigMap[category] || [];
-                                                  
-                                                  return requiredDocs.map((type: string) => {
-                                                      const uploadedDoc = employee.documents?.find(
-                                                          (d: any) => d.Document_Type__c === type && (!d.Document_Category__c || d.Document_Category__c === category)
-                                                      ) || employee.documents?.find(
-                                                          (d: any) => d.Document_Type__c === type && (!d.Document_Category__c || displayCategories.includes(d.Document_Category__c))
-                                                      );
-                                                      
-                                                      return (
-                                                          <div key={type} className={cn(
-                                                              "relative flex flex-col p-5 rounded-2xl border transition-all duration-200 group",
-                                                              uploadedDoc 
-                                                                  ? "bg-white border-blue-100 shadow-sm hover:shadow-md hover:border-blue-200" 
-                                                                  : "bg-slate-50/50 border-slate-200 border-dashed hover:bg-white hover:border-blue-300"
-                                                          )}>
-                                                              {uploadedDoc ? (
-                                                                  <>
-                                                                      <div className="flex items-start gap-3 mb-4">
-                                                                          <div className="w-10 h-10 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center shrink-0 border border-orange-100">
-                                                                               <FileText className="w-5 h-5" />
-                                                                          </div>
-                                                                          <div className="min-w-0 flex-1">
-                                                                              <h4 className="font-bold text-slate-800 text-sm truncate" title={type}>{type}</h4>
-                                                                              <div className="flex items-center gap-1.5 mt-1">
-                                                                                  <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
-                                                                                  <p className="text-xs text-slate-500 font-medium">Uploaded</p>
-                                                                              </div>
-                                                                          </div>
-                                                                      </div>
-                                                                      <div className="mt-auto flex gap-2">
-                                                                          <a 
-                                                                            href={uploadedDoc.File_URL__c} 
-                                                                            target="_blank" 
-                                                                            rel="noopener noreferrer"
-                                                                            className="flex-1 bg-slate-50 border border-slate-200 text-slate-600 text-xs font-bold py-2 rounded-lg flex items-center justify-center gap-2 hover:bg-slate-100 transition"
-                                                                          >
-                                                                              <Download className="w-3 h-3" /> View
-                                                                          </a>
-                                                                          {['HR', 'Admin'].includes(currentUserRole) && (
-                                                                              <button 
-                                                                                onClick={() => {
-                                                                                    if(confirm(`Are you sure you want to delete ${type}?`)) {
-                                                                                        deleteDocumentMutation.mutate(uploadedDoc.Id)
-                                                                                    }
-                                                                                }}
-                                                                                className="w-8 flex items-center justify-center bg-white border border-red-100 text-red-500 rounded-lg hover:bg-red-50 transition"
-                                                                                title="Delete"
-                                                                              >
-                                                                                  <Trash2 className="w-3.5 h-3.5" />
-                                                                              </button>
-                                                                          )}
-                                                                      </div>
-                                                                  </>
-                                                              ) : (
-                                                                  <div className="flex flex-col items-center text-center py-2 h-full justify-center">
-                                                                      <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mb-3 group-hover:scale-110 group-hover:bg-blue-50 group-hover:text-blue-500 transition-all duration-300">
-                                                                          <Upload className="w-5 h-5" />
-                                                                      </div>
-                                                                      <h4 className="font-semibold text-slate-700 text-sm mb-1">{type}</h4>
-                                                                      <p className="text-xs text-slate-400 mb-4 px-2">Click below to upload</p>
-                                                                      
-                                                                      <label className="cursor-pointer w-full mt-auto">
-                                                                          <div className={cn(
-                                                                              "w-full py-2 bg-slate-800 hover:bg-black text-white text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 shadow-sm",
-                                                                              (customDocMutation.isPending && uploadingType === type) && "opacity-80 cursor-wait"
-                                                                          )}>
-                                                                              {customDocMutation.isPending && uploadingType === type ? (
-                                                                                   <Spin size="small" className="brightness-0 invert scale-75" /> 
-                                                                              ) : (
-                                                                                   <Plus className="w-3 h-3" />
-                                                                              )}
-                                                                              {customDocMutation.isPending && uploadingType === type ? "Uploading..." : "Upload"}
-                                                                          </div>
-                                                                          <input 
-                                                                              type="file" 
-                                                                              className="hidden" 
-                                                                              accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                                                                              onChange={(e) => handleDirectUpload(e, type, category)}
-                                                                              disabled={customDocMutation.isPending} 
-                                                                          />
-                                                                      </label>
-                                                                  </div>
-                                                              )}
-                                                          </div>
-                                                      )
-                                                  })
-                                              })()}
-                                          </div>
-                                      </div>
-                                  ))}
-                                  
-                                  {/* Extra Documents (Unmapped) */}
-                                  {(() => {
-                                      const allMappedTypes = new Set();
-                                      displayCategories.forEach(cat => {
-                                          (docConfigMap[cat] || []).forEach((t: string) => allMappedTypes.add(t));
-                                      });
-                                      
-                                      const extraDocs = employee.documents?.filter((d: any) => !allMappedTypes.has(d.Document_Type__c)) || [];
-                                      
-                                      if (extraDocs.length > 0) return (
-                                          <div className="space-y-4 pt-4 border-t border-slate-100">
-                                              <div className="flex items-center gap-4">
-                                                  <span className="text-xs font-bold uppercase tracking-widest text-slate-400 bg-slate-50 px-2 py-1 rounded">Additional Documents</span>
-                                                  <div className="h-px bg-slate-100 flex-1"></div>
-                                              </div>
-                                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                                                  {extraDocs.map((doc: any) => (
-                                                      <div key={doc.Id} className="relative flex flex-col p-5 rounded-2xl border border-slate-200 bg-white transition group">
-                                                          <div className="flex items-start gap-3 mb-4">
-                                                              <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0 border border-purple-100">
-                                                                  <FileText className="w-5 h-5" />
-                                                              </div>
-                                                              <div className="min-w-0 flex-1">
-                                                                  <h4 className="font-bold text-slate-800 text-sm truncate" title={doc.Document_Type__c}>{doc.Document_Type__c}</h4>
-                                                                  <p className="text-xs text-slate-500 font-medium">{doc.Document_Category__c || "Other"}</p>
-                                                              </div>
-                                                          </div>
-                                                          <div className="mt-auto flex gap-2">
-                                                              <a 
-                                                                href={doc.File_URL__c} 
-                                                                target="_blank" 
-                                                                rel="noopener noreferrer"
-                                                                className="flex-1 bg-slate-50 border border-slate-200 text-slate-600 text-xs font-bold py-2 rounded-lg flex items-center justify-center gap-2 hover:bg-slate-100 transition"
-                                                              >
-                                                                  <Download className="w-3 h-3" /> View
-                                                              </a>
-                                                              {['HR', 'Admin'].includes(currentUserRole) && (
-                                                                  <button 
-                                                                    onClick={() => {
-                                                                        if(confirm(`Delete ${doc.Document_Type__c}?`)) {
-                                                                            deleteDocumentMutation.mutate(doc.Id)
-                                                                        }
-                                                                    }}
-                                                                    className="w-8 flex items-center justify-center bg-white border border-red-100 text-red-500 rounded-lg hover:bg-red-50 transition"
-                                                                    title="Delete"
-                                                                  >
-                                                                      <Trash2 className="w-3.5 h-3.5" />
-                                                                  </button>
-                                                              )}
-                                                          </div>
-                                                      </div>
-                                                  ))}
-                                              </div>
-                                          </div>
-                                      )
-                                      return null;
-                                  })()}
-=======
                               <div className="space-y-8">
 
                                   {/* ── Required Documents Tiles ── */}
@@ -1688,7 +1399,6 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                       )
                                       })()}
                                   </div>
->>>>>>> dade4d7be5e710293536495ea4bb0337d36943df
                               </div>
                           )}
 
