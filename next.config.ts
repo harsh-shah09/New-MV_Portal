@@ -9,7 +9,7 @@ const nextConfig: NextConfig = {
       {
         protocol: "https",
         hostname: `${process.env.BUCKET_NAME || process.env.S3_BUCKET_NAME}.s3.${process.env.AWS_REGION || "us-east-1"}.amazonaws.com`,
-        pathname: "/uploads/**",
+        pathname: "**",
       },
     ],
   },

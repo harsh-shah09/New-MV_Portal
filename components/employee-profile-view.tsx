@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import Image from "next/image"
 import { 
@@ -277,27 +277,51 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
   
   const docCategories = Object.keys(docConfigMap);
 
-  // Auto-select Category based on Role
-  useEffect(() => {
-    if (showDocModal && employee?.Role__c && docCategories.length > 0) {
-        const role = employee.Role__c.toLowerCase();
-        // Check if any category includes the role or vice versa
-        const matchingCategory = docCategories.find(cat => 
-            cat.toLowerCase().includes(role) || role.includes(cat.toLowerCase())
-        );
+  // Filter Categories based on Role & Experience
+  const filteredCategories = useMemo(() => {
+      if (!docConfigMap) return [];
+      
+      const role = (employee?.Role__c || "").toLowerCase();
+      const experienceStr = String(employee?.Experience__c || "");
+      const experience = parseInt(experienceStr.match(/\d+/)?.[0] || "0");
+      const isFresher = experience === 0; // Simple heuristic for fresher
+      
+      return docCategories.filter(cat => {
+          const c = cat.toLowerCase();
+          
+          // 1. Common Documents (Always show)
+          if (c.includes("common")) return true;
+          
+          // 2. Intern Documents (Show only for Interns)
+          if (role === "intern") {
+              if (c.includes("intern")) return true;
+          } 
+          
+          // 3. Fresher Documents (Show for 0 Exp)
+          // If role is NOT intern
+          if (role !== "intern") {
+             if (isFresher && c.includes("fresher")) return true;
+             
+             // 4. Experience Documents (Show for Exp > 0 or non-freshers)
+             if (!isFresher && c.includes("experience")) return true;
+          }
 
-        if (matchingCategory) {
-            setDocCategory(matchingCategory);
-            const types = docConfigMap[matchingCategory];
-            if (types && types.length > 0) setDocType(types[0]);
-        } else if (!docCategory && docCategories.length > 0) {
-             // Default to first if nothing selected
-             setDocCategory(docCategories[0]);
-             const types = docConfigMap[docCategories[0]];
+          return false;
+      });
+  }, [docCategories, employee]);
+
+  const displayCategories = filteredCategories.length > 0 ? filteredCategories : docCategories;
+
+  // Auto-select Category based on filtered list
+  useEffect(() => {
+    if (showDocModal && displayCategories.length > 0) {
+        if (!displayCategories.includes(docCategory)) {
+             setDocCategory(displayCategories[0]);
+             const types = docConfigMap[displayCategories[0]];
              if (types && types.length > 0) setDocType(types[0]);
         }
     }
-  }, [showDocModal, employee, adminConfigs]);
+  }, [showDocModal, displayCategories, docCategory, docConfigMap]);
 
   // Update types when category changes manually
   useEffect(() => {
@@ -445,7 +469,36 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
       }
   }
 
-  // --- Document Upload Handler override ---
+
+  // --- Document Upload Logic ---
+  const [uploadingType, setUploadingType] = useState<string | null>(null)
+
+  const handleDirectUpload = (e: React.ChangeEvent<HTMLInputElement>, type: string, category: string) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      
+      // Max file size 10MB
+      if (file.size > 10 * 1024 * 1024) {
+          message.error("File size exceeds 10MB limit");
+          return;
+      }
+
+      setUploadingType(type);
+
+      const formData = new FormData()
+      formData.append("file", file)
+      formData.append("employeeId", employeeId)
+      formData.append("type", "document") 
+      formData.append("category", category)
+      formData.append("docType", type)
+      
+      customDocMutation.mutate(formData)
+      
+      // Reset input
+      e.target.value = ""
+  }
+
+  // Kept for backward compatibility if needed, but UI is changing
   const handleDocUploadSubmit = () => {
       if (!docFile) {
           message.error("Please select a file")
@@ -487,9 +540,13 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
           setShowDocModal(false)
           setDocFile(null)
           setDocWarning(null)
+          setUploadingType(null) // Reset loading state
           queryClient.invalidateQueries({ queryKey: ["employee", employeeId] })
       },
-      onError: () => message.error("Upload failed")
+      onError: () => {
+          message.error("Upload failed")
+          setUploadingType(null)
+      }
   })
 
   // --- Delete Document Mutation ---
@@ -938,17 +995,18 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                           )}
 
                           {activeTab === "documents" && (
-                              <div>
-                                   <div className="flex justify-between items-center mb-6">
+                              <div className="space-y-10 animate-in fade-in">
+                                  {/* Header */}
+                                  <div className="flex justify-between items-center">
                                       <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
                                           <FileText className="w-5 h-5 text-orange-500" /> Documents
                                       </h2>
-                                      <button 
+                                      {/* <button 
                                         onClick={() => setShowDocModal(true)}
                                         className="text-sm font-semibold bg-blue-50 text-blue-600 hover:bg-blue-100 px-4 py-2 rounded-lg flex items-center gap-2 transition"
                                       >
                                           <Upload className="w-4 h-4" /> Upload Document
-                                      </button>
+                                      </button> */}
                                   </div>
 
                                   {showDocModal && (
@@ -962,6 +1020,18 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                                </div>
                                            )}
                                            <div className="space-y-3">
+                                               <div>
+                                                   <label className="block text-sm font-medium text-slate-700 mb-1">Document Category</label>
+                                                   <select 
+                                                      className="w-full p-2 border border-slate-200 rounded-lg text-sm bg-slate-50"
+                                                      value={docCategory}
+                                                      onChange={(e) => setDocCategory(e.target.value)}
+                                                   >
+                                                       {displayCategories.map(cat => (
+                                                           <option key={cat} value={cat}>{cat}</option>
+                                                       ))}
+                                                   </select>
+                                               </div>
 
                                                <div>
                                                    <label className="block text-sm font-medium text-slate-700 mb-1">Document Type</label>
@@ -975,14 +1045,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                                                <option key={type} value={type}>{type}</option>
                                                            ))
                                                        ) : (
-                                                           <>
-                                                               <option value="Resume">Resume</option>
-                                                               <option value="Offer Letter">Offer Letter</option>
-                                                               <option value="ID Proof">ID Proof</option>
-                                                               <option value="Certificate">Certificate</option>
-                                                               <option value="Payslip">Payslip</option>
-                                                               <option value="Other">Other</option>
-                                                           </>
+                                                           <option value="">Select Category First</option>
                                                        )}
                                                    </select>
                                                </div>
@@ -1014,50 +1077,165 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                     </div>
                                   )}
 
-                                  {employee.documents?.length > 0 ? (
-                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                          {employee.documents.map((doc: any) => (
-                                              <div key={doc.Id} className="group p-4 border border-slate-200 rounded-xl hover:border-blue-300 hover:bg-blue-50/10 transition relative">
-                                                  <div className="flex items-start gap-3">
-                                                      <div className="w-10 h-10 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center shrink-0">
-                                                          <FileText className="w-5 h-5" />
-                                                      </div>
-                                                      <div className="flex-1 min-w-0">
-                                                          <h4 className="font-semibold text-slate-800 truncate" title={doc.Document_Type__c}>{doc.Document_Type__c}</h4>
-                                                          <p className="text-xs text-slate-500">{doc.Document_Category__c} • {doc.Status__c}</p>
-                                                      </div>
-                                                  </div>
-                                                  <div className="mt-4 flex gap-2">
-                                                      <a 
-                                                        href={doc.File_URL__c} 
-                                                        target="_blank" 
-                                                        rel="noopener noreferrer"
-                                                        className="flex-1 bg-white border border-slate-200 text-slate-600 text-xs font-semibold py-2 rounded-lg flex items-center justify-center gap-2 hover:bg-slate-50 transition"
-                                                      >
-                                                          <Download className="w-3 h-3" /> View
-                                                      </a>
-                                                      {['HR', 'Admin'].includes(currentUserRole) && (
-                                                          <button 
-                                                            onClick={() => {
-                                                                if(confirm("Are you sure you want to delete this document?")) {
-                                                                    deleteDocumentMutation.mutate(doc.Id)
-                                                                }
-                                                            }}
-                                                            className="flex-1 bg-white border border-red-100 text-red-500 text-xs font-semibold py-2 rounded-lg flex items-center justify-center gap-2 hover:bg-red-50 transition"
-                                                          >
-                                                              <Trash2 className="w-3 h-3" /> Delete
-                                                          </button>
-                                                      )}
-                                                  </div>
+                                  {/* Render Sections for each Category */}
+                                  {displayCategories.map(category => (
+                                      <div key={category} className="space-y-4">
+                                          <div className="flex items-center gap-4">
+                                              <span className="text-xs font-bold uppercase tracking-widest text-slate-400 bg-slate-50 px-2 py-1 rounded">{category}</span>
+                                              <div className="h-px bg-slate-100 flex-1"></div>
+                                          </div>
+
+                                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                                              {(() => {
+                                                  const requiredDocs = docConfigMap[category] || [];
+                                                  
+                                                  return requiredDocs.map((type: string) => {
+                                                      const uploadedDoc = employee.documents?.find(
+                                                          (d: any) => d.Document_Type__c === type && (!d.Document_Category__c || d.Document_Category__c === category)
+                                                      ) || employee.documents?.find(
+                                                          (d: any) => d.Document_Type__c === type && (!d.Document_Category__c || displayCategories.includes(d.Document_Category__c))
+                                                      );
+                                                      
+                                                      return (
+                                                          <div key={type} className={cn(
+                                                              "relative flex flex-col p-5 rounded-2xl border transition-all duration-200 group",
+                                                              uploadedDoc 
+                                                                  ? "bg-white border-blue-100 shadow-sm hover:shadow-md hover:border-blue-200" 
+                                                                  : "bg-slate-50/50 border-slate-200 border-dashed hover:bg-white hover:border-blue-300"
+                                                          )}>
+                                                              {uploadedDoc ? (
+                                                                  <>
+                                                                      <div className="flex items-start gap-3 mb-4">
+                                                                          <div className="w-10 h-10 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center shrink-0 border border-orange-100">
+                                                                               <FileText className="w-5 h-5" />
+                                                                          </div>
+                                                                          <div className="min-w-0 flex-1">
+                                                                              <h4 className="font-bold text-slate-800 text-sm truncate" title={type}>{type}</h4>
+                                                                              <div className="flex items-center gap-1.5 mt-1">
+                                                                                  <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                                                                                  <p className="text-xs text-slate-500 font-medium">Uploaded</p>
+                                                                              </div>
+                                                                          </div>
+                                                                      </div>
+                                                                      <div className="mt-auto flex gap-2">
+                                                                          <a 
+                                                                            href={uploadedDoc.File_URL__c} 
+                                                                            target="_blank" 
+                                                                            rel="noopener noreferrer"
+                                                                            className="flex-1 bg-slate-50 border border-slate-200 text-slate-600 text-xs font-bold py-2 rounded-lg flex items-center justify-center gap-2 hover:bg-slate-100 transition"
+                                                                          >
+                                                                              <Download className="w-3 h-3" /> View
+                                                                          </a>
+                                                                          {['HR', 'Admin'].includes(currentUserRole) && (
+                                                                              <button 
+                                                                                onClick={() => {
+                                                                                    if(confirm(`Are you sure you want to delete ${type}?`)) {
+                                                                                        deleteDocumentMutation.mutate(uploadedDoc.Id)
+                                                                                    }
+                                                                                }}
+                                                                                className="w-8 flex items-center justify-center bg-white border border-red-100 text-red-500 rounded-lg hover:bg-red-50 transition"
+                                                                                title="Delete"
+                                                                              >
+                                                                                  <Trash2 className="w-3.5 h-3.5" />
+                                                                              </button>
+                                                                          )}
+                                                                      </div>
+                                                                  </>
+                                                              ) : (
+                                                                  <div className="flex flex-col items-center text-center py-2 h-full justify-center">
+                                                                      <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mb-3 group-hover:scale-110 group-hover:bg-blue-50 group-hover:text-blue-500 transition-all duration-300">
+                                                                          <Upload className="w-5 h-5" />
+                                                                      </div>
+                                                                      <h4 className="font-semibold text-slate-700 text-sm mb-1">{type}</h4>
+                                                                      <p className="text-xs text-slate-400 mb-4 px-2">Click below to upload</p>
+                                                                      
+                                                                      <label className="cursor-pointer w-full mt-auto">
+                                                                          <div className={cn(
+                                                                              "w-full py-2 bg-slate-800 hover:bg-black text-white text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 shadow-sm",
+                                                                              (customDocMutation.isPending && uploadingType === type) && "opacity-80 cursor-wait"
+                                                                          )}>
+                                                                              {customDocMutation.isPending && uploadingType === type ? (
+                                                                                   <Spin size="small" className="brightness-0 invert scale-75" /> 
+                                                                              ) : (
+                                                                                   <Plus className="w-3 h-3" />
+                                                                              )}
+                                                                              {customDocMutation.isPending && uploadingType === type ? "Uploading..." : "Upload"}
+                                                                          </div>
+                                                                          <input 
+                                                                              type="file" 
+                                                                              className="hidden" 
+                                                                              accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                                                              onChange={(e) => handleDirectUpload(e, type, category)}
+                                                                              disabled={customDocMutation.isPending} 
+                                                                          />
+                                                                      </label>
+                                                                  </div>
+                                                              )}
+                                                          </div>
+                                                      )
+                                                  })
+                                              })()}
+                                          </div>
+                                      </div>
+                                  ))}
+                                  
+                                  {/* Extra Documents (Unmapped) */}
+                                  {(() => {
+                                      const allMappedTypes = new Set();
+                                      displayCategories.forEach(cat => {
+                                          (docConfigMap[cat] || []).forEach((t: string) => allMappedTypes.add(t));
+                                      });
+                                      
+                                      const extraDocs = employee.documents?.filter((d: any) => !allMappedTypes.has(d.Document_Type__c)) || [];
+                                      
+                                      if (extraDocs.length > 0) return (
+                                          <div className="space-y-4 pt-4 border-t border-slate-100">
+                                              <div className="flex items-center gap-4">
+                                                  <span className="text-xs font-bold uppercase tracking-widest text-slate-400 bg-slate-50 px-2 py-1 rounded">Additional Documents</span>
+                                                  <div className="h-px bg-slate-100 flex-1"></div>
                                               </div>
-                                          ))}
-                                      </div>
-                                  ) : (
-                                       <div className="text-center py-12 bg-slate-50 rounded-xl border-dashed border-2 border-slate-200">
-                                          <FileText className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-                                          <p className="text-slate-500">No documents uploaded yet.</p>
-                                      </div>
-                                  )}
+                                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                                                  {extraDocs.map((doc: any) => (
+                                                      <div key={doc.Id} className="relative flex flex-col p-5 rounded-2xl border border-slate-200 bg-white transition group">
+                                                          <div className="flex items-start gap-3 mb-4">
+                                                              <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0 border border-purple-100">
+                                                                  <FileText className="w-5 h-5" />
+                                                              </div>
+                                                              <div className="min-w-0 flex-1">
+                                                                  <h4 className="font-bold text-slate-800 text-sm truncate" title={doc.Document_Type__c}>{doc.Document_Type__c}</h4>
+                                                                  <p className="text-xs text-slate-500 font-medium">{doc.Document_Category__c || "Other"}</p>
+                                                              </div>
+                                                          </div>
+                                                          <div className="mt-auto flex gap-2">
+                                                              <a 
+                                                                href={doc.File_URL__c} 
+                                                                target="_blank" 
+                                                                rel="noopener noreferrer"
+                                                                className="flex-1 bg-slate-50 border border-slate-200 text-slate-600 text-xs font-bold py-2 rounded-lg flex items-center justify-center gap-2 hover:bg-slate-100 transition"
+                                                              >
+                                                                  <Download className="w-3 h-3" /> View
+                                                              </a>
+                                                              {['HR', 'Admin'].includes(currentUserRole) && (
+                                                                  <button 
+                                                                    onClick={() => {
+                                                                        if(confirm(`Delete ${doc.Document_Type__c}?`)) {
+                                                                            deleteDocumentMutation.mutate(doc.Id)
+                                                                        }
+                                                                    }}
+                                                                    className="w-8 flex items-center justify-center bg-white border border-red-100 text-red-500 rounded-lg hover:bg-red-50 transition"
+                                                                    title="Delete"
+                                                                  >
+                                                                      <Trash2 className="w-3.5 h-3.5" />
+                                                                  </button>
+                                                              )}
+                                                          </div>
+                                                      </div>
+                                                  ))}
+                                              </div>
+                                          </div>
+                                      )
+                                      return null;
+                                  })()}
                               </div>
                           )}
 
