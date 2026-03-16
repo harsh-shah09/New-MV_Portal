@@ -741,7 +741,7 @@ export default function LeavesPage() {
                     <h2 className="text-lg font-semibold text-gray-900">My Leave Requests</h2>
                   </div>
                   <div className="flex items-center gap-2">
-                    <RefreshButton onClick={refetch} loading={isLoading} />
+                    <RefreshButton onClick={refetch} loading={isLoading} size="large" label="" className="h-10 w-10 p-0" />
                     <Select
                       placeholder="Filter by Leave Type"
                       style={{ width: 200 }}
@@ -780,7 +780,7 @@ export default function LeavesPage() {
               <div>
                 <div className="flex items-center justify-between gap-2 mb-4">
                   <h2 className="text-lg font-semibold text-gray-900">Pending Approvals</h2>
-                  <RefreshButton onClick={refetch} loading={isLoading} />
+                  <RefreshButton onClick={refetch} loading={isLoading} size="large" label="" className="h-10 w-10 p-0" />
                 </div>
                 {(currentUser?.role === 'HR' || currentUser?.role === 'Admin' || (currentUser?.role === 'Developer' && currentUser?.title === 'Team Lead')) ? (
                   pendingApprovals.length > 0 ? (
@@ -959,7 +959,7 @@ export default function LeavesPage() {
               <div>
                 <div className="flex items-center justify-between gap-2 mb-4">
                   <h2 className="text-lg font-semibold text-gray-900">All Leave Records</h2>
-                  <RefreshButton onClick={fetchAllLeaves} loading={isRefreshingAllLeaves} />
+                  <RefreshButton onClick={fetchAllLeaves} loading={isRefreshingAllLeaves} size="large" label="" className="h-10 w-10 p-0" />
                 </div>
                 
                 {/* Filters */}

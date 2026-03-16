@@ -158,7 +158,7 @@ export default function MyPayrollsPage() {
 
       {isLoading ? (
         <div className="flex justify-center items-center py-12">
-          <Spin size="large" tip="Loading your payrolls...">
+          <Spin size="large" tip="">
             <div className="min-h-[200px]" />
           </Spin>
         </div>

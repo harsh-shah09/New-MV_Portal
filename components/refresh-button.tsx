@@ -9,6 +9,7 @@ interface RefreshButtonProps {
   loading?: boolean
   label?: string
   className?: string
+  size?: "large" | "middle" | "small"
 }
 
 export function RefreshButton({
@@ -16,9 +17,11 @@ export function RefreshButton({
   loading = false,
   label = "Refresh",
   className,
+  size = "middle",
 }: RefreshButtonProps) {
   return (
     <Button
+      size={size}
       onClick={onClick}
       disabled={loading}
       icon={<RefreshCw className={cn("w-4 h-4", loading && "animate-spin")} />}
