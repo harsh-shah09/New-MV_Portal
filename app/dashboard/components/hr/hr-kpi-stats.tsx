@@ -35,7 +35,7 @@ export function HRKPIStats({ stats }: HRKPIStatsProps) {
             type="link" 
             size="small" 
             className="mt-2 p-0"
-            onClick={() => router.push('/leaves?tab=approvals')}
+            onClick={() => router.push('/leaves?tab=approvals&status=applied')}
           >
             View All
           </Button>

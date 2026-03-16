@@ -1,20 +1,23 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { LeaveRequestForm } from "./components/leave-request-form"
 import { LeaveTable } from "./components/leave-table"
 import { useLeaveStore } from "@/store/leaveStore"
 import type { LeaveRequest } from "@/types"
 import { useQuery } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { Modal, Select, Input, Card, Row, Col, Spin } from "antd"
+import { Modal, Select, Input, Card, Row, Col, Spin, DatePicker } from "antd"
 import { SearchOutlined } from "@ant-design/icons"
 import { PageContainer } from "@/components/page-container"
 import { PageHeader } from "@/components/page-header"
+import { RefreshButton } from "@/components/refresh-button"
+import dayjs from "dayjs"
 
 export default function LeavesPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [showForm, setShowForm] = useState(false)
   const [selectedTab, setSelectedTab] = useState<"my-requests" | "approvals" | "all-leaves">("my-requests")
   const [currentUser, setCurrentUser] = useState<{ employeeId: string; email?: string; recordId: string; role?: string; title?: string } | null>(null)
@@ -23,6 +26,7 @@ export default function LeavesPage() {
   const [rejectReason, setRejectReason] = useState("")
   const [allLeaves, setAllLeaves] = useState<LeaveRequest[]>([])
   const [filteredLeaves, setFilteredLeaves] = useState<LeaveRequest[]>([])
+  const [filteredMyLeaves, setFilteredMyLeaves] = useState<LeaveRequest[]>([])
   const [isRefreshingAllLeaves, setIsRefreshingAllLeaves] = useState(false)
   const [filters, setFilters] = useState({
     status: "",
@@ -32,6 +36,45 @@ export default function LeavesPage() {
   
   console.log("Current User:", currentUser)
   const { leaves, pendingApprovals, setLeaves, setPendingApprovals, updateLeave } = useLeaveStore()
+
+  // Handle URL parameters for filtering
+  useEffect(() => {
+    const typeParam = searchParams.get('type')
+    const statusParam = searchParams.get('status')
+    const tabParam = searchParams.get('tab')
+    
+    if (tabParam === 'approvals') {
+      setSelectedTab('approvals')
+    } else if (typeParam || statusParam) {
+      setSelectedTab('my-requests')
+    }
+    
+    if (typeParam || statusParam) {
+      setFilters(prev => ({
+        ...prev,
+        leaveType: typeParam || "",
+        status: statusParam || ""
+      }))
+    }
+  }, [searchParams])
+
+  // Apply filters to my leaves
+  useEffect(() => {
+    let filtered = [...leaves]
+
+    if (filters.leaveType && filters.leaveType !== "") {
+      filtered = filtered.filter(leave => {
+        const displayType = leave.leaveCategory === 'Extra Day Pay' ? 'Extra Day Pay' : leave.leaveType
+        return displayType === filters.leaveType
+      })
+    }
+
+    if (filters.status && filters.status !== "") {
+      filtered = filtered.filter(leave => leave.status.toLowerCase() === filters.status.toLowerCase())
+    }
+
+    setFilteredMyLeaves(filtered)
+  }, [leaves, filters.leaveType, filters.status])
 
   // Fetch current user and their leaves
   const { data, isLoading, error, refetch } = useQuery({
@@ -340,6 +383,10 @@ export default function LeavesPage() {
     const leave = leaves.find((l) => l.id === leaveId)
     if (!leave) return
 
+    let selectedWithdrawalStart = leave.startDate
+    let selectedWithdrawalEnd = leave.endDate
+    const isSingleDayLeave = leave.startDate === leave.endDate
+
     Modal.confirm({
       title: '⚠️ Withdraw Approved Leave',
       content: (
@@ -351,6 +398,28 @@ export default function LeavesPage() {
               <div><strong>Dates:</strong> {leave.startDate} to {leave.endDate}</div>
               <div><strong>Duration:</strong> {leave.duration} day(s)</div>
             </div>
+          </div>
+          <div className="mt-4">
+            <p className="text-sm font-medium mb-2">Withdrawal Date Range</p>
+            <DatePicker.RangePicker
+              className="w-full"
+              allowClear={false}
+              disabled={isSingleDayLeave}
+              defaultValue={[dayjs(leave.startDate), dayjs(leave.endDate)]}
+              minDate={dayjs(leave.startDate)}
+              maxDate={dayjs(leave.endDate)}
+              onChange={(value) => {
+                if (value && value[0] && value[1]) {
+                  selectedWithdrawalStart = value[0].format('YYYY-MM-DD')
+                  selectedWithdrawalEnd = value[1].format('YYYY-MM-DD')
+                }
+              }}
+            />
+            <p className="text-xs text-gray-600 mt-2">
+              {isSingleDayLeave
+                ? 'Single-day leave will be fully withdrawn.'
+                : 'Pick full range for complete withdrawal, or a subset for partial withdrawal.'}
+            </p>
           </div>
           <p className="mt-3 text-sm text-gray-600">Leave Withdraw Request Submitted to HR.</p>
         </div>
@@ -369,6 +438,8 @@ export default function LeavesPage() {
             body: JSON.stringify({
               leaveId,
               action: "withdraw",
+              withdrawalStartDate: selectedWithdrawalStart,
+              withdrawalEndDate: selectedWithdrawalEnd,
             }),
           })
 
@@ -497,6 +568,9 @@ export default function LeavesPage() {
               <div><strong>Employee:</strong> {leave.employeeName}</div>
               <div><strong>Type:</strong> {leave.leaveType || leave.leaveCategory}</div>
               <div><strong>Dates:</strong> {leave.startDate} to {leave.endDate}</div>
+              {leave.withdrawalStartDate && leave.withdrawalEndDate && (
+                <div><strong>Requested Withdrawal:</strong> {leave.withdrawalStartDate} to {leave.withdrawalEndDate}</div>
+              )}
               <div><strong>Duration:</strong> {leave.duration} day(s)</div>
             </div>
           </div>
@@ -662,37 +736,51 @@ export default function LeavesPage() {
           <div className="p-6">
             {selectedTab === "my-requests" && (
               <div>
-                <div className="flex items-center gap-2 mb-4">
-                  <h2 className="text-lg font-semibold text-gray-900">My Leave Requests</h2>
-                  <button
-                    onClick={() => refetch()}
-                    disabled={isLoading}
-                    className="p-1.5 hover:bg-gray-100 rounded-full transition disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Refresh"
-                  >
-                    <svg className={`w-4 h-4 text-gray-600 ${isLoading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                  </button>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-lg font-semibold text-gray-900">My Leave Requests</h2>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <RefreshButton onClick={refetch} loading={isLoading} />
+                    <Select
+                      placeholder="Filter by Leave Type"
+                      style={{ width: 200 }}
+                      value={filters.leaveType || undefined}
+                      onChange={(value) => setFilters({ ...filters, leaveType: value || "" })}
+                      allowClear
+                    >
+                      <Select.Option value="">All Leaves</Select.Option>
+                      <Select.Option value="Annual Leave">Annual Leave</Select.Option>
+                      <Select.Option value="Sick Leave">Sick Leave</Select.Option>
+                      <Select.Option value="Emergency Leave">Emergency Leave</Select.Option>
+                      <Select.Option value="Planned Leave">Planned Leave</Select.Option>
+                      <Select.Option value="Extra Day Pay">Extra Day Pay</Select.Option>
+                    </Select>
+                    <Select
+                      placeholder="Filter by Status"
+                      style={{ width: 180 }}
+                      value={filters.status || undefined}
+                      onChange={(value) => setFilters({ ...filters, status: value || "" })}
+                      allowClear
+                    >
+                      <Select.Option value="">All Status</Select.Option>
+                      <Select.Option value="applied">Applied</Select.Option>
+                      <Select.Option value="approved">Approved</Select.Option>
+                      <Select.Option value="rejected">Rejected</Select.Option>
+                      <Select.Option value="cancelled">Cancelled</Select.Option>
+                      <Select.Option value="pending">Pending</Select.Option>
+                    </Select>
+                  </div>
                 </div>
-                <LeaveTable leaves={leaves} onCancel={handleCancel} onWithdraw={handleWithdraw} />
+                <LeaveTable leaves={filteredMyLeaves} onCancel={handleCancel} onWithdraw={handleWithdraw} />
               </div>
             )}
 
             {selectedTab === "approvals" && (
               <div>
-                <div className="flex items-center gap-2 mb-4">
+                <div className="flex items-center justify-between gap-2 mb-4">
                   <h2 className="text-lg font-semibold text-gray-900">Pending Approvals</h2>
-                  <button
-                    onClick={() => refetch()}
-                    disabled={isLoading}
-                    className="p-1.5 hover:bg-gray-100 rounded-full transition disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Refresh"
-                  >
-                    <svg className={`w-4 h-4 text-gray-600 ${isLoading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                  </button>
+                  <RefreshButton onClick={refetch} loading={isLoading} />
                 </div>
                 {(currentUser?.role === 'HR' || currentUser?.role === 'Admin' || (currentUser?.role === 'Developer' && currentUser?.title === 'Team Lead')) ? (
                   pendingApprovals.length > 0 ? (
@@ -706,6 +794,14 @@ export default function LeavesPage() {
                         const tlRejected = leave.tlApproved === 'Rejected'
                         const hrApproved = leave.hrApproval === 'Approved'
                         const hrRejected = leave.hrApproval === 'Rejected'
+                        const hasRequestedWithdrawalRange = Boolean(
+                          leave.isWithdrawalRequest && leave.withdrawalStartDate && leave.withdrawalEndDate
+                        )
+                        const displayStartDate = hasRequestedWithdrawalRange ? leave.withdrawalStartDate! : leave.startDate
+                        const displayEndDate = hasRequestedWithdrawalRange ? leave.withdrawalEndDate! : leave.endDate
+                        const displayDuration = hasRequestedWithdrawalRange
+                          ? dayjs(displayEndDate).diff(dayjs(displayStartDate), 'day') + 1
+                          : leave.duration
                         // For withdrawal requests, always show action buttons regardless of previous approval status
                         const alreadyActioned = leave.isWithdrawalRequest ? false : (isTeamLead ? (tlApproved || tlRejected) : (hrApproved || hrRejected))
 
@@ -784,16 +880,31 @@ export default function LeavesPage() {
                                   <p className="text-sm font-medium text-gray-900 capitalize">{leave.leaveType || leave.leaveCategory}</p>
                                 </div>
                                 <div className="bg-white/70 rounded-md p-3 border border-gray-100">
-                                  <p className="text-xs text-gray-500 mb-1">Duration</p>
-                                  <p className="text-sm font-medium text-gray-900">{leave.duration} {leave.duration === 1 ? 'Day' : 'Days'}</p>
+                                    <p className="text-xs text-gray-500 mb-1">
+                                      {hasRequestedWithdrawalRange ? 'Requested Duration' : 'Duration'}
+                                    </p>
+                                    <p className="text-sm font-medium text-gray-900">{displayDuration} {displayDuration === 1 ? 'Day' : 'Days'}</p>
+                                    {hasRequestedWithdrawalRange && (
+                                      <p className="text-xs text-gray-500 mt-1">Original: {leave.duration} {leave.duration === 1 ? 'Day' : 'Days'}</p>
+                                    )}
                                 </div>
                                 <div className="bg-white/70 rounded-md p-3 border border-gray-100">
-                                  <p className="text-xs text-gray-500 mb-1">Start Date</p>
-                                  <p className="text-sm font-medium text-gray-900">{new Date(leave.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                                    <p className="text-xs text-gray-500 mb-1">
+                                      {hasRequestedWithdrawalRange ? 'Requested Start Date' : 'Start Date'}
+                                    </p>
+                                    <p className="text-sm font-medium text-gray-900">{new Date(displayStartDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                                    {hasRequestedWithdrawalRange && (
+                                      <p className="text-xs text-gray-500 mt-1">Original: {new Date(leave.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                                    )}
                                 </div>
                                 <div className="bg-white/70 rounded-md p-3 border border-gray-100">
-                                  <p className="text-xs text-gray-500 mb-1">End Date</p>
-                                  <p className="text-sm font-medium text-gray-900">{new Date(leave.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                                    <p className="text-xs text-gray-500 mb-1">
+                                      {hasRequestedWithdrawalRange ? 'Requested End Date' : 'End Date'}
+                                    </p>
+                                    <p className="text-sm font-medium text-gray-900">{new Date(displayEndDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                                    {hasRequestedWithdrawalRange && (
+                                      <p className="text-xs text-gray-500 mt-1">Original: {new Date(leave.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                                    )}
                                 </div>
                               </div>
 
@@ -846,18 +957,9 @@ export default function LeavesPage() {
 
             {selectedTab === "all-leaves" && (
               <div>
-                <div className="flex items-center gap-2 mb-4">
+                <div className="flex items-center justify-between gap-2 mb-4">
                   <h2 className="text-lg font-semibold text-gray-900">All Leave Records</h2>
-                  <button
-                    onClick={() => fetchAllLeaves()}
-                    disabled={isRefreshingAllLeaves}
-                    className="p-1.5 hover:bg-gray-100 rounded-full transition disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Refresh"
-                  >
-                    <svg className={`w-4 h-4 text-gray-600 ${isRefreshingAllLeaves ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                  </button>
+                  <RefreshButton onClick={fetchAllLeaves} loading={isRefreshingAllLeaves} />
                 </div>
                 
                 {/* Filters */}

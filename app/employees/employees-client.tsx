@@ -3,8 +3,7 @@
 import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useQuery } from "@tanstack/react-query"
-import { Skeleton, Card, Space, Result, Button, message, Tooltip } from "antd"
-import { RefreshCw } from "lucide-react"
+import { Skeleton, Card, Space, Result, Button, message } from "antd"
 
 import { EmployeeForm } from "./components/employee-form"
 import { EmployeeTable } from "./components/employee-table"
@@ -14,6 +13,7 @@ import { useEmployeeStore } from "@/store/employeeStore"
 import type { Employee } from "@/types"
 import { PageContainer } from "@/components/page-container"
 import { PageHeader } from "@/components/page-header"
+import { RefreshButton } from "@/components/refresh-button"
 
 interface EmployeesClientProps {
   role: string
@@ -339,14 +339,7 @@ export default function EmployeesClient({ role }: EmployeesClientProps) {
     <PageContainer>
       <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
         <PageHeader title="Employees" subtitle="Manage your workforce">
-            <Tooltip title="Refresh Data">
-              <Button 
-                icon={<RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />} 
-                onClick={() => refetch()} 
-              >
-                Refresh
-              </Button>
-            </Tooltip>
+            <RefreshButton onClick={refetch} loading={isFetching} />
         </PageHeader>
 
         <EmployeeFilters

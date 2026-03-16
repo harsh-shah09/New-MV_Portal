@@ -20,6 +20,7 @@ import {
   Plus, 
   Trash2,
   Download,
+    Eye,
   Building2,
   CheckCircle2,
   Shield,
@@ -126,21 +127,48 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
   const [formData, setFormData] = useState<any>({})
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [warningMsg, setWarningMsg] = useState<string | null>(null)
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    const phonePattern = /^(?:\+91\d{10}|\d{10})$/
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
+        const employeeName = formData.Employee_Name__c?.trim()
+        const email = formData.Employee_Email__c?.trim()
+        const phone = formData.Employee_Phone__c?.trim()
+        const normalizedPhone = phone?.replace(/[\s-]/g, "")
+        const emergencyPhone = formData.Emergency_Contact_Number__c?.trim()
+        const normalizedEmergencyPhone = emergencyPhone?.replace(/[\s-]/g, "")
+        const gender = formData.Gender__c?.trim()
     
-    // Basic Text & Email Validation
-    if (formData.Employee_Email__c && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.Employee_Email__c)) {
+        // Required Basic Information
+        if (!employeeName) {
+            newErrors.Employee_Name__c = "Employee name is required"
+        }
+
+        if (!email) {
+            newErrors.Employee_Email__c = "Email address is required"
+        } else if (!emailPattern.test(email)) {
       newErrors.Employee_Email__c = "Please enter a valid email address"
     }
 
-    if (formData.Employee_Phone__c && !/^\+?[\d\s-]{10,}$/.test(formData.Employee_Phone__c)) {
-      newErrors.Employee_Phone__c = "Please enter a valid phone number (min 10 digits)"
+        if (!phone) {
+            newErrors.Employee_Phone__c = "Phone number is required"
+        } else if (!normalizedPhone || !phonePattern.test(normalizedPhone)) {
+            newErrors.Employee_Phone__c = "Phone must be 10 digits or +91 followed by 10 digits"
+        }
+
+        if (!formData.Birthdate__c) {
+            newErrors.Birthdate__c = "Date of birth is required"
+        }
+
+        if (!gender) {
+            newErrors.Gender__c = "Gender is required"
+        } else if (!["Male", "Female"].includes(gender)) {
+            newErrors.Gender__c = "Please select a valid gender"
     }
 
-    if (formData.Emergency_Contact_Number__c && !/^\+?[\d\s-]{10,}$/.test(formData.Emergency_Contact_Number__c)) {
-      newErrors.Emergency_Contact_Number__c = "Please enter a valid emergency contact number"
+        if (emergencyPhone && (!normalizedEmergencyPhone || !phonePattern.test(normalizedEmergencyPhone))) {
+            newErrors.Emergency_Contact_Number__c = "Emergency contact must be 10 digits or +91 followed by 10 digits"
     }
 
     // Date Validation
@@ -157,8 +185,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
         }
     }
     
-    // Required Fields (Example)
-    if (!formData.Employee_Name__c) newErrors.Employee_Name__c = "Name is required"
+    // Required Employment Fields
     if (!formData.Role__c) newErrors.Role__c = "Role is required"
     if (!formData.Department__c) newErrors.Department__c = "Department is required"
 
@@ -209,6 +236,10 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
         
         // Prepare payload with Address Object
         const payload = { ...formData };
+                payload.Employee_Name__c = payload.Employee_Name__c?.trim();
+                payload.Employee_Email__c = payload.Employee_Email__c?.trim();
+                payload.Employee_Phone__c = payload.Employee_Phone__c?.trim()?.replace(/[\s-]/g, '');
+        payload.Emergency_Contact_Number__c = payload.Emergency_Contact_Number__c?.trim()?.replace(/[\s-]/g, '');
         payload.Employee_Address__c = {
             street: formData.Employee_Address__Street__s,
             city: formData.Employee_Address__City__s,
@@ -244,7 +275,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
       Bank_Branch_Name__c: '',
       Bank_Account_Number__c: '',
       IFSC__c: '',
-      Primary_Account__c: false
+      Primary_Account__c: true
   })
   const [bankErrors, setBankErrors] = useState<Record<string, string>>({})
 
@@ -252,6 +283,63 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
   const [docFile, setDocFile] = useState<File | null>(null)
   const [docCategory, setDocCategory] = useState("Intern Docs")
   const [docType, setDocType] = useState("Resume")
+
+  // Tile-based document upload state
+  const [selectedDocTile, setSelectedDocTile] = useState<string | null>(null)
+  const [tileUploadFile, setTileUploadFile] = useState<File | null>(null)
+  const tileFileInputRef = useRef<HTMLInputElement>(null)
+    const [isDocPreviewOpen, setIsDocPreviewOpen] = useState(false)
+    const [docPreviewUrl, setDocPreviewUrl] = useState<string | null>(null)
+    const [docPreviewTitle, setDocPreviewTitle] = useState<string>("Document Preview")
+
+    const openDocumentPreview = (url?: string, title?: string) => {
+        if (!url) {
+            message.error("Document URL not available")
+            return
+        }
+        setDocPreviewUrl(url)
+        setDocPreviewTitle(title || "Document Preview")
+        setIsDocPreviewOpen(true)
+    }
+
+    const handleDocumentDownload = async (documentId?: string, title?: string) => {
+        if (!documentId) {
+            message.error("Document ID not available")
+            return
+        }
+
+        const toastKey = `doc-download-${Date.now()}`
+        message.loading({ content: "Preparing download...", key: toastKey, duration: 0 })
+
+        try {
+            const params = new URLSearchParams({
+                documentId,
+                filename: title || "document"
+            })
+
+            const response = await fetch(`/api/documents/download?${params.toString()}`)
+            if (!response.ok) throw new Error("Failed to download file")
+
+            const blob = await response.blob()
+            const contentDisposition = response.headers.get("content-disposition") || ""
+            const filenameMatch = contentDisposition.match(/filename="?([^";]+)"?/i)
+            const fallbackTitle = (title || "document").trim().replace(/[^a-zA-Z0-9._-]+/g, "_") || "document"
+            const filename = filenameMatch?.[1] || fallbackTitle
+
+            const objectUrl = URL.createObjectURL(blob)
+            const link = document.createElement("a")
+            link.href = objectUrl
+            link.download = filename
+            document.body.appendChild(link)
+            link.click()
+            document.body.removeChild(link)
+            URL.revokeObjectURL(objectUrl)
+
+            message.success({ content: "Download started", key: toastKey })
+        } catch {
+            message.error({ content: "Unable to download this document", key: toastKey })
+        }
+    }
 
   // --- Admin Configs ---
   const { data: adminConfigs } = useQuery({
@@ -332,6 +420,47 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
          }
      }
   }, [docCategory, adminConfigs]);
+
+  // --- Required Document Tiles ---
+  // Determine which role-specific MDT config applies for this employee
+  const getRoleDocCategory = (): string | null => {
+    if (!employee) return null;
+    const role       = (employee.Role__c   || '').toLowerCase();
+    const experience = employee.Experience__c;
+
+    // 1. Intern — role explicitly says "intern"
+    if (role.includes('intern')) return 'Intern_Documents';
+
+    // 2. Fresher — experience is 0 or absent
+    const expNum = parseFloat(experience);
+    if (experience === null || experience === undefined || experience === '' || expNum === 0 || isNaN(expNum)) {
+      return 'Freshers_Documents';
+    }
+
+    // 3. Experienced — experience > 0
+    if (expNum > 0) return 'Experience_Documents';
+
+    return null;
+  };
+
+  const requiredDocTiles: string[] = useMemo(() => {
+    if (!adminConfigs?.documents) return [];
+    const allDocs = adminConfigs.documents as any[];
+    const commonRecord = allDocs.find((d: any) => d.DeveloperName === 'Common_Documents');
+    const commonDocs: string[] = commonRecord
+      ? (commonRecord.Value__c || '').split(',').map((s: string) => s.trim()).filter(Boolean)
+      : [];
+    const roleCategory = getRoleDocCategory();
+    let roleDocs: string[] = [];
+    if (roleCategory) {
+      const roleRecord = allDocs.find((d: any) => d.DeveloperName === roleCategory);
+      if (roleRecord) {
+        roleDocs = (roleRecord.Value__c || '').split(',').map((s: string) => s.trim()).filter(Boolean);
+      }
+    }
+    // Merge, dedup
+    return Array.from(new Set([...commonDocs, ...roleDocs]));
+  }, [adminConfigs, employee]);
 
   // --- 2FA States ---
   const [show2FAModal, setShow2FAModal] = useState(false)
@@ -434,7 +563,36 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
       onError: () => message.error("Failed to remove bank account")
   })
 
+  const setPrimaryBankMutation = useMutation({
+      mutationFn: async (bankId: string) => {
+          const res = await fetch(`/api/employees/${employeeId}/bank`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ bankId, primaryAccount: true })
+          })
+          if (!res.ok) {
+              const data = await res.json().catch(() => ({}))
+              throw new Error(data?.error || 'Failed to update primary account')
+          }
+          return res.json()
+      },
+      onSuccess: () => {
+          message.success("Primary account updated")
+          queryClient.invalidateQueries({ queryKey: ["employee", employeeId] })
+      },
+      onError: (error: any) => {
+          message.error(error?.message || "Failed to update primary account")
+      }
+  })
+
+  const canManageBankAccounts = ['HR', 'Admin'].includes(currentUserRole)
+
   const handleAddBank = () => {
+      if (!canManageBankAccounts) {
+          message.error("Only HR or Admin can add bank accounts")
+          return
+      }
+
       const newErrors: Record<string, string> = {}
     
       if(!bankFormData.Name) newErrors.Name = "Bank Name is required"
@@ -452,16 +610,6 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
           newErrors.IFSC__c = "Invalid IFSC Code format"
       }
 
-      // Check Primary Validation
-      if (bankFormData.Primary_Account__c) {
-          const existingPrimary = employee.bankDetails?.find((b: any) => b.Primary_Account__c === true);
-          if (existingPrimary) {
-               message.warning("A primary account already exists. Only one account can be primary.");
-               // We prevent submission
-               return; 
-          }
-      }
-
       setBankErrors(newErrors)
 
       if (Object.keys(newErrors).length === 0) {
@@ -469,6 +617,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
       }
   }
 
+<<<<<<< HEAD
 
   // --- Document Upload Logic ---
   const [uploadingType, setUploadingType] = useState<string | null>(null)
@@ -512,15 +661,40 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
       }
       
       setDocWarning(null);
+=======
+  // Maps MDT DeveloperName → Salesforce Document_Category__c picklist value
+  const MDT_TO_PICKLIST: Record<string, string> = {
+      Common_Documents:     'Personal',
+      Intern_Documents:     'Intern Docs',
+      Freshers_Documents:   'Fresher Docs',
+      Experience_Documents: 'Experience Docs',
+  }
 
-      // Use existing uploadMutation but pass extras
+  // --- Tile-based document upload handler ---
+  const handleTileFileSelected = (file: File, docName: string) => {
+      if (file.size > 10 * 1024 * 1024) {
+          message.error("File size exceeds 10MB limit.")
+          return
+      }
+      setTileUploadFile(file)
+      setSelectedDocTile(docName)
+
+      // Determine which MDT category this doc belongs to (Common or role-specific)
+      const allDocs = adminConfigs?.documents as any[] || []
+      const commonRecord = allDocs.find((d: any) => d.DeveloperName === 'Common_Documents')
+      const commonDocs: string[] = commonRecord
+          ? (commonRecord.Value__c || '').split(',').map((s: string) => s.trim()).filter(Boolean)
+          : []
+      const mdtKey = commonDocs.includes(docName) ? 'Common_Documents' : (getRoleDocCategory() || 'Common_Documents')
+      const category = MDT_TO_PICKLIST[mdtKey] ?? 'Personal'
+>>>>>>> dade4d7be5e710293536495ea4bb0337d36943df
+
       const formData = new FormData()
-      formData.append("file", docFile)
+      formData.append("file", file)
       formData.append("employeeId", employeeId)
-      formData.append("type", "document") // Generic type for API logic
-      formData.append("category", docCategory)
-      formData.append("docType", docType)
-      
+      formData.append("type", "document")
+      formData.append("category", category)
+      formData.append("docType", docName)
       customDocMutation.mutate(formData)
   }
 
@@ -565,12 +739,59 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
       onError: () => message.error("Failed to remove document")
   })
 
+  const verifyDocumentMutation = useMutation({
+      mutationFn: async ({ docId, action }: { docId: string, action: 'approve' | 'reject' }) => {
+          const res = await fetch('/api/documents/verify', {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ documentId: docId, action })
+          })
+          const data = await res.json()
+          if (!res.ok) throw new Error(data.error || 'Failed to verify document')
+          return data
+      },
+      onSuccess: (_data, variables) => {
+          message.success(`Document ${variables.action === 'approve' ? 'approved' : 'rejected'} successfully`)
+          queryClient.invalidateQueries({ queryKey: ["employee", employeeId] })
+      },
+      onError: (error: any) => {
+          message.error(error?.message || 'Failed to verify document')
+      }
+  })
+
+    const isScreenActionLoading =
+        updateMutation.isPending ||
+        uploadMutation.isPending ||
+        addBankMutation.isPending ||
+        setPrimaryBankMutation.isPending ||
+        deleteBankMutation.isPending ||
+        customDocMutation.isPending ||
+        deleteDocumentMutation.isPending ||
+        verifyDocumentMutation.isPending ||
+        is2FALoading
+
 
   if (isLoading) return <div className="flex h-screen items-center justify-center"><Spin size="large" /></div>
   if (!employee) return <div className="flex h-screen items-center justify-center text-red-500">Employee not found</div>
 
+    const viewedEmployeeRole = (employee.Role__c || "").trim()
+    const canToggleUserActive =
+        currentUserRole === 'Admin'
+            ? true
+            : currentUserRole === 'HR'
+            ? !['HR', 'Admin'].includes(viewedEmployeeRole)
+            : false
+
   return (
     <div className="max-w-7xl mx-auto p-6 lg:p-10 space-y-8 animate-in fade-in duration-500 relative">
+            {isScreenActionLoading && (
+                <div className="fixed inset-0 z-[999] bg-black/35 backdrop-blur-sm flex items-center justify-center">
+                    <div className="bg-white rounded-xl shadow-xl px-6 py-5 flex items-center gap-3 border border-slate-100">
+                        <Spin size="large" />
+                        <span className="text-sm font-semibold text-slate-700">Processing...</span>
+                    </div>
+                </div>
+            )}
       
       {/* Header Profile Card */}
       <div className="relative bg-white rounded-3xl p-8 border border-slate-100 shadow-xl overflow-hidden">
@@ -610,7 +831,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                        </div>
                    </div>
                    <div className="flex gap-3 justify-center items-center">
-                       {['HR', 'Admin'].includes(currentUserRole) && (
+                                             {canToggleUserActive && (
                            <button
                              onClick={() => {
                                  const isActivating = !employee.Active__c;
@@ -650,29 +871,6 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                          </button>
                        )}
 
-                       {(!isEditing) ? (
-                           <button 
-                             onClick={handleEditToggle}
-                             className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold transition"
-                           >
-                             <Edit3 className="w-4 h-4" /> Edit Profile
-                           </button>
-                       ) : (
-                           <>
-                             <button 
-                               onClick={handleEditToggle}
-                               className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold transition"
-                             >
-                               <X className="w-4 h-4" /> Cancel
-                             </button>
-                             <button 
-                               onClick={handleSave}
-                               className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold transition shadow-lg shadow-blue-500/20"
-                             >
-                               {updateMutation.isPending ? <Spin size="small" /> : <Save className="w-4 h-4" />} Save Changes
-                             </button>
-                           </>
-                       )}
                    </div>
                </div>
            </div>
@@ -755,15 +953,40 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                           {activeTab === "personal" && (
                               <div className="space-y-8">
                                   <div>
+                                      <div className="flex justify-end mb-4">
+                                          {!isEditing ? (
+                                              <button
+                                                  onClick={handleEditToggle}
+                                                  className="flex items-center gap-2 px-5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold transition"
+                                              >
+                                                  <Edit3 className="w-4 h-4" /> Edit Personal Details
+                                              </button>
+                                          ) : (
+                                              <div className="flex items-center gap-2">
+                                                  <button
+                                                      onClick={handleEditToggle}
+                                                      className="flex items-center gap-2 px-5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold transition"
+                                                  >
+                                                      <X className="w-4 h-4" /> Cancel
+                                                  </button>
+                                                  <button
+                                                      onClick={handleSave}
+                                                      className="flex items-center gap-2 px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold transition shadow-lg shadow-blue-500/20"
+                                                  >
+                                                      {updateMutation.isPending ? <Spin size="small" /> : <Save className="w-4 h-4" />} Save Changes
+                                                  </button>
+                                              </div>
+                                          )}
+                                      </div>
                                       <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
                                           <User className="w-5 h-5 text-blue-500" /> Basic Information
                                       </h2>
                                       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-                                          <Field label="Employee Name" value={employee.Employee_Name__c} fieldKey="Employee_Name__c" isEditing={isEditing} formData={formData} setFormData={setFormData} error={errors.Employee_Name__c} placeholder="e.g. John Doe" />
-                                          <Field label="Email Address" value={employee.Employee_Email__c} fieldKey="Employee_Email__c" type="email" isEditing={isEditing} formData={formData} setFormData={setFormData} error={errors.Employee_Email__c} placeholder="e.g. john@example.com" />
-                                          <Field label="Phone Number" value={employee.Employee_Phone__c} fieldKey="Employee_Phone__c" type="tel" isEditing={isEditing} formData={formData} setFormData={setFormData} error={errors.Employee_Phone__c} placeholder="+91 9876543210" />
-                                          <Field label="Date of Birth" value={employee.Birthdate__c} fieldKey="Birthdate__c" type="date" isEditing={isEditing} formData={formData} setFormData={setFormData} error={errors.Birthdate__c} />
-                                          <Field label="Gender" value={employee.Gender__c} fieldKey="Gender__c" isEditing={isEditing} formData={formData} setFormData={setFormData} options={[{label: 'Male', value:'Male'}, {label:'Female', value:'Female'}, {label:'Other', value:'Other'}]} type="select" />
+                                          <Field label="Employee Name" value={employee.Employee_Name__c} fieldKey="Employee_Name__c" isEditing={isEditing} formData={formData} setFormData={setFormData} error={errors.Employee_Name__c} placeholder="e.g. John Doe" required />
+                                          <Field label="Email Address" value={employee.Employee_Email__c} fieldKey="Employee_Email__c" type="email" isEditing={isEditing} formData={formData} setFormData={setFormData} error={errors.Employee_Email__c} placeholder="e.g. john@example.com" required />
+                                          <Field label="Phone Number" value={employee.Employee_Phone__c} fieldKey="Employee_Phone__c" type="tel" isEditing={isEditing} formData={formData} setFormData={setFormData} error={errors.Employee_Phone__c} placeholder="+919876543210 or 9876543210" required />
+                                          <Field label="Date of Birth" value={employee.Birthdate__c} fieldKey="Birthdate__c" type="date" isEditing={isEditing} formData={formData} setFormData={setFormData} error={errors.Birthdate__c} required />
+                                          <Field label="Gender" value={employee.Gender__c} fieldKey="Gender__c" isEditing={isEditing} formData={formData} setFormData={setFormData} options={[{label: 'Male', value:'Male'}, {label:'Female', value:'Female'}]} type="select" error={errors.Gender__c} required />
                                       </div>
                                   </div>
 
@@ -796,7 +1019,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                       </h2>
                                       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                                           <Field label="Contact Name" value={employee.Emergency_Contact_Name__c} fieldKey="Emergency_Contact_Name__c" isEditing={isEditing} formData={formData} setFormData={setFormData} error={errors.Emergency_Contact_Name__c} />
-                                          <Field label="Contact Number" value={employee.Emergency_Contact_Number__c} fieldKey="Emergency_Contact_Number__c" isEditing={isEditing} formData={formData} setFormData={setFormData} pattern = '^(?:(?:\\+|0{0,2})91(\\s*[\\-]\\s*)?|?)?\\d{9}$' type = 'tel' error={errors.Emergency_Contact_Number__c} />
+                                          <Field label="Contact Number" value={employee.Emergency_Contact_Number__c} fieldKey="Emergency_Contact_Number__c" isEditing={isEditing} formData={formData} setFormData={setFormData} pattern="^(?:\\+91\\d{10}|\\d{10})$" type="tel" error={errors.Emergency_Contact_Number__c} placeholder="+919876543210 or 9876543210" />
                                       </div>
                                   </div>
                               </div>
@@ -805,6 +1028,33 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                           {activeTab === "employment" && (
                                <div className="space-y-8">
                                   <div>
+                                      {['HR', 'Admin'].includes(currentUserRole) && (
+                                          <div className="flex justify-end mb-4">
+                                              {!isEditing ? (
+                                                  <button
+                                                      onClick={handleEditToggle}
+                                                      className="flex items-center gap-2 px-5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold transition"
+                                                  >
+                                                      <Edit3 className="w-4 h-4" /> Edit Employment Info
+                                                  </button>
+                                              ) : (
+                                                  <div className="flex items-center gap-2">
+                                                      <button
+                                                          onClick={handleEditToggle}
+                                                          className="flex items-center gap-2 px-5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold transition"
+                                                      >
+                                                          <X className="w-4 h-4" /> Cancel
+                                                      </button>
+                                                      <button
+                                                          onClick={handleSave}
+                                                          className="flex items-center gap-2 px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold transition shadow-lg shadow-blue-500/20"
+                                                      >
+                                                          {updateMutation.isPending ? <Spin size="small" /> : <Save className="w-4 h-4" />} Save Changes
+                                                      </button>
+                                                  </div>
+                                              )}
+                                          </div>
+                                      )}
                                       <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
                                           <Briefcase className="w-5 h-5 text-blue-500" /> Employment Details
                                       </h2>
@@ -902,15 +1152,17 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                       <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
                                           <Building2 className="w-5 h-5 text-purple-500" /> Bank Accounts
                                       </h2>
-                                      <button 
-                                        onClick={() => setShowBankForm(true)}
-                                        className="text-sm font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1"
-                                      >
-                                          <Plus className="w-4 h-4" /> Add Account
-                                      </button>
+                                      {canManageBankAccounts && (
+                                          <button 
+                                            onClick={() => setShowBankForm(true)}
+                                            className="text-sm font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                                          >
+                                              <Plus className="w-4 h-4" /> Add Account
+                                          </button>
+                                      )}
                                   </div>
 
-                                  {showBankForm && (
+                                  {showBankForm && canManageBankAccounts && (
                                       <div className="mb-6 p-6 bg-slate-50 border border-blue-100 rounded-xl animate-in fade-in slide-in-from-top-2">
                                           <h3 className="font-semibold text-slate-800 mb-4 flex items-center gap-2"><CreditCard className="w-4 h-4"/> Account Details</h3>
                                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -930,7 +1182,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                                     Bank_Branch_Name__c: "",
                                                     Bank_Account_Number__c: "",
                                                     IFSC__c: "",
-                                                    Primary_Account__c: false
+                                                    Primary_Account__c: true
                                                 })
                                                 setBankErrors({
                                                     Name: "",
@@ -939,7 +1191,14 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                                     IFSC__c: ""
                                                 })
                                                 setShowBankForm(false)}} className="px-4 py-2 text-slate-600 hover:bg-slate-200 rounded-lg text-sm">Cancel</button>
-                                              <button onClick={handleAddBank} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">Save Account</button>
+                                                                                            <button
+                                                                                                onClick={handleAddBank}
+                                                                                                disabled={addBankMutation.isPending}
+                                                                                                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center gap-2"
+                                                                                            >
+                                                                                                {addBankMutation.isPending && <Spin size="small" />}
+                                                                                                {addBankMutation.isPending ? "Saving..." : "Save Account"}
+                                                                                            </button>
                                           </div>
                                       </div>
                                   )}
@@ -955,6 +1214,16 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                                       </div>
                                                       <div className="flex items-center gap-2">
                                                           {bank.Primary_Account__c && <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full font-medium">Primary</span>}
+                                                          {canManageBankAccounts && !bank.Primary_Account__c && (
+                                                              <button
+                                                                  onClick={() => setPrimaryBankMutation.mutate(bank.Id)}
+                                                                  disabled={setPrimaryBankMutation.isPending}
+                                                                  className="text-xs px-2 py-1 rounded-md border border-blue-100 text-blue-600 hover:bg-blue-50 disabled:opacity-50"
+                                                                  title="Set as Primary"
+                                                              >
+                                                                  Set Primary
+                                                              </button>
+                                                          )}
                                                           {currentUserRole === 'Admin' && (
                                                               <button 
                                                                   onClick={() => {
@@ -995,6 +1264,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                           )}
 
                           {activeTab === "documents" && (
+<<<<<<< HEAD
                               <div className="space-y-10 animate-in fade-in">
                                   {/* Header */}
                                   <div className="flex justify-between items-center">
@@ -1236,6 +1506,189 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                       )
                                       return null;
                                   })()}
+=======
+                              <div className="space-y-8">
+
+                                  {/* ── Required Documents Tiles ── */}
+                                  <div>
+                                      <h2 className="text-xl font-bold text-slate-800 mb-1 flex items-center gap-2">
+                                          <FileText className="w-5 h-5 text-orange-500" /> Required Documents
+                                      </h2>
+                                      <p className="text-sm text-slate-500 mb-5">Click on a tile to upload the corresponding document.</p>
+
+                                      {requiredDocTiles.length === 0 ? (
+                                          <div className="text-center py-10 bg-slate-50 rounded-xl border-dashed border-2 border-slate-200">
+                                              <FileText className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+                                              <p className="text-slate-400 text-sm">No document requirements configured yet.</p>
+                                          </div>
+                                      ) : (
+                                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                                              {requiredDocTiles.map((docName) => {
+                                                  const uploaded = employee.documents?.find(
+                                                      (d: any) => d.Document_Type__c?.trim().toLowerCase() === docName.trim().toLowerCase()
+                                                  )
+                                                  const tileStatus = uploaded?.Status__c || 'Uploaded'
+                                                  const tileStatusLower = String(tileStatus).toLowerCase()
+                                                  const tileStatusClass = tileStatusLower === 'rejected'
+                                                      ? 'text-red-600'
+                                                      : tileStatusLower === 'verified' || tileStatusLower === 'approved'
+                                                      ? 'text-green-600'
+                                                      : 'text-blue-600'
+                                                  const isUploading = customDocMutation.isPending && selectedDocTile === docName
+                                                  return (
+                                                      <label
+                                                          key={docName}
+                                                          className={`relative flex flex-col items-center justify-center gap-2 p-4 rounded-2xl border-2 cursor-pointer transition-all select-none
+                                                              ${isUploading
+                                                                  ? 'border-blue-300 bg-blue-50 opacity-80 cursor-wait'
+                                                                  : uploaded
+                                                                  ? 'border-green-300 bg-green-50 hover:border-green-400'
+                                                                  : 'border-dashed border-slate-300 bg-white hover:border-blue-400 hover:bg-blue-50/40'
+                                                              }`}
+                                                      >
+                                                          <input
+                                                              type="file"
+                                                              className="sr-only"
+                                                              disabled={isUploading || customDocMutation.isPending}
+                                                              onChange={(e) => {
+                                                                  const file = e.target.files?.[0]
+                                                                  if (file) handleTileFileSelected(file, docName)
+                                                                  e.target.value = ''
+                                                              }}
+                                                          />
+                                                          {isUploading ? (
+                                                              <Spin size="default" />
+                                                          ) : uploaded ? (
+                                                              <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+                                                                  <CheckCircle2 className="w-6 h-6 text-green-600" />
+                                                              </div>
+                                                          ) : (
+                                                              <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center">
+                                                                  <Upload className="w-5 h-5 text-orange-500" />
+                                                              </div>
+                                                          )}
+                                                          <span className="text-xs font-semibold text-center text-slate-700 leading-tight">{docName}</span>
+                                                          {uploaded && (
+                                                              <span className={`text-[10px] font-medium ${tileStatusClass}`}>{tileStatus}</span>
+                                                          )}
+                                                          {!uploaded && !isUploading && (
+                                                              <span className="text-[10px] text-slate-400">Click to upload</span>
+                                                          )}
+                                                          {/* View link for uploaded docs */}
+                                                          {uploaded && uploaded.File_URL__c && (
+                                                              <button
+                                                                  type="button"
+                                                                  onClick={(e) => {
+                                                                      e.stopPropagation()
+                                                                      openDocumentPreview(uploaded.File_URL__c, uploaded.Document_Type__c || docName)
+                                                                  }}
+                                                                  className="text-[10px] text-blue-500 hover:underline font-medium inline-flex items-center gap-1"
+                                                              >
+                                                                  <Eye className="w-3 h-3" /> View
+                                                              </button>
+                                                          )}
+                                                      </label>
+                                                  )
+                                              })}
+                                          </div>
+                                      )}
+                                  </div>
+
+                                  {/* ── All Uploaded Documents ── */}
+                                  <div className="border-t border-slate-100 pt-6">
+                                      <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                          <Download className="w-4 h-4 text-slate-500" /> All Uploaded Documents
+                                      </h3>
+                                      {(() => {
+                                          const nonPayslipDocs = (employee.documents || []).filter(
+                                              (doc: any) => doc.Document_Type__c?.trim().toLowerCase() !== 'payslip'
+                                          )
+                                          return nonPayslipDocs.length > 0 ? (
+                                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                              {nonPayslipDocs.map((doc: any) => (
+                                                  <div key={doc.Id} className="group p-4 border border-slate-200 rounded-xl hover:border-blue-300 hover:bg-blue-50/10 transition relative">
+                                                      {/* Top row: icon + name + approve/reject */}
+                                                      <div className="flex items-start gap-3">
+                                                          <div className="w-10 h-10 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center shrink-0">
+                                                              <FileText className="w-5 h-5" />
+                                                          </div>
+                                                          <div className="flex-1 min-w-0">
+                                                              <h4 className="font-semibold text-slate-800 truncate" title={doc.Document_Type__c}>{doc.Document_Type__c}</h4>
+                                                              <p className="text-xs text-slate-500">{doc.Document_Category__c} • {doc.Status__c}</p>
+                                                          </div>
+                                                          {/* Approve / Reject — top right */}
+                                                          {doc.Status__c === 'Uploaded' &&
+                                                              ((currentUserRole === 'HR' && employee.Role__c !== 'HR') || (currentUserRole === 'Admin' && employee.Role__c === 'HR')) && (
+                                                                  <div className="flex items-center gap-1.5 shrink-0">
+                                                                      <button
+                                                                          onClick={() => verifyDocumentMutation.mutate({ docId: doc.Id, action: 'approve' })}
+                                                                          disabled={verifyDocumentMutation.isPending}
+                                                                          className="bg-white border border-green-200 text-green-600 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-green-50 transition disabled:opacity-50"
+                                                                      >
+                                                                          Approve
+                                                                      </button>
+                                                                      <button
+                                                                          onClick={() => verifyDocumentMutation.mutate({ docId: doc.Id, action: 'reject' })}
+                                                                          disabled={verifyDocumentMutation.isPending}
+                                                                          className="bg-white border border-amber-200 text-amber-600 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-amber-50 transition disabled:opacity-50"
+                                                                      >
+                                                                          Reject
+                                                                      </button>
+                                                                  </div>
+                                                              )
+                                                          }
+                                                      </div>
+                                                      {/* Bottom row: View / Download / Delete */}
+                                                      <div className="mt-4 flex gap-2">
+                                                          <button
+                                                              type="button"
+                                                              onClick={() => openDocumentPreview(doc.File_URL__c, doc.Document_Type__c)}
+                                                              className="flex-1 bg-white border border-slate-200 text-slate-600 text-xs font-semibold py-2 rounded-lg flex items-center justify-center gap-2 hover:bg-slate-50 transition"
+                                                          >
+                                                              <Eye className="w-3 h-3" /> View
+                                                          </button>
+                                                          {doc.File_URL__c && (
+                                                              <button
+                                                                  type="button"
+                                                                  onClick={() => handleDocumentDownload(doc.Id, doc.Document_Type__c)}
+                                                                  className="flex-1 bg-white border border-slate-200 text-slate-600 text-xs font-semibold py-2 rounded-lg flex items-center justify-center gap-2 hover:bg-slate-50 transition"
+                                                              >
+                                                                  <Download className="w-3 h-3" /> Download
+                                                              </button>
+                                                          )}
+                                                          {['HR', 'Admin'].includes(currentUserRole) && (
+                                                              <button
+                                                                  onClick={() => {
+                                                                      Modal.confirm({
+                                                                          title: 'Delete this document?',
+                                                                          content: 'This action cannot be undone. The document will be permanently removed.',
+                                                                          okText: 'Delete',
+                                                                          okType: 'danger',
+                                                                          cancelText: 'Cancel',
+                                                                          centered: true,
+                                                                          onOk: async () => {
+                                                                              deleteDocumentMutation.mutate(doc.Id)
+                                                                          }
+                                                                      })
+                                                                  }}
+                                                                  className="flex-1 bg-white border border-red-100 text-red-500 text-xs font-semibold py-2 rounded-lg flex items-center justify-center gap-2 hover:bg-red-50 transition"
+                                                              >
+                                                                  <Trash2 className="w-3 h-3" /> Delete
+                                                              </button>
+                                                          )}
+                                                      </div>
+                                                  </div>
+                                              ))}
+                                          </div>
+                                      ) : (
+                                          <div className="text-center py-10 bg-slate-50 rounded-xl border-dashed border-2 border-slate-200">
+                                              <FileText className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+                                              <p className="text-slate-500 text-sm">No documents uploaded yet.</p>
+                                          </div>
+                                      )
+                                      })()}
+                                  </div>
+>>>>>>> dade4d7be5e710293536495ea4bb0337d36943df
                               </div>
                           )}
 
@@ -1486,6 +1939,30 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
               </div>
           </div>
       </div>
+            <Modal
+                title={docPreviewTitle}
+                open={isDocPreviewOpen}
+                onCancel={() => {
+                    setIsDocPreviewOpen(false)
+                    setDocPreviewUrl(null)
+                }}
+                footer={null}
+                width="80vw"
+                style={{ top: 20 }}
+                destroyOnHidden
+            >
+                {docPreviewUrl && /\.(png|jpg|jpeg|gif|webp|svg)(\?|$)/i.test(docPreviewUrl) ? (
+                    <div className="w-full max-h-[75vh] overflow-auto flex justify-center bg-slate-50 rounded-lg p-2">
+                        <img src={docPreviewUrl} alt={docPreviewTitle} className="max-w-full max-h-[72vh] object-contain" />
+                    </div>
+                ) : (
+                    <iframe
+                        src={docPreviewUrl || undefined}
+                        title={docPreviewTitle}
+                        className="w-full h-[75vh] rounded-lg border border-slate-200"
+                    />
+                )}
+            </Modal>
       <style jsx global>{`
         .input-std {
             @apply w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none transition;

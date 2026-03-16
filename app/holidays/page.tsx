@@ -7,6 +7,7 @@ import { Spin } from "antd"
 import { CalendarRange, Plus, Edit2, Trash2, X, Calendar, ChevronDown } from "lucide-react"
 import { PageContainer } from "@/components/page-container"
 import { PageHeader } from "@/components/page-header"
+import { toast } from "sonner"
 
 interface Holiday {
   id: string
@@ -33,9 +34,9 @@ export default function HolidaysPage() {
     day: "",
     year: "",
   })
-  const [bulkRows, setBulkRows] = useState<BulkHolidayRow[]>(
-    Array(12).fill({ name: "", date: "", day: "" })
-  )
+  const [bulkRows, setBulkRows] = useState<BulkHolidayRow[]>([
+    { name: "", date: "", day: "" }
+  ])
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString())
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deletingHolidayId, setDeletingHolidayId] = useState<string | null>(null)
@@ -97,6 +98,19 @@ export default function HolidaysPage() {
     setBulkRows(newRows)
   }
 
+  // Add a new row
+  const addNewRow = () => {
+    setBulkRows([...bulkRows, { name: "", date: "", day: "" }])
+  }
+
+  // Remove a row
+  const removeRow = (index: number) => {
+    if (bulkRows.length > 1) {
+      const newRows = bulkRows.filter((_, i) => i !== index)
+      setBulkRows(newRows)
+    }
+  }
+
   // Auto-fill day when date is selected in edit form
   useEffect(() => {
     if (editFormData.date) {
@@ -113,7 +127,7 @@ export default function HolidaysPage() {
     const validRows = bulkRows.filter(row => row.name.trim() && row.date)
 
     if (validRows.length === 0) {
-      alert("Please add at least one holiday")
+      toast.error("Please add at least one holiday")
       return
     }
 
@@ -137,18 +151,18 @@ export default function HolidaysPage() {
 
       if (!response.ok) {
         const error = await response.json()
-        alert(error.error || "Failed to create holidays")
+        toast.error(error.error || "Failed to create holidays")
         return
       }
 
       const result = await response.json()
       refetch()
       setShowBulkModal(false)
-      setBulkRows(Array(12).fill({ name: "", date: "", day: "" }))
-      alert(result.message || `Successfully created ${validRows.length} holiday(s)!`)
+      setBulkRows([{ name: "", date: "", day: "" }])
+      toast.success(result.message || `Successfully created ${validRows.length} holiday(s)!`)
     } catch (error) {
       console.error("Error creating holidays:", error)
-      alert("Failed to create holidays")
+      toast.error("Failed to create holidays")
     }
   }
 
@@ -181,17 +195,17 @@ export default function HolidaysPage() {
 
       if (!response.ok) {
         const error = await response.json()
-        alert(error.error || "Failed to update holiday")
+        toast.error(error.error || "Failed to update holiday")
         return
       }
 
       refetch()
       setShowEditModal(false)
       setEditingHoliday(null)
-      alert("Holiday updated successfully!")
+      toast.success("Holiday updated successfully!")
     } catch (error) {
       console.error("Error updating holiday:", error)
-      alert("Failed to update holiday")
+      toast.error("Failed to update holiday")
     }
   }
 
@@ -205,17 +219,17 @@ export default function HolidaysPage() {
 
       if (!response.ok) {
         const error = await response.json()
-        alert(error.error || "Failed to delete holiday")
+        toast.error(error.error || "Failed to delete holiday")
         return
       }
 
       refetch()
       setShowDeleteConfirm(false)
       setDeletingHolidayId(null)
-      alert("Holiday deleted successfully!")
+      toast.success("Holiday deleted successfully!")
     } catch (error) {
       console.error("Error deleting holiday:", error)
-      alert("Failed to delete holiday")
+      toast.error("Failed to delete holiday")
     }
   }
 
@@ -346,9 +360,9 @@ export default function HolidaysPage() {
 
       {/* Bulk Add Modal */}
       {showBulkModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full my-8 overflow-hidden transform transition-all">
-            <div className="p-6 bg-gradient-to-r from-indigo-600 to-purple-600">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden transform transition-all">
+            <div className="p-6 bg-gradient-to-r from-blue-600 to-blue-700 flex-shrink-0">
               <div className="flex items-center justify-between text-white">
                 <h3 className="text-xl font-bold">
                   Add Holidays for {selectedYear}
@@ -356,7 +370,7 @@ export default function HolidaysPage() {
                 <button
                   onClick={() => {
                     setShowBulkModal(false)
-                    setBulkRows(Array(12).fill({ name: "", date: "", day: "" }))
+                    setBulkRows([{ name: "", date: "", day: "" }])
                   }}
                   className="p-1 hover:bg-white/20 rounded-lg transition-colors"
                 >
@@ -365,76 +379,99 @@ export default function HolidaysPage() {
               </div>
             </div>
             
-            <form onSubmit={handleBulkSubmit} className="p-6">
-              <div className="mb-4 text-sm text-gray-600">
-                Fill in the holidays below. You can add up to 12 holidays at once. Empty rows will be skipped.
-              </div>
-              
-              <div className="overflow-x-auto max-h-[60vh] overflow-y-auto border rounded-xl">
-                <table className="w-full">
-                  <thead className="bg-gray-100 sticky top-0">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase">#</th>
-                      <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase">Holiday Name</th>
-                      <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase">Date</th>
-                      <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase">Day</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {bulkRows.map((row, index) => (
-                      <tr key={index} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 text-sm font-semibold text-gray-500">
+            <form onSubmit={handleBulkSubmit} className="flex flex-col flex-1 min-h-0">
+              <div className="p-6 overflow-y-auto flex-1">
+                <div className="mb-4 text-sm text-gray-600">
+                  Fill in the holidays below. Click the + button to add more holidays.
+                </div>
+                
+                <div className="space-y-4">
+                  {bulkRows.map((row, index) => (
+                    <div key={index} className="bg-gray-50 p-4 rounded-xl border-2 border-gray-200 hover:border-blue-300 transition-colors">
+                      <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0 w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold text-sm">
                           {index + 1}
-                        </td>
-                        <td className="px-4 py-3">
-                          <input
-                            type="text"
-                            value={row.name}
-                            onChange={(e) => {
-                              const newRows = [...bulkRows]
-                              newRows[index] = { ...newRows[index], name: e.target.value }
-                              setBulkRows(newRows)
-                            }}
-                            placeholder="e.g., New Year's Day"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-sm"
-                          />
-                        </td>
-                        <td className="px-4 py-3">
-                          <input
-                            type="date"
-                            value={row.date}
-                            onChange={(e) => updateBulkRowDate(index, e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-sm"
-                          />
-                        </td>
-                        <td className="px-4 py-3">
-                          <input
-                            type="text"
-                            value={row.day}
-                            readOnly
-                            className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-sm"
-                          />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                        </div>
+                        <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-3">
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                              Holiday Name *
+                            </label>
+                            <input
+                              type="text"
+                              value={row.name}
+                              onChange={(e) => {
+                                const newRows = [...bulkRows]
+                                newRows[index] = { ...newRows[index], name: e.target.value }
+                                setBulkRows(newRows)
+                              }}
+                              placeholder="e.g., New Year's Day"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                              Date *
+                            </label>
+                            <input
+                              type="date"
+                              value={row.date}
+                              onChange={(e) => updateBulkRowDate(index, e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                              Day
+                            </label>
+                            <input
+                              type="text"
+                              value={row.day}
+                              readOnly
+                              className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white text-sm"
+                              placeholder="Auto-filled"
+                            />
+                          </div>
+                        </div>
+                        {bulkRows.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeRow(index)}
+                            className="flex-shrink-0 p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Remove"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={addNewRow}
+                  className="mt-4 w-full py-3 border-2 border-dashed border-gray-300 rounded-xl text-gray-600 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-all flex items-center justify-center gap-2 font-medium"
+                >
+                  <Plus className="w-5 h-5" />
+                  Add Another Holiday
+                </button>
               </div>
 
-              <div className="flex gap-3 mt-6">
+              <div className="p-6 bg-gray-50 border-t border-gray-200 flex gap-3 flex-shrink-0">
                 <button
                   type="button"
                   onClick={() => {
                     setShowBulkModal(false)
-                    setBulkRows(Array(12).fill({ name: "", date: "", day: "" }))
+                    setBulkRows([{ name: "", date: "", day: "" }])
                   }}
-                  className="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-semibold transition-colors"
+                  className="flex-1 px-4 py-3 bg-white hover:bg-gray-100 text-gray-700 rounded-xl font-semibold transition-colors border-2 border-gray-300"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl font-semibold transition-all transform hover:scale-105"
+                  className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl font-semibold transition-all transform hover:scale-105"
                 >
                   Save All Holidays
                 </button>
@@ -447,93 +484,95 @@ export default function HolidaysPage() {
       {/* Edit Modal */}
       {showEditModal && editingHoliday && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden transform transition-all">
-            <div className="p-6 bg-gradient-to-r from-indigo-600 to-purple-600">
-              <div className="flex items-center justify-between text-white">
-                <h3 className="text-xl font-bold">Edit Holiday</h3>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden transform transition-all border border-gray-100">
+            <div className="p-6 border-b border-gray-100">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-bold text-gray-900">Edit Holiday</h3>
                 <button
                   onClick={() => {
                     setShowEditModal(false)
                     setEditingHoliday(null)
                   }}
-                  className="p-1 hover:bg-white/20 rounded-lg transition-colors"
+                  className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors text-gray-400 hover:text-gray-600"
                 >
-                  <X className="w-6 h-6" />
+                  <X className="w-5 h-5" />
                 </button>
               </div>
             </div>
             
-            <form onSubmit={handleEditSubmit} className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Holiday Name *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={editFormData.name}
-                  onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
-                  placeholder="e.g., New Year's Day"
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-gray-700"
-                />
+            <form onSubmit={handleEditSubmit} className="p-6">
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Holiday Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editFormData.name}
+                    onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                    placeholder="e.g., New Year's Day"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-gray-900 transition-colors"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Date *
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={editFormData.date}
+                    onChange={(e) => setEditFormData({ ...editFormData, date: e.target.value })}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-gray-900 transition-colors"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Day
+                  </label>
+                  <input
+                    type="text"
+                    value={editFormData.day}
+                    readOnly
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50 text-gray-600"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Year *
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    value={editFormData.year}
+                    onChange={(e) => setEditFormData({ ...editFormData, year: e.target.value })}
+                    min="2020"
+                    max="2100"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-gray-900 transition-colors"
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Date *
-                </label>
-                <input
-                  type="date"
-                  required
-                  value={editFormData.date}
-                  onChange={(e) => setEditFormData({ ...editFormData, date: e.target.value })}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-gray-700"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Day
-                </label>
-                <input
-                  type="text"
-                  value={editFormData.day}
-                  readOnly
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl bg-gray-50 text-gray-700"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Year *
-                </label>
-                <input
-                  type="number"
-                  required
-                  value={editFormData.year}
-                  onChange={(e) => setEditFormData({ ...editFormData, year: e.target.value })}
-                  min="2020"
-                  max="2100"
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-gray-700"
-                />
-              </div>
-
-              <div className="flex gap-3 pt-4">
+              <div className="flex gap-3 pt-4 border-t border-gray-100">
                 <button
                   type="button"
                   onClick={() => {
                     setShowEditModal(false)
                     setEditingHoliday(null)
                   }}
-                  className="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-semibold transition-colors"
+                  className="flex-1 px-4 py-2.5 bg-white hover:bg-gray-50 text-gray-700 rounded-lg font-medium transition-colors border border-gray-300"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl font-semibold transition-all transform hover:scale-105"
+                  className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
                 >
-                  Update
+                  Update Holiday
                 </button>
               </div>
             </form>
@@ -544,36 +583,36 @@ export default function HolidaysPage() {
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-card rounded-xl shadow-2xl max-w-md w-full overflow-hidden transform transition-all border border-border">
-            <div className="p-6 bg-destructive/10 border-b border-destructive/20">
-              <div className="flex items-center gap-3 text-destructive">
-                <div className="w-10 h-10 rounded-full bg-destructive/20 flex items-center justify-center">
-                  <Trash2 className="w-5 h-5" />
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden transform transition-all border border-gray-100">
+            <div className="p-6">
+              <div className="flex items-start gap-4">
+                <div className="flex-shrink-0 w-12 h-12 rounded-full bg-red-50 flex items-center justify-center">
+                  <Trash2 className="w-6 h-6 text-red-500" />
                 </div>
-                <h3 className="text-lg font-bold">Delete Holiday</h3>
+                <div className="flex-1">
+                  <h3 className="text-lg font-bold text-gray-900 mb-2">Delete Holiday</h3>
+                  <p className="text-sm text-gray-600">
+                    Are you sure you want to delete this holiday? This action cannot be undone.
+                  </p>
+                </div>
               </div>
             </div>
-            <div className="p-6">
-              <p className="text-muted-foreground text-sm mb-6">
-                Are you sure you want to delete this holiday? This action cannot be undone.
-              </p>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => {
-                    setShowDeleteConfirm(false)
-                    setDeletingHolidayId(null)
-                  }}
-                  className="flex-1 px-4 py-2 bg-muted hover:bg-muted/80 text-foreground rounded-lg font-medium transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleDelete}
-                  className="flex-1 px-4 py-2 bg-destructive hover:bg-destructive/90 text-destructive-foreground rounded-lg font-medium transition-colors"
-                >
-                  Delete
-                </button>
-              </div>
+            <div className="px-6 py-4 bg-gray-50 flex gap-3">
+              <button
+                onClick={() => {
+                  setShowDeleteConfirm(false)
+                  setDeletingHolidayId(null)
+                }}
+                className="flex-1 px-4 py-2.5 bg-white hover:bg-gray-50 text-gray-700 rounded-lg font-medium transition-colors border border-gray-300"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                className="flex-1 px-4 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-lg font-medium transition-colors"
+              >
+                Yes, Delete
+              </button>
             </div>
           </div>
         </div>

@@ -31,8 +31,12 @@ export async function GET(req: NextRequest) {
         const isHR = role === 'HR';
         const isAdmin = role === 'Admin';
 
-        // HR/Admin Dashboard Data
-        if (isHR || isAdmin) {
+        // Get view mode from query params (for HR users)
+        const { searchParams } = new URL(req.url);
+        const viewMode = searchParams.get('view') || 'hr';
+
+        // HR/Admin Dashboard Data (only show if Admin OR if HR with HR view mode)
+        if ((isAdmin) || (isHR && viewMode === 'hr')) {
             // Get total employees
             const employeeQuery = await conn.query(`
                 SELECT COUNT(Id) totalEmployees
