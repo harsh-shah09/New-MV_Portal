@@ -687,6 +687,7 @@ export default function LeavesPage() {
 
   return (
     <PageContainer>
+      <div className="bg-white p-2 rounded-xl">
       <PageHeader
         title="Leave Management"
         subtitle="Manage leave requests and approvals"
@@ -1116,6 +1117,7 @@ export default function LeavesPage() {
           </div>
         </div>
       </Modal>
+      </div>
     </PageContainer>
   )
 }

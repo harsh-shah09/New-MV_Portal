@@ -57,6 +57,7 @@ export default function DashboardPage() {
 
   return (
     <PageContainer>
+      <div className="bg-white p-2 rounded-xl">
       {isHR && (
         <div className="flex justify-end mb-4">
           <div className="flex items-center gap-3 bg-white px-4 py-2 rounded-lg shadow-sm border">
@@ -75,6 +76,7 @@ export default function DashboardPage() {
       ) : (
         <EmployeeDashboard data={data} />
       )}
+      </div>
     </PageContainer>
   )
 }
