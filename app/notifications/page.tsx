@@ -1,7 +1,7 @@
 
 "use client"
 
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Card, List, Tag, Button, Spin, Empty } from "antd"
 import { CheckCircle, AlertCircle, Info, Clock, X, Trash2 } from "lucide-react"
 import { formatDistanceToNow } from 'date-fns'
@@ -12,6 +12,7 @@ import { RefreshButton } from "@/components/refresh-button"
 export default function NotificationsPage() {
     const [showAll, setShowAll] = useState(false)
     const [clearing, setClearing] = useState(false)
+    const queryClient = useQueryClient()
 
     // Query for unread notifications only (initial load)
     const { data: unreadNotifications, isLoading: isLoadingUnread, isFetching: isFetchingUnread, refetch: refetchUnread } = useQuery({
@@ -55,6 +56,7 @@ export default function NotificationsPage() {
             if (!res.ok) throw new Error('Failed to mark as read')
             toast.success('Notification cleared')
             refetch()
+            queryClient.invalidateQueries({ queryKey: ['notifications'] })
         } catch (error) {
             toast.error('Failed to clear notification')
         }
@@ -81,6 +83,7 @@ export default function NotificationsPage() {
             
             toast.success(`Cleared ${unreadList.length} notifications`)
             refetch()
+            queryClient.invalidateQueries({ queryKey: ['notifications'] })
         } catch (error) {
             toast.error('Failed to clear all notifications')
         } finally {

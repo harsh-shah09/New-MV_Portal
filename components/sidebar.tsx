@@ -92,7 +92,12 @@ export function Sidebar({
     }
   })
 
-  const unreadCount = notifications?.filter((n: any) => !n.Is_Read__c && n.Status__c === 'Unread')?.length || 0;
+  const unreadCount = notifications?.filter((n: any) =>
+    n.Status__c === 'Unread' ||
+    n.Is_Read__c === false ||
+    n.Is_Read__c === 'false' ||
+    !n.Is_Read__c
+  )?.length || 0;
   const latestNotif = notifications?.[0];
 
   useEffect(() => {
@@ -211,7 +216,7 @@ export function Sidebar({
             )}
           </div>
           <p className="text-[11px] text-slate-500 line-clamp-1">
-            {latestNotif ? latestNotif.Message__c : 'No new notifications'}
+            {latestNotif ? latestNotif.Message__c : 'No New Notification'}
           </p>
         </div>
 
