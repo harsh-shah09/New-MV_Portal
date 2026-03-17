@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { SalesforceProduct } from '../types';
 import { CreateProductModal } from '../components/CreateProductModal';
 import { useRouter } from 'next/navigation';
+import { RefreshButton } from '@/components/refresh-button';
 
 export function ProductList({ products: initialProducts }: { products: SalesforceProduct[] }) {
     const router = useRouter();
@@ -77,8 +78,8 @@ export function ProductList({ products: initialProducts }: { products: Salesforc
                 
                 <div className="flex items-center gap-3 w-full md:w-auto">
                      <Tooltip title="Refresh List">
-                        <Button 
-                            icon={<ReloadOutlined />} 
+                        <RefreshButton 
+                            label = ''
                             onClick={() => router.refresh()} 
                             className="bg-gray-50 text-gray-500 border-gray-200 hover:text-blue-600 hover:border-blue-200"
                         />

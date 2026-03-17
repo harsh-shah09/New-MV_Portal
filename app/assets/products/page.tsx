@@ -10,7 +10,7 @@ export default async function ProductsPage() {
   const products = await getProducts(); // Returns SalesforceProduct[]
 
   return (
-    <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-6">
+    <div className="p-6 md:p-8 w-full mx-auto space-y-6">
         <div className="flex items-center gap-4 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
             <Link href="/assets">
                 <Button 

@@ -46,7 +46,7 @@ export function AssetTable({ assets, loading, onManageAssignment, onViewDetails,
               <button
                 onClick={() => handleProductClick(id)}
                 disabled={!!navigatingId}
-                className="inline-flex items-center gap-1.5 text-blue-600 hover:underline disabled:opacity-70 disabled:cursor-wait bg-transparent border-none p-0"
+                className="inline-flex items-center gap-1.5 text-blue-600 hover:underline disabled:opacity-70 disabled:cursor-wait bg-transparent border-none p-0 cursor-pointer"
               >
                 {name}
               </button>
@@ -59,8 +59,8 @@ export function AssetTable({ assets, loading, onManageAssignment, onViewDetails,
       dataIndex: 'AMS_Category__c',
       key: 'AMS_Category__c',
       responsive: ['md'],
-      filters: Array.from(new Set(assets.map(a => a.AMS_Category__c).filter(Boolean))).map(c => ({ text: c, value: c })),
-      onFilter: (value: any, record) => record.AMS_Category__c === value,
+      // filters: Array.from(new Set(assets.map(a => a.AMS_Category__c).filter(Boolean))).map(c => ({ text: c, value: c })),
+      // onFilter: (value: any, record) => record.AMS_Category__c === value,
     },
     {
       title: 'Serial No.',
@@ -80,12 +80,12 @@ export function AssetTable({ assets, loading, onManageAssignment, onViewDetails,
       dataIndex: 'AMS_Status__c',
       key: 'AMS_Status__c',
       width: 120,
-      filters: [
-          { text: 'Assigned', value: 'Assigned' },
-          { text: 'Un-Assigned', value: 'Un-Assigned' },
-          { text: 'Discarded', value: 'Discarded' },
-      ],
-      onFilter: (value: any, record) => record.AMS_Status__c === value,
+      // filters: [
+      //     { text: 'Assigned', value: 'Assigned' },
+      //     { text: 'Un-Assigned', value: 'Un-Assigned' },
+      //     { text: 'Discarded', value: 'Discarded' },
+      // ],
+      // onFilter: (value: any, record) => record.AMS_Status__c === value,
       render: (status) => {
         let color = 'default';
         if (status === 'Assigned') color = 'processing'; // Blue

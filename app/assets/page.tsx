@@ -16,11 +16,13 @@ export default async function AssetsPage() {
 
   return (
     <PageContainer>
-      <PageHeader 
-        title="Asset Management" 
-        subtitle="Manage company assets, assignments, and returns."
-      />
-      <AssetManager initialAssets={assets} />
+      <div className='bg-white p-3 rounded-xl'>
+        <PageHeader 
+          title="Asset Management" 
+          subtitle="Manage company assets, assignments, and returns."
+        />
+        <AssetManager initialAssets={assets} />
+      </div>
     </PageContainer>
   )
 }

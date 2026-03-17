@@ -16,7 +16,7 @@ export function PageContainer({ children, className }: PageContainerProps) {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: "easeOut" }}
-        className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8"
+        className="w-full mx-auto px-4 sm:px-6 lg:px-8 py-8"
       >
         {children}
       </motion.div>

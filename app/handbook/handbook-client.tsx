@@ -4,7 +4,8 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Input, Button, Card, Modal, Form, Select, Upload, message, Tag, Empty, Tooltip } from "antd"
 import { Search, Plus, FileText, Download, Eye, File as FileIcon } from "lucide-react"
-import { InboxOutlined } from "@ant-design/icons"
+import { InboxOutlined, SearchOutlined } from "@ant-design/icons"
+import { PageHeader } from "@/components/page-header"
 
 interface HandbookClientProps {
   role: string
@@ -110,29 +111,29 @@ export default function HandbookClient({ role, userId }: HandbookClientProps) {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
-            <div>
-                <h1 className="text-3xl font-bold text-gray-900">Handbook & Policies</h1>
-                <p className="text-gray-500 mt-1">Access company policies, manuals, and guidelines.</p>
-            </div>
-            {isHR && (
-                <Button type="primary" size="large" icon={<Plus size={16}/>} onClick={() => setUploadModalOpen(true)}>
-                    Upload Document
-                </Button>
-            )}
-        </div>
+    <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+        <div className="p-3 bg-white rounded-xl">
+        <PageHeader 
+        title="Handbook & Policies"
+        subtitle="Access company policies, manuals, and guidelines."
+        >
+        {isHR && (
+            <Button type="primary" size="large" icon={<Plus size={16}/>} onClick={() => setUploadModalOpen(true)}>
+                Upload Document
+            </Button>
+        )}
+        </PageHeader>
 
         {/* Filters */}
         <div className="flex gap-4 mb-8 bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
              <div className="relative flex-1 max-w-md">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <Input 
                     placeholder="Search documents..." 
                     className="pl-10" 
                     size="large"
                     value={searchTerm}
                     onChange={e => setSearchTerm(e.target.value)}
+                    prefix={<SearchOutlined className="text-muted-foreground" />}
                 />
              </div>
         </div>
@@ -229,6 +230,7 @@ export default function HandbookClient({ role, userId }: HandbookClientProps) {
         </Modal>
 
         {renderPreview()}
+        </div>
     </div>
   )
 }

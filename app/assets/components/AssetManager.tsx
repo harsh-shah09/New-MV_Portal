@@ -1,8 +1,8 @@
 "use client"
 
 import { useState } from 'react';
-import { Button, Input, Modal } from 'antd';
-import { PlusOutlined, SearchOutlined, ReloadOutlined, AppstoreOutlined, FileAddOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
+import {  Input, Button, Card , Modal , Row , Col } from 'antd';
+import { PlusOutlined, SearchOutlined, AppstoreOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { useRouter } from 'next/navigation';
 import { AssetTable } from './AssetTable';
 import { AssetAssignmentModal } from './AssetAssignmentModal';
@@ -10,6 +10,7 @@ import { CreateAssetModal } from './CreateAssetModal';
 import { SalesforceAsset, AssignmentHistory } from '../types';
 import { getAssetById, getAssets, updateAssetStatus } from '../actions';
 import { showToast } from './toast';
+import { RefreshButton } from '@/components/refresh-button';
 
 interface AssetManagerProps {
   initialAssets: SalesforceAsset[];
@@ -120,57 +121,65 @@ export function AssetManager({ initialAssets }: AssetManagerProps) {
   return (
     <div className="space-y-6">
       {/* Header Actions */}
-      <div className="flex flex-col lg:flex-row gap-4 justify-between items-stretch lg:items-center">
-        <div className="relative w-full lg:w-96">
-            <Input 
-                prefix={<SearchOutlined className="text-gray-400" />} 
-                placeholder="Search by Product, Category or Assignee..." 
-                value={searchText}
-                onChange={e => setSearchText(e.target.value)}
-                className="rounded-lg py-2.5 shadow-sm text-base"
-                size="large"
+      <Card
+        className="rounded-xl shadow-sm border-border bg-card text-card-foreground mb-6"
+        styles={{ body: { padding: '20px' } }}
+      >
+        <Row gutter={[16, 16]} align="middle">
+
+          {/* 🔍 Search */}
+          <Col xs={24} lg={10}>
+            <Input
+              prefix={<SearchOutlined className="text-gray-400" />}
+              placeholder="Search by Product or Assignee..."
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              size="large"
+              className="rounded-lg shadow-sm w-full"
             />
-        </div>
-        
-        <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto items-center">
-            {/* Mobile: Grid of actions */}
-            <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full">
-                <Button 
-                    icon={<ReloadOutlined />} 
-                    onClick={refreshAssets} 
-                    loading={loading}
-                    className="w-full sm:w-auto h-10"
-                >
-                    Refresh
-                </Button>
-                
-                <Button 
-                    icon={<AppstoreOutlined />} 
-                    onClick={() => router.push('/assets/products')}
-                    className="w-full sm:w-auto h-10"
-                >
-                    Catalog
-                </Button>
-            </div>
-            
-            <Button 
-                type="primary" 
-                icon={<PlusOutlined />} 
+          </Col>
+
+          {/* 🔘 Actions */}
+          <Col xs={24} lg={14}>
+            <div className="flex flex-wrap lg:flex-nowrap gap-4 justify-start lg:justify-end items-center w-full">
+
+              <RefreshButton
+                label=""
+                onClick={refreshAssets}
+                loading={loading}
+                className="h-10"
+              />
+
+              <Button
+                icon={<AppstoreOutlined />}
+                onClick={() => router.push('/assets/products')}
+                className="h-10 flex items-center"
+              >
+                Catalog
+              </Button>
+
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
                 onClick={() => setIsCreateModalVisible(true)}
-                className="w-full sm:w-auto h-10 shadow-md"
-            >
+                className="h-10 shadow-md flex items-center"
+              >
                 New Asset
-            </Button>
-        </div>
-      </div>
+              </Button>
+
+            </div>
+          </Col>
+
+        </Row>
+      </Card>
 
       {/* Stats Summary */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+      {/* <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
           <StatCard title="Total Assets" value={assets.length} color="blue" />
           <StatCard title="Assigned" value={assets.filter(a => a.AMS_Status__c === 'Assigned').length} color="purple" />
           <StatCard title="In Stock" value={assets.filter(a => a.AMS_Status__c === 'Un-Assigned').length} color="green" />
-          <StatCard title="Discarded" value={assets.filter(a => a.AMS_Status__c === 'Discarded').length} color="gray" />
-      </div>
+          <StatCard title="Discarded" value={assets.filter(a => a.AMS_Status__c === 'Discarded').length} color="red" />
+      </div> */}
 
       {/* Table */}
       <AssetTable 
@@ -202,7 +211,7 @@ export function AssetManager({ initialAssets }: AssetManagerProps) {
 function StatCard({ title, value, color }: { title: string, value: number, color: string }) {
     // Map colors to theme-aware classes if needed, or keeping it simple for now
     return (
-        <div className="p-4 rounded-xl bg-card border border-border shadow-sm flex flex-col items-center justify-center">
+        <div className={`p-4 rounded-xl bg-card border border-border shadow-sm flex flex-col items-center justify-center bg-${color}-50`}>
             <span className="text-muted-foreground text-xs font-medium uppercase tracking-wider">{title}</span>
             <span className="text-2xl font-bold text-foreground">{value}</span>
         </div>
