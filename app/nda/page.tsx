@@ -8,6 +8,7 @@ import { Download, FileText, User, Search, Printer, FileCheck, UploadCloud, Refr
 import { UploadOutlined } from '@ant-design/icons'
 import { generateNDAPDF } from "./actions"
 import { RoleGuard } from "@/components/role-guard"
+import { PageHeader } from "@/components/page-header"
 
 export default function NDAPage() {
     const [selectedEmpId, setSelectedEmpId] = useState<string | null>(null)
@@ -139,6 +140,23 @@ export default function NDAPage() {
 
     const handleDownload = () => {
         if (!selectedEmpId) return;
+
+        // Validate manual fields before generating PDF
+        const missingFields: string[] = [];
+        if (!manualValues.Register_No?.trim()) missingFields.push('Register No');
+        if (!manualValues.Date?.trim())        missingFields.push('Date');
+
+        if (missingFields.length > 0) {
+            missingFields.forEach(field => {
+                message.error({
+                    content: `"${field}" is required. Please fill in this field before downloading.`,
+                    duration: 4,
+                    style: { marginTop: '10px' }
+                });
+            });
+            return;
+        }
+
         const emp = employees.find((e: any) => e.Id === selectedEmpId);
         const name = emp ? `${emp.Employee_Name__c || 'Employee'}`.replace(/ /g, '_') : "Employee";
         const tmplName = selectedTemplateFile?.replace('.html', '') || 'Doc';
@@ -248,16 +266,15 @@ export default function NDAPage() {
 
     return (
         <RoleGuard>
-            <div className="min-h-screen bg-background p-4 md:p-6 lg:p-10 flex flex-col">
-                <div className="max-w-7xl mx-auto w-full space-y-6 flex-1 flex flex-col">
+            <div className="min-h-screen bg-background p-2 md:p-4 lg:p-6 flex flex-col">
+                <div className="max-w-7xl mx-auto w-full flex-1 flex flex-col">
 
                     {/* Header */}
-                    <div className="shrink-0 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                        <div>
-                            <h1 className="text-3xl font-extrabold text-foreground tracking-tight">Document Manager</h1>
-                            <p className="text-muted-foreground">Generate, preview, and download agreements and letters.</p>
-                        </div>
-                    </div>
+                    <PageHeader 
+                        title="Document Manager"
+                        subtitle="Generate, preview, and download agreements and letters."
+                        className="mb-0"
+                    />
 
                     <Tabs
                         defaultActiveKey="1"
@@ -270,10 +287,10 @@ export default function NDAPage() {
                                     </span>
                                 ),
                                 children: (
-                                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 flex-1">
+                                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-2 flex-1">
 
                                         {/* Left Sidebar: Controls */}
-                                        <div className="lg:col-span-4 space-y-6 h-fit sticky top-6">
+                                        <div className="lg:col-span-4 space-y-4 h-fit sticky top-6">
 
                                             {/* Employee Selector Card */}
                                             <div className="bg-card rounded-2xl shadow-sm border border-border p-6 transition-all hover:shadow-md">
@@ -337,7 +354,7 @@ export default function NDAPage() {
                                                                     <div className="flex justify-between items-center text-xs group">
                                                                         <span className="text-muted-foreground font-medium">Employee Id</span>
                                                                         <span className="font-semibold text-card-foreground bg-background px-2 py-0.5 rounded border border-border group-hover:border-primary/30 transition-colors">
-                                                                            {selectedPartitionKey || selectedEmployee.PartitionKey || selectedEmployee.Employee_Id || '-'}
+                                                                            {selectedEmployee.Name || '-'}
                                                                         </span>
                                                                     </div>
                                                                 </div>
@@ -393,7 +410,7 @@ export default function NDAPage() {
                                                             }))}
                                                         />
 
-                                                        {selectedTemplateFile && (
+                                                    {/* {selectedTemplateFile && (
                                                             <div className="p-3 border rounded-xl bg-purple-50/30 flex items-center gap-3 border-purple-200 animate-in fade-in slide-in-from-left-2">
                                                                 <FileCheck className="w-5 h-5 text-purple-600" />
                                                                 <div className="flex-1">
@@ -401,7 +418,7 @@ export default function NDAPage() {
                                                                     <p className="text-xs text-purple-500">HTML Template</p>
                                                                 </div>
                                                             </div>
-                                                        )}
+                                                        )} */}
                                                     </div>
                                                 )}
                                             </div>

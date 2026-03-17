@@ -44,7 +44,27 @@ interface ViewProps {
 }
 
 export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }: ViewProps) {
-  const [activeTab, setActiveTab] = useState<"personal" | "employment" | "bank" | "documents" | "security" | "assets">("personal")
+  // --- Hash <-> Tab mapping ---
+  type TabId = "personal" | "employment" | "bank" | "documents" | "security" | "assets"
+  const TAB_HASH_MAP: Record<TabId, string> = {
+    personal:    "PersonalDetails",
+    employment:  "EmploymentInfo",
+    assets:      "Assets",
+    bank:        "BankDetails",
+    documents:   "Documents",
+    security:    "Security",
+  }
+  const HASH_TAB_MAP: Record<string, TabId> = Object.fromEntries(
+    Object.entries(TAB_HASH_MAP).map(([k, v]) => [v.toLowerCase(), k as TabId])
+  )
+
+  const getTabFromHash = (): TabId => {
+    if (typeof window === "undefined") return "personal"
+    const raw = window.location.hash.replace("#", "").toLowerCase()
+    return HASH_TAB_MAP[raw] ?? "personal"
+  }
+
+  const [activeTab, setActiveTab] = useState<TabId>(getTabFromHash)
   const [showAssetHistory, setShowAssetHistory] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -54,6 +74,26 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
   useEffect(() => {
     getEmployeeTitles().then(setTitles).catch(console.error)
   }, [])
+
+  // --- Sync hash → tab on browser back/forward ---
+  useEffect(() => {
+    const onHashChange = () => setActiveTab(getTabFromHash())
+    window.addEventListener("hashchange", onHashChange)
+    return () => window.removeEventListener("hashchange", onHashChange)
+  }, [])
+
+  // --- Sync tab → hash whenever activeTab changes ---
+  useEffect(() => {
+    const hash = TAB_HASH_MAP[activeTab]
+    if (typeof window !== "undefined" && window.location.hash !== `#${hash}`) {
+      window.history.replaceState(null, "", `#${hash}`)
+    }
+  }, [activeTab])
+
+  // --- Tab change handler ---
+  const handleTabChange = (tab: TabId) => {
+    setActiveTab(tab)
+  }
 
   // --- Data Fetching ---
   const { data: employee, isLoading } = useQuery({
@@ -130,6 +170,30 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     const phonePattern = /^(?:\+91\d{10}|\d{10})$/
 
+  // --- Experience Helpers ---
+  const decimalToYearsMonths = (decimal: number | string | null | undefined): { years: number; months: number } => {
+    const val = parseFloat(String(decimal || 0))
+    if (isNaN(val) || val < 0) return { years: 0, months: 0 }
+    const years = Math.floor(val)
+    const months = Math.round((val - years) * 12)
+    return { years, months }
+  }
+
+  const yearsMonthsToDecimal = (years: number | string, months: number | string): number => {
+    const y = parseInt(String(years || 0), 10) || 0
+    const m = parseInt(String(months || 0), 10) || 0
+    return parseFloat((y + m / 12).toFixed(10))
+  }
+
+  const formatExperienceDisplay = (decimal: number | string | null | undefined): string => {
+    const { years, months } = decimalToYearsMonths(decimal)
+    if (years === 0 && months === 0) return 'Not set'
+    const parts: string[] = []
+    if (years > 0) parts.push(`${years} ${years === 1 ? 'year' : 'years'}`)
+    if (months > 0) parts.push(`${months} ${months === 1 ? 'month' : 'months'}`)
+    return parts.join(' ')
+  }
+
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
         const employeeName = formData.Employee_Name__c?.trim()
@@ -200,6 +264,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
         setErrors({})
         setWarningMsg(null)
     } else {
+        const expParsed = decimalToYearsMonths(employee.Experience__c)
         setFormData({
              Employee_Name__c: employee.Employee_Name__c,
              Employee_Email__c: employee.Employee_Email__c,
@@ -217,6 +282,8 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
 
              Emergency_Contact_Name__c: employee.Emergency_Contact_Name__c,
              Emergency_Contact_Number__c: employee.Emergency_Contact_Number__c,
+             exp_years: expParsed.years,
+             exp_months: expParsed.months,
              Experience__c: employee.Experience__c,
              Department__c: employee.Department__c,
              Role__c: employee.Role__c,
@@ -224,7 +291,8 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
              Team_Lead__c: employee.Team_Lead__c,
              Joining_Date__c: employee.Joining_Date__c,
              Base_Salary__c: employee.Base_Salary__c,
-             Salary_CTC__c: employee.Salary_CTC__c
+             Salary_CTC__c: employee.Salary_CTC__c,
+             Status__c: employee.Status__c
           })
           setIsEditing(true)
     }
@@ -254,6 +322,11 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
         delete payload.Employee_Address__StateCode__s;
         delete payload.Employee_Address__PostalCode__s;
         delete payload.Employee_Address__CountryCode__s;
+
+        // Convert years + months UI fields to decimal Experience__c for Salesforce
+        payload.Experience__c = yearsMonthsToDecimal(payload.exp_years ?? 0, payload.exp_months ?? 0)
+        delete payload.exp_years
+        delete payload.exp_months
 
         updateMutation.mutate(payload)
       } else {
@@ -860,7 +933,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                  ].map((tab) => (
                      <button
                         key={tab.id}
-                        onClick={() => setActiveTab(tab.id as any)}
+                        onClick={() => handleTabChange(tab.id as TabId)}
                         className={cn(
                             "w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all duration-200",
                             activeTab === tab.id 
@@ -905,9 +978,9 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                          transition={{ duration: 0.2 }}
                       >
                           {activeTab === "personal" && (
-                              <div className="space-y-8">
+                              <div className="space-y-8 relative">
                                   <div>
-                                      <div className="flex justify-end mb-4">
+                                      <div className="flex justify-end mb-4 absolute right-0">
                                           {!isEditing ? (
                                               <button
                                                   onClick={handleEditToggle}
@@ -980,10 +1053,10 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                           )}
 
                           {activeTab === "employment" && (
-                               <div className="space-y-8">
+                               <div className="space-y-8 relative">
                                   <div>
                                       {['HR', 'Admin'].includes(currentUserRole) && (
-                                          <div className="flex justify-end mb-4">
+                                          <div className="flex justify-end mb-4 absolute right-0">
                                               {!isEditing ? (
                                                   <button
                                                       onClick={handleEditToggle}
@@ -1062,7 +1135,83 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                             placeholder="Select Job Title" 
                                           />
                                           <Field label="Joining Date" value={employee.Joining_Date__c} fieldKey="Joining_Date__c" type="date" isEditing={isEditing && ['HR', 'Admin'].includes(currentUserRole)} formData={formData} setFormData={setFormData} error={errors.Joining_Date__c} />
-                                          <Field label="Total Experience" value={employee.Experience__c} fieldKey="Experience__c" isEditing={isEditing && ['HR', 'Admin'].includes(currentUserRole)} formData={formData} setFormData={setFormData} placeholder="e.g. 5 Years" />
+                                          {/* ── Total Experience: split into Years + Months ── */}
+                                          <div className="space-y-1.5">
+                                            <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                                              Total Experience
+                                            </label>
+                                            {isEditing && ['HR', 'Admin'].includes(currentUserRole) ? (
+                                              <div className="flex items-center gap-2">
+                                                {/* Years */}
+                                                <div className="flex-1 relative">
+                                                  <input
+                                                    type="number"
+                                                    min="0"
+                                                    value={formData.exp_years ?? 0}
+                                                    onChange={(e) => {
+                                                      const y = Math.max(0, parseInt(e.target.value, 10) || 0)
+                                                      setFormData({ ...formData, exp_years: y })
+                                                    }}
+                                                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none transition"
+                                                    placeholder="0"
+                                                  />
+                                                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 pointer-events-none">
+                                                    yr
+                                                  </span>
+                                                </div>
+                                                <span className="text-slate-400 text-sm font-medium shrink-0">:</span>
+                                                {/* Months */}
+                                                <div className="flex-1 relative">
+                                                  <input
+                                                    type="number"
+                                                    min="0"
+                                                    max="11"
+                                                    value={formData.exp_months ?? 0}
+                                                    onChange={(e) => {
+                                                      const m = Math.min(11, Math.max(0, parseInt(e.target.value, 10) || 0))
+                                                      setFormData({ ...formData, exp_months: m })
+                                                    }}
+                                                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none transition"
+                                                    placeholder="0"
+                                                  />
+                                                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 pointer-events-none">
+                                                    mo
+                                                  </span>
+                                                </div>
+                                              </div>
+                                            ) : (
+                                              <p className="font-medium text-slate-800 text-sm break-words py-1">
+                                                {formatExperienceDisplay(employee.Experience__c) !== 'Not set'
+                                                  ? formatExperienceDisplay(employee.Experience__c)
+                                                  : <span className="text-slate-400 italic">Not set</span>
+                                                }
+                                              </p>
+                                            )}
+                                            {/* Live preview while editing */}
+                                            {isEditing && ['HR', 'Admin'].includes(currentUserRole) && (
+                                              <p className="text-[11px] text-slate-400">
+                                                <span className="font-semibold text-slate-600">
+                                                  {formatExperienceDisplay(yearsMonthsToDecimal(formData.exp_years ?? 0, formData.exp_months ?? 0))}
+                                                </span>
+                                              </p>
+                                            )}
+                                          </div>
+                                          <Field 
+                                            label="Status" 
+                                            value={employee.Status__c} 
+                                            fieldKey="Status__c" 
+                                            isEditing={isEditing && ['HR', 'Admin'].includes(currentUserRole)} 
+                                            formData={formData} 
+                                            setFormData={setFormData}
+                                            error={errors?.Status__c}
+                                            type="select" 
+                                            options={[
+                                                {label: 'Active', value: 'Active'},
+                                                {label: 'On Notice', value: 'On Notice'},
+                                                {label: 'Resigned', value: 'Resigned'},
+                                                {label: 'Terminated', value: 'Terminated'},
+                                            ]} 
+                                          />
                                           <div className="space-y-1 flex flex-col">
                                               <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">Manager / Team Lead</label>
                                               {isEditing && ['HR', 'Admin'].includes(currentUserRole) ? (

@@ -41,6 +41,15 @@ export default function AdminConsole() {
     const [userSearch, setUserSearch] = useState("");
     const [saving, setSaving] = useState(false);
     const [unsavedChanges, setUnsavedChanges] = useState<any[]>([]);
+    // Pagination Controls
+    const [currentPageUsers, setCurrentPageUsers] = useState(1);
+    const [currentPageIntegrations, setCurrentPageIntegrations] = useState(1);
+    const itemsPerPage = 10;
+
+    // Reset user page when search changes
+    useEffect(() => {
+        setCurrentPageUsers(1);
+    }, [userSearch]);
 
     // Integration List State
     const [connectedUsers, setConnectedUsers] = useState<any[]>([]);
@@ -580,10 +589,15 @@ export default function AdminConsole() {
                                                                     </tr>
                                                                 </thead>
                                                                 <tbody className="divide-y divide-slate-100">
-                                                                    {users.filter(u =>
-                                                                        u.Name?.toLowerCase().includes(userSearch.toLowerCase()) ||
-                                                                        u.Email?.toLowerCase().includes(userSearch.toLowerCase())
-                                                                    ).map(user => (
+                                                                    {(() => {
+                                                                        const filteredUsers = users.filter(u =>
+                                                                            u.Name?.toLowerCase().includes(userSearch.toLowerCase()) ||
+                                                                            u.Email?.toLowerCase().includes(userSearch.toLowerCase())
+                                                                        );
+                                                                        const startIndex = (currentPageUsers - 1) * itemsPerPage;
+                                                                        const paginatedUsers = filteredUsers.slice(startIndex, startIndex + itemsPerPage);
+                                                                        
+                                                                        return paginatedUsers.map(user => (
                                                                         <tr key={user.Id} className="hover:bg-slate-50/50 transition-colors">
                                                                             <td className="px-6 py-4">
                                                                                 <div className="flex items-center gap-3">
@@ -608,22 +622,38 @@ export default function AdminConsole() {
                                                                                 </select>
                                                                             </td>
                                                                             <td className="px-6 py-4">
-                                                                                <button
-                                                                                    onClick={() => {
-                                                                                        const data = {
-                                                                                            Active__c: user.Active__c ? false : true
-                                                                                        }
-                                                                                        console.log(data)
-                                                                                        updateUser(user.Id, data)
-                                                                                    }}
-                                                                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${user.Active__c
-                                                                                            ? "bg-green-100 text-green-700 hover:bg-green-200"
-                                                                                            : "bg-red-100 text-red-700 hover:bg-red-200"
-                                                                                        }`}
-                                                                                >
-                                                                                    {user.Active__c ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
-                                                                                    {user.Active__c ? 'Enabled' : 'Disabled'}
-                                                                                </button>
+                                                                                {user.Role === 'Admin' ? (
+                                                                                    <div className="relative group/lock inline-block">
+                                                                                        <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-400 cursor-not-allowed select-none border border-slate-200">
+                                                                                            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                                                                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                                                                                                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                                                                                            </svg>
+                                                                                             Enabled
+                                                                                        </span>
+                                                                                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 bg-slate-800 text-white text-xs rounded-lg whitespace-nowrap opacity-0 group-hover/lock:opacity-100 transition-opacity pointer-events-none z-10 shadow-lg">
+                                                                                            You cannot change the portal visibility of an Admin
+                                                                                            <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800"/>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                ) : (
+                                                                                    <button
+                                                                                        onClick={() => {
+                                                                                            const data = {
+                                                                                                Active__c: user.Active__c ? false : true
+                                                                                            }
+                                                                                            console.log(data)
+                                                                                            updateUser(user.Id, data)
+                                                                                        }}
+                                                                                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${user.Active__c
+                                                                                                ? "bg-green-100 text-green-700 hover:bg-green-200"
+                                                                                                : "bg-red-100 text-red-700 hover:bg-red-200"
+                                                                                            }`}
+                                                                                    >
+                                                                                        {user.Active__c ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                                                                                        {user.Active__c ? 'Enabled' : 'Disabled'}
+                                                                                    </button>
+                                                                                )}
                                                                             </td>
                                                                             <td className="px-6 py-4">
                                                                                 <span className={`inline-block w-2 h-2 rounded-full mr-2 ${user.Status === 'Active' ? 'bg-green-500' : 'bg-red-400'
@@ -631,13 +661,54 @@ export default function AdminConsole() {
                                                                                 {user.Status === 'Active' ? 'Active' : 'Inactive'}
                                                                             </td>
                                                                         </tr>
-                                                                    ))}
+                                                                    ))})()}
                                                                 </tbody>
                                                             </table>
                                                         </div>
-                                                        {users.length === 0 && !loadingUsers && (
-                                                            <div className="p-8 text-center text-slate-400 italic">No employees found.</div>
-                                                        )}
+                                                        {(() => {
+                                                            const filteredUsers = users.filter(u =>
+                                                                u.Name?.toLowerCase().includes(userSearch.toLowerCase()) ||
+                                                                u.Email?.toLowerCase().includes(userSearch.toLowerCase())
+                                                            );
+                                                            const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
+                                                            const start = filteredUsers.length === 0 ? 0 : (currentPageUsers - 1) * itemsPerPage + 1;
+                                                            const end = Math.min(currentPageUsers * itemsPerPage, filteredUsers.length);
+
+                                                            if (filteredUsers.length === 0) {
+                                                                return (
+                                                                    <div className="p-8 text-center text-slate-400 italic">
+                                                                        {userSearch ? `No employees match "${userSearch}".` : 'No employees found.'}
+                                                                    </div>
+                                                                );
+                                                            }
+
+                                                            return (
+                                                                <div className="p-4 border-t border-slate-200 flex items-center justify-between bg-slate-50">
+                                                                    <div className="text-sm text-slate-500">
+                                                                        Showing {start} to {end} of {filteredUsers.length} entries
+                                                                    </div>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <button
+                                                                            disabled={currentPageUsers === 1}
+                                                                            onClick={() => setCurrentPageUsers(prev => prev - 1)}
+                                                                            className="px-3 py-1.5 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                                                        >
+                                                                            Previous
+                                                                        </button>
+                                                                        <span className="text-xs text-slate-400 px-1">
+                                                                            {currentPageUsers} / {totalPages}
+                                                                        </span>
+                                                                        <button
+                                                                            disabled={currentPageUsers >= totalPages}
+                                                                            onClick={() => setCurrentPageUsers(prev => prev + 1)}
+                                                                            className="px-3 py-1.5 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                                                        >
+                                                                            Next
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })()}
                                                     </div>
                                                 )}
                                             </div>
@@ -662,6 +733,7 @@ export default function AdminConsole() {
                                                             <Spin indicator={<Loader2 className="w-8 h-8 animate-spin text-blue-500" />} />
                                                         </div>
                                                     ) : (
+                                                        <>
                                                         <div className="overflow-x-auto">
                                                             <table className="w-full text-left">
                                                                 <thead className="bg-slate-50 border-b border-slate-200">
@@ -673,7 +745,10 @@ export default function AdminConsole() {
                                                                     </tr>
                                                                 </thead>
                                                                 <tbody className="divide-y divide-slate-100">
-                                                                    {connectedUsers.map((item) => {
+                                                                    {(() => {
+                                                                        const startIndex = (currentPageIntegrations - 1) * itemsPerPage;
+                                                                        const paginatedIntegrations = connectedUsers.slice(startIndex, startIndex + itemsPerPage);
+                                                                        return paginatedIntegrations.map((item) => {
                                                                         const employee = users.find(u => u.Id === item.Employee_Id);
                                                                         return (
                                                                             <tr key={item.Employee_Id} className="hover:bg-slate-50/50 transition-colors">
@@ -708,7 +783,7 @@ export default function AdminConsole() {
                                                                                 </td>
                                                                             </tr>
                                                                         );
-                                                                    })}
+                                                                    })})()}
                                                                     {connectedUsers.length === 0 && (
                                                                         <tr>
                                                                             <td colSpan={4} className="px-6 py-12 text-center text-slate-400 italic">
@@ -719,6 +794,30 @@ export default function AdminConsole() {
                                                                 </tbody>
                                                             </table>
                                                         </div>
+                                                        {connectedUsers.length > 0 && (
+                                                            <div className="p-4 border-t border-slate-200 flex items-center justify-between bg-slate-50">
+                                                                <div className="text-sm text-slate-500">
+                                                                    Showing {((currentPageIntegrations - 1) * itemsPerPage) + 1} to {Math.min(currentPageIntegrations * itemsPerPage, connectedUsers.length)} of {connectedUsers.length} entries
+                                                                </div>
+                                                                <div className="flex items-center gap-2">
+                                                                    <button 
+                                                                        disabled={currentPageIntegrations === 1}
+                                                                        onClick={() => setCurrentPageIntegrations(prev => prev - 1)}
+                                                                        className="px-3 py-1.5 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                                                    >
+                                                                        Previous
+                                                                    </button>
+                                                                    <button 
+                                                                        disabled={currentPageIntegrations >= Math.ceil(connectedUsers.length / itemsPerPage)}
+                                                                        onClick={() => setCurrentPageIntegrations(prev => prev + 1)}
+                                                                        className="px-3 py-1.5 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                                                    >
+                                                                        Next
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                        </>
                                                     )}
                                                 </div>
                                             </div>

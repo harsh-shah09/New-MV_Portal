@@ -202,8 +202,7 @@ export function AssetAssignmentModal({ visible, onCancel, onSuccess, asset, curr
                     >
                          <Select>
                             <Select.Option value="New">New</Select.Option>
-                            <Select.Option value="Good">Good</Select.Option>
-                            <Select.Option value="Refurbished">Refurbished</Select.Option>
+                            <Select.Option value="Second-hand">Second hand</Select.Option>
                         </Select>
                     </Form.Item>
                 </div>

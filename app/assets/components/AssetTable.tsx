@@ -1,10 +1,12 @@
 "use client"
 
-import { Table, Button, Tag, Space, Tooltip } from 'antd';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { Table, Button, Tag, Space, Tooltip, Spin } from 'antd';
+import { LoadingOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { EyeOutlined, EditOutlined, SwapOutlined, DeleteOutlined } from '@ant-design/icons';
 import { SalesforceAsset } from '../types';
-import Link from 'next/link';
 
 interface AssetTableProps {
   assets: SalesforceAsset[];
@@ -15,21 +17,40 @@ interface AssetTableProps {
 }
 
 export function AssetTable({ assets, loading, onManageAssignment, onViewDetails, onDiscard }: AssetTableProps) {
+  const router = useRouter()
+  const [navigatingId, setNavigatingId] = useState<string | null>(null)
+
+  const handleProductClick = (id: string) => {
+    if (navigatingId) return // prevent double-click
+    setNavigatingId(id)
+    router.push(`/assets/products/${id}`)
+  }
+
   const columns: ColumnsType<SalesforceAsset> = [
-    {
-      title: 'Asset ID',
-      dataIndex: 'Name',
-      key: 'Name',
-      render: (text) => <span className="font-semibold text-primary">{text}</span>,
-      sorter: (a, b) => a.Name.localeCompare(b.Name),
-    },
+    // {
+    //   title: 'Asset ID',
+    //   dataIndex: 'Name',
+    //   key: 'Name',
+    //   render: (text) => <span className="font-semibold text-primary">{text}</span>,
+    //   sorter: (a, b) => a.Name.localeCompare(b.Name),
+    // },
     {
         title: 'Product',
         key: 'Product',
         render: (_, r) => {
             const name = r.AMS_Product__r?.Name || r.AMS_Product__c || '-';
             const id = r.AMS_Product__r?.Id || r.AMS_Product__c;
-            return id ? <Link href={`/assets/products/${id}`} className="text-blue-600 hover:underline">{name}</Link> : name;
+            if (!id) return <span>{name}</span>;
+            const isNavigating = navigatingId === id;
+            return (
+              <button
+                onClick={() => handleProductClick(id)}
+                disabled={!!navigatingId}
+                className="inline-flex items-center gap-1.5 text-blue-600 hover:underline disabled:opacity-70 disabled:cursor-wait bg-transparent border-none p-0"
+              >
+                {name}
+              </button>
+            );
         },
         responsive: ['md'],
     },

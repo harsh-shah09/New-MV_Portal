@@ -11,8 +11,6 @@ import { SalesforceAsset, AssignmentHistory } from '../types';
 import { getAssetById, getAssets, updateAssetStatus } from '../actions';
 import { showToast } from './toast';
 
-// ... (existing modalWidth)
-
 interface AssetManagerProps {
   initialAssets: SalesforceAsset[];
 }
@@ -126,7 +124,7 @@ export function AssetManager({ initialAssets }: AssetManagerProps) {
         <div className="relative w-full lg:w-96">
             <Input 
                 prefix={<SearchOutlined className="text-gray-400" />} 
-                placeholder="Search assets..." 
+                placeholder="Search by Product, Category or Assignee..." 
                 value={searchText}
                 onChange={e => setSearchText(e.target.value)}
                 className="rounded-lg py-2.5 shadow-sm text-base"
