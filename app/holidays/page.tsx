@@ -360,7 +360,7 @@ export default function HolidaysPage() {
 
       {/* Bulk Add Modal */}
       {showBulkModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 lg:left-72 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden transform transition-all">
             <div className="p-6 bg-gradient-to-r from-blue-600 to-blue-700 flex-shrink-0">
               <div className="flex items-center justify-between text-white">
@@ -483,7 +483,7 @@ export default function HolidaysPage() {
 
       {/* Edit Modal */}
       {showEditModal && editingHoliday && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 lg:left-72 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden transform transition-all border border-gray-100">
             <div className="p-6 border-b border-gray-100">
               <div className="flex items-center justify-between">
@@ -582,7 +582,7 @@ export default function HolidaysPage() {
 
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 lg:left-72 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden transform transition-all border border-gray-100">
             <div className="p-6">
               <div className="flex items-start gap-4">
