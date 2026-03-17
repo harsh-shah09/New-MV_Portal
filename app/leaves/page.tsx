@@ -8,12 +8,13 @@ import { useLeaveStore } from "@/store/leaveStore"
 import type { LeaveRequest } from "@/types"
 import { useQuery } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { Modal, Select, Input, Card, Row, Col, Spin, DatePicker } from "antd"
+import { Modal, Select, Input, Card, Row, Col, Spin, DatePicker, Button } from "antd"
 import { SearchOutlined } from "@ant-design/icons"
 import { PageContainer } from "@/components/page-container"
 import { PageHeader } from "@/components/page-header"
 import { RefreshButton } from "@/components/refresh-button"
 import dayjs from "dayjs"
+import { Plus } from "lucide-react"
 
 export default function LeavesPage() {
   const router = useRouter()
@@ -690,12 +691,14 @@ export default function LeavesPage() {
         title="Leave Management"
         subtitle="Manage leave requests and approvals"
       >
-        <button
+        <Button
+        type = 'primary'
+        size="large"
           onClick={() => setShowForm(true)}
-          className="bg-primary hover:bg-primary/90 text-primary-foreground px-6 py-2 rounded-lg font-medium transition shadow-sm"
+          icon={<Plus size={16}/>}
         >
-          + Request Leave
-        </button>
+          Request Leave
+        </Button>
       </PageHeader>
 
       <div className="bg-card rounded-xl shadow-sm border border-border mb-6 overflow-hidden">

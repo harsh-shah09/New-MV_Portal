@@ -267,7 +267,7 @@ export default function NDAPage() {
     return (
         <RoleGuard>
             <div className="min-h-screen bg-background p-2 md:p-4 lg:p-6 flex flex-col">
-                <div className="max-w-7xl mx-auto w-full flex-1 flex flex-col">
+                <div className="w-full mx-auto flex-1 flex flex-col bg-white p-3 rounded-xl">
 
                     {/* Header */}
                     <PageHeader 

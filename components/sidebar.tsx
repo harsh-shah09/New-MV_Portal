@@ -59,7 +59,7 @@ export function Sidebar({
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/leaves", label: "Leave", icon: CalendarDays },
     { href: "/holidays", label: "Holidays", icon: CalendarRange },
-    // { href: "/training", label: "Training", icon: BookOpen },
+    { href: "/handbook", label: "Handbook", icon: BookOpen },
     // { href: "/documents", label: "Documents", icon: FileText },
   ];
 

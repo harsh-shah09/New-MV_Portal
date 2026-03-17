@@ -151,6 +151,7 @@ export default function MyPayrollsPage() {
 
   return (
     <PageContainer>
+      <div className="w-full mx-auto flex-1 flex flex-col bg-white p-3 rounded-xl">
       <PageHeader
         title="My Payslips"
         subtitle="View your salary details and download payslips"
@@ -187,6 +188,7 @@ export default function MyPayrollsPage() {
           />
         </Card>
       )}
+      </div>
     </PageContainer>
   )
 }

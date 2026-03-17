@@ -32,11 +32,11 @@ export function EmployeeFilters({
       <Row gutter={[16, 16]}>
         <Col xs={24} md={6}>
           <label className="block text-sm font-medium text-muted-foreground mb-1.5">
-            Search
+            Name
           </label>
           <Input
             prefix={<SearchOutlined className="text-muted-foreground" />}
-            placeholder="Search by name & Email"
+            placeholder="Search by name or email..."
             value={searchTerm}
             onChange={(e) => onSearchChange(e.target.value)}
             allowClear

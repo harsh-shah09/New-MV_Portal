@@ -14,6 +14,7 @@ import type { Employee } from "@/types"
 import { PageContainer } from "@/components/page-container"
 import { PageHeader } from "@/components/page-header"
 import { RefreshButton } from "@/components/refresh-button"
+import { Plus } from "lucide-react"
 
 interface EmployeesClientProps {
   role: string
@@ -337,9 +338,15 @@ export default function EmployeesClient({ role }: EmployeesClientProps) {
 
   return (
     <PageContainer>
-      <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+      <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 bg-white p-3 rounded-xl flex flex-col gap-4">
         <PageHeader title="Employees" subtitle="Manage your workforce">
             <RefreshButton onClick={refetch} label="" size="large" loading={isFetching} />
+
+            <div>
+              <Button type="primary" onClick={() => setShowForm(true)} size="large" icon={<Plus size={16}/>}>
+                Add Employee
+              </Button>
+            </div>
         </PageHeader>
 
         <EmployeeFilters
@@ -353,7 +360,7 @@ export default function EmployeesClient({ role }: EmployeesClientProps) {
           onAccountStatusChange={setAccountStatus}
         />
 
-        <div className="bg-card rounded-xl shadow-sm border border-border p-4 sm:p-6 mb-8 overflow-hidden">
+        <div className="bg-card rounded-xl shadow-sm border border-border p-4 sm:p-6 overflow-hidden">
           <EmployeeTable 
             employees={filteredEmployees}
             onView={(emp) => router.push(`/employees/${emp.id}`)}

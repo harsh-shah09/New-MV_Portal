@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useQuery } from "@tanstack/react-query"
-import { Spin } from "antd"
+import { Button, Spin } from "antd"
 import { CalendarRange, Plus, Edit2, Trash2, X, Calendar, ChevronDown } from "lucide-react"
 import { PageContainer } from "@/components/page-container"
 import { PageHeader } from "@/components/page-header"
@@ -250,6 +250,7 @@ export default function HolidaysPage() {
 
   return (
     <PageContainer>
+      <div className="bg-white p-3 rounded-xl">
       <PageHeader
         title="Holiday Calendar"
         subtitle="View and manage company holidays"
@@ -270,13 +271,14 @@ export default function HolidaysPage() {
           </div>
 
           {isHR && (
-            <button
+            <Button
+            type="primary"
+            size="large"
+            icon={<Plus size={16}/>}
               onClick={() => setShowBulkModal(true)}
-              className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-lg font-medium transition-all shadow-sm flex items-center gap-2 whitespace-nowrap"
             >
-              <Plus className="w-4 h-4" />
               Add Holidays
-            </button>
+            </Button>
           )}
         </div>
       </PageHeader>
@@ -617,6 +619,7 @@ export default function HolidaysPage() {
           </div>
         </div>
       )}
+      </div>
     </PageContainer>
   )
 }

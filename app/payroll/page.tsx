@@ -140,6 +140,7 @@ export default function PayrollPage() {
   return (
     <RoleGuard>
       <PageContainer>
+        <div className="w-full mx-auto flex-1 flex flex-col bg-white p-3 rounded-xl">
         <PageHeader
           title="Payroll Management"
           subtitle="Manage employee payrolls and generate monthly summaries"
@@ -204,6 +205,7 @@ export default function PayrollPage() {
           onClose={() => setIsGenerateModalOpen(false)}
           onGenerate={handleGeneratePayroll}
         />
+        </div>
       </PageContainer>
     </RoleGuard>
   )
