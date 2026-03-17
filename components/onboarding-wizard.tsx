@@ -13,6 +13,7 @@ export function OnboardingWizard() {
     const [currentStep, setCurrentStep] = useState(0)
     const [loading, setLoading] = useState(false)
     const [form] = Form.useForm()
+    console.log(form.getFieldsValue())
     const queryClient = useQueryClient()
     const [showConfetti, setShowConfetti] = useState(false)
     const [profileFile, setProfileFile] = useState<File | null>(null)
@@ -24,7 +25,8 @@ export function OnboardingWizard() {
             .then(data => {
                 if (data.showOnboarding) {
                     setOpen(true)
-                    setCurrentStep(data.currentStep || 0)
+                    // If backend returns 0 or null, start at step 1
+                    setCurrentStep(data.currentStep || 1)
                 }
             })
             .catch(err => console.error(err))
@@ -40,7 +42,7 @@ export function OnboardingWizard() {
         try {
             setLoading(true)
             
-            if (currentStep === 0) {
+            if (currentStep === 1) {
                  // Profile Photo Upload (Step 1 in API)
                  if (profileFile) {
                      const formData = new FormData()
@@ -52,16 +54,11 @@ export function OnboardingWizard() {
                      })
                      if (!res.ok) throw new Error('Upload Failed')
                  } else {
-                     // If skipped or no file, just advance step via JSON or API call?
-                     // Assuming API handles 'skip' if we send json step=1 with no data?
-                     // Or force upload? Let's assume optional or basic skip.
-                     // The backend update for step 1 only runs if multipart. 
-                     // We need to tell backend to advance step if no file.
-                     // I'll send a JSON request to advance step if no file.
+                     // Just advance step
                      await fetch('/api/auth/onboarding-status', {
                          method: 'POST',
                          headers: { 'Content-Type': 'application/json' },
-                         body: JSON.stringify({ step: 1, data: {} }) // Just to advance
+                         body: JSON.stringify({ step: 1, data: {} })
                      })
                  }
             } else {
@@ -71,11 +68,12 @@ export function OnboardingWizard() {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
-                        step: currentStep + 1, // matches API expectation
+                        step: currentStep, 
                         data: values 
                     })
                 })
                 if (!res.ok) throw new Error('Failed')
+                if (currentStep === 2) form.resetFields()
             }
             
             setCurrentStep(prev => prev + 1)
@@ -152,11 +150,11 @@ export function OnboardingWizard() {
                      </div>
                 )
             case 2: 
-                // Personal Info (Previously 0)
+                // Personal Info
                 return (
                     <div className="py-4">
                         <p className="mb-4 text-gray-500">Please verify your personal details.</p>
-                        <Form.Item name="address" label="Address" rules={[{ required: true }]}>
+                        <Form.Item name="street" label="Street Address" rules={[{ required: true }]}>
                             <Input placeholder="123 Main St" />
                         </Form.Item>
                         <div className="grid grid-cols-2 gap-4">
@@ -168,10 +166,10 @@ export function OnboardingWizard() {
                             </Form.Item>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
-                             <Form.Item name="zipCode" label="Zip Code" rules={[{ required: true }]}>
+                             <Form.Item name="postalCode" label="Postal Code" rules={[{ required: true }]}>
                                 <Input />
                             </Form.Item>
-                            <Form.Item name="nationality" label="Nationality" rules={[{ required: true }]}>
+                            <Form.Item name="country" label="Country" rules={[{ required: true }]}>
                                 <Input />
                             </Form.Item>
                         </div>
@@ -184,7 +182,6 @@ export function OnboardingWizard() {
                     </div>
                 )
             case 3:
-                // Bank (Previously 1)
                 return (
                      <div className="py-4">
                         <p className="mb-4 text-gray-500">We need your bank details for payroll processing.</p>
@@ -203,7 +200,6 @@ export function OnboardingWizard() {
                      </div>
                 )
             case 4:
-                // Documents (Previously 2)
                 return (
                      <div className="py-4 text-center">
                         <p className="mb-6 text-gray-500">Please upload your ID proof and other relevant documents (Optional).</p>
@@ -260,7 +256,7 @@ export function OnboardingWizard() {
     overflowY: 'auto'}}>
                     <Form form={form} layout="vertical">
                         <AnimatePresence mode="wait">
-                            {currentStep < stepItems.length ? (
+                            {currentStep <= stepItems.length ? (
                                 <motion.div
                                     key={currentStep}
                                     initial={{ y: 10, opacity: 0 }}
@@ -289,17 +285,12 @@ export function OnboardingWizard() {
                 <div className="flex justify-between pt-6 border-t border-gray-100 mt-6">
                     <Button onClick={() => setOpen(false)}>Skip for Now</Button>
                     
-                    {currentStep < stepItems.length - 1 && (
+                    {currentStep <= stepItems.length && (
                         <Button type="primary" size="large" onClick={handleNext} loading={loading}>
                             Next Step
                         </Button>
                     )}
-                    {currentStep === stepItems.length - 1 && (
-                         <Button type="primary" size="large" onClick={() => setCurrentStep(prev => prev + 1)}>
-                            Continue
-                        </Button>
-                    )}
-                     {currentStep >= stepItems.length && (
+                     {currentStep > stepItems.length && (
                          <Button type="primary" size="large" onClick={handleFinish} loading={loading} className="bg-green-600 hover:bg-green-700">
                             Get Started
                         </Button>

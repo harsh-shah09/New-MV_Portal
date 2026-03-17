@@ -33,7 +33,7 @@ import {
   ChevronUp
 } from "lucide-react"
 import { generate2FASecretAction, verifyAndEnable2FAAction, disable2FAAction, getEmployeeTitles } from "@/app/employees/[id]/actions"
-import { message, Spin, Select, Modal } from "antd"
+import { message, Spin, Select, Modal, Form } from "antd"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { cn } from "@/lib/utils"
 import { Field } from "./field-component"
@@ -164,6 +164,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
   })
 
   // --- Handlers ---
+  const [form] = Form.useForm()
   const [formData, setFormData] = useState<any>({})
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [warningMsg, setWarningMsg] = useState<string | null>(null)
@@ -249,9 +250,11 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
         }
     }
     
-    // Required Employment Fields
-    if (!formData.Role__c) newErrors.Role__c = "Role is required"
-    if (!formData.Department__c) newErrors.Department__c = "Department is required"
+    // Required Employment Fields - only for non-Employee roles
+    if (currentUserRole !== "Employee") {
+        if (!formData.Role__c) newErrors.Role__c = "Role is required"
+        if (!formData.Department__c) newErrors.Department__c = "Department is required"
+    }
 
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
@@ -810,7 +813,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
             : false
 
   return (
-    <div className="max-w-7xl mx-auto p-6 lg:p-10 space-y-8 animate-in fade-in duration-500 relative">
+    <div className="w-full mx-auto p-6 lg:p-10 space-y-8 animate-in fade-in duration-500 relative">
             {isScreenActionLoading && (
                 <div className="fixed inset-0 z-[999] bg-black/35 backdrop-blur-sm flex items-center justify-center">
                     <div className="bg-white rounded-xl shadow-xl px-6 py-5 flex items-center gap-3 border border-slate-100">

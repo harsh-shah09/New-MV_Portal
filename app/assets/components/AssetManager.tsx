@@ -158,7 +158,8 @@ export function AssetManager({ initialAssets }: AssetManagerProps) {
       >
         <Button
           type="primary"
-          icon={<PlusOutlined />}
+          size='large'
+          icon={<PlusOutlined size={16}/>}
           onClick={() => setIsCreateModalVisible(true)}
           className="h-10 shadow-md flex items-center"
         >

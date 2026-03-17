@@ -3,7 +3,7 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Card, List, Tag, Button, Spin, Empty } from "antd"
-import { CheckCircle, AlertCircle, Info, Clock, X, Trash2 } from "lucide-react"
+import { CheckCircle, AlertCircle, Info, Clock, X, Trash2, Check, CheckCheckIcon } from "lucide-react"
 import { formatDistanceToNow } from 'date-fns'
 import { useState } from "react"
 import { toast } from "sonner"
@@ -117,14 +117,14 @@ export default function NotificationsPage() {
                             {showAll ? 'Show Unread Only' : 'Show All'}
                         </Button>
                         <Button 
-                            icon={<Trash2 className="w-4 h-4" />} 
+                            icon={<CheckCheckIcon className="w-4 h-4" />} 
                             onClick={handleClearAll}
                             loading={clearing}
                             disabled={!unreadNotifications || unreadNotifications.length === 0}
                             className="mt-1"
                             danger
                         >
-                            Clear All
+                            Read All
                         </Button>
                         <RefreshButton
                             onClick={refetch}
