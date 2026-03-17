@@ -10,6 +10,27 @@ import { generateNDAPDF } from "./actions"
 import { RoleGuard } from "@/components/role-guard"
 import { PageHeader } from "@/components/page-header"
 
+// Keys that are always auto-filled from employee data — never shown as manual inputs
+const AUTO_REPLACED_KEYS = new Set([
+    'FirstName', 'LastName', 'Employee_Name__c', 'Company_Name', 'Name',
+    'Employee_Role__c', 'Department__c', 'employee_Id', 'EmployeeId',
+    'Joining_Date__c', 'joining_date', 'Base_Salary__c', 'Salary_CTC__c',
+    'Seperation_Date__c', 'Employee_Title__c', 'Employee_ID__c',
+    'Employment_Duration__c', 'Email', 'Phone', 'Employee_Address',
+    'Father_Name',
+]);
+
+/** Extract all {{KEY}} placeholders from an HTML template string */
+function extractTemplateKeys(html: string): string[] {
+    const matches = [...html.matchAll(/\{\{([^}]+)\}\}/g)];
+    return [...new Set(matches.map(m => m[1].trim()))];
+}
+
+/** Make a human-readable label from a key like "Register_No" → "Register No" */
+function toLabel(key: string): string {
+    return key.replace(/_/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2');
+}
+
 export default function NDAPage() {
     const [selectedEmpId, setSelectedEmpId] = useState<string | null>(null)
     const [selectedPartitionKey, setSelectedPartitionKey] = useState<string | null>(null)
@@ -18,11 +39,9 @@ export default function NDAPage() {
     const [previewContent, setPreviewContent] = useState<string>("")
     const [loadingTemplate, setLoadingTemplate] = useState(false)
 
-    // Manual Fields State
-    const [manualValues, setManualValues] = useState<any>({
-        Register_No: '',
-        Date: new Date().toISOString().split('T')[0]
-    });
+    // Manual Fields State — keys populated dynamically from template
+    const [manualValues, setManualValues] = useState<Record<string, string>>({});
+    const [dynamicManualKeys, setDynamicManualKeys] = useState<string[]>([]);
     // Pending Requests State
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
     const [selectedRequest, setSelectedRequest] = useState<any>(null);
@@ -59,13 +78,6 @@ export default function NDAPage() {
         }
     })
 
-    // Set default template if available
-    useEffect(() => {
-        if (templates && templates.length > 0 && !selectedTemplateFile) {
-            setSelectedTemplateFile(templates[0].id);
-        }
-    }, [templates, selectedTemplateFile]);
-
     // Fetch Template Content
     useEffect(() => {
         const fetchTemplate = async () => {
@@ -84,6 +96,30 @@ export default function NDAPage() {
         fetchTemplate();
     }, [selectedTemplateFile])
 
+    // Derive dynamic manual fields whenever template changes
+    useEffect(() => {
+        if (!templateContent) {
+            setDynamicManualKeys([]);
+            return;
+        }
+        const allKeys = extractTemplateKeys(templateContent);
+        const manualKeys = allKeys.filter(k => !AUTO_REPLACED_KEYS.has(k));
+        setDynamicManualKeys(manualKeys);
+        // Seed missing keys with smart defaults; preserve existing user input
+        setManualValues(prev => {
+            const next = { ...prev };
+            manualKeys.forEach(k => {
+                if (!(k in next)) {
+                    // Default Date to today, everything else to empty string
+                    next[k] = k === 'Date'
+                        ? new Date().toISOString().split('T')[0]
+                        : '';
+                }
+            });
+            return next;
+        });
+    }, [templateContent])
+
     // Handle Employee Selection & Preview Generation
     useEffect(() => {
         if (!selectedEmpId || !employees || !templateContent) {
@@ -97,7 +133,7 @@ export default function NDAPage() {
             const pk = emp.Employee_Id || emp.PartitionKey || emp.EmployeeId || emp.Id || null;
             setSelectedPartitionKey(pk);
             const contact = emp || {};
-            const address = contact.Employee_Address__c || {};
+            const address = JSON.parse(emp.Employee_Address__c) || {};
 
             let html = templateContent;
 
@@ -109,6 +145,8 @@ export default function NDAPage() {
             replace('Register_No', manualValues.Register_No)
             replace('FirstName', contact.Employee_Name__c?.split(' ')[0]);
             replace('LastName', contact.Employee_Name__c?.split(' ').slice(1).join(' '));
+            replace('Employee_Name__c' , emp.Employee_Name__c);
+            replace('Company_Name' , 'MV Clouds')
             replace('Name', contact.Employee_Name__c)
             replace('Employee_Role__c', contact.Role__c);
             replace('Department__c', contact.Department__c);
@@ -120,7 +158,13 @@ export default function NDAPage() {
             replace('Base_Salary__c', emp.Base_Salary__c);
             replace('Salary_CTC__c', emp.Salary_CTC__c);
             replace('Date', manualValues.Date || new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }));
-
+            replace('Seperation_Date__c', emp.Seperation_Date__c || new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }));
+            replace('Employee_Title__c' , emp.Title__c + ' ' + emp.Role__c);
+            replace('Employee_ID__c' , emp.Name);
+            replace('Employment_Duration__c' , ( emp.Seperation_Date__c - emp.Joining_Date__c ) / 365);
+            replace('Email' , emp.Employee_Email__c);
+            replace('Phone' , emp.Employee_Phone__c);
+            
             // Manual Fields
             Object.keys(manualValues).forEach(key => {
                 replace(key, manualValues[key]);
@@ -128,11 +172,7 @@ export default function NDAPage() {
 
 
             // Address handling (Salesforce Composite Field)
-            replace('MailingStreet', address.street);
-            replace('MailingCity', address.city);
-            replace('MailingState', address.state);
-            replace('MailingPostalCode', address.postalCode);
-            replace('MailingCountry', address.country);
+            replace('Employee_Address', address.street + ', ' + address.city + ', ' + address.state + ' - ' + address.postalCode + ', ' + address.country);
 
             setPreviewContent(html);
         }
@@ -141,20 +181,16 @@ export default function NDAPage() {
     const handleDownload = () => {
         if (!selectedEmpId) return;
 
-        // Validate manual fields before generating PDF
-        const missingFields: string[] = [];
-        if (!manualValues.Register_No?.trim()) missingFields.push('Register No');
-        if (!manualValues.Date?.trim())        missingFields.push('Date');
-
+        // Validate: warn for any dynamic manual field that is empty
+        const missingFields = dynamicManualKeys.filter(k => !manualValues[k]?.trim());
         if (missingFields.length > 0) {
-            missingFields.forEach(field => {
-                message.error({
-                    content: `"${field}" is required. Please fill in this field before downloading.`,
-                    duration: 4,
+            missingFields.forEach(k => {
+                message.warning({
+                    content: `"${toLabel(k)}" is empty. Fill it in for best results.`,
+                    duration: 3,
                     style: { marginTop: '10px' }
                 });
             });
-            return;
         }
 
         const emp = employees.find((e: any) => e.Id === selectedEmpId);
@@ -364,30 +400,34 @@ export default function NDAPage() {
                                                 )}
                                             </div>
 
-                                            {/* Manual Inputs Card */}
-                                            <div className="bg-card rounded-2xl shadow-sm border border-border p-6 transition-all hover:shadow-md">
-                                                <h2 className="text-lg font-bold text-card-foreground mb-4 flex items-center gap-2">
-                                                    <Printer className="w-5 h-5 text-green-500" /> Manual Fields
-                                                </h2>
-                                                <div className="space-y-3">
-                                                    <div>
-                                                        <label className="text-xs font-semibold text-muted-foreground">Register No</label>
-                                                        <Input
-                                                            value={manualValues.Register_No}
-                                                            onChange={(e) => setManualValues({ ...manualValues, Register_No: e.target.value })}
-                                                            placeholder="REG-XXX"
-                                                        />
-                                                    </div>
-                                                    <div>
-                                                        <label className="text-xs font-semibold text-muted-foreground">Date</label>
-                                                        <Input
-                                                            type="date"
-                                                            value={manualValues.Date}
-                                                            onChange={(e) => setManualValues({ ...manualValues, Date: e.target.value })}
-                                                        />
+                                            {/* Manual Inputs Card — dynamic per template */}
+                                            {dynamicManualKeys.length > 0 && (
+                                                <div className="bg-card rounded-2xl shadow-sm border border-border p-6 transition-all hover:shadow-md">
+                                                    <h2 className="text-lg font-bold text-card-foreground mb-1 flex items-center gap-2">
+                                                        <Printer className="w-5 h-5 text-green-500" /> Manual Fields
+                                                    </h2>
+                                                    <p className="text-xs text-muted-foreground mb-4">
+                                                        {dynamicManualKeys.length} field{dynamicManualKeys.length !== 1 ? 's' : ''} required by this template
+                                                    </p>
+                                                    <div className="space-y-3">
+                                                        {dynamicManualKeys.map(key => (
+                                                            <div key={key}>
+                                                                <label className="text-xs font-semibold text-muted-foreground">
+                                                                    {toLabel(key)}
+                                                                </label>
+                                                                <Input
+                                                                    id={`manual-${key}`}
+                                                                    type={key === 'Date' ? 'date' : 'text'}
+                                                                    value={manualValues[key] ?? ''}
+                                                                    onChange={e => setManualValues(prev => ({ ...prev, [key]: e.target.value }))}
+                                                                    placeholder={toLabel(key)}
+                                                                    status={!manualValues[key]?.trim() ? 'warning' : ''}
+                                                                />
+                                                            </div>
+                                                        ))}
                                                     </div>
                                                 </div>
-                                            </div>
+                                            )}
 
                                             {/* Template Selector */}
                                             <div className="bg-card rounded-2xl shadow-sm border border-border p-6 transition-all hover:shadow-md">
