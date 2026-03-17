@@ -156,6 +156,12 @@ export function AssetManager({ initialAssets }: AssetManagerProps) {
         title="Asset Management"
         subtitle="Manage company assets, assignments, and returns."
       >
+        <RefreshButton
+          label=""
+          onClick={refreshAssets}
+          loading={loading}
+          size='large'
+        />
         <Button
           type="primary"
           size='large'
@@ -220,12 +226,6 @@ export function AssetManager({ initialAssets }: AssetManagerProps) {
               &nbsp;
             </label>
             <div className="flex gap-3 justify-end items-center">
-              <RefreshButton
-                label=""
-                onClick={refreshAssets}
-                loading={loading}
-                className="h-9"
-              />
               <Button
                 icon={<AppstoreOutlined />}
                 loading={catalogLoading}
@@ -233,7 +233,7 @@ export function AssetManager({ initialAssets }: AssetManagerProps) {
                   setCatalogLoading(true);
                   router.push('/assets/products');
                 }}
-                className="h-9 flex items-center"
+                size='large'
               >
                 Catalog
               </Button>

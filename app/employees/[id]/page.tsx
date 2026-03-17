@@ -9,7 +9,7 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
   const role = (session?.role as string) || 'Employee';
   return (
     <div className="min-h-screen bg-slate-50/50">
-        <div className="max-w-7xl mx-auto px-6 lg:px-10 pt-6 pb-0">
+        <div className="w-full px-6 lg:px-10 pt-6 pb-0">
             {role === 'HR' || role === 'Admin' && (
             <Link 
                 href="/employees" 
