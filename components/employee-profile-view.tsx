@@ -749,11 +749,11 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
       
       {/* Header Profile Card */}
       <div className="relative bg-white rounded-3xl p-8 border border-slate-100 shadow-xl overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-r from-cyan-500 to-blue-600"></div>
+        <div className="absolute top-0 left-0 w-full h-[340px] md:h-40 bg-gradient-to-r from-cyan-500 to-blue-600"></div>
         
-        <div className="relative flex flex-col md:flex-row gap-6 items-center md:items-center mt-12">
+        <div className="relative flex flex-col md:flex-row gap-6 items-center md:items-center mt-6">
            {/* Avatar */}
-           <div className="relative group">
+           <div className="relative group shrink-0">
               <div className="w-32 h-32 rounded-full border-4 border-white shadow-lg bg-slate-200 flex items-center justify-center overflow-hidden">
                   {employee.Profile_Photo__c && !uploadMutation.isPending ? (
                       <Image key={employee.Profile_Photo__c} src={employee.Profile_Photo__c} alt="Profile" width={128} height={128} className="w-full h-full object-cover" />
@@ -774,13 +774,13 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
            </div>
 
            {/* Info */}
-           <div className="flex-1 mb-2">
+           <div className="flex-1 w-full text-center md:text-left mb-2">
                <div className="flex flex-col md:flex-row md:items-center gap-4 justify-between">
                    <div>
-                       <h1 className="text-3xl font-bold text-slate-900">{employee.Employee_Name__c}</h1>
-                       <div className="flex items-center justify-center gap-3 text-slate-500 mt-1">
+                       <h1 className="text-3xl font-bold text-white">{employee.Employee_Name__c}</h1>
+                       <div className="flex items-center justify-center md:justify-start gap-3 text-cyan-50 mt-1">
                           <span className="flex items-center gap-1"><Briefcase className="w-4 h-4" /> {employee.Role__c || "Role not set"}</span>
-                          <span className="w-1 h-1 rounded-full bg-slate-300"></span>
+                          <span className="w-1 h-1 rounded-full bg-cyan-200"></span>
                           <span className="flex items-center gap-1"><MapPin className="w-4 h-4" /> {employee.Employee_Address__c.city || "Location not set"}</span>
                        </div>
                    </div>
