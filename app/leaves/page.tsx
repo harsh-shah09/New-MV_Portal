@@ -750,7 +750,6 @@ export default function LeavesPage() {
                       allowClear
                     >
                       <Select.Option value="">All Leaves</Select.Option>
-                      <Select.Option value="Annual Leave">Annual Leave</Select.Option>
                       <Select.Option value="Sick Leave">Sick Leave</Select.Option>
                       <Select.Option value="Emergency Leave">Emergency Leave</Select.Option>
                       <Select.Option value="Planned Leave">Planned Leave</Select.Option>
