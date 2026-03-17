@@ -36,7 +36,7 @@ export function EmployeeFilters({
           </label>
           <Input
             prefix={<SearchOutlined className="text-muted-foreground" />}
-            placeholder="Search by name..."
+            placeholder="Search by name & Email"
             value={searchTerm}
             onChange={(e) => onSearchChange(e.target.value)}
             allowClear

@@ -339,7 +339,7 @@ export default function EmployeesClient({ role }: EmployeesClientProps) {
     <PageContainer>
       <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
         <PageHeader title="Employees" subtitle="Manage your workforce">
-            <RefreshButton onClick={refetch} loading={isFetching} />
+            <RefreshButton onClick={refetch} label="" size="large" loading={isFetching} />
         </PageHeader>
 
         <EmployeeFilters
