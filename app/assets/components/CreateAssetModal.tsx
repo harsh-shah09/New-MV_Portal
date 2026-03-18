@@ -39,10 +39,7 @@ export function CreateAssetModal({ visible, onCancel, onSuccess }: CreateAssetMo
     try {
         await createAsset({
             AMS_Product__c: values.AMS_Product__c,
-            AMS_Category__c: values.AMS_Category__c, // Could be auto-populated from Product, but user might want override? 
-            // Prompt says Product has Category. Often Asset copies it or has its own.
-            // Let's assume user selects Product, we can auto-fill Category if not provided, or ask user.
-            // The Asset Object has `AMS_Category__c`.
+            AMS_Category__c: values.AMS_Category__c,
             AMS_Asset_Serial_Number__c: values.AMS_Asset_Serial_Number__c,
             AMS_Purchase_Date__c: values.AMS_Purchase_Date__c ? values.AMS_Purchase_Date__c.format('YYYY-MM-DD') : undefined,
             AMS_Warranty_Expiry_Date__c: values.AMS_Warranty_Expiry_Date__c ? values.AMS_Warranty_Expiry_Date__c.format('YYYY-MM-DD') : undefined,
@@ -51,7 +48,7 @@ export function CreateAssetModal({ visible, onCancel, onSuccess }: CreateAssetMo
         showToast.success("Asset Created", { description: "Asset created successfully!" });
         onSuccess();
     } catch (err: any) {
-        showToast.error("Creation Failed", { description: err.message });
+        showToast.error("Creation Failed", { description: err.message.includes('duplicate') ? 'Serial number should be unique'  : 'Check inputs and try again' });
     } finally {
         setLoading(false);
     }
@@ -72,7 +69,7 @@ export function CreateAssetModal({ visible, onCancel, onSuccess }: CreateAssetMo
       open={visible}
       onCancel={onCancel}
       footer={null}
-      destroyOnClose
+      destroyOnHidden
     >
       <Form
         form={form}
@@ -151,8 +148,7 @@ export function CreateAssetModal({ visible, onCancel, onSuccess }: CreateAssetMo
         <Form.Item name="AMS_Purchase_Condition__c" label="Purchase Condition">
              <Select>
                 <Select.Option value="New">New</Select.Option>
-                <Select.Option value="Refurbished">Refurbished</Select.Option>
-                <Select.Option value="Used">Used</Select.Option>
+                <Select.Option value="Second-hand">Second hand</Select.Option>
             </Select>
         </Form.Item>
 

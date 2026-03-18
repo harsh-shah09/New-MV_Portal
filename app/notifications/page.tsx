@@ -1,23 +1,95 @@
 
 "use client"
 
-import { useQuery } from "@tanstack/react-query"
-import { Card, List, Tag, Button, Spin, Empty, Typography } from "antd"
-import { Bell, CheckCircle, AlertCircle, Info, Clock, RefreshCw } from "lucide-react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { Card, List, Tag, Button, Spin, Empty } from "antd"
+import { CheckCircle, AlertCircle, Info, Clock, X, Trash2, Check, CheckCheckIcon } from "lucide-react"
 import { formatDistanceToNow } from 'date-fns'
-
-const { Title, Text } = Typography;
+import { useState } from "react"
+import { toast } from "sonner"
+import { RefreshButton } from "@/components/refresh-button"
 
 export default function NotificationsPage() {
+    const [showAll, setShowAll] = useState(false)
+    const [clearing, setClearing] = useState(false)
+    const queryClient = useQueryClient()
 
-    const { data: notifications, isLoading, isFetching, refetch } = useQuery({
-        queryKey: ['notifications'],
+    // Query for unread notifications only (initial load)
+    const { data: unreadNotifications, isLoading: isLoadingUnread, isFetching: isFetchingUnread, refetch: refetchUnread } = useQuery({
+        queryKey: ['notifications', 'unread'],
         queryFn: async () => {
-             const res = await fetch('/api/notifications');
-             if (!res.ok) throw new Error("Failed to fetch");
+             const res = await fetch('/api/notifications?unreadOnly=true');
+             if (!res.ok) throw new Error("Failed to fetch unread notifications");
              return res.json();
         }
     })
+
+    // Query for all notifications (lazy loaded when showAll is true)
+    const { data: allNotifications, isLoading: isLoadingAll, isFetching: isFetchingAll, refetch: refetchAll } = useQuery({
+        queryKey: ['notifications', 'all'],
+        queryFn: async () => {
+             const res = await fetch('/api/notifications');
+             if (!res.ok) throw new Error("Failed to fetch all notifications");
+             return res.json();
+        },
+        enabled: showAll // Only fetch when showAll is true
+    })
+
+    const displayNotifications = showAll ? (allNotifications || []) : (unreadNotifications || [])
+    const isLoading = showAll ? isLoadingAll : isLoadingUnread
+    const isFetching = showAll ? isFetchingAll : isFetchingUnread
+
+    const refetch = () => {
+        refetchUnread()
+        if (showAll) {
+            refetchAll()
+        }
+    }
+
+    const handleMarkAsRead = async (notificationId: string) => {
+        try {
+            const res = await fetch('/api/notifications', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ notificationId, isRead: true })
+            })
+            if (!res.ok) throw new Error('Failed to mark as read')
+            toast.success('Notification cleared')
+            refetch()
+            queryClient.invalidateQueries({ queryKey: ['notifications'] })
+        } catch (error) {
+            toast.error('Failed to clear notification')
+        }
+    }
+
+    const handleClearAll = async () => {
+        const unreadList = unreadNotifications || []
+        if (unreadList.length === 0) {
+            toast.info('No unread notifications to clear')
+            return
+        }
+        
+        setClearing(true)
+        try {
+            const notificationIds = unreadList.map((n: any) => n.Id)
+            
+            const res = await fetch('/api/notifications', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ notificationIds, isRead: true })
+            })
+            
+            if (!res.ok) throw new Error('Failed to clear notifications')
+            
+            toast.success(`Cleared ${unreadList.length} notifications`)
+            refetch()
+            queryClient.invalidateQueries({ queryKey: ['notifications'] })
+        } catch (error) {
+            toast.error('Failed to clear all notifications')
+        } finally {
+            setClearing(false)
+        }
+    }
 
     const getIcon = (type: string) => {
         switch(type) {
@@ -33,15 +105,33 @@ export default function NotificationsPage() {
                  <div className="flex justify-between items-start">
                     <div>
                         <h1 className="text-3xl font-extrabold text-slate-900">Notifications</h1>
-                        <p className="text-slate-500">Stay updated with your latest alerts and tasks.</p>
+                        <p className="text-slate-500">
+                            {showAll ? 'All notifications' : `${unreadNotifications?.length || 0} unread notification${unreadNotifications?.length !== 1 ? 's' : ''}`}
+                        </p>
                     </div>
-                    <Button 
-                        icon={<RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />} 
-                        onClick={() => refetch()}
-                        className="mt-1"
-                    >
-                        Refresh
-                    </Button>
+                    <div className="flex gap-2">
+                        <Button 
+                            onClick={() => setShowAll(!showAll)}
+                            className="mt-1"
+                        >
+                            {showAll ? 'Show Unread Only' : 'Show All'}
+                        </Button>
+                        <Button 
+                            icon={<CheckCheckIcon className="w-4 h-4" />} 
+                            onClick={handleClearAll}
+                            loading={clearing}
+                            disabled={!unreadNotifications || unreadNotifications.length === 0}
+                            className="mt-1"
+                            danger
+                        >
+                            Read All
+                        </Button>
+                        <RefreshButton
+                            onClick={refetch}
+                            loading={isFetching}
+                            className="mt-1"
+                        />
+                    </div>
                 </div>
 
                 <Card className="shadow-sm border-slate-100 rounded-2xl bg-white/80 backdrop-blur-sm">
@@ -50,42 +140,62 @@ export default function NotificationsPage() {
                     ) : (
                         <List
                             itemLayout="horizontal"
-                            dataSource={notifications || []}
+                            dataSource={displayNotifications}
                             locale={{
-                                emptyText: <Empty description="No notifications found" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+                                emptyText: <Empty description={showAll ? "No notifications found" : "No unread notifications"} image={Empty.PRESENTED_IMAGE_SIMPLE} />
                             }}
-                            renderItem={(item: any) => (
+                            renderItem={(item: any) => {
+                                const isRead = item.Status__c !== 'Unread' && item.Is_Read__c !== false && item.Is_Read__c !== 'false' && Boolean(item.Is_Read__c)
+
+                                return (
                                 <List.Item 
-                                    className={`hover:bg-slate-50 transition-colors px-4 py-4 rounded-xl cursor-pointer ${item.Is_Read__c ? 'opacity-70' : 'bg-blue-50/30'}`}
+                                    className={`group relative mb-3 rounded-xl px-4 py-4 transition-colors hover:bg-slate-50 ${isRead ? 'opacity-70' : 'bg-blue-50/30'}`}
                                 >
-                                    <List.Item.Meta
+                                    {!isRead && (
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                handleMarkAsRead(item.Id)
+                                            }}
+                                            className="absolute right-4 top-4 opacity-0 transition-opacity hover:bg-red-50 group-hover:opacity-100 rounded-lg p-1.5 text-red-500"
+                                            title="Clear notification"
+                                        >
+                                            <X className="w-4 h-4" />
+                                        </button>
+                                    )}
+                                    <List.Item.Meta className="px-3"
                                         avatar={
-                                            <div className="mt-1 p-2 bg-white rounded-full border border-slate-100 shadow-sm">
+                                                <div className="mt-5 p-2 bg-white rounded-full border border-slate-100 shadow-sm">
                                                 {getIcon(item.Notification_Type__c)}
                                             </div>
                                         }
                                         title={
-                                            <div className="flex justify-between items-start">
-                                                <span className="font-semibold text-slate-800 text-base">{item.Notification_Type__c?.replace('_', ' ') || 'Notification'}</span>
-                                                <span className="text-xs text-slate-400 font-medium whitespace-nowrap ml-2 flex items-center gap-1">
-                                                    <Clock className="w-3 h-3" />
-                                                    {item.CreatedDate ? formatDistanceToNow(new Date(item.CreatedDate), { addSuffix: true }) : ''}
-                                                </span>
+                                            <div className="pr-8">
+                                                <span className="font-semibold text-base text-slate-800">{item.Notification_Type__c?.replace('_', ' ') || 'Notification'}</span>
                                             </div>
                                         }
                                         description={
-                                            <div className="mt-1 space-y-2">
+                                            <div className="mt-1 space-y-3">
                                                 <p className="text-slate-600 text-sm leading-relaxed">{item.Message__c}</p>
-                                                {item.Status__c && (
-                                                    <Tag color={item.Status__c === 'Pending' ? 'orange' : 'green'} className="border-0 bg-opacity-10 font-medium">
-                                                        {item.Status__c}
-                                                    </Tag>
-                                                )}
+                                                <div className="flex items-end justify-between gap-3">
+                                                    <div>
+                                                        {item.Status__c && (
+                                                            <Tag color={item.Status__c === 'Pending' ? 'orange' : 'green'} className="border-0 bg-opacity-10 font-medium">
+                                                                {item.Status__c}
+                                                            </Tag>
+                                                        )}
+                                                    </div>
+                                                    <span className="flex items-center gap-1 whitespace-nowrap text-xs font-medium text-slate-400">
+                                                        <Clock className="w-3 h-3" />
+                                                        {item.CreatedDate ? formatDistanceToNow(new Date(item.CreatedDate), { addSuffix: true }) : ''}
+                                                    </span>
+                                                </div>
                                             </div>
                                         }
                                     />
                                 </List.Item>
-                            )}
+                                )
+                            }}
                         />
                     )}
                 </Card>

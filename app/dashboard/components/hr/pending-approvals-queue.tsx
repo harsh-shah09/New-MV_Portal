@@ -195,7 +195,7 @@ export function PendingApprovalsQueue() {
           />
           {pendingApprovals.length > 5 && (
             <div className="text-center mt-4">
-              <Button type="primary" onClick={() => router.push('/leaves?tab=approvals')}>
+              <Button type="primary" onClick={() => router.push('/leaves?tab=approvals&status=applied')}>
                 View All {pendingApprovals.length} Pending Requests
               </Button>
             </div>

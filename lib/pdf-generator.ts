@@ -1,4 +1,5 @@
 import puppeteer from 'puppeteer'
+import type { Browser } from 'puppeteer'
 import fs from 'fs'
 import path from 'path'
 
@@ -48,19 +49,71 @@ interface PayslipData {
   daysInMonth: number
 }
 
+let browserInstance: Browser | null = null
+let browserLaunching: Promise<Browser> | null = null
+
+const launchBrowser = async (): Promise<Browser> => {
+  const maxAttempts = 3
+  let lastError: unknown
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      console.info('[PDF] Launching browser', { attempt })
+      const browser = await puppeteer.launch({
+        headless: true,
+        timeout: 60000,
+        protocolTimeout: 120000,
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-gpu',
+          '--no-zygote',
+          '--single-process'
+        ]
+      })
+      console.info('[PDF] Browser launched successfully', { attempt })
+      return browser
+    } catch (error) {
+      lastError = error
+      console.error('[PDF] Browser launch failed', { attempt, error })
+      if (attempt < maxAttempts) {
+        await new Promise((resolve) => setTimeout(resolve, attempt * 1000))
+      }
+    }
+  }
+
+  throw lastError || new Error('Failed to launch browser')
+}
+
+const getBrowser = async (): Promise<Browser> => {
+  if (browserInstance && browserInstance.connected) {
+    return browserInstance
+  }
+
+  if (!browserLaunching) {
+    browserLaunching = launchBrowser()
+      .then((browser) => {
+        browserInstance = browser
+        return browser
+      })
+      .finally(() => {
+        browserLaunching = null
+      })
+  }
+
+  return browserLaunching
+}
+
 export async function generatePayslipPDF(payslipData: PayslipData): Promise<Buffer> {
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox']
-  })
+  const browser = await getBrowser()
+  const page = await browser.newPage()
 
   try {
-    const page = await browser.newPage()
-    
     // Generate HTML for the payslip
     const html = generatePayslipHTML(payslipData)
     
-    await page.setContent(html, { waitUntil: 'networkidle0' })
+    await page.setContent(html, { waitUntil: 'networkidle0', timeout: 60000 })
     
     // Generate PDF
     const pdfBuffer = await page.pdf({
@@ -75,8 +128,21 @@ export async function generatePayslipPDF(payslipData: PayslipData): Promise<Buff
     })
 
     return Buffer.from(pdfBuffer)
+  } catch (error) {
+    console.error('[PDF] PDF generation failed', {
+      employeeId: payslipData.employeeId,
+      employeeName: payslipData.employeeName,
+      payrollMonth: payslipData.payrollMonth,
+      payrollYear: payslipData.payrollYear,
+      error,
+    })
+    throw error
   } finally {
-    await browser.close()
+    try {
+      await page.close()
+    } catch (error) {
+      console.warn('[PDF] Failed to close page', { error })
+    }
   }
 }
 

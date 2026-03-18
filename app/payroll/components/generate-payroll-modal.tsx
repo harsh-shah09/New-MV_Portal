@@ -47,9 +47,23 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
   const [selectedEmployee, setSelectedEmployee] = useState<PayrollEmployeeDetail | null>(null)
   const [editMode, setEditMode] = useState(false)
 
+  const isFuturePayrollPeriod = (month: string, year: number) => {
+    const monthIndex = months.indexOf(month)
+    if (monthIndex < 0) return false
+    const selectedPeriod = new Date(year, monthIndex, 1)
+    const now = new Date()
+    const currentPeriod = new Date(now.getFullYear(), now.getMonth(), 1)
+    return selectedPeriod > currentPeriod
+  }
+
   const handleGenerate = async () => {
     if (!selectedMonth) {
       message.error("Please select a month")
+      return
+    }
+
+    if (isFuturePayrollPeriod(selectedMonth, selectedYear)) {
+      message.error("Cannot generate payroll for a future month")
       return
     }
 
@@ -86,6 +100,11 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
   const handleConfirmGeneration = async () => {
     if (!selectedMonth || !selectedYear) {
       message.error("Month and year are required")
+      return
+    }
+
+    if (isFuturePayrollPeriod(selectedMonth, selectedYear)) {
+      message.error("Cannot save payroll for a future month")
       return
     }
 

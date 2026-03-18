@@ -364,6 +364,26 @@ export const createDocumentRecord = async (docData: any) => {
 export const createBankDetail = async (bankData: any) => {
     const conn = await getSalesforceConnection();
     if (!conn) throw new Error("No Salesforce connection");
+
+  if (bankData?.Primary_Account__c === true && bankData?.Employee__c) {
+    const existingPrimaryQuery = `
+      SELECT Id
+      FROM Bank_Detail__c
+      WHERE Employee__c = '${bankData.Employee__c}' AND Primary_Account__c = true
+    `;
+
+    const existingPrimaryResult = await conn.query(existingPrimaryQuery);
+
+    if (existingPrimaryResult.records.length > 0) {
+      const updates = existingPrimaryResult.records.map((record: any) => ({
+        Id: record.Id,
+        Primary_Account__c: false
+      }));
+
+      await conn.sobject("Bank_Detail__c").update(updates);
+    }
+  }
+
     return await conn.sobject("Bank_Detail__c").create(bankData);
 };
 
@@ -371,6 +391,28 @@ export const createBankDetail = async (bankData: any) => {
 export const updateBankDetail = async (bankData: any) => {
     const conn = await getSalesforceConnection();
     if (!conn) throw new Error("No Salesforce connection");
+
+    if (bankData?.Primary_Account__c === true && bankData?.Employee__c && bankData?.Id) {
+      const existingPrimaryQuery = `
+        SELECT Id
+        FROM Bank_Detail__c
+        WHERE Employee__c = '${bankData.Employee__c}'
+          AND Primary_Account__c = true
+          AND Id != '${bankData.Id}'
+      `;
+
+      const existingPrimaryResult = await conn.query(existingPrimaryQuery);
+
+      if (existingPrimaryResult.records.length > 0) {
+        const updates = existingPrimaryResult.records.map((record: any) => ({
+          Id: record.Id,
+          Primary_Account__c: false
+        }));
+
+        await conn.sobject("Bank_Detail__c").update(updates);
+      }
+    }
+
     return await conn.sobject("Bank_Detail__c").update(bankData);
 };
 
@@ -448,19 +490,39 @@ export const getDocumentsByEmployee = async (employeeId: string) => {
     return result.records;
 }
 
-export const getPendingDocuments = async () => {
+export const getPendingDocuments = async (reviewerRole?: string) => {
     const conn = await getSalesforceConnection();
     if (!conn) throw new Error("No Salesforce connection");
     // Fetch pending and uploaded documents and include related Employee Name
     const query = `
       SELECT Id, Name, Document_Type__c, Document_Category__c, File_URL__c, Status__c, CreatedDate,
-             Employee__c, Employee__r.Employee_Name__c
+       Employee__c, Employee__r.Employee_Name__c, Employee__r.Role__c
       FROM Document__c
       WHERE Status__c IN ('Pending', 'Uploaded')
       ORDER BY CreatedDate DESC
     `;
     const result = await conn.query(query);
-    return result.records;
+
+  const docs = result.records as any[];
+
+  if (!reviewerRole) return docs;
+
+  // Verification rule:
+  // - HR verifies uploaded docs for non-HR employees
+  // - Admin verifies uploaded docs for HR employees
+  if (reviewerRole === 'HR') {
+    return docs.filter((doc: any) =>
+      doc.Status__c === 'Uploaded' && (doc.Employee__r?.Role__c || '') !== 'HR'
+    );
+  }
+
+  if (reviewerRole === 'Admin') {
+    return docs.filter((doc: any) =>
+      doc.Status__c === 'Uploaded' && (doc.Employee__r?.Role__c || '') === 'HR'
+    );
+  }
+
+  return [];
 }
 
 export const updateDocument = async (docData: any) => {
@@ -495,14 +557,12 @@ export const getNotifications = async (employeeId: string) => {
     if (!conn) throw new Error("No Salesforce connection");
     
     const query = `
-      SELECT Id, Name, Message__c, Action_Required__c, Status__c, Notification_Type__c, CreatedDate, Is_Read__c,
-             Employee__c
+      SELECT Id, Employee__c, Message__c, Status__c, Notification_Type__c, Is_Read__c, CreatedDate
       FROM MV_Notification__c
       WHERE Employee__c = '${employeeId}'
       ORDER BY CreatedDate DESC
       LIMIT 100
     `;
-    // console.log(query)
     const result = await conn.query(query);
     return result.records;
 }

@@ -76,6 +76,8 @@ export interface LeaveRequest {
   hrApproval?: string
   confirmMerge ?: boolean
   mergeExistingLeaveId ?: string
+  withdrawalStartDate?: string
+  withdrawalEndDate?: string
 }
 
 export interface LeavePolicy {

@@ -14,7 +14,6 @@ export async function GET(
     }
 
     // Parse Address for frontend convenience
-    // Parse Address for frontend convenience
     if (typeof employee.Employee_Address__c === 'string') {
         try {
             // Try parsing as JSON first (New Format)

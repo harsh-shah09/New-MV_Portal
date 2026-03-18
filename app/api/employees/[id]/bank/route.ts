@@ -1,12 +1,22 @@
 
 import { NextResponse } from 'next/server';
-import { createBankDetail, deleteBankDetail } from '@/lib/salesforce';
+import { verifySession } from '@/lib/auth';
+import { createBankDetail, deleteBankDetail, updateBankDetail } from '@/lib/salesforce';
 
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await verifySession();
+    if (!session || !session.employeeId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (!['HR', 'Admin'].includes(session.role)) {
+      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+    }
+
     const { id } = await params;
     const body = await request.json();
     
@@ -49,5 +59,44 @@ export async function DELETE(
   } catch (error) {
     console.error('Error deleting bank detail:', error);
     return NextResponse.json({ error: 'Failed to delete bank detail' }, { status: 500 });
+  }
+}
+
+export async function PUT(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await verifySession();
+    if (!session || !session.employeeId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (!['HR', 'Admin'].includes(session.role)) {
+      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+    }
+
+    const { id } = await params;
+    const body = await request.json();
+    const { bankId, primaryAccount } = body as { bankId?: string; primaryAccount?: boolean };
+
+    if (!bankId) {
+      return NextResponse.json({ error: 'Bank ID is required' }, { status: 400 });
+    }
+
+    if (primaryAccount !== true) {
+      return NextResponse.json({ error: 'Only setting primary account is supported' }, { status: 400 });
+    }
+
+    await updateBankDetail({
+      Id: bankId,
+      Employee__c: id,
+      Primary_Account__c: true,
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error updating bank detail:', error);
+    return NextResponse.json({ error: 'Failed to update bank detail' }, { status: 500 });
   }
 }

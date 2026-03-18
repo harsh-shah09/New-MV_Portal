@@ -8,12 +8,14 @@ import { HRDashboard } from "./components/hr-dashboard"
 import { useQuery } from "@tanstack/react-query"
 import { verifySession } from "@/lib/auth"
 import { PageContainer } from "@/components/page-container"
+import { Switch } from "antd"
 
 
 export default function DashboardPage() {
   const router = useRouter()
   const [role, setRole] = useState<string | null>(null)
   const [title, setTitle] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<'hr' | 'employee'>('hr')
   
   useEffect(() => {
     let mounted = true
@@ -34,8 +36,8 @@ export default function DashboardPage() {
   }, [])
 
   const { data, isLoading, isFetching } = useQuery({
-    queryKey: ["dashboard", role],
-    queryFn: () => fetch("/api/dashboard").then((res) => {
+    queryKey: ["dashboard", role, viewMode],
+    queryFn: () => fetch(`/api/dashboard?view=${viewMode}`).then((res) => {
       if (!res.ok) {
         if (res.status === 401) {
           router.push("/auth/login")
@@ -55,11 +57,26 @@ export default function DashboardPage() {
 
   return (
     <PageContainer>
-        {(isHR || isAdmin) ? (
-          <HRDashboard data={data} />
-        ) : (
-          <EmployeeDashboard data={data} />
-        )}
+      <div className="bg-white p-2 rounded-xl">
+      {isHR && (
+        <div className="flex justify-end mb-4">
+          <div className="flex items-center gap-3 bg-white px-4 py-2 rounded-lg shadow-sm border">
+            <span className="text-sm font-medium text-gray-700">My Dashboard</span>
+            <Switch
+              checked={viewMode === 'hr'}
+              onChange={(checked) => setViewMode(checked ? 'hr' : 'employee')}
+              className="bg-gray-300"
+            />
+            <span className="text-sm font-medium text-gray-700">HR Dashboard</span>
+          </div>
+        </div>
+      )}
+      {(isHR && viewMode === 'hr') || isAdmin ? (
+        <HRDashboard data={data} />
+      ) : (
+        <EmployeeDashboard data={data} />
+      )}
+      </div>
     </PageContainer>
   )
 }

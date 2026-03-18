@@ -1,8 +1,8 @@
 "use client"
 
-import { useState } from 'react';
-import { Button, Input, Modal } from 'antd';
-import { PlusOutlined, SearchOutlined, ReloadOutlined, AppstoreOutlined, FileAddOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
+import { useState, useMemo } from 'react';
+import { Input, Button, Card, Modal, Row, Col, Select } from 'antd';
+import { PlusOutlined, SearchOutlined, AppstoreOutlined, ExclamationCircleOutlined, FilterOutlined } from '@ant-design/icons';
 import { useRouter } from 'next/navigation';
 import { AssetTable } from './AssetTable';
 import { AssetAssignmentModal } from './AssetAssignmentModal';
@@ -10,24 +10,43 @@ import { CreateAssetModal } from './CreateAssetModal';
 import { SalesforceAsset, AssignmentHistory } from '../types';
 import { getAssetById, getAssets, updateAssetStatus } from '../actions';
 import { showToast } from './toast';
-
-// ... (existing modalWidth)
+import { RefreshButton } from '@/components/refresh-button';
+import { PageHeader } from '@/components/page-header';
 
 interface AssetManagerProps {
   initialAssets: SalesforceAsset[];
 }
 
+const STATUS_OPTIONS = [
+  { label: 'All Status', value: '' },
+  { label: 'Assigned', value: 'Assigned' },
+  { label: 'Un-Assigned', value: 'Un-Assigned' },
+  { label: 'Discarded', value: 'Discarded' },
+];
+
 export function AssetManager({ initialAssets }: AssetManagerProps) {
   const router = useRouter();
   const [assets, setAssets] = useState<SalesforceAsset[]>(initialAssets);
   const [loading, setLoading] = useState(false);
+  const [catalogLoading, setCatalogLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
-  
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+
   // Modal States
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isCreateModalVisible, setIsCreateModalVisible] = useState(false);
   const [currentAssignment, setCurrentAssignment] = useState<AssignmentHistory | null>(null);
   const [selectedAsset, setSelectedAsset] = useState<SalesforceAsset | null>(null);
+
+  // Derive unique categories from loaded assets
+  const categoryOptions = useMemo(() => {
+    const unique = Array.from(new Set(assets.map(a => a.AMS_Category__c).filter(Boolean)));
+    return [
+      { label: 'All Categories', value: '' },
+      ...unique.map(c => ({ label: c, value: c })),
+    ];
+  }, [assets]);
 
   const refreshAssets = async () => {
     setLoading(true);
@@ -42,68 +61,73 @@ export function AssetManager({ initialAssets }: AssetManagerProps) {
   };
 
   const handleCreateSuccess = () => {
-      setIsCreateModalVisible(false);
-      refreshAssets();
-  }
+    setIsCreateModalVisible(false);
+    refreshAssets();
+  };
 
   const handleManageAssignment = async (asset: SalesforceAsset) => {
     setSelectedAsset(asset);
     try {
-        const details = await getAssetById(asset.Id);
-        if (details && details.history) {
-            const active = details.history.find(h => !h.AMS_Returned_Date__c);
-            setCurrentAssignment(active || null);
-        } else {
-             setCurrentAssignment(null);
-        }
-        setIsModalVisible(true);
+      const details = await getAssetById(asset.Id);
+      if (details && details.history) {
+        const active = details.history.find(h => !h.AMS_Returned_Date__c);
+        setCurrentAssignment(active || null);
+      } else {
+        setCurrentAssignment(null);
+      }
+      setIsModalVisible(true);
     } catch (e) {
-        showToast.error("Failed to fetch assignment details");
+      showToast.error("Failed to fetch assignment details");
     }
   };
-  
+
   const handleDiscard = async (asset: SalesforceAsset) => {
     if (asset.AMS_Status__c === 'Discarded') {
-        showToast.warning("Asset Already Discarded", { 
-            description: "This asset has already been marked as discarded. No further action is required." 
-        });
-        return;
+      showToast.warning("Asset Already Discarded", {
+        description: "This asset has already been marked as discarded. No further action is required.",
+      });
+      return;
     }
 
     try {
-        const details = await getAssetById(asset.Id);
-        const active = details?.history?.find(h => !h.AMS_Returned_Date__c);
+      const details = await getAssetById(asset.Id);
+      const active = details?.history?.find(h => !h.AMS_Returned_Date__c);
 
-        if (active) {
-            const assigneeName = active.AMS_Assigned_Person__r?.Employee_Name__c || active.AMS_Assigned_Person__r?.Name || 'Unknown';
-            showToast.warning("Active Assignment Found", {
-                description: `This asset has an active assignment record (${active.Name} with ${assigneeName}). Please ensure the asset is returned before proceeding.`
-            });
-            return;
-        }
-
-        Modal.confirm({
-            title: 'Confirm Discard',
-            icon: <ExclamationCircleOutlined />,
-            content: 'Consent Given to Discard? This action updates the status to Discarded.',
-            okText: 'Yes, Discard',
-            okType: 'danger',
-            cancelText: 'No',
-            onOk: async () => {
-                try {
-                    setLoading(true);
-                    await updateAssetStatus(asset.Id, 'Discarded');
-                    showToast.success('Asset Discarded', { description: 'The asset status has been updated to Discarded.' });
-                    await refreshAssets();
-                } catch (e: any) {
-                    showToast.error('Discard Failed', { description: e.message || 'Failed to discard asset' });
-                    setLoading(false);
-                }
-            }
+      if (active) {
+        const assigneeName =
+          active.AMS_Assigned_Person__r?.Employee_Name__c ||
+          active.AMS_Assigned_Person__r?.Name ||
+          'Unknown';
+        showToast.warning("Active Assignment Found", {
+          description: `This asset has an active assignment record (${active.Name} with ${assigneeName}). Please ensure the asset is returned before proceeding.`,
         });
+        return;
+      }
+
+      Modal.confirm({
+        title: 'Confirm Discard',
+        icon: <ExclamationCircleOutlined />,
+        content: 'Consent Given to Discard? This action updates the status to Discarded.',
+        okText: 'Yes, Discard',
+        okType: 'danger',
+        cancelText: 'No',
+        onOk: async () => {
+          try {
+            setLoading(true);
+            await updateAssetStatus(asset.Id, 'Discarded');
+            showToast.success('Asset Discarded', {
+              description: 'The asset status has been updated to Discarded.',
+            });
+            await refreshAssets();
+          } catch (e: any) {
+            showToast.error('Discard Failed', { description: e.message || 'Failed to discard asset' });
+            setLoading(false);
+          }
+        },
+      });
     } catch (e) {
-        console.error("Check Discard Error", e);
-        showToast.error("Verification Failed", { description: "Failed to verify asset details" });
+      console.error("Check Discard Error", e);
+      showToast.error("Verification Failed", { description: "Failed to verify asset details" });
     }
   };
 
@@ -112,78 +136,123 @@ export function AssetManager({ initialAssets }: AssetManagerProps) {
     refreshAssets();
   };
 
-  // Filter
-  const filteredAssets = assets.filter(a => 
-    a.Name.toLowerCase().includes(searchText.toLowerCase()) || 
-    (a.AMS_Product__r?.Name || '').toLowerCase().includes(searchText.toLowerCase()) ||
-    (a.AMS_Assigned_To__r?.Employee_Name__c || '').toLowerCase().includes(searchText.toLowerCase())
-  );
+  // Combined filter
+  const filteredAssets = assets.filter(a => {
+    const search = searchText.toLowerCase();
+    const matchesSearch =
+      a.Name.toLowerCase().includes(search) ||
+      (a.AMS_Product__r?.Name || '').toLowerCase().includes(search) ||
+      (a.AMS_Assigned_To__r?.Employee_Name__c || '').toLowerCase().includes(search);
+    const matchesCategory = !categoryFilter || a.AMS_Category__c === categoryFilter;
+    const matchesStatus = !statusFilter || a.AMS_Status__c === statusFilter;
+    return matchesSearch && matchesCategory && matchesStatus;
+  });
 
   return (
-    <div className="space-y-6">
-      {/* Header Actions */}
-      <div className="flex flex-col lg:flex-row gap-4 justify-between items-stretch lg:items-center">
-        <div className="relative w-full lg:w-96">
-            <Input 
-                prefix={<SearchOutlined className="text-gray-400" />} 
-                placeholder="Search assets..." 
-                value={searchText}
-                onChange={e => setSearchText(e.target.value)}
-                className="rounded-lg py-2.5 shadow-sm text-base"
-                size="large"
+    <div className="space-y-4">
+
+      {/* ── Page Header with New Asset CTA ── */}
+      <PageHeader
+        title="Asset Management"
+        subtitle="Manage company assets, assignments, and returns."
+      >
+        <RefreshButton
+          label=""
+          onClick={refreshAssets}
+          loading={loading}
+          size='large'
+        />
+        <Button
+          type="primary"
+          size='large'
+          icon={<PlusOutlined size={16}/>}
+          onClick={() => setIsCreateModalVisible(true)}
+          className="h-10 shadow-md flex items-center"
+        >
+          New Asset
+        </Button>
+      </PageHeader>
+
+      {/* ── Filter / Action Bar ── */}
+      <Card
+        className="rounded-xl shadow-sm border-border bg-card text-card-foreground"
+        styles={{ body: { padding: '14px 16px' } }}
+        style={{ marginBottom: '10px' }}
+      >
+        <Row gutter={[12, 12]} align="middle" wrap>
+
+          {/* 🔍 Search — takes remaining space */}
+          <Col xs={24} sm={24} md={8} lg={9} xl={10}>
+            <label className="block text-xs font-medium text-muted-foreground mb-1">Search</label>
+            <Input
+              prefix={<SearchOutlined className="text-gray-400" />}
+              placeholder="Search by Product or Assignee..."
+              value={searchText}
+              onChange={e => setSearchText(e.target.value)}
+              allowClear
+              className="rounded-lg w-full"
             />
-        </div>
-        
-        <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto items-center">
-            {/* Mobile: Grid of actions */}
-            <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full">
-                <Button 
-                    icon={<ReloadOutlined />} 
-                    onClick={refreshAssets} 
-                    loading={loading}
-                    className="w-full sm:w-auto h-10"
-                >
-                    Refresh
-                </Button>
-                
-                <Button 
-                    icon={<AppstoreOutlined />} 
-                    onClick={() => router.push('/assets/products')}
-                    className="w-full sm:w-auto h-10"
-                >
-                    Catalog
-                </Button>
+          </Col>
+
+          {/* 🗂 Category Filter */}
+          <Col xs={12} sm={8} md={5} lg={5} xl={5}>
+            <label className="block text-xs font-medium text-muted-foreground mb-1">Category</label>
+            <Select
+              options={categoryOptions}
+              value={categoryFilter}
+              onChange={setCategoryFilter}
+              placeholder="All Categories"
+              className="w-full"
+              suffixIcon={<FilterOutlined className="text-gray-400" />}
+            />
+          </Col>
+
+          {/* 🔖 Status Filter */}
+          <Col xs={12} sm={8} md={4} lg={4} xl={4}>
+            <label className="block text-xs font-medium text-muted-foreground mb-1">Status</label>
+            <Select
+              options={STATUS_OPTIONS}
+              value={statusFilter}
+              onChange={setStatusFilter}
+              placeholder="All Status"
+              className="w-full"
+            />
+          </Col>
+
+          {/* 🔘 Right-side action buttons */}
+          <Col xs={24} sm={8} md={7} lg={6} xl={5}>
+            {/* Spacer matches the label height in other columns */}
+            <label className="block text-xs font-medium text-muted-foreground mb-1 invisible select-none">
+              &nbsp;
+            </label>
+            <div className="flex gap-3 justify-end items-center">
+              <Button
+                icon={<AppstoreOutlined />}
+                loading={catalogLoading}
+                onClick={() => {
+                  setCatalogLoading(true);
+                  router.push('/assets/products');
+                }}
+                size='large'
+              >
+                Catalog
+              </Button>
             </div>
-            
-            <Button 
-                type="primary" 
-                icon={<PlusOutlined />} 
-                onClick={() => setIsCreateModalVisible(true)}
-                className="w-full sm:w-auto h-10 shadow-md"
-            >
-                New Asset
-            </Button>
-        </div>
-      </div>
+          </Col>
 
-      {/* Stats Summary */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-          <StatCard title="Total Assets" value={assets.length} color="blue" />
-          <StatCard title="Assigned" value={assets.filter(a => a.AMS_Status__c === 'Assigned').length} color="purple" />
-          <StatCard title="In Stock" value={assets.filter(a => a.AMS_Status__c === 'Un-Assigned').length} color="green" />
-          <StatCard title="Discarded" value={assets.filter(a => a.AMS_Status__c === 'Discarded').length} color="gray" />
-      </div>
+        </Row>
+      </Card>
 
-      {/* Table */}
-      <AssetTable 
-        assets={filteredAssets} 
-        loading={loading} 
-        onManageAssignment={handleManageAssignment} 
+      {/* ── Table ── */}
+      <AssetTable
+        assets={filteredAssets}
+        loading={loading}
+        onManageAssignment={handleManageAssignment}
         onDiscard={handleDiscard}
       />
 
       {/* Assignment Modal */}
-      <AssetAssignmentModal 
+      <AssetAssignmentModal
         visible={isModalVisible}
         onCancel={() => setIsModalVisible(false)}
         onSuccess={handleModalSuccess}
@@ -199,14 +268,4 @@ export function AssetManager({ initialAssets }: AssetManagerProps) {
       />
     </div>
   );
-}
-
-function StatCard({ title, value, color }: { title: string, value: number, color: string }) {
-    // Map colors to theme-aware classes if needed, or keeping it simple for now
-    return (
-        <div className="p-4 rounded-xl bg-card border border-border shadow-sm flex flex-col items-center justify-center">
-            <span className="text-muted-foreground text-xs font-medium uppercase tracking-wider">{title}</span>
-            <span className="text-2xl font-bold text-foreground">{value}</span>
-        </div>
-    )
 }

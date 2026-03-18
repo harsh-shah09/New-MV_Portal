@@ -28,16 +28,6 @@ export function LeaveTable({ leaves, onCancel, onWithdraw, showActions = true }:
         const displayText = record.leaveCategory === 'Extra Day Pay' ? 'Extra Day Pay' : text;
         return <span className="capitalize">{displayText || 'N/A'}</span>;
       },
-      filters: [
-        { text: 'Planned Leave', value: 'Planned Leave' },
-        { text: 'Sick Leave', value: 'Sick Leave' },
-        { text: 'Emergency Leave', value: 'Emergency Leave' },
-        { text: 'Extra Day Pay', value: 'Extra Day Pay' },
-      ],
-      onFilter: (value: any, record) => {
-        const displayText = record.leaveCategory === 'Extra Day Pay' ? 'Extra Day Pay' : record.leaveType;
-        return displayText === value;
-      },
     },
     {
       title: 'From',
@@ -67,7 +57,7 @@ export function LeaveTable({ leaves, onCancel, onWithdraw, showActions = true }:
         if (status === 'pending') color = 'warning';
         if (status === 'rejected') color = 'error';
         if (status === 'cancelled') color = 'default';
-        
+
         return (
           <Tag color={color} className="capitalize">
             {status}

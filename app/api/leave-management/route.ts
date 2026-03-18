@@ -4,6 +4,7 @@ import dayjs from "dayjs";
 import { verifyToken } from "@/lib/auth-utils";
 import { getSalesforceConnection, sendInAppNotifications } from "@/lib/salesforce";
 import { sendEmailAsync, getHREmail } from "@/lib/email";
+import { calculateLeaveDays, type LeaveDateInput } from "@/lib/leave-policy";
 import {
   newLeaveRequestToTeamLead,
   teamLeadLeaveRequestToHR,
@@ -113,6 +114,7 @@ interface RuleCalculationDetails {
     applied: boolean;
     preSandwichDates: string[];
     postSandwichDates: string[];
+    countedLeaveDates?: string[];
     totalDays: number;
   };
 
@@ -141,6 +143,237 @@ interface RuleCalculationDetails {
 
   // Timestamp
   calculatedAt: string;
+}
+
+interface RecalculatedLeaveMetrics {
+  totalDays: number;
+  totalDaysAfterRule: number;
+  sandwichApplied: boolean;
+  onePlusTwoRuleApplied: boolean;
+  details: RuleCalculationDetails;
+}
+
+function parseRuleCalculationDetails(rawValue: any): RuleCalculationDetails | null {
+  if (!rawValue || typeof rawValue !== "string") {
+    return null;
+  }
+
+  try {
+    return JSON.parse(rawValue) as RuleCalculationDetails;
+  } catch (error) {
+    console.error("Failed to parse Rule_Calculation_Details__c:", error);
+    return null;
+  }
+}
+
+async function getHolidaySet(conn: any): Promise<Set<string>> {
+  const holidayQuery = await conn.query(
+    "SELECT Name, Date__c, Day__c, Year__c FROM Holidays_List__c"
+  );
+
+  const holidayDates = (holidayQuery.records || [])
+    .map((holiday: any) => holiday?.Date__c)
+    .filter(Boolean)
+    .map((dateValue: string) => dayjs(dateValue).format("YYYY-MM-DD"));
+
+  return new Set(holidayDates);
+}
+
+function getDisplayLeaveType(leaveType: string | undefined, leaveCategory: string): string {
+  const normalized = (leaveCategory || "").toLowerCase();
+  if (normalized === "extra day pay" || normalized === "extra-day-pay") {
+    return "Extra Day Pay";
+  }
+  return leaveType || "N/A";
+}
+
+function getCanonicalLeaveCategory(leaveCategory: string): "loss-of-pay" | "extra-day-pay" {
+  const normalized = (leaveCategory || "").toLowerCase().replace(/\s+/g, "-");
+  return normalized === "extra-day-pay" ? "extra-day-pay" : "loss-of-pay";
+}
+
+function createRuleCalculationDetails(
+  startDate: dayjs.Dayjs,
+  endDate: dayjs.Dayjs,
+  role: string | undefined,
+  leaveType: string | undefined,
+  leaveCategory: string,
+  sessionValue: string | undefined,
+  leaveConfig: LeaveConfig,
+  holidaySet: Set<string>,
+  createdReferenceDate: dayjs.Dayjs,
+  mergeInfo?: RuleCalculationDetails["mergeInfo"]
+): RecalculatedLeaveMetrics {
+  const isWeekend = (d: dayjs.Dayjs) => {
+    const day = d.day();
+    return day === 0 || day === 6;
+  };
+  const isHoliday = (d: dayjs.Dayjs) => holidaySet.has(d.format("YYYY-MM-DD"));
+  const isNonWorking = (d: dayjs.Dayjs) => isWeekend(d) || isHoliday(d);
+
+  const normalizedCategory = getCanonicalLeaveCategory(leaveCategory);
+  const effectiveLeaveCategory = normalizedCategory === "loss-of-pay" ? "Loss of Pay" : "Extra Day Pay";
+
+  const requestedStartDate = startDate.format("YYYY-MM-DD");
+  const requestedEndDate = endDate.format("YYYY-MM-DD");
+  const baseCalendarDays = endDate.diff(startDate, "day") + 1;
+  const isHalfDay = sessionValue === "Session-1" || sessionValue === "Session-2";
+  const applyRules = effectiveLeaveCategory === "Loss of Pay" && (leaveType || "") === "Planned Leave";
+  const sandwichRuleAppliesToUser = leaveConfig.sandwichRuleAppliesTo.includes(role || "");
+  const penaltyAppliesToUser = leaveConfig.penaltyAppliesTo.includes(role || "");
+  const applySandwichRule = applyRules && !isHalfDay && leaveConfig.enableSandwichRule && sandwichRuleAppliesToUser;
+
+  let workingDaysInRange = 0;
+  let nonWorkingDaysInRange = 0;
+  let cursor = startDate.clone();
+
+  while (cursor.isSame(endDate) || cursor.isBefore(endDate)) {
+    if (isNonWorking(cursor)) {
+      nonWorkingDaysInRange++;
+    } else {
+      workingDaysInRange++;
+    }
+    cursor = cursor.add(1, "day");
+  }
+
+  const sandwichDateList: LeaveDateInput[] = [];
+  if (applySandwichRule && workingDaysInRange > 0) {
+    let sandwichCursor = startDate.clone();
+    const sandwichWindowEnd = endDate.add(3, "day");
+    while (sandwichCursor.isSame(sandwichWindowEnd) || sandwichCursor.isBefore(sandwichWindowEnd)) {
+      const dateKey = sandwichCursor.format("YYYY-MM-DD");
+      const isLeaveDay =
+        (sandwichCursor.isSame(startDate) || sandwichCursor.isAfter(startDate)) &&
+        (sandwichCursor.isSame(endDate) || sandwichCursor.isBefore(endDate)) &&
+        !isNonWorking(sandwichCursor);
+
+      sandwichDateList.push({
+        date: dateKey,
+        isLeaveDay,
+        isHalfDay,
+        leaveType,
+        leaveCategory,
+        isPublicHoliday: holidaySet.has(dateKey),
+        isWeekend: isWeekend(sandwichCursor),
+      });
+
+      sandwichCursor = sandwichCursor.add(1, "day");
+    }
+  }
+
+  const sandwichPolicy =
+    sandwichDateList.length > 0
+      ? calculateLeaveDays(sandwichDateList, {
+          allowedLeaveTypes: ["Planned Leave"],
+          allowedLeaveCategories: ["loss-of-pay", "loss of pay"],
+        })
+      : {
+          sandwichApplied: false,
+          sandwichDates: [] as string[],
+        };
+
+  const sandwichDates = applySandwichRule ? sandwichPolicy.sandwichDates : [];
+  const preSandwichDates = sandwichDates.filter((dateValue) => dayjs(dateValue).isBefore(startDate, "day"));
+  const postSandwichDates = sandwichDates.filter((dateValue) => dayjs(dateValue).isAfter(endDate, "day"));
+  const sandwichApplied = applySandwichRule && sandwichPolicy.sandwichApplied;
+
+  let rangeLeaveDays: number;
+  if (effectiveLeaveCategory === "Extra Day Pay") {
+    rangeLeaveDays = baseCalendarDays;
+  } else {
+    rangeLeaveDays = workingDaysInRange;
+  }
+
+  if (isHalfDay) {
+    rangeLeaveDays = rangeLeaveDays * 0.5;
+  }
+
+  const sandwichExtra = sandwichApplied ? sandwichDates.length : 0;
+
+  let onePlusTwoExtra = 0;
+  if (applyRules && !isHalfDay && leaveConfig.enableOnePlusTwoRule && penaltyAppliesToUser) {
+    const countWorkingDaysBetween = (fromDate: dayjs.Dayjs, toDate: dayjs.Dayjs): number => {
+      let workingDays = 0;
+      let current = fromDate.clone();
+
+      while (current.isBefore(toDate)) {
+        if (!isNonWorking(current)) {
+          workingDays++;
+        }
+        current = current.add(1, "day");
+      }
+
+      return workingDays;
+    };
+
+    const penaltyMultiplier = leaveConfig.penaltyDaysPerDay;
+    let cursorPenalty = startDate.startOf("day");
+    const endPenalty = endDate.startOf("day");
+
+    while (cursorPenalty.isSame(endPenalty) || cursorPenalty.isBefore(endPenalty)) {
+      if (!isNonWorking(cursorPenalty)) {
+        const workingDaysInAdvance = countWorkingDaysBetween(createdReferenceDate.startOf("day"), cursorPenalty);
+        if (workingDaysInAdvance < leaveConfig.minWorkingDayNoticePeriod) {
+          onePlusTwoExtra += penaltyMultiplier;
+        }
+      }
+      cursorPenalty = cursorPenalty.add(1, "day");
+    }
+  }
+
+  const onePlusTwoRuleApplied = applyRules && onePlusTwoExtra > 0;
+  const finalTotalAfterRules = rangeLeaveDays + sandwichExtra + onePlusTwoExtra;
+
+  let effectiveStartDate = requestedStartDate;
+  let effectiveEndDate = requestedEndDate;
+
+  if (sandwichApplied) {
+    if (preSandwichDates.length > 0) {
+      const earliestPreDate = preSandwichDates.reduce((earliest, dateValue) =>
+        dayjs(dateValue).isBefore(dayjs(earliest)) ? dateValue : earliest
+      );
+      effectiveStartDate = earliestPreDate;
+    }
+
+    if (postSandwichDates.length > 0) {
+      const latestPostDate = postSandwichDates.reduce((latest, dateValue) =>
+        dayjs(dateValue).isAfter(dayjs(latest)) ? dateValue : latest
+      );
+      effectiveEndDate = latestPostDate;
+    }
+  }
+
+  const details: RuleCalculationDetails = {
+    requestedStartDate,
+    requestedEndDate,
+    effectiveStartDate,
+    effectiveEndDate,
+    baseCalendarDays,
+    rangeLeaveDays,
+    sameRequestSandwich: {
+      applied: sandwichApplied,
+      preSandwichDates,
+      postSandwichDates,
+      countedLeaveDates: sandwichDates,
+      totalDays: sandwichExtra,
+    },
+    onePlusTwoRule: {
+      applied: onePlusTwoRuleApplied,
+      extraDays: onePlusTwoExtra,
+    },
+    totalSandwichDays: sandwichExtra,
+    finalTotalAfterRules,
+    mergeInfo,
+    calculatedAt: new Date().toISOString(),
+  };
+
+  return {
+    totalDays: rangeLeaveDays,
+    totalDaysAfterRule: finalTotalAfterRules,
+    sandwichApplied,
+    onePlusTwoRuleApplied,
+    details,
+  };
 }
 
 /**
@@ -194,7 +427,8 @@ export async function GET(request: NextRequest) {
         End_Date__c,
         Total_Days__c,
         Status__c,
-        Approved_Date__c
+        Approved_Date__c,
+        Rule_Calculation_Details__c
       FROM Leave__c
       WHERE Employee__c = '${currentEmployeeId}'
       ORDER BY Start_Date__c DESC
@@ -202,20 +436,27 @@ export async function GET(request: NextRequest) {
 
     console.log("Fetched leave records:", leaveRecords);
     // Map Salesforce records to LeaveRequest format
-    const leaves: LeaveRequest[] = leaveRecords.records.map((record: any) => ({
-      id: record.Id,
-      employeeId: currentEmployeeId,
-      employeeName: record.Employee__r?.Employee_Name__c || email || name || "Unknown",
-      leaveType: record.Leave_Category__c === 'Extra Day Pay' ? 'Extra Day Pay' : (record.Leave_Type__c || ""),
-      leaveCategory: record.Leave_Category__c,
-      startDate: record.Start_Date__c || "",
-      endDate: record.End_Date__c || "",
-      duration: record.Total_Days__c || 0,
-      status: record.Status__c?.toLowerCase() || "pending",
-      approvedBy: record.Approved_By__c,
-      approvalDate: record.Approved_Date__c,
-      reason: '',
-    }));
+    const leaves: LeaveRequest[] = leaveRecords.records.map((record: any) => {
+      const parsedDetails = parseRuleCalculationDetails(record.Rule_Calculation_Details__c);
+      const partialRequest = (parsedDetails as any)?.partialWithdrawalRequest;
+
+      return {
+        id: record.Id,
+        employeeId: currentEmployeeId,
+        employeeName: record.Employee__r?.Employee_Name__c || email || name || "Unknown",
+        leaveType: record.Leave_Category__c === 'Extra Day Pay' ? 'Extra Day Pay' : (record.Leave_Type__c || ""),
+        leaveCategory: record.Leave_Category__c,
+        startDate: record.Start_Date__c || "",
+        endDate: record.End_Date__c || "",
+        duration: record.Total_Days__c || 0,
+        status: record.Status__c?.toLowerCase() || "pending",
+        approvedBy: record.Approved_By__c,
+        approvalDate: record.Approved_Date__c,
+        reason: '',
+        withdrawalStartDate: partialRequest?.requested ? partialRequest.withdrawalStartDate : undefined,
+        withdrawalEndDate: partialRequest?.requested ? partialRequest.withdrawalEndDate : undefined,
+      };
+    });
 
     // Fetch pending approvals based on user role
     let pendingApprovals: LeaveRequest[] = [];
@@ -237,7 +478,8 @@ export async function GET(request: NextRequest) {
           Approved_Date__c,
           TL_Approval__c,
           HR_Approval__c,
-          Reason__c
+          Reason__c,
+          Rule_Calculation_Details__c
         FROM Leave__c
         WHERE Status__c IN ('Applied', 'Withdrawal Pending')
         AND Employee__r.Role__c = 'HR'
@@ -246,23 +488,30 @@ export async function GET(request: NextRequest) {
 
       console.log("Fetched pending HR approvals for Admin:", pendingLeaveRecords);
 
-      pendingApprovals = pendingLeaveRecords.records.map((record: any) => ({
-        id: record.Id,
-        employeeId: record.Employee__c,
-        employeeName: record.Employee__r?.Employee_Name__c || "Unknown",
-        leaveType: record.Leave_Category__c === 'Extra Day Pay' ? 'Extra Day Pay' : (record.Leave_Type__c || ""),
-        leaveCategory: record.Leave_Category__c,
-        startDate: record.Start_Date__c || "",
-        endDate: record.End_Date__c || "",
-        duration: record.Total_Days__c || 0,
-        status: record.Status__c?.toLowerCase() || "pending",
-        isWithdrawalRequest: record.Status__c === 'Withdrawal Pending',
-        approvedBy: record.Approved_By__c,
-        approvalDate: record.Approved_Date__c,
-        reason: record.Reason__c || '',
-        tlApproved: record.TL_Approval__c,
-        hrApproval: record.HR_Approval__c,
-      }));
+      pendingApprovals = pendingLeaveRecords.records.map((record: any) => {
+        const parsedDetails = parseRuleCalculationDetails(record.Rule_Calculation_Details__c);
+        const partialRequest = (parsedDetails as any)?.partialWithdrawalRequest;
+
+        return {
+          id: record.Id,
+          employeeId: record.Employee__c,
+          employeeName: record.Employee__r?.Employee_Name__c || "Unknown",
+          leaveType: record.Leave_Category__c === 'Extra Day Pay' ? 'Extra Day Pay' : (record.Leave_Type__c || ""),
+          leaveCategory: record.Leave_Category__c,
+          startDate: record.Start_Date__c || "",
+          endDate: record.End_Date__c || "",
+          duration: record.Total_Days__c || 0,
+          status: record.Status__c?.toLowerCase() || "pending",
+          isWithdrawalRequest: record.Status__c === 'Withdrawal Pending',
+          approvedBy: record.Approved_By__c,
+          approvalDate: record.Approved_Date__c,
+          reason: record.Reason__c || '',
+          tlApproved: record.TL_Approval__c,
+          hrApproval: record.HR_Approval__c,
+          withdrawalStartDate: partialRequest?.requested ? partialRequest.withdrawalStartDate : undefined,
+          withdrawalEndDate: partialRequest?.requested ? partialRequest.withdrawalEndDate : undefined,
+        };
+      });
     } else if (role === 'HR') {
       // HR can approve regular employees and Team Lead leaves (but not their own)
       const pendingLeaveRecords = await conn.query<any>(`
@@ -281,7 +530,8 @@ export async function GET(request: NextRequest) {
           Approved_Date__c,
           TL_Approval__c,
           HR_Approval__c,
-          Reason__c
+          Reason__c,
+          Rule_Calculation_Details__c
         FROM Leave__c
         WHERE Status__c IN ('Applied', 'Withdrawal Pending')
         AND Employee__r.Role__c != 'HR'
@@ -290,23 +540,30 @@ export async function GET(request: NextRequest) {
 
       console.log("Fetched pending approvals for HR:", pendingLeaveRecords);
 
-      pendingApprovals = pendingLeaveRecords.records.map((record: any) => ({
-        id: record.Id,
-        employeeId: record.Employee__c,
-        employeeName: record.Employee__r?.Employee_Name__c || "Unknown",
-        leaveType: record.Leave_Category__c === 'Extra Day Pay' ? 'Extra Day Pay' : (record.Leave_Type__c || ""),
-        leaveCategory: record.Leave_Category__c,
-        startDate: record.Start_Date__c || "",
-        endDate: record.End_Date__c || "",
-        duration: record.Total_Days__c || 0,
-        status: record.Status__c?.toLowerCase() || "pending",
-        isWithdrawalRequest: record.Status__c === 'Withdrawal Pending',
-        approvedBy: record.Approved_By__c,
-        approvalDate: record.Approved_Date__c,
-        reason: record.Reason__c || '',
-        tlApproved: record.TL_Approval__c,
-        hrApproval: record.HR_Approval__c,
-      }));
+      pendingApprovals = pendingLeaveRecords.records.map((record: any) => {
+        const parsedDetails = parseRuleCalculationDetails(record.Rule_Calculation_Details__c);
+        const partialRequest = (parsedDetails as any)?.partialWithdrawalRequest;
+
+        return {
+          id: record.Id,
+          employeeId: record.Employee__c,
+          employeeName: record.Employee__r?.Employee_Name__c || "Unknown",
+          leaveType: record.Leave_Category__c === 'Extra Day Pay' ? 'Extra Day Pay' : (record.Leave_Type__c || ""),
+          leaveCategory: record.Leave_Category__c,
+          startDate: record.Start_Date__c || "",
+          endDate: record.End_Date__c || "",
+          duration: record.Total_Days__c || 0,
+          status: record.Status__c?.toLowerCase() || "pending",
+          isWithdrawalRequest: record.Status__c === 'Withdrawal Pending',
+          approvedBy: record.Approved_By__c,
+          approvalDate: record.Approved_Date__c,
+          reason: record.Reason__c || '',
+          tlApproved: record.TL_Approval__c,
+          hrApproval: record.HR_Approval__c,
+          withdrawalStartDate: partialRequest?.requested ? partialRequest.withdrawalStartDate : undefined,
+          withdrawalEndDate: partialRequest?.requested ? partialRequest.withdrawalEndDate : undefined,
+        };
+      });
     } else if (role === 'Developer' && title === 'Team Lead') {
       // Fetch leaves for employees managed by this Team Lead
       const pendingLeaveRecords = await conn.query<any>(`
@@ -324,7 +581,8 @@ export async function GET(request: NextRequest) {
           Approved_Date__c,
           TL_Approval__c,
           HR_Approval__c,
-          Reason__c
+          Reason__c,
+          Rule_Calculation_Details__c
         FROM Leave__c
         WHERE Employee__r.Team_Lead__r.Employee_Name__c = '${name}'
         AND Status__c IN ('Applied', 'Withdrawal Pending')
@@ -333,23 +591,30 @@ export async function GET(request: NextRequest) {
 
       console.log("Fetched pending approvals for Team Lead:", pendingLeaveRecords);
 
-      pendingApprovals = pendingLeaveRecords.records.map((record: any) => ({
-        id: record.Id,
-        employeeId: record.Employee__c,
-        employeeName: record.Employee__r?.Employee_Name__c || "Unknown",
-        leaveType: record.Leave_Category__c === 'Extra Day Pay' ? 'Extra Day Pay' : (record.Leave_Type__c || ""),
-        leaveCategory: record.Leave_Category__c,
-        startDate: record.Start_Date__c || "",
-        endDate: record.End_Date__c || "",
-        duration: record.Total_Days__c || 0,
-        status: record.Status__c?.toLowerCase() || "pending",
-        isWithdrawalRequest: record.Status__c === 'Withdrawal Pending',
-        approvedBy: record.Approved_By__c,
-        approvalDate: record.Approved_Date__c,
-        reason: record.Reason__c || '',
-        tlApproved: record.TL_Approval__c,
-        hrApproval: record.HR_Approval__c,
-      }));
+      pendingApprovals = pendingLeaveRecords.records.map((record: any) => {
+        const parsedDetails = parseRuleCalculationDetails(record.Rule_Calculation_Details__c);
+        const partialRequest = (parsedDetails as any)?.partialWithdrawalRequest;
+
+        return {
+          id: record.Id,
+          employeeId: record.Employee__c,
+          employeeName: record.Employee__r?.Employee_Name__c || "Unknown",
+          leaveType: record.Leave_Category__c === 'Extra Day Pay' ? 'Extra Day Pay' : (record.Leave_Type__c || ""),
+          leaveCategory: record.Leave_Category__c,
+          startDate: record.Start_Date__c || "",
+          endDate: record.End_Date__c || "",
+          duration: record.Total_Days__c || 0,
+          status: record.Status__c?.toLowerCase() || "pending",
+          isWithdrawalRequest: record.Status__c === 'Withdrawal Pending',
+          approvedBy: record.Approved_By__c,
+          approvalDate: record.Approved_Date__c,
+          reason: record.Reason__c || '',
+          tlApproved: record.TL_Approval__c,
+          hrApproval: record.HR_Approval__c,
+          withdrawalStartDate: partialRequest?.requested ? partialRequest.withdrawalStartDate : undefined,
+          withdrawalEndDate: partialRequest?.requested ? partialRequest.withdrawalEndDate : undefined,
+        };
+      });
     }
 
     return NextResponse.json({
@@ -397,6 +662,7 @@ export async function POST(request: NextRequest) {
     console.log("Submitting user - Role:", role, "Title:", title);
 
     const {
+      applyForOthers,
       leaveCategory,
       leaveType,
       startDate,
@@ -410,6 +676,7 @@ export async function POST(request: NextRequest) {
       confirmMerge,
       mergeExistingLeaveId
     } = body;
+    const targetEmployeeId = body?.employeeId;
     const reason = rawReason?.trim() || '';
     const rulesAlreadyConfirmed = confirmedRules === true;
     const confirmMergeWithExisting = confirmMerge === true;
@@ -428,25 +695,216 @@ export async function POST(request: NextRequest) {
 
     console.log('Duration received from client:', duration);
 
+    const conn = await getSalesforceConnection();
+
+    // Special flow: HR/Admin applying leave for other employees
+    if (applyForOthers === true) {
+      const isHR = role === 'HR';
+      const isAdmin = role === 'Admin';
+
+      if (!isHR && !isAdmin) {
+        return NextResponse.json({ error: 'Only HR and Admin can apply leave for others' }, { status: 403 });
+      }
+
+      if (!targetEmployeeId || !leaveType || !startDate || !endDate) {
+        return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+      }
+
+      if (leaveType !== 'Sick Leave' && leaveType !== 'Emergency Leave') {
+        return NextResponse.json({ error: 'Leave type must be Sick Leave or Emergency Leave' }, { status: 400 });
+      }
+
+      const parsedStart = dayjs(startDate).startOf('day');
+      const parsedEnd = dayjs(endDate).startOf('day');
+
+      if (!parsedStart.isValid() || !parsedEnd.isValid()) {
+        return NextResponse.json({ error: 'Invalid leave dates' }, { status: 400 });
+      }
+
+      if (parsedStart.isAfter(parsedEnd, 'day')) {
+        return NextResponse.json({ error: 'Start date must be on or before end date' }, { status: 400 });
+      }
+
+      const holidaySet = await getHolidaySet(conn);
+      const isNonWorkingDay = createNonWorkingDayChecker(holidaySet);
+      const blockedDates: string[] = [];
+      let currentDate = parsedStart.clone();
+
+      while (currentDate.isSame(parsedEnd) || currentDate.isBefore(parsedEnd)) {
+        if (isNonWorkingDay(currentDate)) {
+          blockedDates.push(currentDate.format('YYYY-MM-DD'));
+        }
+        currentDate = currentDate.add(1, 'day');
+      }
+
+      if (blockedDates.length > 0) {
+        return NextResponse.json(
+          {
+            error: `Leave cannot be applied on weekends/holidays. Invalid date(s): ${blockedDates.join(', ')}`,
+          },
+          { status: 400 }
+        );
+      }
+
+      const overlapCheckQuery = await conn.query<any>(`
+        SELECT Id, Start_Date__c, End_Date__c, Status__c, Leave_Type__c, Leave_Category__c
+        FROM Leave__c
+        WHERE Employee__c = '${targetEmployeeId}'
+        AND Status__c IN ('Applied', 'Approved', 'Withdrawal Pending')
+        AND (Start_Date__c <= ${parsedEnd.format('YYYY-MM-DD')} AND End_Date__c >= ${parsedStart.format('YYYY-MM-DD')})
+      `);
+
+      if (overlapCheckQuery.records && overlapCheckQuery.records.length > 0) {
+        const existingLeave = overlapCheckQuery.records[0];
+        return NextResponse.json(
+          {
+            error: `Overlapping leave exists from ${dayjs(existingLeave.Start_Date__c).format('DD MMM YYYY')} to ${dayjs(existingLeave.End_Date__c).format('DD MMM YYYY')} (${existingLeave.Status__c}).`,
+          },
+          { status: 400 }
+        );
+      }
+
+      const targetEmployeeQuery = await conn.query<any>(`
+        SELECT Id, Employee_Name__c, Employee_Email__c, Base_Salary__c,
+               Team_Lead__c, Team_Lead__r.Employee_Name__c, Team_Lead__r.Employee_Email__c
+        FROM Employee__c
+        WHERE Id = '${targetEmployeeId}'
+        LIMIT 1
+      `);
+
+      if (!targetEmployeeQuery.records || targetEmployeeQuery.records.length === 0) {
+        return NextResponse.json({ error: 'Selected employee not found' }, { status: 404 });
+      }
+
+      const targetEmployee = targetEmployeeQuery.records[0];
+      const fullDayDuration = parsedEnd.diff(parsedStart, 'day') + 1;
+      const approverTitle = isAdmin ? 'Admin' : 'HR';
+
+      const approvedLeaveRecord: any = {
+        Employee__c: targetEmployeeId,
+        Leave_Category__c: 'Loss of Pay',
+        Leave_Type__c: leaveType,
+        Start_Date__c: parsedStart.format('YYYY-MM-DD'),
+        End_Date__c: parsedEnd.format('YYYY-MM-DD'),
+        Session__c: 'Full Day',
+        Reason__c: reason || `Applied by ${approverTitle}`,
+        Status__c: 'Approved',
+        HR_Approval__c: 'Approved',
+        TL_Approval__c: 'Approved',
+        Approved_Date__c: new Date().toISOString(),
+        Total_Days__c: fullDayDuration,
+        Total_Days_After_Rule__c: fullDayDuration,
+        OnePlusTwo_Rule__c: false,
+        Sandwich_Rule__c: false,
+        Actual_Deduction__c: calculateLeaveDeduction(
+          'Loss of Pay',
+          parsedStart.format('YYYY-MM-DD'),
+          fullDayDuration,
+          targetEmployee.Base_Salary__c
+        ),
+        After_Rule_Deduction__c: calculateLeaveDeduction(
+          'Loss of Pay',
+          parsedStart.format('YYYY-MM-DD'),
+          fullDayDuration,
+          targetEmployee.Base_Salary__c
+        ),
+      };
+
+      const createResult = await conn.sobject('Leave__c').create(approvedLeaveRecord) as any;
+
+      if (!createResult.success) {
+        return NextResponse.json({ error: 'Failed to create leave request' }, { status: 500 });
+      }
+
+      // Keep leave summary/balance in sync for direct-approved apply-for-others flow
+      await updateLeaveBalance(conn, approvedLeaveRecord, 'approve');
+
+      try {
+        const employeeName = targetEmployee.Employee_Name__c || 'Employee';
+        const employeeEmail = targetEmployee.Employee_Email__c;
+        const teamLeadEmail = targetEmployee.Team_Lead__r?.Employee_Email__c;
+        const teamLeadName = targetEmployee.Team_Lead__r?.Employee_Name__c || 'Team Lead';
+
+        if (employeeEmail) {
+          const employeeEmailTemplate = leaveApprovedFinal({
+            recipientName: employeeName,
+            approverTitle,
+            leaveType,
+            startDate: parsedStart.format('YYYY-MM-DD'),
+            endDate: parsedEnd.format('YYYY-MM-DD'),
+            duration: fullDayDuration,
+          });
+
+          sendEmailAsync({
+            to: employeeEmail,
+            subject: employeeEmailTemplate.subject,
+            body: employeeEmailTemplate.html,
+          });
+        }
+
+        if (teamLeadEmail) {
+          sendEmailAsync({
+            to: teamLeadEmail,
+            subject: `Leave Auto-Approved for ${employeeName}`,
+            body: `
+              <p>Dear ${teamLeadName},</p>
+              <p>${approverTitle} has applied and approved a leave on behalf of <strong>${employeeName}</strong>.</p>
+              <p><strong>Leave Details:</strong></p>
+              <ul>
+                <li>Type: ${leaveType}</li>
+                <li>Category: Loss of Pay</li>
+                <li>Start Date: ${parsedStart.format('YYYY-MM-DD')}</li>
+                <li>End Date: ${parsedEnd.format('YYYY-MM-DD')}</li>
+                <li>Duration: ${fullDayDuration} day(s)</li>
+              </ul>
+              <p>Regards,<br/>HRMS System</p>
+            `,
+          });
+        }
+
+        const inAppRecipients: string[] = [targetEmployeeId];
+        if (targetEmployee.Team_Lead__c) {
+          inAppRecipients.push(targetEmployee.Team_Lead__c);
+        }
+
+        await sendInAppNotifications(
+          inAppRecipients,
+          `Leave has been applied and approved by ${approverTitle} for ${targetEmployee.Employee_Name__c || 'employee'} from ${parsedStart.format('DD MMM YYYY')} to ${parsedEnd.format('DD MMM YYYY')}.`,
+          'Leave',
+          false
+        );
+      } catch (notifyError) {
+        console.error('Error sending apply-for-others notifications:', notifyError);
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: 'Leave applied and approved successfully for selected employee',
+        leaveId: createResult.id,
+      });
+    }
+
     // Validate required fields
     if (!leaveCategory || !startDate || !endDate || !sessionValue) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    // Validate that leave is not being applied for past dates
+    // Validate past-date policy:
+    // - Loss of Pay: current/future only
+    // - Extra Day Pay: past dates allowed
     const today = dayjs().startOf("day");
     const leaveStartDate = dayjs(startDate).startOf("day");
+    const normalizedCategory = (leaveCategory || "").toLowerCase().replace(/\s+/g, "-");
+    const isExtraDayPay = normalizedCategory === "extra-day-pay";
 
-    if (leaveStartDate.isBefore(today)) {
+    if (!isExtraDayPay && leaveStartDate.isBefore(today)) {
       return NextResponse.json({
         error: "Cannot apply leave for past dates",
         details: {
-          message: "Leave start date cannot be in the past. Please select a current or future date."
+          message: "Loss of Pay leave start date cannot be in the past. Please select a current or future date."
         }
       }, { status: 400 });
     }
-
-    const conn = await getSalesforceConnection();
 
     // Check for existing leaves that overlap with the requested dates
     const existingLeavesQuery = await conn.query<any>(`
@@ -812,72 +1270,57 @@ export async function POST(request: NextRequest) {
       cursor = cursor.add(1, "day");
     }
 
-    // Check if there are non-working days sandwiched between working days
-    let hasNonWorkingInside = false;
-    if (applySandwichRule && nonWorkingDaysInRange > 0) {
-      // Check if there's at least one working day before and after non-working days
-      let foundWorkingBefore = false;
-      let foundNonWorking = false;
-      let foundWorkingAfter = false;
-
-      cursor = start.clone();
-      while (cursor.isSame(end) || cursor.isBefore(end)) {
-        if (!isNonWorking(cursor)) {
-          if (!foundNonWorking) {
-            foundWorkingBefore = true;
-          } else {
-            foundWorkingAfter = true;
-            break;
-          }
-        } else if (foundWorkingBefore) {
-          foundNonWorking = true;
-        }
-        cursor = cursor.add(1, "day");
-      }
-
-      hasNonWorkingInside = foundWorkingBefore && foundNonWorking && foundWorkingAfter;
-    }
-
-    // Collect dates counted by same-request sandwich (to avoid double-counting in cross-request)
-    const sameRequestSandwichDates = new Set<string>();
-    let preSandwich = 0;
-    const preSandwichDates: string[] = [];
+    const sandwichDateList: LeaveDateInput[] = [];
     if (applySandwichRule && workingDaysInRange > 0) {
-      cursor = start.subtract(1, "day");
-      while (isNonWorking(cursor)) {
-        preSandwich += 1;
-        preSandwichDates.push(cursor.format('YYYY-MM-DD'));
-        cursor = cursor.subtract(1, "day");
+      let sandwichCursor = start.clone();
+      const sandwichWindowEnd = end.add(3, "day");
+
+      while (sandwichCursor.isSame(sandwichWindowEnd) || sandwichCursor.isBefore(sandwichWindowEnd)) {
+        const dateKey = sandwichCursor.format("YYYY-MM-DD");
+        const isLeaveDay =
+          (sandwichCursor.isSame(start) || sandwichCursor.isAfter(start)) &&
+          (sandwichCursor.isSame(end) || sandwichCursor.isBefore(end)) &&
+          !isNonWorking(sandwichCursor);
+
+        sandwichDateList.push({
+          date: dateKey,
+          isLeaveDay,
+          isHalfDay,
+          leaveType,
+          leaveCategory,
+          isPublicHoliday: holidaySet.has(dateKey),
+          isWeekend: isWeekend(sandwichCursor),
+        });
+
+        sandwichCursor = sandwichCursor.add(1, "day");
       }
     }
 
-    let postSandwich = 0;
-    const postSandwichDates: string[] = [];
-    if (applySandwichRule && workingDaysInRange > 0) {
-      cursor = end.add(1, "day");
-      while (isNonWorking(cursor)) {
-        postSandwich += 1;
-        postSandwichDates.push(cursor.format('YYYY-MM-DD'));
-        cursor = cursor.add(1, "day");
-      }
-    }
+    const sandwichPolicy =
+      sandwichDateList.length > 0
+        ? calculateLeaveDays(sandwichDateList, {
+            allowedLeaveTypes: ["Planned Leave"],
+            allowedLeaveCategories: ["loss-of-pay", "loss of pay"],
+          })
+        : {
+            sandwichApplied: false,
+            sandwichDates: [] as string[],
+          };
 
-    // Sandwich applies if: non-working days are sandwiched inside OR there are non-working days both before and after
-    const sandwichApplied = applySandwichRule && (hasNonWorkingInside || (preSandwich > 0 && postSandwich > 0));
+    const sandwichApplied = applySandwichRule && sandwichPolicy.sandwichApplied;
+    const sandwichDates = sandwichApplied ? sandwichPolicy.sandwichDates : [];
+    const sameRequestSandwichDates = new Set<string>(sandwichDates);
+    const preSandwichDates = sandwichDates.filter((dateValue) => dayjs(dateValue).isBefore(start, "day"));
+    const postSandwichDates = sandwichDates.filter((dateValue) => dayjs(dateValue).isAfter(end, "day"));
+    const insideSandwichDates = sandwichDates.filter(
+      (dateValue) =>
+        !dayjs(dateValue).isBefore(start, "day") &&
+        !dayjs(dateValue).isAfter(end, "day")
+    );
 
-    // If sandwich is applied, add all those dates to the set for cross-request exclusion
-    if (sandwichApplied) {
-      preSandwichDates.forEach(d => sameRequestSandwichDates.add(d));
-      postSandwichDates.forEach(d => sameRequestSandwichDates.add(d));
-      // Also add non-working days inside the range
-      let innerCursor = start.clone();
-      while (innerCursor.isSame(end) || innerCursor.isBefore(end)) {
-        if (isNonWorking(innerCursor)) {
-          sameRequestSandwichDates.add(innerCursor.format('YYYY-MM-DD'));
-        }
-        innerCursor = innerCursor.add(1, "day");
-      }
-    }
+    const preSandwich = preSandwichDates.length;
+    const postSandwich = postSandwichDates.length;
+    const hasNonWorkingInside = insideSandwichDates.length > 0;
 
     console.log('[Same-Request Sandwich] Pre-sandwich dates:', preSandwichDates);
     console.log('[Same-Request Sandwich] Post-sandwich dates:', postSandwichDates);
@@ -885,12 +1328,12 @@ export async function POST(request: NextRequest) {
 
     // Base leave days calculation:
     // - For Extra Day Pay: Always use calendar days (weekends/holidays are the purpose)
-    // - For Loss of Pay: Use working days when no sandwich, or all calendar days when sandwich applies
+    // - For Loss of Pay: Base = working leave days; sandwich days are added separately
     let rangeLeaveDays: number;
     if (leaveCategory === 'extra-day-pay') {
       rangeLeaveDays = baseCalendarDays;
     } else {
-      rangeLeaveDays = sandwichApplied ? baseCalendarDays : workingDaysInRange;
+      rangeLeaveDays = workingDaysInRange;
     }
 
     console.log('[Half-Day Check] Before adjustment:', {
@@ -907,7 +1350,7 @@ export async function POST(request: NextRequest) {
       console.log('[Half-Day Check] After 0.5 multiplication:', rangeLeaveDays);
     }
 
-    const sandwichExtra = sandwichApplied ? preSandwich + postSandwich : 0;
+    const sandwichExtra = sandwichApplied ? sandwichDates.length : 0;
 
     // Server-side One+Two rule calculation (planned leave within minimum working day notice period)
     // Only applies to full-day leaves, NOT half-day leaves
@@ -1030,7 +1473,7 @@ export async function POST(request: NextRequest) {
             nonWorkingDaysInRange,
             rangeLeaveDays,
             sameRequestSandwichDays: sandwichExtra,
-            sameRequestSandwichDatesList: sandwichApplied ? [...preSandwichDates, ...postSandwichDates] : [],
+            sameRequestSandwichDatesList: sandwichApplied ? sandwichDates : [],
             totalSandwichDays,
             totalSandwichDeduction,
             onePlusTwoExtra,
@@ -1063,6 +1506,7 @@ export async function POST(request: NextRequest) {
         applied: sandwichApplied,
         preSandwichDates,
         postSandwichDates,
+        countedLeaveDates: sandwichApplied ? sandwichDates : [],
         totalDays: sandwichExtra
       },
 
@@ -1456,10 +1900,12 @@ export async function PATCH(request: NextRequest) {
 
     // Handle withdraw action - REQUEST withdrawal approval from HR
     if (action === "withdraw") {
+      const { withdrawalStartDate, withdrawalEndDate } = body;
+
       // Verify the leave belongs to the current user
       const leaveRecordQuery = await conn.query<any>(`
         SELECT Id, Employee__c, Status__c, Leave_Category__c, Leave_Type__c, Total_Days__c, Total_Days_After_Rule__c, 
-               Start_Date__c, End_Date__c, Sandwich_Rule__c, Rule_Calculation_Details__c
+               Start_Date__c, End_Date__c, Session__c, Sandwich_Rule__c, Rule_Calculation_Details__c
         FROM Leave__c
         WHERE Id = '${leaveId}'
         LIMIT 1
@@ -1482,11 +1928,53 @@ export async function PATCH(request: NextRequest) {
         return NextResponse.json({ error: "Only approved leaves can be withdrawn" }, { status: 400 });
       }
 
+      const leaveStart = dayjs(leave.Start_Date__c).startOf("day");
+      const leaveEnd = dayjs(leave.End_Date__c).startOf("day");
+      const isHalfDayLeave = leave.Session__c === "Session-1" || leave.Session__c === "Session-2";
+
+      let requestedWithdrawalStart = leaveStart;
+      let requestedWithdrawalEnd = leaveEnd;
+
+      if (withdrawalStartDate || withdrawalEndDate) {
+        if (!withdrawalStartDate || !withdrawalEndDate) {
+          return NextResponse.json({ error: "Both withdrawal start and end dates are required" }, { status: 400 });
+        }
+
+        requestedWithdrawalStart = dayjs(withdrawalStartDate).startOf("day");
+        requestedWithdrawalEnd = dayjs(withdrawalEndDate).startOf("day");
+
+        if (!requestedWithdrawalStart.isValid() || !requestedWithdrawalEnd.isValid() || requestedWithdrawalEnd.isBefore(requestedWithdrawalStart)) {
+          return NextResponse.json({ error: "Invalid withdrawal date range" }, { status: 400 });
+        }
+
+        if (requestedWithdrawalStart.isBefore(leaveStart) || requestedWithdrawalEnd.isAfter(leaveEnd)) {
+          return NextResponse.json({ error: "Withdrawal dates must be within approved leave range" }, { status: 400 });
+        }
+
+        if (isHalfDayLeave && !requestedWithdrawalStart.isSame(leaveStart, "day") && !requestedWithdrawalEnd.isSame(leaveEnd, "day")) {
+          return NextResponse.json({ error: "Partial withdrawal is not supported for half-day leave" }, { status: 400 });
+        }
+      }
+
+      const isPartialWithdrawal = !requestedWithdrawalStart.isSame(leaveStart, "day") || !requestedWithdrawalEnd.isSame(leaveEnd, "day");
+      const existingRuleDetails = parseRuleCalculationDetails(leave.Rule_Calculation_Details__c);
+      const updatedRuleDetails = {
+        ...(existingRuleDetails || {}),
+        partialWithdrawalRequest: {
+          requested: isPartialWithdrawal,
+          withdrawalStartDate: requestedWithdrawalStart.format("YYYY-MM-DD"),
+          withdrawalEndDate: requestedWithdrawalEnd.format("YYYY-MM-DD"),
+          requestedAt: new Date().toISOString(),
+          requestedBy: employeeId,
+        },
+      } as any;
+
       // Update the status to Withdrawal Pending in Salesforce
       await conn.sobject('Leave__c').update({
         Id: leaveId,
         Status__c: 'Withdrawal Pending',
         Withdrawal_Requested_Date__c: new Date().toISOString(),
+        Rule_Calculation_Details__c: JSON.stringify(updatedRuleDetails),
       });
 
       // Send notifications to HR for withdrawal approval
@@ -1573,7 +2061,9 @@ export async function PATCH(request: NextRequest) {
           if (notificationRecipients.length > 0) {
             await sendInAppNotifications(
               notificationRecipients,
-              `${employeeName} has requested to withdraw their approved leave from ${dayjs(leave.Start_Date__c).format('DD MMM YYYY')} to ${dayjs(leave.End_Date__c).format('DD MMM YYYY')}. Please review and approve/reject.`,
+              isPartialWithdrawal
+                ? `${employeeName} has requested partial withdrawal for approved leave dates ${requestedWithdrawalStart.format('DD MMM YYYY')} to ${requestedWithdrawalEnd.format('DD MMM YYYY')} (original leave: ${dayjs(leave.Start_Date__c).format('DD MMM YYYY')} to ${dayjs(leave.End_Date__c).format('DD MMM YYYY')}). Please review and approve/reject.`
+                : `${employeeName} has requested to withdraw their approved leave from ${dayjs(leave.Start_Date__c).format('DD MMM YYYY')} to ${dayjs(leave.End_Date__c).format('DD MMM YYYY')}. Please review and approve/reject.`,
               'Leave',
               true
             );
@@ -1601,7 +2091,9 @@ export async function PATCH(request: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        message: "Withdrawal request submitted. Awaiting HR approval.",
+        message: isPartialWithdrawal
+          ? "Partial withdrawal request submitted. Awaiting HR approval."
+          : "Withdrawal request submitted. Awaiting HR approval.",
         status: 'Withdrawal Pending'
       });
     }
@@ -1620,7 +2112,8 @@ export async function PATCH(request: NextRequest) {
 
       const leaveRecordQuery = await conn.query<any>(`
         SELECT Id, Employee__c, Status__c, Leave_Category__c, Leave_Type__c, Total_Days__c, Total_Days_After_Rule__c, 
-               Start_Date__c, End_Date__c, Sandwich_Rule__c, Rule_Calculation_Details__c
+               Start_Date__c, End_Date__c, Session__c, Reason__c, CreatedDate, Employee__r.Role__c,
+               Sandwich_Rule__c, Rule_Calculation_Details__c
         FROM Leave__c
         WHERE Id = '${leaveId}'
         LIMIT 1
@@ -1637,15 +2130,189 @@ export async function PATCH(request: NextRequest) {
         return NextResponse.json({ error: "Leave is not pending withdrawal approval" }, { status: 400 });
       }
 
-      // Update the status to Withdrawn in Salesforce
-      await conn.sobject('Leave__c').update({
-        Id: leaveId,
-        Status__c: 'Withdrawn',
-        Withdrawal_Result_Date__c: new Date().toISOString(),
-      });
+      const parsedRuleDetails = parseRuleCalculationDetails(leave.Rule_Calculation_Details__c);
+      const partialWithdrawalRequest = (parsedRuleDetails as any)?.partialWithdrawalRequest;
 
-      // Revert Leave Balance since the leave was approved earlier
+      const leaveStart = dayjs(leave.Start_Date__c).startOf("day");
+      const leaveEnd = dayjs(leave.End_Date__c).startOf("day");
+      const withdrawalStart = partialWithdrawalRequest?.requested
+        ? dayjs(partialWithdrawalRequest.withdrawalStartDate).startOf("day")
+        : leaveStart;
+      const withdrawalEnd = partialWithdrawalRequest?.requested
+        ? dayjs(partialWithdrawalRequest.withdrawalEndDate).startOf("day")
+        : leaveEnd;
+
+      if (!withdrawalStart.isValid() || !withdrawalEnd.isValid() || withdrawalEnd.isBefore(withdrawalStart)) {
+        return NextResponse.json({ error: "Invalid withdrawal request data" }, { status: 400 });
+      }
+
+      const isFullWithdrawal = withdrawalStart.isSame(leaveStart, "day") && withdrawalEnd.isSame(leaveEnd, "day");
+      const isTailTrim = withdrawalStart.isAfter(leaveStart, "day") && withdrawalEnd.isSame(leaveEnd, "day");
+      const isHeadTrim = withdrawalStart.isSame(leaveStart, "day") && withdrawalEnd.isBefore(leaveEnd, "day");
+      const isMiddleSplit = withdrawalStart.isAfter(leaveStart, "day") && withdrawalEnd.isBefore(leaveEnd, "day");
+
+      if (!isFullWithdrawal && !isTailTrim && !isHeadTrim && !isMiddleSplit) {
+        return NextResponse.json({ error: "Unsupported withdrawal pattern" }, { status: 400 });
+      }
+
       await updateLeaveBalance(conn, leave, 'revert');
+
+      let responseMessage = "Withdrawal request approved successfully";
+      const holidaySet = await getHolidaySet(conn);
+      const leaveConfig = await fetchLeaveConfigurations(conn);
+      const employeeRole = leave.Employee__r?.Role__c || "";
+      const createdReferenceDate = dayjs(leave.CreatedDate || new Date().toISOString()).startOf("day");
+
+      if (isFullWithdrawal) {
+        await conn.sobject('Leave__c').update({
+          Id: leaveId,
+          Status__c: 'Withdrawn',
+          Withdrawal_Result_Date__c: new Date().toISOString(),
+          Rule_Calculation_Details__c: leave.Rule_Calculation_Details__c,
+        });
+      } else {
+        const canonicalCategory = getCanonicalLeaveCategory(leave.Leave_Category__c || "");
+        const sfLeaveCategory = canonicalCategory === "loss-of-pay" ? "Loss of Pay" : "Extra Day Pay";
+        const isHalfDayLeave = leave.Session__c === "Session-1" || leave.Session__c === "Session-2";
+
+        if (isHalfDayLeave) {
+          return NextResponse.json({ error: "Partial withdrawal is not supported for half-day leave" }, { status: 400 });
+        }
+
+        const buildUpdatedRuleDetails = (metrics: RecalculatedLeaveMetrics) => {
+          const nextDetails: any = {
+            ...metrics.details,
+            partialWithdrawalRequest: {
+              requested: true,
+              withdrawalStartDate: withdrawalStart.format("YYYY-MM-DD"),
+              withdrawalEndDate: withdrawalEnd.format("YYYY-MM-DD"),
+              approvedAt: new Date().toISOString(),
+              approvedBy: employeeId,
+            },
+          };
+          return JSON.stringify(nextDetails);
+        };
+
+        if (isTailTrim || isHeadTrim) {
+          const retainedStart = isTailTrim ? leaveStart : withdrawalEnd.add(1, "day");
+          const retainedEnd = isTailTrim ? withdrawalStart.subtract(1, "day") : leaveEnd;
+
+          const recalculated = createRuleCalculationDetails(
+            retainedStart,
+            retainedEnd,
+            employeeRole,
+            leave.Leave_Type__c,
+            sfLeaveCategory,
+            leave.Session__c,
+            leaveConfig,
+            holidaySet,
+            createdReferenceDate
+          );
+
+          await conn.sobject('Leave__c').update({
+            Id: leaveId,
+            Status__c: 'Approved',
+            Start_Date__c: retainedStart.format("YYYY-MM-DD"),
+            End_Date__c: retainedEnd.format("YYYY-MM-DD"),
+            Total_Days__c: recalculated.totalDays,
+            Total_Days_After_Rule__c: recalculated.totalDaysAfterRule,
+            OnePlusTwo_Rule__c: recalculated.onePlusTwoRuleApplied,
+            Sandwich_Rule__c: recalculated.sandwichApplied,
+            Rule_Calculation_Details__c: buildUpdatedRuleDetails(recalculated),
+            Withdrawal_Result_Date__c: new Date().toISOString(),
+          });
+
+          await updateLeaveBalance(conn, {
+            Employee__c: leave.Employee__c,
+            Leave_Category__c: leave.Leave_Category__c,
+            Leave_Type__c: leave.Leave_Type__c,
+            Total_Days__c: recalculated.totalDays,
+            Total_Days_After_Rule__c: recalculated.totalDaysAfterRule,
+          }, 'approve');
+
+          responseMessage = "Partial withdrawal approved and leave updated successfully";
+        }
+
+        if (isMiddleSplit) {
+          const leftStart = leaveStart;
+          const leftEnd = withdrawalStart.subtract(1, "day");
+          const rightStart = withdrawalEnd.add(1, "day");
+          const rightEnd = leaveEnd;
+
+          const leftRecalculated = createRuleCalculationDetails(
+            leftStart,
+            leftEnd,
+            employeeRole,
+            leave.Leave_Type__c,
+            sfLeaveCategory,
+            leave.Session__c,
+            leaveConfig,
+            holidaySet,
+            createdReferenceDate
+          );
+
+          const rightRecalculated = createRuleCalculationDetails(
+            rightStart,
+            rightEnd,
+            employeeRole,
+            leave.Leave_Type__c,
+            sfLeaveCategory,
+            leave.Session__c,
+            leaveConfig,
+            holidaySet,
+            createdReferenceDate
+          );
+
+          await conn.sobject('Leave__c').update({
+            Id: leaveId,
+            Status__c: 'Approved',
+            Start_Date__c: leftStart.format("YYYY-MM-DD"),
+            End_Date__c: leftEnd.format("YYYY-MM-DD"),
+            Total_Days__c: leftRecalculated.totalDays,
+            Total_Days_After_Rule__c: leftRecalculated.totalDaysAfterRule,
+            OnePlusTwo_Rule__c: leftRecalculated.onePlusTwoRuleApplied,
+            Sandwich_Rule__c: leftRecalculated.sandwichApplied,
+            Rule_Calculation_Details__c: buildUpdatedRuleDetails(leftRecalculated),
+            Withdrawal_Result_Date__c: new Date().toISOString(),
+          });
+
+          await conn.sobject('Leave__c').create({
+            Employee__c: leave.Employee__c,
+            Leave_Type__c: leave.Leave_Type__c,
+            Leave_Category__c: leave.Leave_Category__c,
+            Start_Date__c: rightStart.format("YYYY-MM-DD"),
+            End_Date__c: rightEnd.format("YYYY-MM-DD"),
+            Session__c: leave.Session__c,
+            Reason__c: leave.Reason__c || '',
+            Status__c: 'Approved',
+            Total_Days__c: rightRecalculated.totalDays,
+            Total_Days_After_Rule__c: rightRecalculated.totalDaysAfterRule,
+            OnePlusTwo_Rule__c: rightRecalculated.onePlusTwoRuleApplied,
+            Sandwich_Rule__c: rightRecalculated.sandwichApplied,
+            Rule_Calculation_Details__c: buildUpdatedRuleDetails(rightRecalculated),
+            HR_Approval__c: 'Approved',
+            Approved_Date__c: new Date().toISOString(),
+          });
+
+          await updateLeaveBalance(conn, {
+            Employee__c: leave.Employee__c,
+            Leave_Category__c: leave.Leave_Category__c,
+            Leave_Type__c: leave.Leave_Type__c,
+            Total_Days__c: leftRecalculated.totalDays,
+            Total_Days_After_Rule__c: leftRecalculated.totalDaysAfterRule,
+          }, 'approve');
+
+          await updateLeaveBalance(conn, {
+            Employee__c: leave.Employee__c,
+            Leave_Category__c: leave.Leave_Category__c,
+            Leave_Type__c: leave.Leave_Type__c,
+            Total_Days__c: rightRecalculated.totalDays,
+            Total_Days_After_Rule__c: rightRecalculated.totalDaysAfterRule,
+          }, 'approve');
+
+          responseMessage = "Partial withdrawal approved and leave split into two approved records";
+        }
+      }
 
       // Send notification emails
       try {
@@ -1671,9 +2338,10 @@ export async function PATCH(request: NextRequest) {
           // Send email to employee
           if (emp.Employee_Email__c) {
             const approverTitle = isAdmin ? 'Admin' : 'HR';
+            const emailLeaveType = getDisplayLeaveType(leave.Leave_Type__c, leave.Leave_Category__c || "");
             const emailData = withdrawalApproved({
               recipientName: employeeName,
-              leaveType: leave.Leave_Type__c || leave.Leave_Category__c,
+              leaveType: emailLeaveType,
               startDate: dayjs(leave.Start_Date__c).format('DD MMM YYYY'),
               endDate: dayjs(leave.End_Date__c).format('DD MMM YYYY'),
               duration: leave.Total_Days__c,
@@ -1703,7 +2371,7 @@ export async function PATCH(request: NextRequest) {
                 const emailData = withdrawalApproved({
                   recipientName: emp.Team_Lead__r.Employee_Name__c,
                   employeeName: employeeName,
-                  leaveType: leave.Leave_Type__c || leave.Leave_Category__c,
+                  leaveType: getDisplayLeaveType(leave.Leave_Type__c, leave.Leave_Category__c || ""),
                   startDate: dayjs(leave.Start_Date__c).format('DD MMM YYYY'),
                   endDate: dayjs(leave.End_Date__c).format('DD MMM YYYY'),
                   duration: leave.Total_Days__c,
@@ -1731,7 +2399,7 @@ export async function PATCH(request: NextRequest) {
         console.error('Error sending withdrawal approval notification:', emailError);
       }
 
-      return NextResponse.json({ success: true, message: "Withdrawal request approved successfully" });
+      return NextResponse.json({ success: true, message: responseMessage });
     }
 
     // Handle reject_withdrawal action (HR or Admin only)

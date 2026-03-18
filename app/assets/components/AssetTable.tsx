@@ -1,10 +1,12 @@
 "use client"
 
-import { Table, Button, Tag, Space, Tooltip } from 'antd';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { Table, Button, Tag, Space, Tooltip, Spin } from 'antd';
+import { LoadingOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { EyeOutlined, EditOutlined, SwapOutlined, DeleteOutlined } from '@ant-design/icons';
 import { SalesforceAsset } from '../types';
-import Link from 'next/link';
 
 interface AssetTableProps {
   assets: SalesforceAsset[];
@@ -15,21 +17,40 @@ interface AssetTableProps {
 }
 
 export function AssetTable({ assets, loading, onManageAssignment, onViewDetails, onDiscard }: AssetTableProps) {
+  const router = useRouter()
+  const [navigatingId, setNavigatingId] = useState<string | null>(null)
+
+  const handleProductClick = (id: string) => {
+    if (navigatingId) return // prevent double-click
+    setNavigatingId(id)
+    router.push(`/assets/products/${id}`)
+  }
+
   const columns: ColumnsType<SalesforceAsset> = [
-    {
-      title: 'Asset ID',
-      dataIndex: 'Name',
-      key: 'Name',
-      render: (text) => <span className="font-semibold text-primary">{text}</span>,
-      sorter: (a, b) => a.Name.localeCompare(b.Name),
-    },
+    // {
+    //   title: 'Asset ID',
+    //   dataIndex: 'Name',
+    //   key: 'Name',
+    //   render: (text) => <span className="font-semibold text-primary">{text}</span>,
+    //   sorter: (a, b) => a.Name.localeCompare(b.Name),
+    // },
     {
         title: 'Product',
         key: 'Product',
         render: (_, r) => {
             const name = r.AMS_Product__r?.Name || r.AMS_Product__c || '-';
             const id = r.AMS_Product__r?.Id || r.AMS_Product__c;
-            return id ? <Link href={`/assets/products/${id}`} className="text-blue-600 hover:underline">{name}</Link> : name;
+            if (!id) return <span>{name}</span>;
+            const isNavigating = navigatingId === id;
+            return (
+              <button
+                onClick={() => handleProductClick(id)}
+                disabled={!!navigatingId}
+                className="inline-flex items-center gap-1.5 text-blue-600 hover:underline disabled:opacity-70 disabled:cursor-wait bg-transparent border-none p-0 cursor-pointer"
+              >
+                {name}
+              </button>
+            );
         },
         responsive: ['md'],
     },
@@ -38,8 +59,8 @@ export function AssetTable({ assets, loading, onManageAssignment, onViewDetails,
       dataIndex: 'AMS_Category__c',
       key: 'AMS_Category__c',
       responsive: ['md'],
-      filters: Array.from(new Set(assets.map(a => a.AMS_Category__c).filter(Boolean))).map(c => ({ text: c, value: c })),
-      onFilter: (value: any, record) => record.AMS_Category__c === value,
+      // filters: Array.from(new Set(assets.map(a => a.AMS_Category__c).filter(Boolean))).map(c => ({ text: c, value: c })),
+      // onFilter: (value: any, record) => record.AMS_Category__c === value,
     },
     {
       title: 'Serial No.',
@@ -59,12 +80,12 @@ export function AssetTable({ assets, loading, onManageAssignment, onViewDetails,
       dataIndex: 'AMS_Status__c',
       key: 'AMS_Status__c',
       width: 120,
-      filters: [
-          { text: 'Assigned', value: 'Assigned' },
-          { text: 'Un-Assigned', value: 'Un-Assigned' },
-          { text: 'Discarded', value: 'Discarded' },
-      ],
-      onFilter: (value: any, record) => record.AMS_Status__c === value,
+      // filters: [
+      //     { text: 'Assigned', value: 'Assigned' },
+      //     { text: 'Un-Assigned', value: 'Un-Assigned' },
+      //     { text: 'Discarded', value: 'Discarded' },
+      // ],
+      // onFilter: (value: any, record) => record.AMS_Status__c === value,
       render: (status) => {
         let color = 'default';
         if (status === 'Assigned') color = 'processing'; // Blue

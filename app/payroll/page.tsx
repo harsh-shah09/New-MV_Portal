@@ -12,6 +12,7 @@ import { GeneratePayrollModal } from "./components/generate-payroll-modal"
 import type { PayrollSummary, PayrollEmployeeDetail } from "@/types"
 import { PageContainer } from "@/components/page-container"
 import { PageHeader } from "@/components/page-header"
+import { RoleGuard } from "@/components/role-guard"
 
 export default function PayrollPage() {
   const { data: user } = useQuery({
@@ -49,11 +50,11 @@ export default function PayrollPage() {
   const handleSelectSummary = async (summary: PayrollSummary) => {
     setSelectedSummary(summary)
     setLoadingEmployees(true)
-    
+
     try {
       const res = await fetch(`/api/payroll/employees/${summary.id}`)
       if (!res.ok) throw new Error("Failed to fetch employee payrolls")
-      
+
       const data = await res.json()
       setEmployeePayrolls(data.employees || [])
       setView("employees")
@@ -85,10 +86,10 @@ export default function PayrollPage() {
   const handleGeneratePayroll = async (month: string, year: number, employees: PayrollEmployeeDetail[]) => {
     // Payroll is already saved by the modal, just refresh the list
     message.success(`Payroll saved for ${month} ${year} - ${employees.length} employees`)
-    
+
     // Refetch summaries to show the newly created one
     await refetchSummaries()
-    
+
     // If we're still on the summary view, the list will update automatically
     // If we had selected a summary, go back to summary view
     setView("summary")
@@ -107,10 +108,10 @@ export default function PayrollPage() {
 
       const result = await res.json()
       message.success(`Payroll summary for ${result.summary.month} ${result.summary.year} deleted successfully`)
-      
+
       // Refetch summaries to update the list
       await refetchSummaries()
-      
+
       // If we're viewing employees from this summary, go back to summary view
       if (selectedSummary?.id === summaryId) {
         handleBackToSummary()
@@ -125,81 +126,87 @@ export default function PayrollPage() {
   // Show appropriate message if not HR/Admin
   if (!isHROrAdmin) {
     return (
-      <PageContainer>
-        <div className="text-center py-12">
-          <h1 className="text-4xl font-bold text-foreground mb-4">Payroll Management</h1>
-          <p className="text-muted-foreground">Access restricted to HR and Admin users only.</p>
-        </div>
-      </PageContainer>
+      <RoleGuard>
+        <PageContainer>
+          <div className="text-center py-12">
+            <h1 className="text-4xl font-bold text-foreground mb-4">Payroll Management</h1>
+            <p className="text-muted-foreground">Access restricted to HR and Admin users only.</p>
+          </div>
+        </PageContainer>
+      </RoleGuard>
     )
   }
 
   return (
-    <PageContainer>
-      <PageHeader 
-        title="Payroll Management" 
-        subtitle="Manage employee payrolls and generate monthly summaries"
-      >
+    <RoleGuard>
+      <PageContainer>
+        <div className="w-full mx-auto flex-1 flex flex-col bg-white p-3 rounded-xl">
+        <PageHeader
+          title="Payroll Management"
+          subtitle="Manage employee payrolls and generate monthly summaries"
+        >
           {view === "summary" && (
             <Button type="primary" icon={<PlusOutlined />} onClick={() => setIsGenerateModalOpen(true)} size="large">
               Generate Payroll
             </Button>
           )}
-      </PageHeader>
+        </PageHeader>
 
-      {loadingSummaries ? (
-        <div className="flex justify-center items-center py-12">
-          <Spin size="large" />
-        </div>
-      ) : (
-        <>
-          {view === "summary" && (
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">Payroll Summaries</h2>
-              <PayrollSummaryList 
-                summaries={payrollSummaries} 
-                onSelectSummary={handleSelectSummary}
-                onDeleteSummary={handleDeleteSummary}
-              />
-            </div>
-          )}
-
-          {view === "employees" && selectedSummary && (
-            <div className="space-y-6">
-              <div className="flex items-center gap-4">
-                <Button icon={<ArrowLeftOutlined />} onClick={handleBackToSummary}>
-                  Back to Summaries
-                </Button>
-                <h2 className="text-2xl font-bold text-gray-900">
-                  {selectedSummary.month} {selectedSummary.year} - Employee Payrolls
-                </h2>
-              </div>
-              {loadingEmployees ? (
-                <div className="flex justify-center items-center py-12">
-                  <Spin size="large" />
-                </div>
-              ) : (
-                <PayrollEmployeeList
-                  employees={employeePayrolls}
-                  month={selectedSummary.month}
-                  year={selectedSummary.year}
-                  onSelectEmployee={handleSelectEmployee}
+        {loadingSummaries ? (
+          <div className="flex justify-center items-center py-12">
+            <Spin size="large" />
+          </div>
+        ) : (
+          <>
+            {view === "summary" && (
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 mb-6">Payroll Summaries</h2>
+                <PayrollSummaryList
+                  summaries={payrollSummaries}
+                  onSelectSummary={handleSelectSummary}
+                  onDeleteSummary={handleDeleteSummary}
                 />
-              )}
-            </div>
-          )}
+              </div>
+            )}
 
-          {view === "detail" && selectedEmployee && (
-            <PayrollEmployeeDetailView employee={selectedEmployee} onBack={handleBackToEmployees} />
-          )}
-        </>
-      )}
+            {view === "employees" && selectedSummary && (
+              <div className="space-y-6">
+                <div className="flex items-center gap-4">
+                  <Button icon={<ArrowLeftOutlined />} onClick={handleBackToSummary}>
+                    Back to Summaries
+                  </Button>
+                  <h2 className="text-2xl font-bold text-gray-900">
+                    {selectedSummary.month} {selectedSummary.year} - Employee Payrolls
+                  </h2>
+                </div>
+                {loadingEmployees ? (
+                  <div className="flex justify-center items-center py-12">
+                    <Spin size="large" />
+                  </div>
+                ) : (
+                  <PayrollEmployeeList
+                    employees={employeePayrolls}
+                    month={selectedSummary.month}
+                    year={selectedSummary.year}
+                    onSelectEmployee={handleSelectEmployee}
+                  />
+                )}
+              </div>
+            )}
 
-      <GeneratePayrollModal
-        open={isGenerateModalOpen}
-        onClose={() => setIsGenerateModalOpen(false)}
-        onGenerate={handleGeneratePayroll}
-      />
-    </PageContainer>
+            {view === "detail" && selectedEmployee && (
+              <PayrollEmployeeDetailView employee={selectedEmployee} onBack={handleBackToEmployees} />
+            )}
+          </>
+        )}
+
+        <GeneratePayrollModal
+          open={isGenerateModalOpen}
+          onClose={() => setIsGenerateModalOpen(false)}
+          onGenerate={handleGeneratePayroll}
+        />
+        </div>
+      </PageContainer>
+    </RoleGuard>
   )
 }

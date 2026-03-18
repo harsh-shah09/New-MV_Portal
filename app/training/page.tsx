@@ -8,6 +8,7 @@ import { TrainingDetail } from "./components/training-detail"
 import { ProgressCard } from "./components/progress-card"
 import { useTrainingStore } from "@/store/trainingStore"
 import type { Training, TrainingEnrollment } from "@/types"
+import { RoleGuard } from "@/components/role-guard"
 
 const mockTrainings: Training[] = [
   {
@@ -113,7 +114,7 @@ export default function TrainingPage() {
   )
 
   const myEnrollments = enrollments.filter((e) => e.employeeId === "current-user")
-  
+
   const items = [
     {
       key: 'available',
@@ -124,42 +125,44 @@ export default function TrainingPage() {
       key: 'my-trainings',
       label: 'My Trainings',
       children: (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2">
-              <TrainingList
-                trainings={trainings.filter((t) => myEnrollments.some((e) => e.trainingId === t.id))}
-                onSelect={setSelectedTraining}
-              />
-            </div>
-            <div>
-              <ProgressCard enrollments={myEnrollments} trainingMap={trainingMap} />
-            </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2">
+            <TrainingList
+              trainings={trainings.filter((t) => myEnrollments.some((e) => e.trainingId === t.id))}
+              onSelect={setSelectedTraining}
+            />
           </div>
+          <div>
+            <ProgressCard enrollments={myEnrollments} trainingMap={trainingMap} />
+          </div>
+        </div>
       )
     }
   ];
 
   return (
-    <div>
+    <RoleGuard>
+      <div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-        <div>
-          <h1 className="text-4xl font-extrabold text-slate-900 mb-2 tracking-tight">Training & Development</h1>
-          <p className="text-slate-500 text-lg">Enhance your skills with our training programs</p>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+          <div>
+            <h1 className="text-4xl font-extrabold text-slate-900 mb-2 tracking-tight">Training & Development</h1>
+            <p className="text-slate-500 text-lg">Enhance your skills with our training programs</p>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm border border-slate-100 mb-6 mt-8 p-6">
+            <Tabs defaultActiveKey="available" items={items} />
+          </div>
+
+          {selectedTraining && (
+            <TrainingDetail
+              training={selectedTraining}
+              onClose={() => setSelectedTraining(null)}
+              onEnroll={handleEnroll}
+            />
+          )}
         </div>
-
-        <div className="bg-white rounded-xl shadow-sm border border-slate-100 mb-6 mt-8 p-6">
-           <Tabs defaultActiveKey="available" items={items} />
-        </div>
-
-        {selectedTraining && (
-          <TrainingDetail
-            training={selectedTraining}
-            onClose={() => setSelectedTraining(null)}
-            onEnroll={handleEnroll}
-          />
-        )}
       </div>
-    </div>
+    </RoleGuard>
   )
 }
