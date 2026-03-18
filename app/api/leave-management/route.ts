@@ -12,6 +12,7 @@ import {
   tlApprovalToHR,
   leaveApprovedByTL,
   leaveApprovedFinal,
+  leaveAutoApproved,
   leaveRejected,
   leaveWithdrawn,
   withdrawalRequestSubmitted,
@@ -843,22 +844,20 @@ export async function POST(request: NextRequest) {
         }
 
         if (teamLeadEmail) {
+          const teamLeadEmailTemplate = leaveAutoApproved({
+            recipientName: teamLeadName,
+            employeeName,
+            approverTitle,
+            leaveType,
+            startDate: parsedStart.format('YYYY-MM-DD'),
+            endDate: parsedEnd.format('YYYY-MM-DD'),
+            duration: fullDayDuration,
+          });
+
           sendEmailAsync({
             to: teamLeadEmail,
-            subject: `Leave Auto-Approved for ${employeeName}`,
-            body: `
-              <p>Dear ${teamLeadName},</p>
-              <p>${approverTitle} has applied and approved a leave on behalf of <strong>${employeeName}</strong>.</p>
-              <p><strong>Leave Details:</strong></p>
-              <ul>
-                <li>Type: ${leaveType}</li>
-                <li>Category: Loss of Pay</li>
-                <li>Start Date: ${parsedStart.format('YYYY-MM-DD')}</li>
-                <li>End Date: ${parsedEnd.format('YYYY-MM-DD')}</li>
-                <li>Duration: ${fullDayDuration} day(s)</li>
-              </ul>
-              <p>Regards,<br/>HRMS System</p>
-            `,
+            subject: teamLeadEmailTemplate.subject,
+            body: teamLeadEmailTemplate.html,
           });
         }
 

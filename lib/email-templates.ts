@@ -118,6 +118,17 @@ export function leaveApprovedFinal(data: LeaveEmailData): { subject: string; htm
 }
 
 /**
+ * Template: Leave Auto-Approved (to Team Lead)
+ */
+export function leaveAutoApproved(data: LeaveEmailData): { subject: string; html: string; text: string } {
+  const subject = `Leave Auto-Approved for ${data.employeeName}`;
+  const html = loadTemplate('leave-auto-approved', data);
+  const text = `Dear ${data.recipientName},\n\n${data.approverTitle} has applied and auto-approved leave on behalf of ${data.employeeName}.\n\nLeave Details:\n- Type: ${data.leaveType}\n- Category: Loss of Pay\n- Start Date: ${data.startDate}\n- End Date: ${data.endDate}\n- Duration: ${data.duration} day(s)\n\nRegards,\nHRMS System`;
+
+  return { subject, html, text };
+}
+
+/**
  * Template: Leave Rejected by Team Lead/HR/Admin
  */
 export function leaveRejected(data: LeaveEmailData): { subject: string; html: string; text: string } {

@@ -24,6 +24,13 @@ interface EmployeeOption {
   active?: boolean
 }
 
+interface EmployeeLeaveKpi {
+  annualLeaveRemaining: number
+  sickLeaveCount: number
+  emergencyLeaveCount: number
+  plannedLeaveCount: number
+}
+
 export default function LeavesPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -49,6 +56,22 @@ export default function LeavesPage() {
     employeeName: "",
     dateRange: [null, null] as [any, any],
   })
+
+  const normalizedEmployeeSearch = filters.employeeName.trim().toLowerCase()
+  const searchedEmployeeLeaves = normalizedEmployeeSearch
+    ? allLeaves.filter((leave) => leave.employeeName?.toLowerCase().includes(normalizedEmployeeSearch))
+    : []
+  const searchedEmployeeIds = Array.from(
+    new Set(
+      searchedEmployeeLeaves
+        .map((leave) => leave.employeeId)
+        .filter((employeeId): employeeId is string => Boolean(employeeId))
+    )
+  )
+  const searchedEmployeeId = searchedEmployeeIds.length === 1 ? searchedEmployeeIds[0] : ""
+  const searchedEmployeeName = searchedEmployeeId
+    ? searchedEmployeeLeaves.find((leave) => leave.employeeId === searchedEmployeeId)?.employeeName || ""
+    : ""
 
   console.log("Current User:", currentUser)
   const { leaves, pendingApprovals, setLeaves, setPendingApprovals, updateLeave } = useLeaveStore()
@@ -114,6 +137,18 @@ export default function LeavesPage() {
       setPendingApprovals(data.pendingApprovals || [])
     }
   }, [data, setLeaves, setPendingApprovals])
+
+  const { data: searchedEmployeeKpi, isLoading: isLoadingSearchedEmployeeKpi } = useQuery<EmployeeLeaveKpi>({
+    queryKey: ["searched-employee-leave-kpi", searchedEmployeeId],
+    enabled: Boolean(searchedEmployeeId),
+    queryFn: async () => {
+      const response = await fetch(`/api/leave-management/employee-kpi?employeeId=${encodeURIComponent(searchedEmployeeId)}`)
+      if (!response.ok) {
+        throw new Error("Failed to fetch searched employee leave KPI")
+      }
+      return response.json()
+    },
+  })
 
   // Fetch all leaves for HR/Admin
   const fetchAllLeaves = async () => {
@@ -1206,6 +1241,43 @@ export default function LeavesPage() {
                   </span>
                 </div> */}
               </Card>
+
+              {searchedEmployeeId && (
+                <Card className="rounded-xl shadow-sm border-border bg-card text-card-foreground mb-6" bodyStyle={{ padding: '16px' }}>
+                  <div className="mb-3">
+                    <h3 className="text-base font-semibold text-gray-900">Leave KPI{searchedEmployeeName ? ` - ${searchedEmployeeName}` : ''}</h3>
+                  </div>
+
+                  <Spin spinning={isLoadingSearchedEmployeeKpi}>
+                    <Row gutter={[16, 16]}>
+                      <Col xs={24} sm={12} lg={6}>
+                        <Card className="border border-emerald-100 bg-emerald-50/50" bodyStyle={{ padding: '14px 16px' }}>
+                          <p className="text-xs text-emerald-700 mb-1">Annual Leave Remaining</p>
+                          <p className="text-2xl font-bold text-emerald-800">{searchedEmployeeKpi?.annualLeaveRemaining ?? 0}</p>
+                        </Card>
+                      </Col>
+                      <Col xs={24} sm={12} lg={6}>
+                        <Card className="border border-blue-100 bg-blue-50/50" bodyStyle={{ padding: '14px 16px' }}>
+                          <p className="text-xs text-blue-700 mb-1">Sick Leave</p>
+                          <p className="text-2xl font-bold text-blue-800">{searchedEmployeeKpi?.sickLeaveCount ?? 0}</p>
+                        </Card>
+                      </Col>
+                      <Col xs={24} sm={12} lg={6}>
+                        <Card className="border border-orange-100 bg-orange-50/50" bodyStyle={{ padding: '14px 16px' }}>
+                          <p className="text-xs text-orange-700 mb-1">Emergency Leave</p>
+                          <p className="text-2xl font-bold text-orange-800">{searchedEmployeeKpi?.emergencyLeaveCount ?? 0}</p>
+                        </Card>
+                      </Col>
+                      <Col xs={24} sm={12} lg={6}>
+                        <Card className="border border-violet-100 bg-violet-50/50" bodyStyle={{ padding: '14px 16px' }}>
+                          <p className="text-xs text-violet-700 mb-1">Planned Leave</p>
+                          <p className="text-2xl font-bold text-violet-800">{searchedEmployeeKpi?.plannedLeaveCount ?? 0}</p>
+                        </Card>
+                      </Col>
+                    </Row>
+                  </Spin>
+                </Card>
+              )}
 
               {/* Leave Table */}
               <div className="mt-4">

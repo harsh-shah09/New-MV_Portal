@@ -129,6 +129,7 @@ export default function NotificationsPage() {
                         <RefreshButton
                             onClick={refetch}
                             loading={isFetching}
+                            label=""
                             className="mt-1"
                         />
                     </div>

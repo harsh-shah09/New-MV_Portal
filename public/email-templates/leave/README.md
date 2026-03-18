@@ -11,16 +11,17 @@ This directory contains professional HTML email templates for all leave-related 
 4. **tl-approval-to-hr.html** - Sent to HR when a Team Lead approves an employee's leave request
 5. **leave-approved-by-tl.html** - Sent to employee when their leave is approved by Team Lead
 6. **leave-approved-final.html** - Sent to employee when their leave receives final HR/Admin approval
-7. **leave-rejected.html** - Sent to employee when their leave request is rejected
+7. **leave-auto-approved.html** - Sent to Team Lead when HR/Admin applies and auto-approves leave for an employee
+8. **leave-rejected.html** - Sent to employee when their leave request is rejected
 
 ### Leave Withdrawal Flow
-8. **withdrawal-request-submitted.html** - Sent to employee confirming their withdrawal request submission
-9. **withdrawal-request-to-hr.html** - Sent to HR when an employee requests to withdraw approved leave
-10. **withdrawal-approved.html** - Sent to employee when HR approves the withdrawal request
-11. **withdrawal-rejected.html** - Sent to employee when HR rejects the withdrawal request
+9. **withdrawal-request-submitted.html** - Sent to employee confirming their withdrawal request submission
+10. **withdrawal-request-to-hr.html** - Sent to HR when an employee requests to withdraw approved leave
+11. **withdrawal-approved.html** - Sent to employee when HR approves the withdrawal request
+12. **withdrawal-rejected.html** - Sent to employee when HR rejects the withdrawal request
 
 ### Legacy
-12. **leave-withdrawn.html** - Legacy template for direct withdrawals (no approval needed)
+13. **leave-withdrawn.html** - Legacy template for direct withdrawals (no approval needed)
 
 ## Features
 
