@@ -8,13 +8,21 @@ import { useLeaveStore } from "@/store/leaveStore"
 import type { LeaveRequest } from "@/types"
 import { useQuery } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { Modal, Select, Input, Card, Row, Col, Spin, DatePicker, Button  } from "antd"
+import { Modal, Select, Input, Card, Row, Col, Spin, DatePicker, Button, Form } from "antd"
 import { SearchOutlined } from "@ant-design/icons"
 import { PageContainer } from "@/components/page-container"
 import { PageHeader } from "@/components/page-header"
 import { RefreshButton } from "@/components/refresh-button"
 import dayjs from "dayjs"
 import { Plus } from "lucide-react"
+
+interface EmployeeOption {
+  id: string
+  name: string
+  email?: string
+  role?: string
+  active?: boolean
+}
 
 export default function LeavesPage() {
   const router = useRouter()
@@ -29,6 +37,12 @@ export default function LeavesPage() {
   const [filteredLeaves, setFilteredLeaves] = useState<LeaveRequest[]>([])
   const [filteredMyLeaves, setFilteredMyLeaves] = useState<LeaveRequest[]>([])
   const [isRefreshingAllLeaves, setIsRefreshingAllLeaves] = useState(false)
+  const [showApplyForOthersForm, setShowApplyForOthersForm] = useState(false)
+  const [employeeOptions, setEmployeeOptions] = useState<EmployeeOption[]>([])
+  const [holidayDateSet, setHolidayDateSet] = useState<Set<string>>(new Set())
+  const [isLoadingEmployees, setIsLoadingEmployees] = useState(false)
+  const [isSubmittingApplyForOthers, setIsSubmittingApplyForOthers] = useState(false)
+  const [applyForOthersForm] = Form.useForm()
   const [filters, setFilters] = useState({
     status: "",
     leaveType: "",
@@ -125,6 +139,125 @@ export default function LeavesPage() {
   useEffect(() => {
     fetchAllLeaves()
   }, [currentUser])
+
+  const canApplyForOthers = currentUser?.role === 'HR' || currentUser?.role === 'Admin'
+
+  const fetchEmployeeOptions = async () => {
+    if (!canApplyForOthers) return
+    setIsLoadingEmployees(true)
+    try {
+      const response = await fetch('/api/employees')
+      if (!response.ok) {
+        throw new Error('Failed to fetch employees')
+      }
+
+      const rawEmployees = await response.json()
+      const options: EmployeeOption[] = (rawEmployees || [])
+        .filter((emp: any) => emp?.Id)
+        .map((emp: any) => ({
+          id: emp.Id,
+          name: emp.Employee_Name__c || emp.Name || 'Unknown',
+          email: emp.Employee_Email__c || '',
+          role: emp.Role__c || '',
+          active: emp.Active__c,
+        }))
+        .filter((emp: EmployeeOption) => emp.active !== false)
+
+      setEmployeeOptions(options)
+    } catch (error) {
+      console.error('Error fetching employees for apply-for-others:', error)
+      toast.error('Failed to fetch employees')
+    } finally {
+      setIsLoadingEmployees(false)
+    }
+  }
+
+  const fetchHolidayDates = async () => {
+    try {
+      const response = await fetch('/api/holidays')
+      if (!response.ok) {
+        throw new Error('Failed to fetch holidays')
+      }
+
+      const data = await response.json()
+      const dates = new Set<string>()
+      ;(data?.holidays || []).forEach((holiday: any) => {
+        if (holiday?.date) {
+          dates.add(dayjs(holiday.date).format('YYYY-MM-DD'))
+        }
+      })
+      setHolidayDateSet(dates)
+    } catch (error) {
+      console.error('Error fetching holidays for apply-for-others:', error)
+    }
+  }
+
+  const disabledApplyForOthersDate = (current: any) => {
+    if (!current) return false
+    const isWeekend = current.day() === 0 || current.day() === 6
+    const isHoliday = holidayDateSet.has(current.format('YYYY-MM-DD'))
+    return isWeekend || isHoliday
+  }
+
+  const openApplyForOthersModal = async () => {
+    if (!canApplyForOthers) return
+    await Promise.all([
+      employeeOptions.length === 0 ? fetchEmployeeOptions() : Promise.resolve(),
+      holidayDateSet.size === 0 ? fetchHolidayDates() : Promise.resolve(),
+    ])
+    setShowApplyForOthersForm(true)
+  }
+
+  const handleSubmitApplyForOthers = async (values: any) => {
+    const start = values.startDate
+    const end = values.endDate
+
+    if (!start || !end || start.isAfter(end, 'day')) {
+      toast.error('Start date must be on or before end date')
+      return
+    }
+
+    setIsSubmittingApplyForOthers(true)
+    const toastId = toast.loading('Applying leave for employee...')
+
+    try {
+      const response = await fetch('/api/leave-management', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          applyForOthers: true,
+          employeeId: values.employeeId,
+          leaveType: values.leaveType,
+          leaveCategory: 'loss-of-pay',
+          startDate: start.format('YYYY-MM-DD'),
+          endDate: end.format('YYYY-MM-DD'),
+          session: 'Full Day',
+          reason: values.reason?.trim(),
+        }),
+      })
+
+      const result = await response.json()
+      if (!response.ok) {
+        toast.error(result?.error || 'Failed to apply leave for employee', { id: toastId })
+        return
+      }
+
+      toast.success(result?.message || 'Leave applied and approved successfully', { id: toastId })
+      applyForOthersForm.resetFields()
+      setShowApplyForOthersForm(false)
+      refetch()
+      if (canApplyForOthers) {
+        fetchAllLeaves()
+      }
+    } catch (error) {
+      console.error('Error applying leave for others:', error)
+      toast.error('Failed to apply leave for employee', { id: toastId })
+    } finally {
+      setIsSubmittingApplyForOthers(false)
+    }
+  }
 
   // Apply filters
   useEffect(() => {
@@ -703,14 +836,25 @@ export default function LeavesPage() {
         title="Leave Management"
         subtitle="Manage leave requests and approvals"
       >
-        <Button
-        type = 'primary'
-        size="large"
-          onClick={() => setShowForm(true)}
-          icon={<Plus size={16}/>}
-        >
-          Request Leave
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            type='primary'
+            size="large"
+            onClick={() => setShowForm(true)}
+            icon={<Plus size={16} />}
+          >
+            Request Leave
+          </Button>
+          {canApplyForOthers && (
+            <Button
+              size="large"
+              onClick={openApplyForOthersModal}
+              loading={isLoadingEmployees}
+            >
+              Apply for Others
+            </Button>
+          )}
+        </div>
       </PageHeader>
 
       <div className="bg-card rounded-xl shadow-sm border border-border mb-6 overflow-hidden">
@@ -1085,6 +1229,98 @@ export default function LeavesPage() {
           employeeName={currentUser?.email || "Current Employee"}
         />
       )}
+
+      <Modal
+        title="Apply Leave for Others"
+        open={showApplyForOthersForm}
+        onCancel={() => {
+          setShowApplyForOthersForm(false)
+          applyForOthersForm.resetFields()
+        }}
+        footer={null}
+        width={620}
+      >
+        <Form
+          form={applyForOthersForm}
+          layout="vertical"
+          className="mt-4"
+          onFinish={handleSubmitApplyForOthers}
+          initialValues={{
+            leaveType: 'Sick Leave',
+          }}
+        >
+          <Form.Item
+            name="employeeId"
+            label="Employee"
+            rules={[{ required: true, message: 'Please select an employee' }]}
+          >
+            <Select
+              showSearch
+              placeholder="Select employee"
+              loading={isLoadingEmployees}
+              optionFilterProp="label"
+              options={employeeOptions.map((emp) => ({
+                value: emp.id,
+                label: `${emp.name}${emp.role ? ` (${emp.role})` : ''}`,
+              }))}
+            />
+          </Form.Item>
+
+          <Form.Item label="Leave Category">
+            <Input value="Loss of Pay" disabled />
+          </Form.Item>
+
+          <Form.Item
+            name="leaveType"
+            label="Leave Type"
+            rules={[{ required: true, message: 'Please select leave type' }]}
+          >
+            <Select>
+              <Select.Option value="Sick Leave">Sick Leave</Select.Option>
+              <Select.Option value="Emergency Leave">Emergency Leave</Select.Option>
+            </Select>
+          </Form.Item>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Form.Item
+              name="startDate"
+              label="Start Date"
+              rules={[{ required: true, message: 'Please select start date' }]}
+            >
+              <DatePicker className="w-full" format="YYYY-MM-DD" disabledDate={disabledApplyForOthersDate} />
+            </Form.Item>
+            <Form.Item
+              name="endDate"
+              label="End Date"
+              rules={[{ required: true, message: 'Please select end date' }]}
+            >
+              <DatePicker className="w-full" format="YYYY-MM-DD" disabledDate={disabledApplyForOthersDate} />
+            </Form.Item>
+          </div>
+
+          <Form.Item
+            name="reason"
+            label="Reason"
+            rules={[{ required: true, message: 'Please provide a reason' }]}
+          >
+            <Input.TextArea rows={3} placeholder="Enter leave reason" />
+          </Form.Item>
+
+          <div className="flex justify-end gap-3 pt-2">
+            <Button
+              onClick={() => {
+                setShowApplyForOthersForm(false)
+                applyForOthersForm.resetFields()
+              }}
+            >
+              Cancel
+            </Button>
+            <Button type="primary" htmlType="submit" loading={isSubmittingApplyForOthers}>
+              Apply and Approve
+            </Button>
+          </div>
+        </Form>
+      </Modal>
 
       {/* Reject Leave Modal */}
       <Modal
