@@ -30,11 +30,13 @@ import {
   Laptop,
   History,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Leaf
 } from "lucide-react"
 import { generate2FASecretAction, verifyAndEnable2FAAction, disable2FAAction, getEmployeeTitles } from "@/app/employees/[id]/actions"
-import { message, Spin, Select, Modal, Form } from "antd"
+import { message, Spin, Select, Modal, Form, DatePicker, Space } from "antd"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import dayjs from "dayjs"
 import { cn } from "@/lib/utils"
 import { Field } from "./field-component"
 
@@ -45,13 +47,14 @@ interface ViewProps {
 
 export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }: ViewProps) {
   // --- Hash <-> Tab mapping ---
-  type TabId = "personal" | "employment" | "bank" | "documents" | "security" | "assets"
+  type TabId = "personal" | "employment" | "bank" | "documents" | "security" | "assets" | "leaves"
   const TAB_HASH_MAP: Record<TabId, string> = {
     personal:    "PersonalDetails",
     employment:  "EmploymentInfo",
     assets:      "Assets",
     bank:        "BankDetails",
     documents:   "Documents",
+    leaves :     "Leaves",
     security:    "Security",
   }
   const HASH_TAB_MAP: Record<string, TabId> = Object.fromEntries(
@@ -70,6 +73,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
   const fileInputRef = useRef<HTMLInputElement>(null)
   const queryClient = useQueryClient()
   const [titles, setTitles] = useState<{ label: string, value: string }[]>([])
+  const [leaveFilters, setLeaveFilters] = useState({ status: '', type: '', dateRange: [null, null] as [any, any] })
 
   useEffect(() => {
     getEmployeeTitles().then(setTitles).catch(console.error)
@@ -932,6 +936,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                      { id: "assets", label: "Assets", icon: Laptop },
                      { id: "bank", label: "Bank Details", icon: CreditCard },
                      { id: "documents", label: "Documents", icon: FileText },
+                    //  { id: "leaves", label: "Leaves", icon: Leaf },
                      { id: "security", label: "Security", icon: Lock },
                  ].map((tab) => (
                      <button
@@ -1792,6 +1797,239 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                                   )}
                                               </div>
                                           )
+                                      })()}
+                                  </div>
+                              </div>
+                          )}
+                        {activeTab === 'leaves' && (
+                              <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
+                                  <div>
+                                      <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+                                          <Leaf className="w-5 h-5 text-green-500" /> Leave History
+                                      </h2>
+
+                                      {/* Filters Section */}
+                                      <div className="mb-6 p-4 bg-slate-50 border border-slate-200 rounded-xl">
+                                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                                              {/* Status Filter */}
+                                              <div>
+                                                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                                                      Filter by Status
+                                                  </label>
+                                                  <select
+                                                      value={leaveFilters.status}
+                                                      onChange={(e) =>
+                                                          setLeaveFilters({ ...leaveFilters, status: e.target.value })
+                                                      }
+                                                      className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white text-slate-800 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition"
+                                                  >
+                                                      <option value="">All Status</option>
+                                                      <option value="applied">Applied</option>
+                                                      <option value="approved">Approved</option>
+                                                      <option value="rejected">Rejected</option>
+                                                  </select>
+                                              </div>
+
+                                              {/* Leave Type Filter */}
+                                              <div>
+                                                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                                                      Filter by Type
+                                                  </label>
+                                                  <select
+                                                      value={leaveFilters.type}
+                                                      onChange={(e) =>
+                                                          setLeaveFilters({ ...leaveFilters, type: e.target.value })
+                                                      }
+                                                      className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white text-slate-800 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition"
+                                                  >
+                                                      <option value="">All Types</option>
+                                                      <option value="Planned leave">Planned Leave</option>
+                                                      <option value="Sick Leave">Sick Leave</option>
+                                                      <option value="Emergency Leave">Emergency Leave</option>
+                                                  </select>
+                                              </div>
+
+                                              {/* Date Range Filter */}
+                                              <div>
+                                                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                                                      Date Range
+                                                  </label>
+                                                  <DatePicker.RangePicker
+                                                      value={leaveFilters.dateRange[0] && leaveFilters.dateRange[1] ? [dayjs(leaveFilters.dateRange[0]), dayjs(leaveFilters.dateRange[1])] : null}
+                                                      onChange={(dates) => {
+                                                          setLeaveFilters({
+                                                              ...leaveFilters,
+                                                              dateRange: dates ? [dates[0]?.toDate(), dates[1]?.toDate()] : [null, null]
+                                                          });
+                                                      }}
+                                                      className="w-full"
+                                                      placeholder={['Start Date', 'End Date']}
+                                                      format="DD/MM/YYYY"
+                                                  />
+                                              </div>
+
+                                              {/* Reset Button */}
+                                              <div className="flex items-end">
+                                                  <button
+                                                      onClick={() => setLeaveFilters({ status: '', type: '', dateRange: [null, null] })}
+                                                      className="w-full px-4 py-2 bg-slate-300 hover:bg-slate-400 text-slate-800 text-sm font-medium rounded-lg transition"
+                                                  >
+                                                      Clear Filters
+                                                  </button>
+                                              </div>
+                                          </div>
+                                      </div>
+
+                                      {/* Table Section */}
+                                      {(() => {
+                                          const leaves = employee.leaveHistory || [];
+                                          const filteredLeaves = leaves.filter((leave: any) => {
+                                              if (leaveFilters.status && leave.Status__c?.toLowerCase() !== leaveFilters.status.toLowerCase()) {
+                                                  return false;
+                                              }
+                                              if (leaveFilters.type) {
+                                                  const leaveType = (leave.Leave_Type__c || leave.leaveType || '').toLowerCase();
+                                                  if (leaveType !== leaveFilters.type.toLowerCase()) {
+                                                      return false;
+                                                  }
+                                              }
+                                              if (leaveFilters.dateRange[0] && leaveFilters.dateRange[1]) {
+                                                  const startDate = new Date(leave.Start_Date__c || leave.startDate);
+                                                  const filterStart = new Date(leaveFilters.dateRange[0]);
+                                                  const filterEnd = new Date(leaveFilters.dateRange[1]);
+                                                  // Set end time to end of day for proper range comparison
+                                                  filterEnd.setHours(23, 59, 59, 999);
+                                                  if (startDate < filterStart || startDate > filterEnd) {
+                                                      return false;
+                                                  }
+                                              }
+                                              return true;
+                                          });
+
+                                          if (leaves.length === 0) {
+                                              return (
+                                                  <div className="text-center py-12 bg-slate-50 rounded-xl border-dashed border-2 border-slate-200">
+                                                      <Leaf className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+                                                      <p className="text-slate-500 text-sm">No leave records found.</p>
+                                                  </div>
+                                              );
+                                          }
+
+                                          return (
+                                              <div className="overflow-x-auto rounded-xl border border-slate-200 shadow-sm">
+                                                  <table className="w-full text-sm">
+                                                      {/* Table Header */}
+                                                      <thead className="bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-200">
+                                                          <tr>
+                                                              <th className="px-4 py-3 text-left font-semibold text-slate-700">Leave Type</th>
+                                                              <th className="px-4 py-3 text-left font-semibold text-slate-700">Start Date</th>
+                                                              <th className="px-4 py-3 text-left font-semibold text-slate-700">End Date</th>
+                                                              <th className="px-4 py-3 text-center font-semibold text-slate-700">Days</th>
+                                                              <th className="px-4 py-3 text-left font-semibold text-slate-700">Reason</th>
+                                                              <th className="px-4 py-3 text-center font-semibold text-slate-700">Status</th>
+                                                          </tr>
+                                                      </thead>
+
+                                                      {/* Table Body */}
+                                                      <tbody className="divide-y divide-slate-200">
+                                                          {filteredLeaves.length > 0 ? (
+                                                              filteredLeaves.map((leave: any, idx: number) => {
+                                                                  const statusLower = (leave.Status__c || 'pending').toLowerCase();
+                                                                  const statusColors: Record<string, string> = {
+                                                                      pending: 'bg-yellow-100 text-yellow-800',
+                                                                      approved: 'bg-green-100 text-green-800',
+                                                                      rejected: 'bg-red-100 text-red-800',
+                                                                      cancelled: 'bg-gray-100 text-gray-800',
+                                                                  };
+                                                                  const statusClass = statusColors[statusLower] || 'bg-slate-100 text-slate-800';
+
+                                                                  return (
+                                                                      <tr key={idx} className="hover:bg-slate-50 transition">
+                                                                          <td className="px-4 py-3 text-slate-800 font-medium">
+                                                                              {leave.Leave_Type__c || leave.leaveType || 'N/A'}
+                                                                          </td>
+                                                                          <td className="px-4 py-3 text-slate-700">
+                                                                              {leave.Start_Date__c || leave.startDate
+                                                                                  ? new Date(leave.Start_Date__c || leave.startDate).toLocaleDateString('en-IN', {
+                                                                                      year: 'numeric',
+                                                                                      month: 'short',
+                                                                                      day: 'numeric'
+                                                                                  })
+                                                                                  : 'N/A'}
+                                                                          </td>
+                                                                          <td className="px-4 py-3 text-slate-700">
+                                                                              {leave.End_Date__c || leave.endDate
+                                                                                  ? new Date(leave.End_Date__c || leave.endDate).toLocaleDateString('en-IN', {
+                                                                                      year: 'numeric',
+                                                                                      month: 'short',
+                                                                                      day: 'numeric'
+                                                                                  })
+                                                                                  : 'N/A'}
+                                                                          </td>
+                                                                          <td className="px-4 py-3 text-center text-slate-700 font-medium">
+                                                                              {leave.Number_of_Days__c || leave.duration || 0}
+                                                                          </td>
+                                                                          <td className="px-4 py-3 text-slate-700 max-w-xs truncate">
+                                                                              {leave.Reason__c || leave.reason || '-'}
+                                                                          </td>
+                                                                          <td className="px-4 py-3 text-center">
+                                                                              <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusClass}`}>
+                                                                                  {(leave.Status__c || 'Pending').charAt(0).toUpperCase() + (leave.Status__c || 'Pending').slice(1).toLowerCase()}
+                                                                              </span>
+                                                                          </td>
+                                                                      </tr>
+                                                                  );
+                                                              })
+                                                          ) : (
+                                                              <tr>
+                                                                  <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
+                                                                      No leaves found matching your filters.
+                                                                  </td>
+                                                              </tr>
+                                                          )}
+                                                      </tbody>
+                                                  </table>
+                                              </div>
+                                          );
+                                      })()}
+
+                                      {/* Summary Stats */}
+                                      {(() => {
+                                          const leaves = employee.leaveHistory || [];
+                                          if (leaves.length === 0) return null;
+
+                                          const stats = {
+                                              total: leaves.length,
+                                              approved: leaves.filter((l: any) => (l.Status__c || '').toLowerCase() === 'approved').length,
+                                              pending: leaves.filter((l: any) => (l.Status__c || '').toLowerCase() === 'applied').length,
+                                              rejected: leaves.filter((l: any) => (l.Status__c || '').toLowerCase() === 'rejected').length,
+                                              totalDays: leaves.reduce((sum: number, l: any) => sum + (l.Number_of_Days__c || l.duration || 0), 0)
+                                          };
+
+                                          return (
+                                              <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                                                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
+                                                      <p className="text-sm text-slate-600">Total Leaves</p>
+                                                      <p className="text-2xl font-bold text-blue-600">{stats.total}</p>
+                                                  </div>
+                                                  <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
+                                                      <p className="text-sm text-slate-600">Approved</p>
+                                                      <p className="text-2xl font-bold text-green-600">{stats.approved}</p>
+                                                  </div>
+                                                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center">
+                                                      <p className="text-sm text-slate-600">Pending</p>
+                                                      <p className="text-2xl font-bold text-yellow-600">{stats.pending}</p>
+                                                  </div>
+                                                  <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
+                                                      <p className="text-sm text-slate-600">Rejected</p>
+                                                      <p className="text-2xl font-bold text-red-600">{stats.rejected}</p>
+                                                  </div>
+                                                  {/* <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 text-center">
+                                                      <p className="text-sm text-slate-600">Total Days</p>
+                                                      <p className="text-2xl font-bold text-purple-600">{stats.totalDays}</p>
+                                                  </div> */}
+                                              </div>
+                                          );
                                       })()}
                                   </div>
                               </div>

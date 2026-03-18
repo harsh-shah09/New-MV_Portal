@@ -8,7 +8,7 @@ import { useLeaveStore } from "@/store/leaveStore"
 import type { LeaveRequest } from "@/types"
 import { useQuery } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { Modal, Select, Input, Card, Row, Col, Spin, DatePicker, Button } from "antd"
+import { Modal, Select, Input, Card, Row, Col, Spin, DatePicker, Button  } from "antd"
 import { SearchOutlined } from "@ant-design/icons"
 import { PageContainer } from "@/components/page-container"
 import { PageHeader } from "@/components/page-header"
@@ -33,6 +33,7 @@ export default function LeavesPage() {
     status: "",
     leaveType: "",
     employeeName: "",
+    dateRange: [null, null] as [any, any],
   })
 
   console.log("Current User:", currentUser)
@@ -144,6 +145,16 @@ export default function LeavesPage() {
       filtered = filtered.filter(leave =>
         leave.employeeName.toLowerCase().includes(filters.employeeName.toLowerCase())
       )
+    }
+
+    if (filters.dateRange[0] && filters.dateRange[1]) {
+      filtered = filtered.filter(leave => {
+        const startDate = new Date(leave.startDate)
+        const filterStart = new Date(filters.dateRange[0])
+        const filterEnd = new Date(filters.dateRange[1])
+        filterEnd.setHours(23, 59, 59, 999)
+        return startDate >= filterStart && startDate <= filterEnd
+      })
     }
 
     setFilteredLeaves(filtered)
@@ -969,7 +980,7 @@ export default function LeavesPage() {
               <Card className="rounded-xl shadow-sm border-border bg-card text-card-foreground mb-6" bodyStyle={{ padding: '16px' }}>
                 <Row gutter={[16, 16]}>
 
-                  <Col xs={24} md={8}>
+                  <Col xs={24} md={6}>
                     <label className="block text-sm font-medium text-muted-foreground mb-1.5">
                       Employee Name
                     </label>
@@ -984,7 +995,7 @@ export default function LeavesPage() {
                     />
                   </Col>
 
-                  <Col xs={24} md={8}>
+                  <Col xs={24} md={6}>
                     <label className="block text-sm font-medium text-muted-foreground mb-1.5">
                       Leave Type
                     </label>
@@ -1004,7 +1015,7 @@ export default function LeavesPage() {
                     </Select>
                   </Col>
 
-                  <Col xs={24} md={8}>
+                  <Col xs={24} md={6}>
                     <label className="block text-sm font-medium text-muted-foreground mb-1.5">
                       Status
                     </label>
@@ -1024,14 +1035,32 @@ export default function LeavesPage() {
                       <Select.Option value="withdrawn">Withdrawn</Select.Option>
                     </Select>
                   </Col>
+                  <Col xs={24} md={6}>
+                    <label className="block text-sm font-medium text-muted-foreground mb-1.5">
+                      Date Range
+                    </label>
+                    <DatePicker.RangePicker
+                      value={filters.dateRange[0] && filters.dateRange[1] ? [dayjs(filters.dateRange[0]), dayjs(filters.dateRange[1])] : null}
+                      onChange={(dates) => {
+                        setFilters({
+                          ...filters,
+                          dateRange: dates ? [dates[0]?.toDate(), dates[1]?.toDate()] : [null, null]
+                        });
+                      }}
+                      className="w-full"
+                      placeholder={['Start Date', 'End Date']}
+                      format="DD/MM/YYYY"
+                      size="large"
+                    />
+                  </Col>
                   
                 </Row>
 
-                <div className="mt-3">
+                {/* <div className="mt-3">
                   <span className="text-sm text-gray-600">
                     Showing {filteredLeaves.length} of {allLeaves.length} records
                   </span>
-                </div>
+                </div> */}
               </Card>
 
               {/* Leave Table */}
