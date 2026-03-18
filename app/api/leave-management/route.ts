@@ -4,6 +4,7 @@ import dayjs from "dayjs";
 import { verifyToken } from "@/lib/auth-utils";
 import { getSalesforceConnection, sendInAppNotifications } from "@/lib/salesforce";
 import { sendEmailAsync, getHREmail } from "@/lib/email";
+import { calculateLeaveDays, type LeaveDateInput } from "@/lib/leave-policy";
 import {
   newLeaveRequestToTeamLead,
   teamLeadLeaveRequestToHR,
@@ -113,6 +114,7 @@ interface RuleCalculationDetails {
     applied: boolean;
     preSandwichDates: string[];
     postSandwichDates: string[];
+    countedLeaveDates?: string[];
     totalDays: number;
   };
 
@@ -234,66 +236,59 @@ function createRuleCalculationDetails(
     cursor = cursor.add(1, "day");
   }
 
-  let hasNonWorkingInside = false;
-  if (applySandwichRule && nonWorkingDaysInRange > 0) {
-    let foundWorkingBefore = false;
-    let foundNonWorking = false;
-    let foundWorkingAfter = false;
-
-    cursor = startDate.clone();
-    while (cursor.isSame(endDate) || cursor.isBefore(endDate)) {
-      if (!isNonWorking(cursor)) {
-        if (!foundNonWorking) {
-          foundWorkingBefore = true;
-        } else {
-          foundWorkingAfter = true;
-          break;
-        }
-      } else if (foundWorkingBefore) {
-        foundNonWorking = true;
-      }
-      cursor = cursor.add(1, "day");
-    }
-
-    hasNonWorkingInside = foundWorkingBefore && foundNonWorking && foundWorkingAfter;
-  }
-
-  let preSandwich = 0;
-  const preSandwichDates: string[] = [];
+  const sandwichDateList: LeaveDateInput[] = [];
   if (applySandwichRule && workingDaysInRange > 0) {
-    cursor = startDate.subtract(1, "day");
-    while (isNonWorking(cursor)) {
-      preSandwich += 1;
-      preSandwichDates.push(cursor.format("YYYY-MM-DD"));
-      cursor = cursor.subtract(1, "day");
+    let sandwichCursor = startDate.clone();
+    const sandwichWindowEnd = endDate.add(3, "day");
+    while (sandwichCursor.isSame(sandwichWindowEnd) || sandwichCursor.isBefore(sandwichWindowEnd)) {
+      const dateKey = sandwichCursor.format("YYYY-MM-DD");
+      const isLeaveDay =
+        (sandwichCursor.isSame(startDate) || sandwichCursor.isAfter(startDate)) &&
+        (sandwichCursor.isSame(endDate) || sandwichCursor.isBefore(endDate)) &&
+        !isNonWorking(sandwichCursor);
+
+      sandwichDateList.push({
+        date: dateKey,
+        isLeaveDay,
+        isHalfDay,
+        leaveType,
+        leaveCategory,
+        isPublicHoliday: holidaySet.has(dateKey),
+        isWeekend: isWeekend(sandwichCursor),
+      });
+
+      sandwichCursor = sandwichCursor.add(1, "day");
     }
   }
 
-  let postSandwich = 0;
-  const postSandwichDates: string[] = [];
-  if (applySandwichRule && workingDaysInRange > 0) {
-    cursor = endDate.add(1, "day");
-    while (isNonWorking(cursor)) {
-      postSandwich += 1;
-      postSandwichDates.push(cursor.format("YYYY-MM-DD"));
-      cursor = cursor.add(1, "day");
-    }
-  }
+  const sandwichPolicy =
+    sandwichDateList.length > 0
+      ? calculateLeaveDays(sandwichDateList, {
+          allowedLeaveTypes: ["Planned Leave"],
+          allowedLeaveCategories: ["loss-of-pay", "loss of pay"],
+        })
+      : {
+          sandwichApplied: false,
+          sandwichDates: [] as string[],
+        };
 
-  const sandwichApplied = applySandwichRule && (hasNonWorkingInside || (preSandwich > 0 && postSandwich > 0));
+  const sandwichDates = applySandwichRule ? sandwichPolicy.sandwichDates : [];
+  const preSandwichDates = sandwichDates.filter((dateValue) => dayjs(dateValue).isBefore(startDate, "day"));
+  const postSandwichDates = sandwichDates.filter((dateValue) => dayjs(dateValue).isAfter(endDate, "day"));
+  const sandwichApplied = applySandwichRule && sandwichPolicy.sandwichApplied;
 
   let rangeLeaveDays: number;
   if (effectiveLeaveCategory === "Extra Day Pay") {
     rangeLeaveDays = baseCalendarDays;
   } else {
-    rangeLeaveDays = sandwichApplied ? baseCalendarDays : workingDaysInRange;
+    rangeLeaveDays = workingDaysInRange;
   }
 
   if (isHalfDay) {
     rangeLeaveDays = rangeLeaveDays * 0.5;
   }
 
-  const sandwichExtra = sandwichApplied ? preSandwich + postSandwich : 0;
+  const sandwichExtra = sandwichApplied ? sandwichDates.length : 0;
 
   let onePlusTwoExtra = 0;
   if (applyRules && !isHalfDay && leaveConfig.enableOnePlusTwoRule && penaltyAppliesToUser) {
@@ -359,6 +354,7 @@ function createRuleCalculationDetails(
       applied: sandwichApplied,
       preSandwichDates,
       postSandwichDates,
+      countedLeaveDates: sandwichDates,
       totalDays: sandwichExtra,
     },
     onePlusTwoRule: {
@@ -666,6 +662,7 @@ export async function POST(request: NextRequest) {
     console.log("Submitting user - Role:", role, "Title:", title);
 
     const {
+      applyForOthers,
       leaveCategory,
       leaveType,
       startDate,
@@ -679,6 +676,7 @@ export async function POST(request: NextRequest) {
       confirmMerge,
       mergeExistingLeaveId
     } = body;
+    const targetEmployeeId = body?.employeeId;
     const reason = rawReason?.trim() || '';
     const rulesAlreadyConfirmed = confirmedRules === true;
     const confirmMergeWithExisting = confirmMerge === true;
@@ -696,6 +694,195 @@ export async function POST(request: NextRequest) {
     } | null = null;
 
     console.log('Duration received from client:', duration);
+
+    const conn = await getSalesforceConnection();
+
+    // Special flow: HR/Admin applying leave for other employees
+    if (applyForOthers === true) {
+      const isHR = role === 'HR';
+      const isAdmin = role === 'Admin';
+
+      if (!isHR && !isAdmin) {
+        return NextResponse.json({ error: 'Only HR and Admin can apply leave for others' }, { status: 403 });
+      }
+
+      if (!targetEmployeeId || !leaveType || !startDate || !endDate) {
+        return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+      }
+
+      if (leaveType !== 'Sick Leave' && leaveType !== 'Emergency Leave') {
+        return NextResponse.json({ error: 'Leave type must be Sick Leave or Emergency Leave' }, { status: 400 });
+      }
+
+      const parsedStart = dayjs(startDate).startOf('day');
+      const parsedEnd = dayjs(endDate).startOf('day');
+
+      if (!parsedStart.isValid() || !parsedEnd.isValid()) {
+        return NextResponse.json({ error: 'Invalid leave dates' }, { status: 400 });
+      }
+
+      if (parsedStart.isAfter(parsedEnd, 'day')) {
+        return NextResponse.json({ error: 'Start date must be on or before end date' }, { status: 400 });
+      }
+
+      const holidaySet = await getHolidaySet(conn);
+      const isNonWorkingDay = createNonWorkingDayChecker(holidaySet);
+      const blockedDates: string[] = [];
+      let currentDate = parsedStart.clone();
+
+      while (currentDate.isSame(parsedEnd) || currentDate.isBefore(parsedEnd)) {
+        if (isNonWorkingDay(currentDate)) {
+          blockedDates.push(currentDate.format('YYYY-MM-DD'));
+        }
+        currentDate = currentDate.add(1, 'day');
+      }
+
+      if (blockedDates.length > 0) {
+        return NextResponse.json(
+          {
+            error: `Leave cannot be applied on weekends/holidays. Invalid date(s): ${blockedDates.join(', ')}`,
+          },
+          { status: 400 }
+        );
+      }
+
+      const overlapCheckQuery = await conn.query<any>(`
+        SELECT Id, Start_Date__c, End_Date__c, Status__c, Leave_Type__c, Leave_Category__c
+        FROM Leave__c
+        WHERE Employee__c = '${targetEmployeeId}'
+        AND Status__c IN ('Applied', 'Approved', 'Withdrawal Pending')
+        AND (Start_Date__c <= ${parsedEnd.format('YYYY-MM-DD')} AND End_Date__c >= ${parsedStart.format('YYYY-MM-DD')})
+      `);
+
+      if (overlapCheckQuery.records && overlapCheckQuery.records.length > 0) {
+        const existingLeave = overlapCheckQuery.records[0];
+        return NextResponse.json(
+          {
+            error: `Overlapping leave exists from ${dayjs(existingLeave.Start_Date__c).format('DD MMM YYYY')} to ${dayjs(existingLeave.End_Date__c).format('DD MMM YYYY')} (${existingLeave.Status__c}).`,
+          },
+          { status: 400 }
+        );
+      }
+
+      const targetEmployeeQuery = await conn.query<any>(`
+        SELECT Id, Employee_Name__c, Employee_Email__c, Base_Salary__c,
+               Team_Lead__c, Team_Lead__r.Employee_Name__c, Team_Lead__r.Employee_Email__c
+        FROM Employee__c
+        WHERE Id = '${targetEmployeeId}'
+        LIMIT 1
+      `);
+
+      if (!targetEmployeeQuery.records || targetEmployeeQuery.records.length === 0) {
+        return NextResponse.json({ error: 'Selected employee not found' }, { status: 404 });
+      }
+
+      const targetEmployee = targetEmployeeQuery.records[0];
+      const fullDayDuration = parsedEnd.diff(parsedStart, 'day') + 1;
+      const approverTitle = isAdmin ? 'Admin' : 'HR';
+
+      const approvedLeaveRecord: any = {
+        Employee__c: targetEmployeeId,
+        Leave_Category__c: 'Loss of Pay',
+        Leave_Type__c: leaveType,
+        Start_Date__c: parsedStart.format('YYYY-MM-DD'),
+        End_Date__c: parsedEnd.format('YYYY-MM-DD'),
+        Session__c: 'Full Day',
+        Reason__c: reason || `Applied by ${approverTitle}`,
+        Status__c: 'Approved',
+        HR_Approval__c: 'Approved',
+        TL_Approval__c: 'Approved',
+        Approved_Date__c: new Date().toISOString(),
+        Total_Days__c: fullDayDuration,
+        Total_Days_After_Rule__c: fullDayDuration,
+        OnePlusTwo_Rule__c: false,
+        Sandwich_Rule__c: false,
+        Actual_Deduction__c: calculateLeaveDeduction(
+          'Loss of Pay',
+          parsedStart.format('YYYY-MM-DD'),
+          fullDayDuration,
+          targetEmployee.Base_Salary__c
+        ),
+        After_Rule_Deduction__c: calculateLeaveDeduction(
+          'Loss of Pay',
+          parsedStart.format('YYYY-MM-DD'),
+          fullDayDuration,
+          targetEmployee.Base_Salary__c
+        ),
+      };
+
+      const createResult = await conn.sobject('Leave__c').create(approvedLeaveRecord) as any;
+
+      if (!createResult.success) {
+        return NextResponse.json({ error: 'Failed to create leave request' }, { status: 500 });
+      }
+
+      // Keep leave summary/balance in sync for direct-approved apply-for-others flow
+      await updateLeaveBalance(conn, approvedLeaveRecord, 'approve');
+
+      try {
+        const employeeName = targetEmployee.Employee_Name__c || 'Employee';
+        const employeeEmail = targetEmployee.Employee_Email__c;
+        const teamLeadEmail = targetEmployee.Team_Lead__r?.Employee_Email__c;
+        const teamLeadName = targetEmployee.Team_Lead__r?.Employee_Name__c || 'Team Lead';
+
+        if (employeeEmail) {
+          const employeeEmailTemplate = leaveApprovedFinal({
+            recipientName: employeeName,
+            approverTitle,
+            leaveType,
+            startDate: parsedStart.format('YYYY-MM-DD'),
+            endDate: parsedEnd.format('YYYY-MM-DD'),
+            duration: fullDayDuration,
+          });
+
+          sendEmailAsync({
+            to: employeeEmail,
+            subject: employeeEmailTemplate.subject,
+            body: employeeEmailTemplate.html,
+          });
+        }
+
+        if (teamLeadEmail) {
+          sendEmailAsync({
+            to: teamLeadEmail,
+            subject: `Leave Auto-Approved for ${employeeName}`,
+            body: `
+              <p>Dear ${teamLeadName},</p>
+              <p>${approverTitle} has applied and approved a leave on behalf of <strong>${employeeName}</strong>.</p>
+              <p><strong>Leave Details:</strong></p>
+              <ul>
+                <li>Type: ${leaveType}</li>
+                <li>Category: Loss of Pay</li>
+                <li>Start Date: ${parsedStart.format('YYYY-MM-DD')}</li>
+                <li>End Date: ${parsedEnd.format('YYYY-MM-DD')}</li>
+                <li>Duration: ${fullDayDuration} day(s)</li>
+              </ul>
+              <p>Regards,<br/>HRMS System</p>
+            `,
+          });
+        }
+
+        const inAppRecipients: string[] = [targetEmployeeId];
+        if (targetEmployee.Team_Lead__c) {
+          inAppRecipients.push(targetEmployee.Team_Lead__c);
+        }
+
+        await sendInAppNotifications(
+          inAppRecipients,
+          `Leave has been applied and approved by ${approverTitle} for ${targetEmployee.Employee_Name__c || 'employee'} from ${parsedStart.format('DD MMM YYYY')} to ${parsedEnd.format('DD MMM YYYY')}.`,
+          'Leave',
+          false
+        );
+      } catch (notifyError) {
+        console.error('Error sending apply-for-others notifications:', notifyError);
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: 'Leave applied and approved successfully for selected employee',
+        leaveId: createResult.id,
+      });
+    }
 
     // Validate required fields
     if (!leaveCategory || !startDate || !endDate || !sessionValue) {
@@ -718,8 +905,6 @@ export async function POST(request: NextRequest) {
         }
       }, { status: 400 });
     }
-
-    const conn = await getSalesforceConnection();
 
     // Check for existing leaves that overlap with the requested dates
     const existingLeavesQuery = await conn.query<any>(`
@@ -1085,72 +1270,57 @@ export async function POST(request: NextRequest) {
       cursor = cursor.add(1, "day");
     }
 
-    // Check if there are non-working days sandwiched between working days
-    let hasNonWorkingInside = false;
-    if (applySandwichRule && nonWorkingDaysInRange > 0) {
-      // Check if there's at least one working day before and after non-working days
-      let foundWorkingBefore = false;
-      let foundNonWorking = false;
-      let foundWorkingAfter = false;
-
-      cursor = start.clone();
-      while (cursor.isSame(end) || cursor.isBefore(end)) {
-        if (!isNonWorking(cursor)) {
-          if (!foundNonWorking) {
-            foundWorkingBefore = true;
-          } else {
-            foundWorkingAfter = true;
-            break;
-          }
-        } else if (foundWorkingBefore) {
-          foundNonWorking = true;
-        }
-        cursor = cursor.add(1, "day");
-      }
-
-      hasNonWorkingInside = foundWorkingBefore && foundNonWorking && foundWorkingAfter;
-    }
-
-    // Collect dates counted by same-request sandwich (to avoid double-counting in cross-request)
-    const sameRequestSandwichDates = new Set<string>();
-    let preSandwich = 0;
-    const preSandwichDates: string[] = [];
+    const sandwichDateList: LeaveDateInput[] = [];
     if (applySandwichRule && workingDaysInRange > 0) {
-      cursor = start.subtract(1, "day");
-      while (isNonWorking(cursor)) {
-        preSandwich += 1;
-        preSandwichDates.push(cursor.format('YYYY-MM-DD'));
-        cursor = cursor.subtract(1, "day");
+      let sandwichCursor = start.clone();
+      const sandwichWindowEnd = end.add(3, "day");
+
+      while (sandwichCursor.isSame(sandwichWindowEnd) || sandwichCursor.isBefore(sandwichWindowEnd)) {
+        const dateKey = sandwichCursor.format("YYYY-MM-DD");
+        const isLeaveDay =
+          (sandwichCursor.isSame(start) || sandwichCursor.isAfter(start)) &&
+          (sandwichCursor.isSame(end) || sandwichCursor.isBefore(end)) &&
+          !isNonWorking(sandwichCursor);
+
+        sandwichDateList.push({
+          date: dateKey,
+          isLeaveDay,
+          isHalfDay,
+          leaveType,
+          leaveCategory,
+          isPublicHoliday: holidaySet.has(dateKey),
+          isWeekend: isWeekend(sandwichCursor),
+        });
+
+        sandwichCursor = sandwichCursor.add(1, "day");
       }
     }
 
-    let postSandwich = 0;
-    const postSandwichDates: string[] = [];
-    if (applySandwichRule && workingDaysInRange > 0) {
-      cursor = end.add(1, "day");
-      while (isNonWorking(cursor)) {
-        postSandwich += 1;
-        postSandwichDates.push(cursor.format('YYYY-MM-DD'));
-        cursor = cursor.add(1, "day");
-      }
-    }
+    const sandwichPolicy =
+      sandwichDateList.length > 0
+        ? calculateLeaveDays(sandwichDateList, {
+            allowedLeaveTypes: ["Planned Leave"],
+            allowedLeaveCategories: ["loss-of-pay", "loss of pay"],
+          })
+        : {
+            sandwichApplied: false,
+            sandwichDates: [] as string[],
+          };
 
-    // Sandwich applies if: non-working days are sandwiched inside OR there are non-working days both before and after
-    const sandwichApplied = applySandwichRule && (hasNonWorkingInside || (preSandwich > 0 && postSandwich > 0));
+    const sandwichApplied = applySandwichRule && sandwichPolicy.sandwichApplied;
+    const sandwichDates = sandwichApplied ? sandwichPolicy.sandwichDates : [];
+    const sameRequestSandwichDates = new Set<string>(sandwichDates);
+    const preSandwichDates = sandwichDates.filter((dateValue) => dayjs(dateValue).isBefore(start, "day"));
+    const postSandwichDates = sandwichDates.filter((dateValue) => dayjs(dateValue).isAfter(end, "day"));
+    const insideSandwichDates = sandwichDates.filter(
+      (dateValue) =>
+        !dayjs(dateValue).isBefore(start, "day") &&
+        !dayjs(dateValue).isAfter(end, "day")
+    );
 
-    // If sandwich is applied, add all those dates to the set for cross-request exclusion
-    if (sandwichApplied) {
-      preSandwichDates.forEach(d => sameRequestSandwichDates.add(d));
-      postSandwichDates.forEach(d => sameRequestSandwichDates.add(d));
-      // Also add non-working days inside the range
-      let innerCursor = start.clone();
-      while (innerCursor.isSame(end) || innerCursor.isBefore(end)) {
-        if (isNonWorking(innerCursor)) {
-          sameRequestSandwichDates.add(innerCursor.format('YYYY-MM-DD'));
-        }
-        innerCursor = innerCursor.add(1, "day");
-      }
-    }
+    const preSandwich = preSandwichDates.length;
+    const postSandwich = postSandwichDates.length;
+    const hasNonWorkingInside = insideSandwichDates.length > 0;
 
     console.log('[Same-Request Sandwich] Pre-sandwich dates:', preSandwichDates);
     console.log('[Same-Request Sandwich] Post-sandwich dates:', postSandwichDates);
@@ -1158,12 +1328,12 @@ export async function POST(request: NextRequest) {
 
     // Base leave days calculation:
     // - For Extra Day Pay: Always use calendar days (weekends/holidays are the purpose)
-    // - For Loss of Pay: Use working days when no sandwich, or all calendar days when sandwich applies
+    // - For Loss of Pay: Base = working leave days; sandwich days are added separately
     let rangeLeaveDays: number;
     if (leaveCategory === 'extra-day-pay') {
       rangeLeaveDays = baseCalendarDays;
     } else {
-      rangeLeaveDays = sandwichApplied ? baseCalendarDays : workingDaysInRange;
+      rangeLeaveDays = workingDaysInRange;
     }
 
     console.log('[Half-Day Check] Before adjustment:', {
@@ -1180,7 +1350,7 @@ export async function POST(request: NextRequest) {
       console.log('[Half-Day Check] After 0.5 multiplication:', rangeLeaveDays);
     }
 
-    const sandwichExtra = sandwichApplied ? preSandwich + postSandwich : 0;
+    const sandwichExtra = sandwichApplied ? sandwichDates.length : 0;
 
     // Server-side One+Two rule calculation (planned leave within minimum working day notice period)
     // Only applies to full-day leaves, NOT half-day leaves
@@ -1303,7 +1473,7 @@ export async function POST(request: NextRequest) {
             nonWorkingDaysInRange,
             rangeLeaveDays,
             sameRequestSandwichDays: sandwichExtra,
-            sameRequestSandwichDatesList: sandwichApplied ? [...preSandwichDates, ...postSandwichDates] : [],
+            sameRequestSandwichDatesList: sandwichApplied ? sandwichDates : [],
             totalSandwichDays,
             totalSandwichDeduction,
             onePlusTwoExtra,
@@ -1336,6 +1506,7 @@ export async function POST(request: NextRequest) {
         applied: sandwichApplied,
         preSandwichDates,
         postSandwichDates,
+        countedLeaveDates: sandwichApplied ? sandwichDates : [],
         totalDays: sandwichExtra
       },
 

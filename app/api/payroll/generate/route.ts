@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { cookies } from "next/headers"
 import { verifyToken } from "@/lib/auth-utils"
 import { getSalesforceConnection } from "@/lib/salesforce"
+import { calculateLeaveDays, type LeaveDateInput } from "@/lib/leave-policy"
 import dayjs from "dayjs"
 
 /**
@@ -296,33 +297,6 @@ export async function POST(request: NextRequest) {
       return isWeekend(d) || isHoliday(d)
     }
 
-    // Helper function to calculate days in the selected month for a leave period
-    const calculateDaysInMonth = (leaveStart: string, leaveEnd: string, monthStart: Date, monthEnd: Date): number => {
-      // Parse dates without timezone issues
-      const parseDate = (dateStr: string) => {
-        const [y, m, d] = dateStr.split('-').map(Number)
-        return new Date(y, m - 1, d)
-      }
-      
-      const start = parseDate(leaveStart)
-      const end = parseDate(leaveEnd)
-      
-      // Determine the overlap period
-      const overlapStart = start > monthStart ? start : monthStart
-      const overlapEnd = end < monthEnd ? end : monthEnd
-      
-      // If there's no overlap, return 0
-      if (overlapStart > overlapEnd) {
-        return 0
-      }
-      
-      // Calculate the number of days (inclusive)
-      const timeDiff = overlapEnd.getTime() - overlapStart.getTime()
-      const daysDiff = Math.ceil(timeDiff / (1000 * 60 * 60 * 24)) + 1 // +1 to include both start and end dates
-      
-      return daysDiff
-    }
-
     // Helper function to calculate deduction based on base salary and days
     const calculateDeduction = (baseSalary: number, leaveDays: number, monthYear: Date): number => {
       if (baseSalary <= 0 || leaveDays <= 0) {
@@ -357,6 +331,8 @@ export async function POST(request: NextRequest) {
       const leaveType = leave.Leave_Type__c
       const leaveCategory = leave.Leave_Category__c
       const sessionValue = leave.Session__c
+      const normalizedCategory = leaveCategory?.toLowerCase().replace(/\s+/g, '-') || ''
+      const normalizedType = leaveType?.toLowerCase() || ''
       const createdDate = dayjs(leave.CreatedDate)
       
       // Parse leave dates
@@ -375,16 +351,40 @@ export async function POST(request: NextRequest) {
       
       // Calculate base calendar days for the FULL leave period
       const baseCalendarDays = end.diff(start, "day") + 1
+      let nonWorkingDaysInRange = 0
+      let nonWorkingCursor = start.clone()
+      while (nonWorkingCursor.isSame(end) || nonWorkingCursor.isBefore(end)) {
+        if (isNonWorking(nonWorkingCursor)) {
+          nonWorkingDaysInRange += 1
+        }
+        nonWorkingCursor = nonWorkingCursor.add(1, "day")
+      }
       
-      // Calculate days that fall in the selected payroll month
-      let daysInSelectedMonth = calculateDaysInMonth(
-        leave.Start_Date__c,
-        leave.End_Date__c,
-        startDate,
-        endDate
-      )
-      
-      // Adjust for half-day leaves
+      // Calculate in-month overlap and base leave days for payroll month
+      const monthStartDay = dayjs(startDate)
+      const monthEndDay = dayjs(endDate)
+      const overlapStart = start.isAfter(monthStartDay) ? start : monthStartDay
+      const overlapEnd = end.isBefore(monthEndDay) ? end : monthEndDay
+
+      if (overlapStart.isAfter(overlapEnd)) {
+        console.log(`   ⚠️  SKIPPED: No overlap with selected month`)
+        return
+      }
+
+      const overlapCalendarDays = overlapEnd.diff(overlapStart, "day") + 1
+      let overlapWorkingDays = 0
+      let overlapCursor = overlapStart.clone()
+      while (overlapCursor.isSame(overlapEnd) || overlapCursor.isBefore(overlapEnd)) {
+        if (!isNonWorking(overlapCursor)) {
+          overlapWorkingDays += 1
+        }
+        overlapCursor = overlapCursor.add(1, "day")
+      }
+
+      let daysInSelectedMonth = overlapCalendarDays
+      if (!isHalfDay && normalizedCategory === 'loss-of-pay') {
+        daysInSelectedMonth = overlapWorkingDays
+      }
       if (isHalfDay) {
         daysInSelectedMonth = daysInSelectedMonth * 0.5
       }
@@ -398,8 +398,6 @@ export async function POST(request: NextRequest) {
       
       // Determine if rules apply
       // Handle both 'Loss of Pay' and 'loss-of-pay' formats (case-insensitive)
-      const normalizedCategory = leaveCategory?.toLowerCase().replace(/\s+/g, '-') || ''
-      const normalizedType = leaveType?.toLowerCase() || ''
       const applyRules = normalizedCategory === 'loss-of-pay' && normalizedType === 'planned leave'
       const sandwichRuleAppliesToUser = leaveConfig.sandwichRuleAppliesTo.includes(employeeRole)
       const penaltyAppliesToUser = leaveConfig.penaltyAppliesTo.includes(employeeRole)
@@ -419,36 +417,49 @@ export async function POST(request: NextRequest) {
       let hasNonWorkingInside = false
       let preSandwich = 0
       let postSandwich = 0
-      
+      let sandwichDates: string[] = []
+
       if (applySandwichRule) {
-        // Check for non-working days within the leave period
-        let cursor = start.clone()
-        while (cursor.isSame(end) || cursor.isBefore(end)) {
-          if (isNonWorking(cursor)) {
-            hasNonWorkingInside = true
-            break
-          }
-          cursor = cursor.add(1, "day")
+        const sandwichDateList: LeaveDateInput[] = []
+        let sandwichCursor = start.clone()
+        const sandwichWindowEnd = end.add(3, "day")
+
+        while (sandwichCursor.isSame(sandwichWindowEnd) || sandwichCursor.isBefore(sandwichWindowEnd)) {
+          const dateKey = sandwichCursor.format("YYYY-MM-DD")
+          const isLeaveDay =
+            (sandwichCursor.isSame(start) || sandwichCursor.isAfter(start)) &&
+            (sandwichCursor.isSame(end) || sandwichCursor.isBefore(end)) &&
+            !isNonWorking(sandwichCursor)
+
+          sandwichDateList.push({
+            date: dateKey,
+            isLeaveDay,
+            isHalfDay,
+            leaveType,
+            leaveCategory,
+            isPublicHoliday: holidaySet.has(dateKey),
+            isWeekend: isWeekend(sandwichCursor),
+          })
+
+          sandwichCursor = sandwichCursor.add(1, "day")
         }
-        
-        // Check pre-sandwich days (only count if within selected month)
-        cursor = start.subtract(1, "day")
-        const monthStartDay = dayjs(startDate)
-        while (isNonWorking(cursor) && !cursor.isBefore(monthStartDay)) {
-          preSandwich += 1
-          cursor = cursor.subtract(1, "day")
-        }
-        
-        // Check post-sandwich days (only count if within selected month)
-        cursor = end.add(1, "day")
-        const monthEndDay = dayjs(endDate)
-        while (isNonWorking(cursor) && !cursor.isAfter(monthEndDay)) {
-          postSandwich += 1
-          cursor = cursor.add(1, "day")
-        }
+
+        const sandwichPolicy = calculateLeaveDays(sandwichDateList, {
+          allowedLeaveTypes: ["Planned Leave"],
+          allowedLeaveCategories: ["loss-of-pay", "loss of pay"],
+        })
+
+        sandwichDates = sandwichPolicy.sandwichDates
+        preSandwich = sandwichDates.filter((dateValue) => dayjs(dateValue).isBefore(start, "day")).length
+        postSandwich = sandwichDates.filter((dateValue) => dayjs(dateValue).isAfter(end, "day")).length
+        hasNonWorkingInside = sandwichDates.some(
+          (dateValue) =>
+            !dayjs(dateValue).isBefore(start, "day") &&
+            !dayjs(dateValue).isAfter(end, "day")
+        )
       }
-      
-      const sandwichApplied = applySandwichRule && (hasNonWorkingInside || (preSandwich > 0 && postSandwich > 0))
+
+      const sandwichApplied = applySandwichRule && sandwichDates.length > 0
       
       if (applySandwichRule) {
         console.log(`   🥪 Sandwich Calculation:`)
@@ -460,11 +471,15 @@ export async function POST(request: NextRequest) {
       
       // Calculate days with sandwich rule
       let rangeLeaveDays = isHalfDay ? baseCalendarDays * 0.5 : baseCalendarDays
-      const sandwichExtra = sandwichApplied ? preSandwich + postSandwich : 0
+      if (!isHalfDay && normalizedCategory === 'loss-of-pay') {
+        rangeLeaveDays = baseCalendarDays - nonWorkingDaysInRange
+      }
+      const sandwichExtra = sandwichApplied ? sandwichDates.length : 0
       const totalSandwichDeduction = rangeLeaveDays + sandwichExtra
       
       // --- ONE+TWO RULE CALCULATION ---
       let onePlusTwoExtra = 0
+      let onePlusTwoExtraInMonth = 0
       
       if (applyOnePlusTwoRule) {
         console.log(`   🔍 1+2 Rule Debug:`)
@@ -493,12 +508,21 @@ export async function POST(request: NextRequest) {
         const endPenalty = end.startOf("day")
         
         while (cursorPenalty.isSame(endPenalty) || cursorPenalty.isBefore(endPenalty)) {
-          // Count only working days between CREATED DATE and this leave day
-          const workingDaysInAdvance = countWorkingDaysBetween(createdDate, cursorPenalty)
-          console.log(`     • Leave Day ${cursorPenalty.format('YYYY-MM-DD')}: ${workingDaysInAdvance} working days notice`)
-          if (workingDaysInAdvance < leaveConfig.minWorkingDayNoticePeriod) {
-            console.log(`       → Penalty Applied! (${workingDaysInAdvance} < ${leaveConfig.minWorkingDayNoticePeriod})`)
-            onePlusTwoExtra += penaltyMultiplier
+          if (!isNonWorking(cursorPenalty)) {
+            const workingDaysInAdvance = countWorkingDaysBetween(createdDate, cursorPenalty)
+            console.log(`     • Leave Day ${cursorPenalty.format('YYYY-MM-DD')}: ${workingDaysInAdvance} working days notice`)
+            if (workingDaysInAdvance < leaveConfig.minWorkingDayNoticePeriod) {
+              console.log(`       → Penalty Applied! (${workingDaysInAdvance} < ${leaveConfig.minWorkingDayNoticePeriod})`)
+              onePlusTwoExtra += penaltyMultiplier
+              if (
+                (cursorPenalty.isSame(monthStartDay, 'day') || cursorPenalty.isAfter(monthStartDay, 'day')) &&
+                (cursorPenalty.isSame(monthEndDay, 'day') || cursorPenalty.isBefore(monthEndDay, 'day'))
+              ) {
+                onePlusTwoExtraInMonth += penaltyMultiplier
+              }
+            }
+          } else {
+            console.log(`     • Leave Day ${cursorPenalty.format('YYYY-MM-DD')}: skipped (non-working day)`)
           }
           cursorPenalty = cursorPenalty.add(1, "day")
         }
@@ -515,21 +539,17 @@ export async function POST(request: NextRequest) {
       }
       
       // --- CALCULATE DAYS FOR THIS MONTH ONLY ---
-      let daysAfterRuleInMonth = daysInSelectedMonth
-      
-      if (sandwichApplied || onePlusTwoRuleApplied) {
-        // For cross-month leaves, calculate proportionally
-        const totalLeaveDays = rangeLeaveDays
-        const proportionInMonth = totalLeaveDays > 0 ? daysInSelectedMonth / totalLeaveDays : 0
-        
-        // Apply sandwich extra proportionally
-        const sandwichInMonth = Math.round(sandwichExtra * proportionInMonth * 100) / 100
-        
-        // Apply 1+2 penalty proportionally
-        const penaltyInMonth = Math.round(onePlusTwoExtra * proportionInMonth * 100) / 100
-        
-        daysAfterRuleInMonth = daysInSelectedMonth + sandwichInMonth + penaltyInMonth
-      }
+      const sandwichInMonth = sandwichApplied
+        ? sandwichDates.filter((dateValue) => {
+            const parsed = dayjs(dateValue)
+            return (
+              (parsed.isSame(monthStartDay, 'day') || parsed.isAfter(monthStartDay, 'day')) &&
+              (parsed.isSame(monthEndDay, 'day') || parsed.isBefore(monthEndDay, 'day'))
+            )
+          }).length
+        : 0
+
+      let daysAfterRuleInMonth = daysInSelectedMonth + sandwichInMonth + onePlusTwoExtraInMonth
       
       daysAfterRuleInMonth = Math.round(daysAfterRuleInMonth * 100) / 100
       
