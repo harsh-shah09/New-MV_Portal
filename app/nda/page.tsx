@@ -133,7 +133,7 @@ export default function NDAPage() {
             const pk = emp.Employee_Id || emp.PartitionKey || emp.EmployeeId || emp.Id || null;
             setSelectedPartitionKey(pk);
             const contact = emp || {};
-            const address = JSON.parse(emp.Employee_Address__c) || {};
+            const address = JSON.parse(emp.Employee_Current_Address__c) || {};
 
             let html = templateContent;
 

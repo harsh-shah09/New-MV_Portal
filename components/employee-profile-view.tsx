@@ -1030,14 +1030,14 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                           <MapPin className="w-5 h-5 text-indigo-500" />Current Address
                                       </h2>
                                       <div className="grid grid-cols-1 gap-y-6">
-                                          <Field label="Street" value={employee.Employee_Address__c?.street} fieldKey="Employee_Address__Street__s" isEditing={isEditing} formData={formData} setFormData={setFormData} />
+                                          <Field label="Street" value={employee.Employee_Current_Address__c?.street} fieldKey="Employee_Address__Street__s" isEditing={isEditing} formData={formData} setFormData={setFormData} />
                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                              <Field label="City" value={employee.Employee_Address__c?.city} fieldKey="Employee_Address__City__s" isEditing={isEditing} formData={formData} setFormData={setFormData} />
-                                              <Field label="State" value={employee.Employee_Address__c?.state} fieldKey="Employee_Address__StateCode__s" isEditing={isEditing} formData={formData} setFormData={setFormData} />
+                                              <Field label="City" value={employee.Employee_Current_Address__c?.city} fieldKey="Employee_Address__City__s" isEditing={isEditing} formData={formData} setFormData={setFormData} />
+                                              <Field label="State" value={employee.Employee_Current_Address__c?.state} fieldKey="Employee_Address__StateCode__s" isEditing={isEditing} formData={formData} setFormData={setFormData} />
                                            </div>
                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                              <Field label="Zip / Postal" value={employee.Employee_Address__c?.postalCode} fieldKey="Employee_Address__PostalCode__s" isEditing={isEditing} formData={formData} setFormData={setFormData} />
-                                              <Field label="Country" value={employee.Employee_Address__c?.country} fieldKey="Employee_Address__CountryCode__s" isEditing={isEditing} formData={formData} setFormData={setFormData} />
+                                              <Field label="Zip / Postal" value={employee.Employee_Current_Address__c?.postalCode} fieldKey="Employee_Address__PostalCode__s" isEditing={isEditing} formData={formData} setFormData={setFormData} />
+                                              <Field label="Country" value={employee.Employee_Current_Address__c?.country} fieldKey="Employee_Address__CountryCode__s" isEditing={isEditing} formData={formData} setFormData={setFormData} />
                                            </div>
                                           {/* Coordinates & Accuracy */}
                                           {/* <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

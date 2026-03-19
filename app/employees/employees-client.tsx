@@ -47,7 +47,7 @@ export default function EmployeesClient({ role }: EmployeesClientProps) {
       // Map Salesforce data to Employee type
       return rawData.map((record: any) => {
         // Parse Address
-        let addressStr = record.Employee_Address__c || '';
+        let addressStr = record.Employee_Current_Address__c || '';
         let street = '', city = '', state = '', zipCode = '', country = '';
         
         try {
@@ -143,7 +143,7 @@ export default function EmployeesClient({ role }: EmployeesClientProps) {
             Base_Salary__c: data.salary,
             Status__c: data.status,
             // Store structured address object (API will JSON.stringify it)
-            Employee_Address__c: {
+            Employee_Current_Address__c: {
                 street: data.personalDetails?.address || '',
                 city: data.personalDetails?.city || '',
                 state: data.personalDetails?.state || '',
