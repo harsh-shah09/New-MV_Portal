@@ -77,9 +77,9 @@ export default function DashboardPage() {
 
   return (
     <PageContainer>
-      <div className="bg-white p-2 rounded-xl">
+      <div className="bg-white p-2 rounded-xl relative">
       {isHR && (
-        <div className="flex justify-end mb-4">
+        <div className="flex justify-end mb-4 absolute top-[1%] right-[2%]">
           <div className="flex items-center gap-3 bg-white px-4 py-2 rounded-lg shadow-sm border">
             <span className="text-sm font-medium text-gray-700">My Dashboard</span>
             <Switch
