@@ -10,6 +10,8 @@ import { verifySession } from "@/lib/auth"
 import { PageContainer } from "@/components/page-container"
 import { Switch } from "antd"
 
+const DASHBOARD_VIEW_STORAGE_KEY = "hr-dashboard-view-mode"
+
 
 export default function DashboardPage() {
   const router = useRouter()
@@ -34,6 +36,24 @@ export default function DashboardPage() {
     loadSession()
     return () => { mounted = false }
   }, [])
+
+  useEffect(() => {
+    if (role !== "HR") return
+
+    const savedViewMode = window.localStorage.getItem(DASHBOARD_VIEW_STORAGE_KEY)
+    if (savedViewMode === "hr" || savedViewMode === "employee") {
+      setViewMode(savedViewMode)
+    }
+  }, [role])
+
+  const handleViewModeChange = (checked: boolean) => {
+    const nextViewMode = checked ? "hr" : "employee"
+    setViewMode(nextViewMode)
+
+    if (role === "HR") {
+      window.localStorage.setItem(DASHBOARD_VIEW_STORAGE_KEY, nextViewMode)
+    }
+  }
 
   const { data, isLoading, isFetching } = useQuery({
     queryKey: ["dashboard", role, viewMode],
@@ -64,7 +84,7 @@ export default function DashboardPage() {
             <span className="text-sm font-medium text-gray-700">My Dashboard</span>
             <Switch
               checked={viewMode === 'hr'}
-              onChange={(checked) => setViewMode(checked ? 'hr' : 'employee')}
+              onChange={handleViewModeChange}
               className="bg-gray-300"
             />
             <span className="text-sm font-medium text-gray-700">HR Dashboard</span>
