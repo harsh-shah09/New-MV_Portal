@@ -31,14 +31,14 @@ export function HRKPIStats({ stats }: HRKPIStatsProps) {
             styles={{content: { color: '#f59e0b' }}}
             prefix={<ClockCircleOutlined />}
           />
-          <Button 
+          {/* <Button 
             type="link" 
             size="small" 
             className="mt-2 p-0"
             onClick={() => router.push('/leaves?tab=approvals&status=applied')}
           >
             View All
-          </Button>
+          </Button> */}
         </Card>
       </Col>
       <Col xs={24} sm={12} lg={6}>

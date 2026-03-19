@@ -34,24 +34,24 @@ export function LeaveBalanceCards({ leaveBalanceData, totalAllowance }: LeaveBal
       <Col xs={24} sm={12} lg={6}>
         <Card className="hover:shadow-lg transition-shadow">
           <Statistic
-            title="Annual Leave Remaining"
+            title="Annual Leaves"
             value={leaveBalanceData.annualLeaveRemaining}
             suffix={`/ ${totalAllowance}`}
             styles={{content: { color: '#3b82f6' }}}
             prefix={<CalendarOutlined />}
           />
-          <Progress 
+          {/* <Progress 
             percent={Math.round((leaveBalanceData.annualLeaveRemaining / totalAllowance) * 100)} 
             strokeColor="#3b82f6"
             size="small"
             className="mt-2"
-          />
+          /> */}
           <Button 
-            type="link" 
+            type= "link" 
             size="small" 
             icon={<EyeOutlined />}
             onClick={() => handleViewAll('All', 'approved')}
-            className="mt-2 px-0"
+            className="mt-2"
           >
             View All
           </Button>
@@ -60,7 +60,7 @@ export function LeaveBalanceCards({ leaveBalanceData, totalAllowance }: LeaveBal
       <Col xs={24} sm={12} lg={6}>
         <Card className="hover:shadow-lg transition-shadow">
           <Statistic
-            title="Sick Leave Taken"
+            title="Sick Leave"
             value={leaveBalanceData.sickLeaveCount}
             styles={{content: { color: '#ef4444' }}}
             prefix={<ClockCircleOutlined />}
@@ -79,7 +79,7 @@ export function LeaveBalanceCards({ leaveBalanceData, totalAllowance }: LeaveBal
       <Col xs={24} sm={12} lg={6}>
         <Card className="hover:shadow-lg transition-shadow">
           <Statistic
-            title="Emergency Leave Taken"
+            title="Emergency Leave"
             value={leaveBalanceData.emergencyLeaveCount}
             styles={{content: { color: '#f59e0b' }}}
             prefix={<ClockCircleOutlined />}
@@ -98,7 +98,7 @@ export function LeaveBalanceCards({ leaveBalanceData, totalAllowance }: LeaveBal
       <Col xs={24} sm={12} lg={6}>
         <Card className="hover:shadow-lg transition-shadow">
           <Statistic
-            title="Planned Leave Taken"
+            title="Planned Leave"
             value={leaveBalanceData.plannedLeaveCount}
             styles={{content: { color: '#10b981' }}}
             prefix={<ClockCircleOutlined />}

@@ -932,7 +932,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
              <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-2 space-y-1">
                  {[
                      { id: "personal", label: "Personal Details", icon: User },
-                     { id: "employment", label: "Employment Info", icon: Building2 },
+                     { id: "employment", label: "Employment Details", icon: Building2 },
                      { id: "assets", label: "Assets", icon: Laptop },
                      { id: "bank", label: "Bank Details", icon: CreditCard },
                      { id: "documents", label: "Documents", icon: FileText },
@@ -963,12 +963,12 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                          <p className="text-slate-400 text-xs uppercase tracking-wider">Status</p>
                          <p className="font-semibold flex items-center gap-2">
                              <span className="w-2 h-2 rounded-full bg-green-400"></span> 
-                             {employee.Status__c || "Active"}
+                             {employee.Status__c}
                          </p>
                      </div>
                      <div>
                          <p className="text-slate-400 text-xs uppercase tracking-wider">Employee ID</p>
-                         <p className="font-mono">{employee.Employee_Id__c || 'Not set'}</p>
+                         <p className="font-mono">{employee.Name || 'Not set'}</p>
                      </div>
                  </div>
              </div>
@@ -1027,7 +1027,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
 
                                   <div className="border-t border-slate-100 pt-8">
                                       <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
-                                          <MapPin className="w-5 h-5 text-indigo-500" /> Address
+                                          <MapPin className="w-5 h-5 text-indigo-500" />Current Address
                                       </h2>
                                       <div className="grid grid-cols-1 gap-y-6">
                                           <Field label="Street" value={employee.Employee_Address__c?.street} fieldKey="Employee_Address__Street__s" isEditing={isEditing} formData={formData} setFormData={setFormData} />
@@ -1050,7 +1050,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
 
                                   <div className="border-t border-slate-100 pt-8">
                                       <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
-                                          <Phone className="w-5 h-5 text-red-500" /> Emergency Contact
+                                          <Phone className="w-5 h-5 text-blue-500" /> Emergency Contact
                                       </h2>
                                       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                                           <Field label="Contact Name" value={employee.Emergency_Contact_Name__c} fieldKey="Emergency_Contact_Name__c" isEditing={isEditing} formData={formData} setFormData={setFormData} error={errors.Emergency_Contact_Name__c} />
@@ -1070,7 +1070,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                                       onClick={handleEditToggle}
                                                       className="flex items-center gap-2 px-5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold transition"
                                                   >
-                                                      <Edit3 className="w-4 h-4" /> Edit Employment Info
+                                                      <Edit3 className="w-4 h-4" /> Edit Employment Details
                                                   </button>
                                               ) : (
                                                   <div className="flex items-center gap-2">

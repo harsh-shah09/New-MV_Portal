@@ -106,7 +106,7 @@ export function PendingApprovalsQueue() {
       render: (text, record) => (
         <div>
           <div className="font-medium">{text}</div>
-          <div className="text-xs text-gray-500">{record.employeeId}</div>
+          {/* <div className="text-xs text-gray-500">{record.employeeId}</div> */}
         </div>
       )
     },

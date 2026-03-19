@@ -39,12 +39,12 @@ export function HRDashboard({ data }: HRDashboardProps) {
 
       {/* KPI Stats */}
       <HRKPIStats stats={stats} />
-
-      {/* Pending Approvals Queue */}
-      <PendingApprovalsQueue />
-
-      {/* Analytics and Stats Row */}
       <Row gutter={[16, 16]}>
+      {/* Pending Approvals Queue */}
+      <Col xs={24} lg={24}>
+        <PendingApprovalsQueue />
+      </Col>
+      {/* Analytics and Stats Row */}
         <Col xs={24} lg={12}>
           <LeaveAnalytics leaveAnalytics={leaveAnalytics} />
         </Col>
@@ -61,13 +61,18 @@ export function HRDashboard({ data }: HRDashboardProps) {
         <Col xs={24} lg={8}>
           <HRQuickActions />
         </Col>
+        <Col xs={24} lg={24}>
+        {/* Employees On Leave Today */}
+        <EmployeesOnLeave employeesOnLeave={employeesOnLeave} />
+        </Col>
+        <Col  xs={24} lg={24}>
+         {/* Google Integration */}
+      <GoogleIntegration />
+      </Col>
       </Row>
 
-      {/* Employees On Leave Today */}
-      <EmployeesOnLeave employeesOnLeave={employeesOnLeave} />
 
-      {/* Google Integration */}
-      <GoogleIntegration />
+     
     </div>
   )
 }

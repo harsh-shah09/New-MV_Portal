@@ -70,23 +70,42 @@ export async function POST(req: Request) {
            if (step === 2) {
             console.log(data , 'in address') 
                // Personal Details
-               await updateEmployee(session.employeeId, {
-                   Employee_Address__c : JSON.stringify({
+               const payload = {
+                   Employee_Current_Address__c : JSON.stringify({
                     street : data.street,
                     city : data.city,
                     state : data.state,
                     postalCode : data.postalCode,
                     country : data.country
                    }),
+                   Employee_Address__c : '',
                    Emergency_Contact_Name__c: data.emergencyContact,
                    Emergency_Contact_Number__c: data.emergencyPhone
-               });
+               }
+                if(data.sameAsCurrent){
+                    payload.Employee_Address__c = JSON.stringify({
+                        street : data.street,
+                        city : data.city,
+                        state : data.state,
+                        postalCode : data.postalCode,
+                        country : data.country
+                    })
+                }else{
+                     payload.Employee_Address__c = JSON.stringify({
+                        street : data.permanentstreet,
+                        city : data.permanentcity,
+                        state : data.permanentstate,
+                        postalCode : data.permanentpostalCode,
+                        country : data.permanentcountry
+                    })
+                }
+               await updateEmployee(session.employeeId, payload );
            } else if (step === 3) {
             console.log(data , 'inn bank')
                // Bank Details
                await createBankDetail({
                    Name: data.bankName,
-                   Bank_Branch_Name__c: data.bankName,
+                   Bank_Branch_Name__c: data.bankbranch,
                    Bank_Account_Number__c: data.accountNumber,
                    IFSC__c: data.ifscCode,
                    Primary_Account__c: true,

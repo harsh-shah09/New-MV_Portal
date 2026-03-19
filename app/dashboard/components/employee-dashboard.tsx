@@ -10,7 +10,7 @@ import { LeaveUtilizationSummary } from "./employee/leave-utilization-summary"
 import { TeamOnLeave } from "./employee/team-on-leave"
 import { GoogleIntegration } from "./employee/google-integration"
 import { PageHeader } from "@/components/page-header"
-
+import EmployeeBirthday from './employee/employee-birthday'
 interface EmployeeDashboardProps {
   data: any
 }
@@ -32,7 +32,7 @@ export function EmployeeDashboard({ data }: EmployeeDashboardProps) {
 
   const totalLeavesTaken = leaveBalanceData.sickLeaveCount + leaveBalanceData.emergencyLeaveCount + leaveBalanceData.plannedLeaveCount
   const totalAllowance = 18
-
+console.log(data)
   return (
     <div className="space-y-6">
       {/* Header Section */}
@@ -49,16 +49,19 @@ export function EmployeeDashboard({ data }: EmployeeDashboardProps) {
 
       {/* Quick Actions and Pending Requests */}
       <Row gutter={[16, 16]}>
+        <Col xs={24} lg={24}>
+          <PendingRequests pendingRequests={pendingRequests} />
+        </Col>
         <Col xs={24} lg={8}>
           <EmployeeQuickActions employeeId={data?.employeeId} />
         </Col>
         <Col xs={24} lg={16}>
-          <PendingRequests pendingRequests={pendingRequests} />
+          <EmployeeBirthday data={data?.birthdayToday || []} />
+        </Col>
+        <Col lg={24} xs={24}>
+        <RecentLeaves recentLeaves={recentLeaves} />
         </Col>
       </Row>
-
-      {/* Recent Leaves Table */}
-      <RecentLeaves recentLeaves={recentLeaves} />
 
       {/* Google Integration */}
       <GoogleIntegration />
@@ -73,11 +76,11 @@ export function EmployeeDashboard({ data }: EmployeeDashboardProps) {
       <TeamOnLeave teamMembers={teamMembers} />
 
       {/* Leave Utilization Summary */}
-      <LeaveUtilizationSummary 
+      {/* <LeaveUtilizationSummary 
         leaveBalanceData={leaveBalanceData}
         totalLeavesTaken={totalLeavesTaken}
         totalAllowance={totalAllowance}
-      />
+      /> */}
     </div>
   )
 }
