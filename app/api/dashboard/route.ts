@@ -89,6 +89,31 @@ export async function GET(req: NextRequest) {
                 WHERE Approved_Date__c = ${today} AND Status__c = 'Approved'
             `);
             const approvedToday = approvedTodayQuery.records[0]?.approvedCount || 0;
+
+            const approvedTodayLeavesQuery = await conn.query(`
+                SELECT Id, Employee__c, Employee__r.Employee_Name__c,
+                       Employee__r.Employee_Email__c, Leave_Type__c,
+                       Leave_Category__c, Start_Date__c, End_Date__c,
+                       Total_Days__c, Approved_Date__c
+                FROM Leave__c
+                WHERE Approved_Date__c = ${today}
+                AND Status__c = 'Approved'
+                ORDER BY Start_Date__c ASC
+            `);
+
+            const approvedTodayLeaves = approvedTodayLeavesQuery.records.map((record: any) => ({
+                id: record.Id,
+                employeeId: record.Employee__c,
+                employeeName: record.Employee__r?.Employee_Name__c || "Unknown",
+                employeeEmail: record.Employee__r?.Employee_Email__c,
+                leaveType: record.Leave_Category__c === 'Extra Day Pay' ? 'Extra Day Pay' : record.Leave_Type__c,
+                leaveCategory: record.Leave_Category__c,
+                startDate: record.Start_Date__c,
+                endDate: record.End_Date__c,
+                duration: record.Total_Days__c,
+                approvedDate: record.Approved_Date__c,
+            }));
+
             const birthdayquery =  await conn.query(`
                 SELECT Id , Name , Employee_Name__c,Role__c , Title__c ,Profile_Photo__c,Department__c
                 FROM Employee__c
@@ -198,6 +223,7 @@ export async function GET(req: NextRequest) {
                 recentActivities,
                 departmentStats: [],
                 employeesOnLeave,
+                approvedTodayLeaves,
                 birthdayToday
             });
         }

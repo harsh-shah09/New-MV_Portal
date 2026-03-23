@@ -1,6 +1,7 @@
 "use client"
 
 import { Row, Col } from "antd"
+import { useRouter } from "next/navigation"
 import { HRKPIStats } from "./hr/hr-kpi-stats"
 import { PendingApprovalsQueue } from "./hr/pending-approvals-queue"
 import { LeaveAnalytics } from "./hr/leave-analytics"
@@ -8,6 +9,7 @@ import { EmployeeStats } from "./hr/employee-stats"
 import { RecentActivities } from "./hr/recent-activities"
 import { HRQuickActions } from "./hr/hr-quick-actions"
 import { EmployeesOnLeave } from "./hr/employees-on-leave"
+import { LeavesApprovedToday } from "./hr/leaves-approved-today"
 import { GoogleIntegration } from "./employee/google-integration"
 import { PageHeader } from "@/components/page-header"
 
@@ -16,6 +18,8 @@ interface HRDashboardProps {
 }
 
 export function HRDashboard({ data }: HRDashboardProps) {
+  const router = useRouter()
+
   const stats = data?.stats || {
     totalEmployees: 0,
     pendingApprovals: 0,
@@ -28,6 +32,14 @@ export function HRDashboard({ data }: HRDashboardProps) {
   const recentActivities = data?.recentActivities || []
   const leaveAnalytics = data?.leaveAnalytics || {}
   const employeesOnLeave = data?.employeesOnLeave || []
+  const approvedTodayLeaves = data?.approvedTodayLeaves || []
+
+  const scrollToElement = (elementId: string) => {
+    const element = document.getElementById(elementId)
+    if (element) {
+      element.scrollIntoView({ behavior: "smooth", block: "start" })
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -38,7 +50,13 @@ export function HRDashboard({ data }: HRDashboardProps) {
       />
 
       {/* KPI Stats */}
-      <HRKPIStats stats={stats} />
+      <HRKPIStats
+        stats={stats}
+        onPendingApprovalsClick={() => router.push('/leaves?tab=approvals')}
+        onApprovedTodayClick={() => scrollToElement('approved-today-widget')}
+        onOnLeaveTodayClick={() => scrollToElement('on-leave-today-widget')}
+        onTotalEmployeesClick={() => router.push('/employees')}
+      />
       <Row gutter={[16, 16]}>
       {/* Pending Approvals Queue */}
       <Col xs={24} lg={24}>
@@ -61,9 +79,13 @@ export function HRDashboard({ data }: HRDashboardProps) {
         <Col xs={24} lg={8}>
           <HRQuickActions />
         </Col>
-        <Col xs={24} lg={24}>
+        <Col xs={24} lg={24} id="on-leave-today-widget">
         {/* Employees On Leave Today */}
         <EmployeesOnLeave employeesOnLeave={employeesOnLeave} />
+        </Col>
+        <Col xs={24} lg={24} id="approved-today-widget">
+        {/* Leaves Approved Today */}
+        <LeavesApprovedToday approvedTodayLeaves={approvedTodayLeaves} />
         </Col>
         <Col  xs={24} lg={24}>
          {/* Google Integration */}

@@ -1,10 +1,9 @@
 "use client"
 
-import { Card, Progress, Statistic, Row, Col, Button } from "antd"
+import { Card, Statistic, Row, Col } from "antd"
 import { 
   CalendarOutlined, 
-  ClockCircleOutlined,
-  EyeOutlined
+  ClockCircleOutlined
 } from "@ant-design/icons"
 import { useRouter } from "next/navigation"
 
@@ -32,7 +31,7 @@ export function LeaveBalanceCards({ leaveBalanceData, totalAllowance }: LeaveBal
   return (
     <Row gutter={[16, 16]}>
       <Col xs={24} sm={12} lg={6}>
-        <Card className="hover:shadow-lg transition-shadow">
+        <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => handleViewAll('All', 'approved')}>
           <Statistic
             title="Annual Leaves"
             value={leaveBalanceData.annualLeaveRemaining}
@@ -40,78 +39,36 @@ export function LeaveBalanceCards({ leaveBalanceData, totalAllowance }: LeaveBal
             styles={{content: { color: '#3b82f6' }}}
             prefix={<CalendarOutlined />}
           />
-          {/* <Progress 
-            percent={Math.round((leaveBalanceData.annualLeaveRemaining / totalAllowance) * 100)} 
-            strokeColor="#3b82f6"
-            size="small"
-            className="mt-2"
-          /> */}
-          <Button 
-            type= "link" 
-            size="small" 
-            icon={<EyeOutlined />}
-            onClick={() => handleViewAll('All', 'approved')}
-            className="mt-2"
-          >
-            View All
-          </Button>
         </Card>
       </Col>
       <Col xs={24} sm={12} lg={6}>
-        <Card className="hover:shadow-lg transition-shadow">
+        <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => handleViewAll('Sick Leave')}>
           <Statistic
             title="Sick Leave"
             value={leaveBalanceData.sickLeaveCount}
             styles={{content: { color: '#ef4444' }}}
             prefix={<ClockCircleOutlined />}
           />
-          <Button 
-            type="link" 
-            size="small" 
-            icon={<EyeOutlined />}
-            onClick={() => handleViewAll('Sick Leave')}
-            className="mt-2 px-0"
-          >
-            View All
-          </Button>
         </Card>
       </Col>
       <Col xs={24} sm={12} lg={6}>
-        <Card className="hover:shadow-lg transition-shadow">
+        <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => handleViewAll('Emergency Leave')}>
           <Statistic
             title="Emergency Leave"
             value={leaveBalanceData.emergencyLeaveCount}
             styles={{content: { color: '#f59e0b' }}}
             prefix={<ClockCircleOutlined />}
           />
-          <Button 
-            type="link" 
-            size="small" 
-            icon={<EyeOutlined />}
-            onClick={() => handleViewAll('Emergency Leave')}
-            className="mt-2 px-0"
-          >
-            View All
-          </Button>
         </Card>
       </Col>
       <Col xs={24} sm={12} lg={6}>
-        <Card className="hover:shadow-lg transition-shadow">
+        <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => handleViewAll('Planned Leave')}>
           <Statistic
             title="Planned Leave"
             value={leaveBalanceData.plannedLeaveCount}
             styles={{content: { color: '#10b981' }}}
             prefix={<ClockCircleOutlined />}
           />
-          <Button 
-            type="link" 
-            size="small" 
-            icon={<EyeOutlined />}
-            onClick={() => handleViewAll('Planned Leave')}
-            className="mt-2 px-0"
-          >
-            View All
-          </Button>
         </Card>
       </Col>
     </Row>

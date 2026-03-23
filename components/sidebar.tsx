@@ -112,6 +112,7 @@ export function Sidebar({
   }
 
   const confirmLogout = async () => {
+    window.localStorage.clear()
     await logout()
     // Clear all React Query cache
     queryClient.clear()

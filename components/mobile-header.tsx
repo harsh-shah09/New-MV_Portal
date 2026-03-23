@@ -49,6 +49,7 @@ export function MobileHeader({ onMenuClick }: { onMenuClick: () => void }) {
     }
 
     const confirmLogout = async () => {
+        window.localStorage.clear()
         await logout()
         queryClient.clear()
         router.push("/auth/login")

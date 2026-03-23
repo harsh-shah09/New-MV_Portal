@@ -1,14 +1,12 @@
 "use client"
 
-import { Card, Button, Statistic, Row, Col } from "antd"
+import { Card, Statistic, Row, Col } from "antd"
 import { 
   CheckCircleOutlined, 
   ClockCircleOutlined,
   UserOutlined,
   TeamOutlined
 } from "@ant-design/icons"
-import { useRouter } from "next/navigation"
-import { color } from "framer-motion"
 
 interface HRKPIStatsProps {
   stats: {
@@ -17,32 +15,33 @@ interface HRKPIStatsProps {
     onLeaveToday: number
     totalEmployees: number
   }
+  onPendingApprovalsClick?: () => void
+  onApprovedTodayClick?: () => void
+  onOnLeaveTodayClick?: () => void
+  onTotalEmployeesClick?: () => void
 }
 
-export function HRKPIStats({ stats }: HRKPIStatsProps) {
-  const router = useRouter()
+export function HRKPIStats({
+  stats,
+  onPendingApprovalsClick,
+  onApprovedTodayClick,
+  onOnLeaveTodayClick,
+  onTotalEmployeesClick,
+}: HRKPIStatsProps) {
   return (
     <Row gutter={[16, 16]}>
       <Col xs={24} sm={12} lg={6}>
-        <Card className="hover:shadow-lg transition-shadow">
+        <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={onPendingApprovalsClick}>
           <Statistic
             title="Pending Approvals"
             value={stats.pendingApprovals}
             styles={{content: { color: '#f59e0b' }}}
             prefix={<ClockCircleOutlined />}
           />
-          {/* <Button 
-            type="link" 
-            size="small" 
-            className="mt-2 p-0"
-            onClick={() => router.push('/leaves?tab=approvals&status=applied')}
-          >
-            View All
-          </Button> */}
         </Card>
       </Col>
       <Col xs={24} sm={12} lg={6}>
-        <Card className="hover:shadow-lg transition-shadow">
+        <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={onApprovedTodayClick}>
           <Statistic
             title="Approved Today"
             value={stats.approvedToday}
@@ -52,7 +51,7 @@ export function HRKPIStats({ stats }: HRKPIStatsProps) {
         </Card>
       </Col>
       <Col xs={24} sm={12} lg={6}>
-        <Card className="hover:shadow-lg transition-shadow">
+        <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={onOnLeaveTodayClick}>
           <Statistic
             title="On Leave Today"
             value={stats.onLeaveToday}
@@ -62,7 +61,7 @@ export function HRKPIStats({ stats }: HRKPIStatsProps) {
         </Card>
       </Col>
       <Col xs={24} sm={12} lg={6}>
-        <Card className="hover:shadow-lg transition-shadow">
+        <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={onTotalEmployeesClick}>
           <Statistic
             title="Total Employees"
             value={stats.totalEmployees}

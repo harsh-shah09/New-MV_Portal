@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { usePathname, useRouter, useSearchParams } from "next/navigation"
+import { useRouter } from "next/navigation"
 import { DashboardSkeleton } from "./components/dashboard-skeleton"
 import { EmployeeDashboard } from "./components/employee-dashboard"
 import { HRDashboard } from "./components/hr-dashboard"
@@ -10,13 +10,14 @@ import { verifySession } from "@/lib/auth"
 import { PageContainer } from "@/components/page-container"
 import { Switch } from "antd"
 
+const DASHBOARD_VIEW_STORAGE_KEY = "dashboard-view-mode"
+
 
 export default function DashboardPage() {
   const router = useRouter()
-  const pathname = usePathname()
-  const searchParams = useSearchParams()
   const [role, setRole] = useState<string | null>(null)
   const [title, setTitle] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<"default" | "hr">("default")
   
   useEffect(() => {
     let mounted = true
@@ -42,29 +43,30 @@ export default function DashboardPage() {
     const isHR = role === "HR"
     const isAdmin = role === "Admin"
     const canAccessHRView = isHR || isAdmin
-    const requestedView = searchParams.get("view")
-    const normalizedView = requestedView === "hr" && canAccessHRView ? "hr" : "default"
 
-    if (requestedView !== normalizedView) {
-      const params = new URLSearchParams(searchParams.toString())
-      params.set("view", normalizedView)
-      router.replace(`${pathname}?${params.toString()}`)
+    if (!canAccessHRView) {
+      setViewMode("default")
+      return
     }
-  }, [role, pathname, router, searchParams])
+
+    const savedView = window.localStorage.getItem(DASHBOARD_VIEW_STORAGE_KEY)
+    if (savedView === "hr" || savedView === "default") {
+      setViewMode(savedView)
+    } else {
+      setViewMode("default")
+    }
+  }, [role])
 
   const isHR = role === "HR"
   const isAdmin = role === "Admin"
   const canAccessHRView = isHR || isAdmin
-  const requestedView = searchParams.get("view")
-  const viewMode: "default" | "hr" = requestedView === "hr" && canAccessHRView ? "hr" : "default"
 
   const handleViewModeChange = (checked: boolean) => {
     if (!canAccessHRView) return
 
     const nextViewMode = checked ? "hr" : "default"
-    const params = new URLSearchParams(searchParams.toString())
-    params.set("view", nextViewMode)
-    router.replace(`${pathname}?${params.toString()}`)
+    setViewMode(nextViewMode)
+    window.localStorage.setItem(DASHBOARD_VIEW_STORAGE_KEY, nextViewMode)
   }
 
   const { data, isLoading, isFetching } = useQuery({

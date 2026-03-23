@@ -27,6 +27,7 @@ export function MainNav() {
   }
 
   const confirmLogout = () => {
+    window.localStorage.clear()
     logout()
     router.push("/auth/login")
   }

@@ -1,6 +1,6 @@
 "use client"
 
-import { Card, Table, Button, Badge } from "antd"
+import { Card, Table, Badge } from "antd"
 import { ClockCircleOutlined } from "@ant-design/icons"
 import { useRouter } from "next/navigation"
 import type { ColumnsType } from 'antd/es/table'
@@ -58,6 +58,8 @@ export function RecentLeaves({ recentLeaves }: RecentLeavesProps) {
 
   return (
     <Card 
+      className="cursor-pointer"
+      onClick={() => router.push('/leaves')}
       title={
         <span className="flex items-center gap-2">
           <ClockCircleOutlined />
@@ -71,13 +73,6 @@ export function RecentLeaves({ recentLeaves }: RecentLeavesProps) {
         pagination={false}
         rowKey="id"
       />
-      {recentLeaves.length > 5 && (
-        <div className="text-center mt-4">
-          <Button type="link" onClick={() => router.push('/leaves')}>
-            View All Leaves
-          </Button>
-        </div>
-      )}
     </Card>
   )
 }
