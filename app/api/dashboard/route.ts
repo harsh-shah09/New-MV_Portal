@@ -30,13 +30,15 @@ export async function GET(req: NextRequest) {
         const conn = await getSalesforceConnection();
         const isHR = role === 'HR';
         const isAdmin = role === 'Admin';
+        const canAccessHRView = isHR || isAdmin;
 
-        // Get view mode from query params (for HR users)
+        // Get view mode from query params
         const { searchParams } = new URL(req.url);
-        const viewMode = searchParams.get('view') || 'hr';
+        const requestedViewMode = searchParams.get('view') === 'hr' ? 'hr' : 'default';
+        const viewMode = canAccessHRView ? requestedViewMode : 'default';
 
-        // HR/Admin Dashboard Data (only show if Admin OR if HR with HR view mode)
-        if ((isAdmin) || isHR) {
+        // HR/Admin Dashboard Data
+        if (viewMode === 'hr' && canAccessHRView) {
             // Get total employees
             const employeeQuery = await conn.query(`
                 SELECT COUNT(Id) totalEmployees
