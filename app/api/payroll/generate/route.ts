@@ -155,7 +155,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid month" }, { status: 400 })
     }
 
-    const selectedPeriod = new Date(Number(year), monthIndex, 1)
+    const parsedYear = Number(year)
+    if (!Number.isFinite(parsedYear)) {
+      return NextResponse.json({ error: "Invalid year" }, { status: 400 })
+    }
+
+    const selectedPeriod = new Date(parsedYear, monthIndex, 1)
     const currentDate = new Date()
     const currentPeriod = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)
 
@@ -174,6 +179,25 @@ export async function POST(request: NextRequest) {
     console.log('------------------------------------------\n')
 
     const conn = await getSalesforceConnection()
+
+    const existingSummaryQuery = await conn.query<any>(`
+      SELECT Id, Name, Status__c
+      FROM Payroll_Summary__c
+      WHERE Payroll_Month__c = '${month}'
+      AND Payroll_Year__c = ${parsedYear}
+      LIMIT 1
+    `)
+
+    if ((existingSummaryQuery.records || []).length > 0) {
+      return NextResponse.json(
+        {
+          error: `Payroll already exists for ${month} ${parsedYear}`,
+          payrollSummaryId: existingSummaryQuery.records[0].Id,
+          status: existingSummaryQuery.records[0].Status__c || "Draft",
+        },
+        { status: 409 }
+      )
+    }
 
     // Fetch leave configurations
     const leaveConfig = await fetchLeaveConfigurations(conn)
@@ -217,8 +241,8 @@ export async function POST(request: NextRequest) {
     console.log(`  ✓ Fetched ${employeeRecords.totalSize} active employees`)
 
     // Calculate the date range for the selected month
-    const startDate = new Date(year, monthIndex, 1)
-    const endDate = new Date(year, monthIndex + 1, 0)
+    const startDate = new Date(parsedYear, monthIndex, 1)
+    const endDate = new Date(parsedYear, monthIndex + 1, 0)
 
     // Format dates as YYYY-MM-DD without timezone conversion
     const formatDate = (date: Date) => {
