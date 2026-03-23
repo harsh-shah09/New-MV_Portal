@@ -504,9 +504,9 @@ export default function AdminConsole() {
                                                                             input.value = '';
                                                                         }
                                                                     }}
-                                                                    className="px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-black transition"
+                                                                    className="flex gap-1 items-center px-4 py-2 bg-blue-600 text-white shadow-lg shadow-blue-500/30 rounded-lg text-sm font-medium hover:bg-blue-800 transition cursor-pointer"
                                                                 >
-                                                                    Add
+                                                                   <Plus size={16}/> Add
                                                                 </button>
                                                             </div>
                                                         </div>

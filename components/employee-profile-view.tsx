@@ -828,7 +828,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
             )}
       
       {/* Header Profile Card */}
-      <div className="relative bg-gradient-to-r from-teal-500 via-cyan-500 to-blue-600 rounded-3xl overflow-hidden shadow-2xl">
+      <div className="relative bg-gradient-to-r from-cyan-500 to-blue-600 rounded-3xl overflow-hidden shadow-2xl">
 
         <div className="relative flex flex-col sm:flex-row items-center sm:items-center gap-5 px-6 py-6 sm:py-5 sm:px-8">
           {/* Avatar */}
@@ -858,12 +858,12 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
               {employee.Employee_Name__c}
             </h1>
             <div className="flex flex-wrap items-center justify-center sm:justify-start gap-x-3 gap-y-1 text-white/80 mt-1.5 text-sm">
-              <span className="flex items-center gap-1.5">
+              <span className="flex font-bold items-center gap-1.5">
                 <Briefcase className="w-3.5 h-3.5 shrink-0" />
                 {employee.Role__c || 'Role not set'}
               </span>
               <span className="w-1 h-1 rounded-full bg-white/40 hidden sm:inline-block"></span>
-              <span className="flex items-center gap-1.5">
+              <span className="flex font-bold items-center gap-1.5">
                 <MapPin className="w-3.5 h-3.5 shrink-0" />
                 {(employee.Employee_Current_Address__c && employee.Employee_Current_Address__c.city) || 'Location not set'}
               </span>

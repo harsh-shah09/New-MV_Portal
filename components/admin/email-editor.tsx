@@ -83,6 +83,7 @@ export default function EmailEditor({ template, onSave, onBack }: EmailEditorPro
            
            // Add simple styles for editing experience
            const style = doc.createElement('style');
+           style.setAttribute('data-editor-style', 'true');
            style.textContent = `
              body { min-height: 100vh; outline: none; }
              *:hover { outline: 1px dashed #3b82f6; }
@@ -121,15 +122,22 @@ export default function EmailEditor({ template, onSave, onBack }: EmailEditorPro
 
   // Sync content from iframe before saving or switching
   const syncContentFromIframe = () => {
-      if (iframeRef.current && iframeRef.current.contentDocument) {
-           const doc = iframeRef.current.contentDocument;
-           // Serialize fully
-           const html = doc.documentElement.outerHTML; 
-           // Add doctype if missing? usually outerHTML of html element excludes doctype
-           setContent(`<!DOCTYPE html>\n${html}`);
-           return `<!DOCTYPE html>\n${html}`;
-      }
-      return content;
+    if (iframeRef.current && iframeRef.current.contentDocument) {
+      const doc = iframeRef.current.contentDocument;
+
+      const clone = doc.documentElement.cloneNode(true) as HTMLElement;
+
+      // Remove editor styles from clone only
+      clone.querySelectorAll('style[data-editor-style]').forEach(el => el.remove());
+      clone.querySelectorAll('[contenteditable]').forEach(el => {
+        el.removeAttribute('contenteditable');
+      });
+
+      const html = clone.outerHTML;
+
+      return `<!DOCTYPE html>\n${html}`;
+    }
+    return content;
   };
 
   const handleSave = async () => {

@@ -217,11 +217,11 @@ export async function forgotPasswordAction(identifier: string) {
 
         if (forgotTemplate?.Value__c) {
             // Replace placeholders in the template
+            const getCurrentYear = () => new Date().getFullYear().toString();
             emailHtml = forgotTemplate.Value__c
-                .replace(/\{\{name\}\}/gi, employee.Name || employee.Employee_Name__c || '')
-                .replace(/\{\{resetLink\}\}/gi, resetLink)
-                // also support href="#" style placeholders
-                .replace(/href="#"/gi, `href="${resetLink}"`);
+                .replace('{{employee.Name}}', employee.Employee_Name__c)
+                .replace('resetLink', `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/auth/change-password?id=${employee.Id}`)
+                .replace('{{year}}' ,getCurrentYear())
         } else {
             // Fallback inline template
             emailHtml = `
