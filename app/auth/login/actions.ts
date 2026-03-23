@@ -9,7 +9,7 @@ import { cookies } from 'next/headers';
 import { v4 as uuidv4 } from 'uuid';
 import { redirect } from 'next/navigation';
 import { getSpecificConfigurations } from '@/lib/admin-config';
-
+import { sendEmail } from '@/lib/email'
 const loginSchema = z.object({
   identifier: z.string().min(1, 'Email or Employee ID is required'),
   password: z.string().min(1, 'Password is required'),
@@ -248,21 +248,11 @@ export async function forgotPasswordAction(identifier: string) {
     }
 
     // Send Email
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: process.env.GMAIL_USER,
-        pass: process.env.GMAIL_APP_PASSWORD,
-      },
-    });
-
     try {
-        await transporter.sendMail({
-            from: process.env.GMAIL_USER,
+        await sendEmail({
             to: email,
             subject: 'Password Reset Link - MV Portal',
-            text: `Hello ${employee.Name},\n\nA password reset has been requested for your account.\n\nPlease click the link below to reset your password:\n\n${resetLink}\n\nIf you did not request this, please ignore this email.`,
-            html: emailHtml,
+            body: emailHtml,
         });
     } catch (emailError) {
         console.error("Email send error:", emailError);
