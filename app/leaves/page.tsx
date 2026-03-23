@@ -81,6 +81,7 @@ export default function LeavesPage() {
     const typeParam = searchParams.get('type')
     const statusParam = searchParams.get('status')
     const tabParam = searchParams.get('tab')
+    const openRequestParam = searchParams.get('openRequest')
 
     if (tabParam === 'approvals') {
       setSelectedTab('approvals')
@@ -95,7 +96,16 @@ export default function LeavesPage() {
         status: statusParam || ""
       }))
     }
-  }, [searchParams])
+
+    if (openRequestParam === 'true' || openRequestParam === '1') {
+      setShowForm(true)
+
+      const nextParams = new URLSearchParams(searchParams.toString())
+      nextParams.delete('openRequest')
+      const nextQuery = nextParams.toString()
+      router.replace(nextQuery ? `/leaves?${nextQuery}` : '/leaves')
+    }
+  }, [searchParams, router])
 
   // Apply filters to my leaves
   useEffect(() => {

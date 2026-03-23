@@ -1,10 +1,11 @@
 "use client"
 
-import { Card, Button, Table, Badge, message } from "antd"
+import { Card, Button, Table, Badge, message, Tooltip } from "antd"
 import { 
   CheckCircleOutlined, 
   CloseCircleOutlined,
-  ClockCircleOutlined
+  ClockCircleOutlined,
+  InfoCircleOutlined
 } from "@ant-design/icons"
 import { useRouter } from "next/navigation"
 import type { ColumnsType } from 'antd/es/table'
@@ -175,6 +176,9 @@ export function PendingApprovalsQueue() {
         <span className="flex items-center gap-2">
           <ClockCircleOutlined />
           Pending Approvals Queue
+          <Tooltip title="Leave requests awaiting HR/Admin review are shown here." placement="top">
+            <InfoCircleOutlined className="text-slate-400 hover:text-slate-600" />
+          </Tooltip>
         </span>
       }
       extra={

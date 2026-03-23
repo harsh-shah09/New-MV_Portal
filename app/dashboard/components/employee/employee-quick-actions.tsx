@@ -33,7 +33,7 @@ export function EmployeeQuickActions({ employeeId }: EmployeeQuickActionsProps) 
           block 
           size="large"
           icon={<CalendarOutlined />}
-          onClick={() => router.push('/leaves')}
+          onClick={() => router.push('/leaves?openRequest=true')}
         >
           Request Leave
         </Button>

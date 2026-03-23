@@ -1,7 +1,7 @@
 "use client"
 
-import { Card, Progress } from "antd"
-import { BarChartOutlined } from "@ant-design/icons"
+import { Card, Progress, Tooltip } from "antd"
+import { BarChartOutlined, InfoCircleOutlined } from "@ant-design/icons"
 
 interface LeaveAnalyticsProps {
   leaveAnalytics: {
@@ -17,6 +17,15 @@ interface LeaveAnalyticsProps {
 }
 
 export function LeaveAnalytics({ leaveAnalytics }: LeaveAnalyticsProps) {
+  const renderTooltipLabel = (label: string, message: string) => (
+    <span className="inline-flex items-center gap-1">
+      <span>{label}</span>
+      <Tooltip title={message} placement="top">
+        <InfoCircleOutlined className="text-slate-400 hover:text-slate-600" />
+      </Tooltip>
+    </span>
+  )
+
   return (
     <Card 
       title={
@@ -30,7 +39,7 @@ export function LeaveAnalytics({ leaveAnalytics }: LeaveAnalyticsProps) {
       <div className="space-y-4">
         <div>
           <div className="flex justify-between mb-2">
-            <span className="text-gray-600">Planned Leaves</span>
+            <span className="text-gray-600">{renderTooltipLabel("Planned Leaves", "Approved planned leaves are shown here.")}</span>
             <span className="font-semibold">{leaveAnalytics.plannedLeaves || 0}</span>
           </div>
           <Progress 
@@ -40,7 +49,7 @@ export function LeaveAnalytics({ leaveAnalytics }: LeaveAnalyticsProps) {
         </div>
         <div>
           <div className="flex justify-between mb-2">
-            <span className="text-gray-600">Sick Leaves</span>
+            <span className="text-gray-600">{renderTooltipLabel("Sick Leaves", "Approved sick leaves are shown here.")}</span>
             <span className="font-semibold">{leaveAnalytics.sickLeaves || 0}</span>
           </div>
           <Progress 
@@ -50,7 +59,7 @@ export function LeaveAnalytics({ leaveAnalytics }: LeaveAnalyticsProps) {
         </div>
         <div>
           <div className="flex justify-between mb-2">
-            <span className="text-gray-600">Emergency Leaves</span>
+            <span className="text-gray-600">{renderTooltipLabel("Emergency Leaves", "Approved emergency leaves are shown here.")}</span>
             <span className="font-semibold">{leaveAnalytics.emergencyLeaves || 0}</span>
           </div>
           <Progress 
@@ -60,7 +69,7 @@ export function LeaveAnalytics({ leaveAnalytics }: LeaveAnalyticsProps) {
         </div>
         <div>
           <div className="flex justify-between mb-2">
-            <span className="text-gray-600">Extra Day Pay</span>
+            <span className="text-gray-600">{renderTooltipLabel("Extra Day Pay", "Approved extra day pay leaves are shown here.")}</span>
             <span className="font-semibold">{leaveAnalytics.extraDayPay || 0}</span>
           </div>
           <Progress 

@@ -1,7 +1,7 @@
 "use client"
 
-import { Card, Avatar, Empty } from "antd"
-import { CheckCircleOutlined, CalendarOutlined, UserOutlined } from "@ant-design/icons"
+import { Card, Avatar, Empty, Tooltip } from "antd"
+import { CheckCircleOutlined, CalendarOutlined, UserOutlined, InfoCircleOutlined } from "@ant-design/icons"
 import dayjs from "dayjs"
 
 interface LeavesApprovedTodayProps {
@@ -15,6 +15,9 @@ export function LeavesApprovedToday({ approvedTodayLeaves }: LeavesApprovedToday
         <span className="flex items-center gap-2">
           <CheckCircleOutlined />
           Leaves Approved Today ({approvedTodayLeaves.length})
+          <Tooltip title="Leaves approved today by HR/Admin are shown here." placement="top">
+            <InfoCircleOutlined className="text-slate-400 hover:text-slate-600" />
+          </Tooltip>
         </span>
       }
       className="h-full"
