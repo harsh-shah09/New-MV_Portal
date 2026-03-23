@@ -8,7 +8,6 @@ import { useQueryClient } from "@tanstack/react-query"
 import Confetti from "react-confetti"
 import { motion, AnimatePresence } from "framer-motion"
 import { Check, AlertCircle, Loader2, Trash2 } from "lucide-react"
-import { AppTour } from "@/components/app-tour"
 
 export function OnboardingWizard() {
     const [open, setOpen] = useState(false)
@@ -22,7 +21,6 @@ export function OnboardingWizard() {
     const [passbookFile, setPassbookFile] = useState<File | null>(null)
     const [passbookUploading, setPassbookUploading] = useState(false)
     const [passbookUploaded, setPassbookUploaded] = useState(false)
-    const [startTour, setStartTour] = useState(false)
     const [userRole, setUserRole] = useState('')
 
     // Google integration state (for step 4)
@@ -225,11 +223,11 @@ export function OnboardingWizard() {
             setOpen(false)
             setShowConfetti(true)
             message.success("Onboarding Completed! Starting your portal tour... 🎉")
-            // Start tour after confetti delay
+            // Start tour globally after confetti delay
             setTimeout(() => {
                 setShowConfetti(false)
+                window.dispatchEvent(new CustomEvent('mv:tour:autostart'))
             }, 3000)
-            setStartTour(true)
         } catch (e) {
              setLoading(false)
         }
@@ -519,7 +517,7 @@ export function OnboardingWizard() {
         }
     }
 
-    if (!open && !showConfetti && !startTour) return null;
+    if (!open && !showConfetti) return null;
 
     return (
         <>
@@ -596,12 +594,6 @@ export function OnboardingWizard() {
                     )}
                 </div>
             </Modal>
-
-            {/* Tour — auto-starts after onboarding, can be restarted via FAB */}
-            <AppTour
-                autoStart={startTour}
-                onAutoStartConsumed={() => setStartTour(false)}
-            />
         </>
     )
 }

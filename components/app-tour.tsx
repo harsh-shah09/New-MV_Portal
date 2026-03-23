@@ -148,13 +148,7 @@ function CustomTooltip(props: any) {
    Main AppTour
 ───────────────────────────────────────────── */
 
-export function AppTour({
-  autoStart = false,
-  onAutoStartConsumed,
-}: {
-  autoStart?: boolean;
-  onAutoStartConsumed?: () => void;
-}) {
+export function AppTour() {
   const [run, setRun] = useState(false);
   const [steps, setSteps] = useState<Step[]>([]);
   const [stepIndex, setStepIndex] = useState(0);
@@ -174,14 +168,18 @@ export function AppTour({
       });
   }, []);
 
+  // Trigger from everywhere via custom event (e.g. after onboarding)
   useEffect(() => {
-    if (autoStart && steps.length > 0 && mounted) {
-      setStepIndex(0);
-      setRun(true);
-      // Tell sidebar to open on mobile
-      window.dispatchEvent(new CustomEvent('mv:tour:start'));
-    }
-  }, [autoStart, steps.length, mounted]);
+    const handleAutoStart = () => {
+      if (steps.length > 0 && mounted) {
+        setStepIndex(0);
+        setRun(true);
+        window.dispatchEvent(new CustomEvent('mv:tour:start'));
+      }
+    };
+    window.addEventListener('mv:tour:autostart', handleAutoStart);
+    return () => window.removeEventListener('mv:tour:autostart', handleAutoStart);
+  }, [steps.length, mounted]);
 
   const startTour = useCallback(() => {
     setStepIndex(0);
@@ -213,11 +211,9 @@ export function AppTour({
         steps={steps}
         run={run}
         stepIndex={stepIndex}
+        continuous={true}
         tooltipComponent={CustomTooltip}
         onEvent={handleEvent}
-        styles={{
-          overlay: { backgroundColor: "rgba(15, 23, 42, 0.55)" },
-        }}
       />
 
       {/* Floating restart button */}
