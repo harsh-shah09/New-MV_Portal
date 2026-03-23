@@ -2,13 +2,22 @@
 import { NextResponse } from 'next/server';
 import { verifySession } from '@/lib/auth';
 import { getEmployeeById } from '@/lib/salesforce';
-import { getAllConfigurations, updateConfiguration } from '@/lib/admin-config';
+import { getAllConfigurations, getSpecificConfigurations, updateConfiguration, ConfigKey } from '@/lib/admin-config';
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const session = await verifySession();
     if (!session || !session.employeeId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(req.url);
+    const typesParam = searchParams.get('types');
+
+    if (typesParam) {
+      const requestedTypes = typesParam.split(',').map((t) => t.trim()) as ConfigKey[];
+      const configs = await getSpecificConfigurations(requestedTypes);
+      return NextResponse.json(configs);
     }
 
     const configs = await getAllConfigurations();

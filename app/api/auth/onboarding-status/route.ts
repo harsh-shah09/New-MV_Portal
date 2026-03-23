@@ -26,8 +26,8 @@ export async function POST(req: Request) {
        
        if (contentType.includes('multipart/form-data')) {
             const formData = await req.formData();
+            console.log(formData)
             const step = parseInt(formData.get('step') as string);
-            
             if (step === 1) {
                 // Profile Photo
                 const file = formData.get('file') as File;
@@ -38,8 +38,26 @@ export async function POST(req: Request) {
                 }
                 await setOnboardingStep(session.employeeId, 2);
             }
-            else if (step === 4) {
-                 // Documents
+            else if (formData.get('step') === '3_passbook') {
+                 // Passbook Upload (sub-step within step 3, does NOT advance the step counter)
+                 const file = formData.get('file') as File;
+                 const type = formData.get('type') as string; // 'Passbook'
+                 if(file) {
+                     const buffer = Buffer.from(await file.arrayBuffer());
+                     const url = await uploadFileToS3(buffer, `documents/${session.employeeId}-${file.name}`, file.type);
+                     console.log('url' , url)
+                     await createDocumentRecord({
+                         Name: file.name,
+                         Document_Type__c: type || 'Passbook',
+                         File_URL__c: url,
+                         Status__c: 'Uploaded',
+                         Employee__c: session.employeeId
+                     });
+                     console.log('here')
+                 }
+            }
+            else if (step === 5) {
+                 // Documents (step 5)
                  const file = formData.get('file') as File;
                  const type = formData.get('type') as string;
                  
@@ -54,8 +72,6 @@ export async function POST(req: Request) {
                          Employee__c: session.employeeId
                      });
                  }
-                 // Advance step? Or allow multiple uploads. Client decides when to call 'submit' to advance.
-                 // Actually client might send { action: 'finish' } or { action: 'next' }
             }
        } else {
            // JSON

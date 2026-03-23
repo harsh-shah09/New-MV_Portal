@@ -828,88 +828,93 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
             )}
       
       {/* Header Profile Card */}
-      <div className="relative bg-white rounded-3xl p-8 border border-slate-100 shadow-xl overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-[340px] md:h-40 bg-gradient-to-r from-cyan-500 to-blue-600"></div>
-        
-        <div className="relative flex flex-col md:flex-row gap-6 items-center md:items-center mt-6">
-           {/* Avatar */}
-           <div className="relative group shrink-0">
-              <div className="w-32 h-32 rounded-full border-4 border-white shadow-lg bg-slate-200 flex items-center justify-center overflow-hidden">
-                  {employee.Profile_Photo__c && !uploadMutation.isPending ? (
-                      <Image key={employee.Profile_Photo__c} src={employee.Profile_Photo__c} alt="Profile" width={128} height={128} className="w-full h-full object-cover" />
-                  ) : uploadMutation.isPending ? (
-                      <Spin size="small" />
-                  ) : (
-                      <User className="w-12 h-12 text-slate-400" />
-                  )}
-              </div>
-              <button 
-                onClick={() => fileInputRef.current?.click()}
-                className="absolute bottom-1 right-1 p-2 rounded-full bg-slate-900 text-white shadow-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black"
-                title="Change Photo"
-               >
-                 <Camera className="w-4 h-4" />
+      <div className="relative bg-gradient-to-r from-teal-500 via-cyan-500 to-blue-600 rounded-3xl overflow-hidden shadow-2xl">
+
+        <div className="relative flex flex-col sm:flex-row items-center sm:items-center gap-5 px-6 py-6 sm:py-5 sm:px-8">
+          {/* Avatar */}
+          <div className="relative group shrink-0">
+            <div className="w-24 h-24 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-full border-[3px] border-white/80 shadow-xl bg-white/20 backdrop-blur-md flex items-center justify-center overflow-hidden">
+              {employee.Profile_Photo__c && !uploadMutation.isPending ? (
+                <Image key={employee.Profile_Photo__c} src={employee.Profile_Photo__c} alt="Profile" width={96} height={96} className="w-full h-full object-cover" />
+              ) : uploadMutation.isPending ? (
+                <Spin size="small" />
+              ) : (
+                <User className="w-10 h-10 text-white/70" />
+              )}
+            </div>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="absolute bottom-0.5 right-0.5 p-1.5 rounded-full bg-black/60 text-white shadow-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black"
+              title="Change Photo"
+            >
+              <Camera className="w-3.5 h-3.5" />
+            </button>
+            <input type="file" hidden ref={fileInputRef} accept="image/*" onChange={handleFileChange} />
+          </div>
+
+          {/* Info */}
+          <div className="flex-1 min-w-0 text-center sm:text-left">
+            <h1 className="text-2xl sm:text-3xl font-bold text-white leading-tight truncate">
+              {employee.Employee_Name__c}
+            </h1>
+            <div className="flex flex-wrap items-center justify-center sm:justify-start gap-x-3 gap-y-1 text-white/80 mt-1.5 text-sm">
+              <span className="flex items-center gap-1.5">
+                <Briefcase className="w-3.5 h-3.5 shrink-0" />
+                {employee.Role__c || 'Role not set'}
+              </span>
+              <span className="w-1 h-1 rounded-full bg-white/40 hidden sm:inline-block"></span>
+              <span className="flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 shrink-0" />
+                {(employee.Employee_Current_Address__c && employee.Employee_Current_Address__c.city) || 'Location not set'}
+              </span>
+            </div>
+          </div>
+
+          {/* Action Button */}
+          {canToggleUserActive && (
+            <div className="shrink-0">
+              <button
+                onClick={() => {
+                  const isActivating = !employee.Active__c;
+                  Modal.confirm({
+                    title: `Are you sure you want to ${isActivating ? 'activate' : 'deactivate'} this user?`,
+                    content: isActivating
+                      ? 'By activating this user, a welcome email with account setup instructions will be sent automatically.'
+                      : 'Deactivating this user will prevent them from logging in.',
+                    okText: isActivating ? 'Activate & Send Email' : 'Deactivate',
+                    okType: isActivating ? 'primary' : 'danger',
+                    cancelText: 'Cancel',
+                    onOk: async () => {
+                      try {
+                        const res = await fetch(`/api/employees/${employeeId}/toggle-active`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ active: isActivating })
+                        });
+                        if (!res.ok) throw new Error('Failed');
+                        message.success(`User ${isActivating ? 'activated' : 'deactivated'} successfully`);
+                        queryClient.invalidateQueries({ queryKey: ['employee', employeeId] });
+                      } catch (e) {
+                        message.error('Failed to update status');
+                      }
+                    }
+                  });
+                }}
+                className={cn(
+                  'flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all border shadow-lg',
+                  employee.Active__c
+                    ? 'bg-red-600/90 text-white border-red-500/50 hover:bg-red-700'
+                    : 'bg-green-600/90 text-white border-green-500/50 hover:bg-green-700'
+                )}
+              >
+                <Power className="w-4 h-4" />
+                {employee.Active__c ? 'Deactivate' : 'Activate'}
               </button>
-              <input type="file" hidden ref={fileInputRef} accept="image/*" onChange={handleFileChange} />
-           </div>
-
-           {/* Info */}
-           <div className="flex-1 w-full text-center md:text-left mb-2">
-               <div className="flex flex-col md:flex-row md:items-center gap-4 justify-between">
-                   <div>
-                       <h1 className="text-3xl font-bold text-white">{employee.Employee_Name__c}</h1>
-                       <div className="flex items-center justify-center md:justify-start gap-3 text-cyan-50 mt-1">
-                          <span className="flex items-center gap-1"><Briefcase className="w-4 h-4" /> {employee.Role__c || "Role not set"}</span>
-                          <span className="w-1 h-1 rounded-full bg-cyan-200"></span>
-                          <span className="flex items-center gap-1"><MapPin className="w-4 h-4" /> {employee.Employee_Address__c.city || "Location not set"}</span>
-                       </div>
-                   </div>
-                   <div className="flex gap-3 justify-center items-center">
-                                             {canToggleUserActive && (
-                           <button
-                             onClick={() => {
-                                 const isActivating = !employee.Active__c;
-                                 Modal.confirm({
-                                     title: `Are you sure you want to ${isActivating ? 'activate' : 'deactivate'} this user?`,
-                                     content: isActivating 
-                                         ? 'By activating this user, a welcome email with account setup instructions will be sent automatically.' 
-                                         : 'Deactivating this user will prevent them from logging in.',
-                                     okText: isActivating ? 'Activate & Send Email' : 'Deactivate',
-                                     okType: isActivating ? 'primary' : 'danger',
-                                     cancelText: 'Cancel',
-                                     onOk: async () => {
-                                         try {
-                                             const res = await fetch(`/api/employees/${employeeId}/toggle-active`, {
-                                                 method: 'POST',
-                                                 headers: { 'Content-Type': 'application/json' },
-                                                 body: JSON.stringify({ active: isActivating })
-                                             });
-                                             if (!res.ok) throw new Error('Failed');
-                                             message.success(`User ${isActivating ? 'activated' : 'deactivated'} successfully`);
-                                             queryClient.invalidateQueries({ queryKey: ["employee", employeeId] });
-                                         } catch (e) {
-                                             message.error("Failed to update status");
-                                         }
-                                     }
-                                 });
-                             }}
-                             className={cn(
-                                 "flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold transition border",
-                                 employee.Active__c 
-                                     ? "bg-red-50 text-red-600 border-red-100 hover:bg-red-100" 
-                                     : "bg-green-50 text-green-600 border-green-100 hover:bg-green-100"
-                             )}
-                         >
-                             <Power className="w-4 h-4" /> 
-                             {employee.Active__c ? 'Deactivate' : 'Activate'}
-                         </button>
-                       )}
-
-                   </div>
-               </div>
-           </div>
+            </div>
+          )}
         </div>
       </div>
+
 
       {warningMsg && (
           <div className="bg-orange-50 border-l-4 border-orange-500 p-4 rounded-r-lg shadow-sm flex items-start gap-4 animate-in slide-in-from-top-2">

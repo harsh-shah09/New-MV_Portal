@@ -33,7 +33,7 @@ export function PageHeader({ title, subtitle, children, className }: PageHeaderP
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.5, delay: 0.1 }}
-          className="flex gap-3 items-center w-full sm:w-auto"
+          className="flex gap-3 items-center w-full sm:w-auto flex-1 justify-end"
         >
           {children}
         </motion.div>

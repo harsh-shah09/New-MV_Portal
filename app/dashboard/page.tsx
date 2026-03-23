@@ -88,20 +88,20 @@ export default function DashboardPage() {
 
   return (
     <PageContainer>
-      <div className="bg-white p-2 rounded-xl relative">
-      {canAccessHRView && (
-        <div className="flex justify-end mb-4 absolute top-[1%] right-[2%]">
-          <div className="flex items-center gap-3 bg-white px-4 py-2 rounded-lg shadow-sm border">
-            <span className="text-sm font-medium text-gray-700">My Dashboard</span>
-            <Switch
-              checked={viewMode === 'hr'}
-              onChange={handleViewModeChange}
-              className="bg-gray-300"
-            />
-            <span className="text-sm font-medium text-gray-700">HR Dashboard</span>
+      <div className="bg-white p-2 sm:p-4 rounded-xl flex flex-col gap-2 sm:gap-4">
+        {canAccessHRView && (
+          <div className="flex w-full justify-center sm:justify-end px-2 pt-2">
+            <div className={`${window.innerWidth > 1024 ? 'absolute top-[3.5%]' : ''} flex items-center gap-2 sm:gap-3 bg-white px-3 sm:px-4 py-2 sm:py-2 rounded-xl shadow-sm border border-slate-100`}>
+              <span className="text-xs sm:text-sm font-medium text-slate-600">My Dashboard</span>
+              <Switch
+                checked={viewMode === 'hr'}
+                onChange={handleViewModeChange}
+                className="bg-slate-200"
+              />
+              <span className="text-xs sm:text-sm font-medium text-slate-600">HR Dashboard</span>
+            </div>
           </div>
-        </div>
-      )}
+        )}
       {viewMode === 'hr' && canAccessHRView ? (
         <HRDashboard data={data} />
       ) : (

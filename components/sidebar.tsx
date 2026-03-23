@@ -107,6 +107,27 @@ export function Sidebar({
     return () => window.removeEventListener("resize", checkMobile)
   }, [])
 
+  // Open/close sidebar during guided tour on mobile
+  useEffect(() => {
+    const onTourStart = () => {
+      if (window.innerWidth < 1024) {
+        // Small delay so joyride initialises after the sidebar slides in
+        setTimeout(() => setOpen?.(true), 50);
+      }
+    };
+    const onTourEnd = () => {
+      if (window.innerWidth < 1024) {
+        setOpen?.(false);
+      }
+    };
+    window.addEventListener('mv:tour:start', onTourStart);
+    window.addEventListener('mv:tour:end',   onTourEnd);
+    return () => {
+      window.removeEventListener('mv:tour:start', onTourStart);
+      window.removeEventListener('mv:tour:end',   onTourEnd);
+    };
+  }, [setOpen]);
+
   const handleLogout = async () => {
     setShowLogoutConfirm(true)
   }
@@ -158,12 +179,15 @@ export function Sidebar({
         </div>
         {navItems.map((item) => {
           const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`)
+          // derive tour key: "/my-payrolls" → "my-payrolls"
+          const tourKey = item.href.replace(/^\//, '')
 
           return (
             <Link
               key={item.href}
               href={item.href}
               onClick={() => isMobile && setOpen?.(false)}
+              data-tour={tourKey}
               className="block"
             >
               <div

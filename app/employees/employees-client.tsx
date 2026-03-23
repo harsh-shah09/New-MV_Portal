@@ -340,7 +340,7 @@ export default function EmployeesClient({ role }: EmployeesClientProps) {
     <PageContainer>
       <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 bg-white p-3 rounded-xl flex flex-col gap-4">
         <PageHeader title="Employees" subtitle="Manage your workforce">
-            <RefreshButton onClick={refetch} label="" size="large" loading={isFetching} />
+            <RefreshButton onClick={refetch} label="" size="large" loading={isFetching}/>
 
             {/* <div>
               <Button type="primary" onClick={() => setShowForm(true)} size="large" icon={<Plus size={16}/>}>
