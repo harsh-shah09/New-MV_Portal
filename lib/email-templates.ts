@@ -1,11 +1,10 @@
 /**
  * Email Templates for Leave Management
  * Professional HTML email templates for all leave-related notifications
- * Templates are loaded from HTML files in public/email-templates/leave/
+ * Templates are loaded from Salesforce Custom Metadata (Email_Templates__mdt)
  */
 
-import fs from 'fs';
-import path from 'path';
+import { getSalesforceConnection } from './salesforce';
 
 interface LeaveEmailData {
   recipientName: string;
@@ -18,16 +17,22 @@ interface LeaveEmailData {
   approverName?: string;
   approverTitle?: string;
   teamLeadName?: string;
+  setupLink?: string;
 }
 
-/**
- * Load HTML template from file and replace placeholders with data
- */
-function loadTemplate(templateName: string, data: LeaveEmailData): string {
-  const templatePath = path.join(process.cwd(), 'public', 'email-templates', 'leave', `${templateName}.html`);
-  let html = fs.readFileSync(templatePath, 'utf-8');
-  
-  // Replace placeholders
+const EMAIL_TEMPLATE_METADATA = 'Email_Templates__mdt';
+const TEMPLATE_CACHE_TTL_MS = 5 * 60 * 1000;
+
+let templateCache: Map<string, string> | null = null;
+let templateCacheFetchedAt = 0;
+
+function normalizeTemplateKey(value: string): string {
+  return (value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function applyTemplateData(template: string, data: LeaveEmailData): string {
+  let html = template;
+
   html = html.replace(/{{recipientName}}/g, data.recipientName || 'Employee');
   html = html.replace(/{{employeeName}}/g, data.employeeName || 'Unknown');
   html = html.replace(/{{leaveType}}/g, data.leaveType || 'N/A');
@@ -36,27 +41,81 @@ function loadTemplate(templateName: string, data: LeaveEmailData): string {
   html = html.replace(/{{duration}}/g, String(data.duration || 0));
   html = html.replace(/{{approverTitle}}/g, data.approverTitle || 'Approver');
   html = html.replace(/{{teamLeadName}}/g, data.teamLeadName || 'Team Lead');
+  html = html.replace(/{{setupLink}}/g, data.setupLink || '');
   html = html.replace(/{{year}}/g, new Date().getFullYear().toString());
-  
-  // Handle conditional reason display (for rejection template)
+
   if (data.reason) {
     html = html.replace(/{{#if reason}}/g, '');
     html = html.replace(/{{\/if}}/g, '');
     html = html.replace(/{{reason}}/g, data.reason);
   } else {
-    // Remove the entire conditional block if no reason
     html = html.replace(/{{#if reason}}[\s\S]*?{{\/if}}/g, '');
   }
-  
+
   return html;
+}
+
+function getDefaultTemplate(data: LeaveEmailData): string {
+  return `
+    <div style="font-family: Arial, sans-serif; color: #1f2937; line-height: 1.6;">
+      <p>Dear ${data.recipientName || 'Employee'},</p>
+      <p>Please review your leave notification in the HRMS portal.</p>
+      <p style="margin-top: 24px;">Regards,<br/>HRMS System</p>
+      <p style="color:#6b7280;font-size:12px;">© ${new Date().getFullYear()} MV Clouds</p>
+    </div>
+  `.trim();
+}
+
+async function getTemplateMap(): Promise<Map<string, string>> {
+  const now = Date.now();
+  if (templateCache && now - templateCacheFetchedAt < TEMPLATE_CACHE_TTL_MS) {
+    return templateCache;
+  }
+
+  const conn = await getSalesforceConnection();
+  const result = await conn.query<any>(`SELECT DeveloperName, Value__c FROM ${EMAIL_TEMPLATE_METADATA}`);
+
+  const map = new Map<string, string>();
+  for (const record of result.records || []) {
+    const key = record.DeveloperName as string;
+    const value = (record.Value__c as string) || '';
+    if (!key || !value) continue;
+
+    map.set(key, value);
+    map.set(normalizeTemplateKey(key), value);
+  }
+
+  templateCache = map;
+  templateCacheFetchedAt = now;
+  return map;
+}
+
+/**
+ * Load HTML template from Salesforce metadata and replace placeholders with data
+ */
+async function loadTemplate(templateName: string, data: LeaveEmailData): Promise<string> {
+  try {
+    const templateMap = await getTemplateMap();
+    const template = templateMap.get(templateName) || templateMap.get(normalizeTemplateKey(templateName));
+
+    if (!template) {
+      console.warn(`[Email Templates] Template not found in metadata: ${templateName}`);
+      return getDefaultTemplate(data);
+    }
+
+    return applyTemplateData(template, data);
+  } catch (error) {
+    console.error(`[Email Templates] Failed loading metadata template: ${templateName}`, error);
+    return getDefaultTemplate(data);
+  }
 }
 
 /**
  * Template: New Leave Request to Team Lead
  */
-export function newLeaveRequestToTeamLead(data: LeaveEmailData): { subject: string; html: string; text: string } {
+export async function newLeaveRequestToTeamLead(data: LeaveEmailData): Promise<{ subject: string; html: string; text: string }> {
   const subject = `New Leave Request from ${data.employeeName}`;
-  const html = loadTemplate('new-request-to-team-lead', data);
+  const html = await loadTemplate('new-request-to-team-lead', data);
   const text = `Dear ${data.recipientName},\n\nA new leave request has been submitted by ${data.employeeName}.\n\nLeave Details:\n- Employee: ${data.employeeName}\n- Leave Type: ${data.leaveType}\n- Start Date: ${data.startDate}\n- End Date: ${data.endDate}\n- Duration: ${data.duration} day(s)\n\nPlease log in to the HRMS portal to review and take action.\n\nRegards,\nHR Team`;
   
   return { subject, html, text };
@@ -65,9 +124,9 @@ export function newLeaveRequestToTeamLead(data: LeaveEmailData): { subject: stri
 /**
  * Template: Team Lead Leave Request to HR
  */
-export function teamLeadLeaveRequestToHR(data: LeaveEmailData): { subject: string; html: string; text: string } {
+export async function teamLeadLeaveRequestToHR(data: LeaveEmailData): Promise<{ subject: string; html: string; text: string }> {
   const subject = `Leave Request from Team Lead - ${data.employeeName}`;
-  const html = loadTemplate('team-lead-request-to-hr', data);
+  const html = await loadTemplate('team-lead-request-to-hr', data);
   const text = `Dear HR,\n\nA new leave request has been submitted by ${data.employeeName} (Team Lead).\n\nPlease review and approve.\n\nRegards,\nHRMS System`;
   
   return { subject, html, text };
@@ -76,9 +135,9 @@ export function teamLeadLeaveRequestToHR(data: LeaveEmailData): { subject: strin
 /**
  * Template: HR Leave Request to Admin
  */
-export function hrLeaveRequestToAdmin(data: LeaveEmailData): { subject: string; html: string; text: string } {
+export async function hrLeaveRequestToAdmin(data: LeaveEmailData): Promise<{ subject: string; html: string; text: string }> {
   const subject = `Leave Request from HR - ${data.employeeName}`;
-  const html = loadTemplate('hr-request-to-admin', data);
+  const html = await loadTemplate('hr-request-to-admin', data);
   const text = `Dear ${data.recipientName},\n\nA new leave request has been submitted by ${data.employeeName} (HR).\n\nPlease review and approve.\n\nRegards,\nHRMS System`;
   
   return { subject, html, text };
@@ -87,9 +146,9 @@ export function hrLeaveRequestToAdmin(data: LeaveEmailData): { subject: string; 
 /**
  * Template: Team Lead Approval Notification to HR
  */
-export function tlApprovalToHR(data: LeaveEmailData): { subject: string; html: string; text: string } {
+export async function tlApprovalToHR(data: LeaveEmailData): Promise<{ subject: string; html: string; text: string }> {
   const subject = `Leave Approved by Team Lead - ${data.employeeName}`;
-  const html = loadTemplate('tl-approval-to-hr', data);
+  const html = await loadTemplate('tl-approval-to-hr', data);
   const text = `Dear HR,\n\nA new leave request has been submitted by ${data.employeeName} and approved by Team Lead ${data.teamLeadName}.`;
   
   return { subject, html, text };
@@ -98,9 +157,9 @@ export function tlApprovalToHR(data: LeaveEmailData): { subject: string; html: s
 /**
  * Template: Leave Approved by Team Lead (to Employee)
  */
-export function leaveApprovedByTL(data: LeaveEmailData): { subject: string; html: string; text: string } {
+export async function leaveApprovedByTL(data: LeaveEmailData): Promise<{ subject: string; html: string; text: string }> {
   const subject = `Leave Request Approved by Team Lead`;
-  const html = loadTemplate('leave-approved-by-tl', data);
+  const html = await loadTemplate('leave-approved-by-tl', data);
   const text = `Dear ${data.recipientName},\n\nYour leave request has been Approved by your Team Lead.\n\nRegards,\nHR Team`;
   
   return { subject, html, text };
@@ -109,9 +168,9 @@ export function leaveApprovedByTL(data: LeaveEmailData): { subject: string; html
 /**
  * Template: Leave Approved by HR/Admin (Final Approval)
  */
-export function leaveApprovedFinal(data: LeaveEmailData): { subject: string; html: string; text: string } {
+export async function leaveApprovedFinal(data: LeaveEmailData): Promise<{ subject: string; html: string; text: string }> {
   const subject = `Leave Request Approved - Final Confirmation`;
-  const html = loadTemplate('leave-approved-final', data);
+  const html = await loadTemplate('leave-approved-final', data);
   const text = `Dear ${data.recipientName},\n\nYour leave request has been Approved by ${data.approverTitle}.\n\nRegards,\nHRMS System`;
   
   return { subject, html, text };
@@ -120,9 +179,9 @@ export function leaveApprovedFinal(data: LeaveEmailData): { subject: string; htm
 /**
  * Template: Leave Auto-Approved (to Team Lead)
  */
-export function leaveAutoApproved(data: LeaveEmailData): { subject: string; html: string; text: string } {
+export async function leaveAutoApproved(data: LeaveEmailData): Promise<{ subject: string; html: string; text: string }> {
   const subject = `Leave Auto-Approved for ${data.employeeName}`;
-  const html = loadTemplate('leave-auto-approved', data);
+  const html = await loadTemplate('leave-auto-approved', data);
   const text = `Dear ${data.recipientName},\n\n${data.approverTitle} has applied and auto-approved leave on behalf of ${data.employeeName}.\n\nLeave Details:\n- Type: ${data.leaveType}\n- Category: Loss of Pay\n- Start Date: ${data.startDate}\n- End Date: ${data.endDate}\n- Duration: ${data.duration} day(s)\n\nRegards,\nHRMS System`;
 
   return { subject, html, text };
@@ -131,9 +190,9 @@ export function leaveAutoApproved(data: LeaveEmailData): { subject: string; html
 /**
  * Template: Leave Rejected by Team Lead/HR/Admin
  */
-export function leaveRejected(data: LeaveEmailData): { subject: string; html: string; text: string } {
+export async function leaveRejected(data: LeaveEmailData): Promise<{ subject: string; html: string; text: string }> {
   const subject = `Leave Request Rejected`;
-  const html = loadTemplate('leave-rejected', data);
+  const html = await loadTemplate('leave-rejected', data);
   const text = `Dear ${data.recipientName},\n\nYour leave request has been Rejected by ${data.approverTitle}.\n${data.reason ? `\nReason: ${data.reason}\n` : ''}\nRegards,\nHRMS System`;
   
   return { subject, html, text };
@@ -142,9 +201,9 @@ export function leaveRejected(data: LeaveEmailData): { subject: string; html: st
 /**
  * Template: Leave Withdrawn
  */
-export function leaveWithdrawn(data: LeaveEmailData): { subject: string; html: string; text: string } {
+export async function leaveWithdrawn(data: LeaveEmailData): Promise<{ subject: string; html: string; text: string }> {
   const subject = `Leave Request Withdrawn - Balance Restored`;
-  const html = loadTemplate('leave-withdrawn', data);
+  const html = await loadTemplate('leave-withdrawn', data);
   const text = `Dear ${data.recipientName || 'Employee'},\n\nYour leave request has been Withdrawn.\n\nRegards,\nHR Team`;
   
   return { subject, html, text };
@@ -153,9 +212,9 @@ export function leaveWithdrawn(data: LeaveEmailData): { subject: string; html: s
 /**
  * Template: Withdrawal Request Submitted (to Employee)
  */
-export function withdrawalRequestSubmitted(data: LeaveEmailData): { subject: string; html: string; text: string } {
+export async function withdrawalRequestSubmitted(data: LeaveEmailData): Promise<{ subject: string; html: string; text: string }> {
   const subject = `Withdrawal Request Submitted - Pending HR Approval`;
-  const html = loadTemplate('withdrawal-request-submitted', data);
+  const html = await loadTemplate('withdrawal-request-submitted', data);
   const text = `Dear ${data.recipientName},\n\nYour request to withdraw the approved leave has been successfully submitted and is now pending HR approval.\n\nLeave Details:\n- Leave Type: ${data.leaveType}\n- Start Date: ${data.startDate}\n- End Date: ${data.endDate}\n- Duration: ${data.duration} day(s)\n\nYou will be notified once HR reviews your request.\n\nRegards,\nHRMS System`;
   
   return { subject, html, text };
@@ -164,9 +223,9 @@ export function withdrawalRequestSubmitted(data: LeaveEmailData): { subject: str
 /**
  * Template: Withdrawal Request to HR
  */
-export function withdrawalRequestToHR(data: LeaveEmailData): { subject: string; html: string; text: string } {
+export async function withdrawalRequestToHR(data: LeaveEmailData): Promise<{ subject: string; html: string; text: string }> {
   const subject = `Withdrawal Request: ${data.employeeName} - Leave from ${data.startDate} to ${data.endDate}`;
-  const html = loadTemplate('withdrawal-request-to-hr', data);
+  const html = await loadTemplate('withdrawal-request-to-hr', data);
   const text = `Dear HR Team,\n\n${data.employeeName} has requested to withdraw their approved leave.\n\nLeave Details:\n- Employee: ${data.employeeName}\n- Leave Type: ${data.leaveType}\n- Start Date: ${data.startDate}\n- End Date: ${data.endDate}\n- Duration: ${data.duration} day(s)\n\nPlease review and approve or reject this withdrawal request through the HRMS portal.\n\nRegards,\nHRMS System`;
   
   return { subject, html, text };
@@ -175,9 +234,9 @@ export function withdrawalRequestToHR(data: LeaveEmailData): { subject: string; 
 /**
  * Template: Withdrawal Approved (to Employee)
  */
-export function withdrawalApproved(data: LeaveEmailData): { subject: string; html: string; text: string } {
+export async function withdrawalApproved(data: LeaveEmailData): Promise<{ subject: string; html: string; text: string }> {
   const subject = `Withdrawal Approved - Leave from ${data.startDate} to ${data.endDate}`;
-  const html = loadTemplate('withdrawal-approved', data);
+  const html = await loadTemplate('withdrawal-approved', data);
   const text = `Dear ${data.recipientName},\n\nYour withdrawal request has been approved by ${data.approverTitle}. The leave has been successfully withdrawn and your leave balance has been restored.\n\nLeave Details:\n- Leave Type: ${data.leaveType}\n- Start Date: ${data.startDate}\n- End Date: ${data.endDate}\n- Duration: ${data.duration} day(s)\n\nRegards,\nHRMS System`;
   
   return { subject, html, text };
@@ -186,9 +245,9 @@ export function withdrawalApproved(data: LeaveEmailData): { subject: string; htm
 /**
  * Template: Withdrawal Rejected (to Employee)
  */
-export function withdrawalRejected(data: LeaveEmailData): { subject: string; html: string; text: string } {
+export async function withdrawalRejected(data: LeaveEmailData): Promise<{ subject: string; html: string; text: string }> {
   const subject = `Withdrawal Rejected - Leave from ${data.startDate} to ${data.endDate}`;
-  const html = loadTemplate('withdrawal-rejected', data);
+  const html = await loadTemplate('withdrawal-rejected', data);
   const text = `Dear ${data.recipientName},\n\nYour withdrawal request has been rejected by ${data.approverTitle}. Your leave remains approved and active.\n\n${data.reason ? `Reason: ${data.reason}\n\n` : ''}Leave Details:\n- Leave Type: ${data.leaveType}\n- Start Date: ${data.startDate}\n- End Date: ${data.endDate}\n- Duration: ${data.duration} day(s)\n\nRegards,\nHRMS System`;
   
   return { subject, html, text };
@@ -197,14 +256,12 @@ export function withdrawalRejected(data: LeaveEmailData): { subject: string; htm
 /**
  * Template: Welcome Email
  */
-export function welcomeEmail(data: { recipientName: string; setupLink: string }): { subject: string; html: string; text: string } {
+export async function welcomeEmail(data: { recipientName: string; setupLink: string }): Promise<{ subject: string; html: string; text: string }> {
     const subject = `Welcome to MV Clouds Team!`;
-    const templatePath = path.join(process.cwd(), 'public', 'email-templates', 'leave', 'welcome-email.html');
-    let html = fs.readFileSync(templatePath, 'utf-8');
-
-    html = html.replace(/{{recipientName}}/g, data.recipientName);
-    html = html.replace(/{{setupLink}}/g, data.setupLink);
-    html = html.replace(/{{year}}/g, new Date().getFullYear().toString());
+    const html = await loadTemplate('welcome-email', {
+      recipientName: data.recipientName,
+      setupLink: data.setupLink,
+    });
     
     const text = `Dear ${data.recipientName},\n\nWelcome to MV Clouds! Please set up your account here: ${data.setupLink}`;
     return { subject, html, text };

@@ -30,7 +30,7 @@ console.log(id , active)
                 // Or passing ID to the page to 'initiate' the flow.
                 const setupLink = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/auth/welcome?id=${id}`;
                 
-                const { subject, html, text } = welcomeEmail({
+                const { subject, html, text } = await welcomeEmail({
                     recipientName: employee.Employee_Name__c,
                     setupLink
                 });

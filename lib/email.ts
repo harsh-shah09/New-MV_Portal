@@ -68,5 +68,5 @@ export function sendEmailAsync(params: EmailParams): void {
  * Get HR email from environment variable
  */
 export function getHREmail(): string {
-  return 'sibtenkhan6789@gmail.com';
+  return 'harsh.s@mvclouds.com';
 }

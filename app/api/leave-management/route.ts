@@ -827,7 +827,7 @@ export async function POST(request: NextRequest) {
         const teamLeadName = targetEmployee.Team_Lead__r?.Employee_Name__c || 'Team Lead';
 
         if (employeeEmail) {
-          const employeeEmailTemplate = leaveApprovedFinal({
+          const employeeEmailTemplate = await leaveApprovedFinal({
             recipientName: employeeName,
             approverTitle,
             leaveType,
@@ -844,7 +844,7 @@ export async function POST(request: NextRequest) {
         }
 
         if (teamLeadEmail) {
-          const teamLeadEmailTemplate = leaveAutoApproved({
+          const teamLeadEmailTemplate = await leaveAutoApproved({
             recipientName: teamLeadName,
             employeeName,
             approverTitle,
@@ -1642,7 +1642,7 @@ export async function POST(request: NextRequest) {
             notificationRecipients.push(admin.Id);
 
             if (adminEmail) {
-              const emailTemplate = hrLeaveRequestToAdmin({
+              const emailTemplate = await hrLeaveRequestToAdmin({
                 recipientName: adminName,
                 employeeName,
                 leaveType: leaveType || 'N/A',
@@ -1676,7 +1676,7 @@ export async function POST(request: NextRequest) {
             notificationRecipients.push(hr.Id);
           }
 
-          const emailTemplate = teamLeadLeaveRequestToHR({
+          const emailTemplate = await teamLeadLeaveRequestToHR({
             recipientName: 'HR Team',
             employeeName,
             leaveType: leaveType || 'N/A',
@@ -1716,7 +1716,7 @@ export async function POST(request: NextRequest) {
           }
 
           if (teamLeadEmail && !leaveRecord.TL_Approval__c) {
-            const emailTemplate = newLeaveRequestToTeamLead({
+            const emailTemplate = await newLeaveRequestToTeamLead({
               recipientName: teamLeadName,
               employeeName,
               leaveType: leaveType || 'N/A',
@@ -2008,7 +2008,7 @@ export async function PATCH(request: NextRequest) {
 
               // Send email to HR
               if (hr.Employee_Email__c) {
-                const emailData = withdrawalRequestToHR({
+                const emailData = await withdrawalRequestToHR({
                   recipientName: 'HR Team',
                   employeeName: employeeName,
                   leaveType: leave.Leave_Type__c || leave.Leave_Category__c,
@@ -2039,7 +2039,7 @@ export async function PATCH(request: NextRequest) {
 
               // Send email to Admin
               if (admin.Employee_Email__c) {
-                const emailData = withdrawalRequestToHR({
+                const emailData = await withdrawalRequestToHR({
                   recipientName: 'Admin',
                   employeeName: employeeName,
                   leaveType: leave.Leave_Type__c || leave.Leave_Category__c,
@@ -2070,7 +2070,7 @@ export async function PATCH(request: NextRequest) {
 
           // Notify employee that withdrawal request is pending
           if (emp.Employee_Email__c) {
-            const emailData = withdrawalRequestSubmitted({
+            const emailData = await withdrawalRequestSubmitted({
               recipientName: employeeName,
               leaveType: leave.Leave_Type__c || leave.Leave_Category__c,
               startDate: dayjs(leave.Start_Date__c).format('DD MMM YYYY'),
@@ -2338,7 +2338,7 @@ export async function PATCH(request: NextRequest) {
           if (emp.Employee_Email__c) {
             const approverTitle = isAdmin ? 'Admin' : 'HR';
             const emailLeaveType = getDisplayLeaveType(leave.Leave_Type__c, leave.Leave_Category__c || "");
-            const emailData = withdrawalApproved({
+            const emailData = await withdrawalApproved({
               recipientName: employeeName,
               leaveType: emailLeaveType,
               startDate: dayjs(leave.Start_Date__c).format('DD MMM YYYY'),
@@ -2367,7 +2367,7 @@ export async function PATCH(request: NextRequest) {
               notificationRecipients.push(emp.Team_Lead__c);
 
               if (emp.Team_Lead__r?.Employee_Email__c) {
-                const emailData = withdrawalApproved({
+                const emailData = await withdrawalApproved({
                   recipientName: emp.Team_Lead__r.Employee_Name__c,
                   employeeName: employeeName,
                   leaveType: getDisplayLeaveType(leave.Leave_Type__c, leave.Leave_Category__c || ""),
@@ -2458,7 +2458,7 @@ export async function PATCH(request: NextRequest) {
           // Send email to employee
           if (emp.Employee_Email__c) {
             const approverTitle = isAdmin ? 'Admin' : 'HR';
-            const emailData = withdrawalRejected({
+            const emailData = await withdrawalRejected({
               recipientName: employeeName,
               leaveType: leave.Leave_Type__c || leave.Leave_Category__c,
               startDate: dayjs(leave.Start_Date__c).format('DD MMM YYYY'),
@@ -2571,7 +2571,7 @@ export async function PATCH(request: NextRequest) {
           if (isTeamLead && !oldLeave.TL_Approval__c) {
             // TL just approved - send email to employee
             if (employeeEmail) {
-              const emailTemplate = leaveApprovedByTL({
+              const emailTemplate = await leaveApprovedByTL({
                 recipientName: employeeName,
                 leaveType: oldLeave.Leave_Type__c || 'N/A',
                 startDate: oldLeave.Start_Date__c || 'N/A',
@@ -2594,7 +2594,7 @@ export async function PATCH(request: NextRequest) {
             );
 
             // Send email to HR about TL approval
-            const emailTemplateHR = tlApprovalToHR({
+            const emailTemplateHR = await tlApprovalToHR({
               recipientName: 'HR Team',
               employeeName,
               teamLeadName,
@@ -2627,7 +2627,7 @@ export async function PATCH(request: NextRequest) {
             // HR or Admin just approved - send email to employee
             if (employeeEmail) {
               const approverTitle = isAdmin ? 'Admin' : 'HR';
-              const emailTemplate = leaveApprovedFinal({
+              const emailTemplate = await leaveApprovedFinal({
                 recipientName: employeeName,
                 approverTitle,
                 leaveType: oldLeave.Leave_Type__c || 'N/A',
@@ -2743,7 +2743,7 @@ export async function PATCH(request: NextRequest) {
           if (isTeamLead && !oldLeave.TL_Approval__c) {
             // TL just rejected
             if (employeeEmail) {
-              const emailTemplate = leaveRejected({
+              const emailTemplate = await leaveRejected({
                 recipientName: employeeName,
                 approverTitle: 'Team Lead',
                 leaveType: oldLeave.Leave_Type__c || 'N/A',
@@ -2786,7 +2786,7 @@ export async function PATCH(request: NextRequest) {
             // HR or Admin just rejected
             if (employeeEmail) {
               const approverTitle = isAdmin ? 'Admin' : 'HR';
-              const emailTemplate = leaveRejected({
+              const emailTemplate = await leaveRejected({
                 recipientName: employeeName,
                 approverTitle,
                 leaveType: oldLeave.Leave_Type__c || 'N/A',
