@@ -10,6 +10,7 @@ import { LeaveUtilizationSummary } from "./employee/leave-utilization-summary"
 import { TeamOnLeave } from "./employee/team-on-leave"
 import { GoogleIntegration } from "./employee/google-integration"
 import { PageHeader } from "@/components/page-header"
+import { PendingApprovalsQueue } from "./hr/pending-approvals-queue"
 import EmployeeBirthday from './employee/employee-birthday'
 interface EmployeeDashboardProps {
   data: any
@@ -29,6 +30,7 @@ export function EmployeeDashboard({ data }: EmployeeDashboardProps) {
   const pendingRequests = data?.pendingRequests || []
   const holidays = data?.holidays || []
   const teamMembers = data?.teamMembers || []
+  const isTeamLead = data?.isTeamLead === true
 
   const totalLeavesTaken = leaveBalanceData.sickLeaveCount + leaveBalanceData.emergencyLeaveCount + leaveBalanceData.plannedLeaveCount
   const totalAllowance = 18
@@ -49,6 +51,11 @@ console.log(data)
 
       {/* Quick Actions and Pending Requests */}
       <Row gutter={[16, 16]}>
+        {isTeamLead && (
+          <Col xs={24} lg={24}>
+            <PendingApprovalsQueue />
+          </Col>
+        )}
         <Col xs={24} lg={24}>
           <PendingRequests pendingRequests={pendingRequests} />
         </Col>

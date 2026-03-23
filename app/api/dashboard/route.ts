@@ -26,6 +26,7 @@ export async function GET(req: NextRequest) {
 
         const { employeeId, email, recordId, name, role, title } = payload;
         const currentEmployeeId = employeeId || name || recordId;
+        const isTeamLead = role === 'Developer' && title === 'Team Lead';
         
         const conn = await getSalesforceConnection();
         const isHR = role === 'HR';
@@ -315,6 +316,32 @@ export async function GET(req: NextRequest) {
             status: record.Status__c?.toLowerCase() || 'pending'
         }));
 
+        let teamLeadPendingApprovals: any[] = [];
+        if (isTeamLead) {
+            const teamLeadApprovalsQuery = await conn.query(`
+                SELECT Id, Name, Employee__c, Employee__r.Employee_Name__c,
+                       Leave_Type__c, Leave_Category__c, Start_Date__c,
+                       End_Date__c, Total_Days__c, TL_Approval__c
+                FROM Leave__c
+                WHERE Status__c = 'Applied'
+                AND Employee__r.Team_Lead__c = '${currentEmployeeId}'
+                AND (TL_Approval__c = null OR TL_Approval__c = '')
+                ORDER BY Start_Date__c ASC
+            `);
+
+            teamLeadPendingApprovals = teamLeadApprovalsQuery.records.map((record: any) => ({
+                id: record.Id,
+                employeeId: record.Name,
+                employeeName: record.Employee__r?.Employee_Name__c || "Unknown",
+                leaveType: record.Leave_Category__c === 'Extra Day Pay' ? 'Extra Day Pay' : record.Leave_Type__c,
+                leaveCategory: record.Leave_Category__c,
+                startDate: record.Start_Date__c,
+                endDate: record.End_Date__c,
+                duration: record.Total_Days__c,
+                tlApproved: record.TL_Approval__c
+            }));
+        }
+
         // Get upcoming holidays
         const holidaysQuery = await conn.query(`
             SELECT Name, Date__c, Day__c
@@ -375,10 +402,12 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({
             employeeName,
             employeeId: currentEmployeeId,
+            isTeamLead,
             leaveBalance,
             recentLeaves,
             upcomingLeaves,
             pendingRequests,
+            pendingApprovals: teamLeadPendingApprovals,
             holidays,
             teamMembers,
         

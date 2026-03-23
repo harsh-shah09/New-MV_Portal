@@ -888,15 +888,51 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    // Validate past-date policy:
-    // - Loss of Pay: current/future only
-    // - Extra Day Pay: past dates allowed
+    // Validate date policy:
+    // - Sick/Emergency/Earned: no future dates, current month allowed, previous month only when today <= 7
+    // - Planned Loss of Pay: current/future only
     const today = dayjs().startOf("day");
     const leaveStartDate = dayjs(startDate).startOf("day");
+    const leaveEndDate = dayjs(endDate).startOf("day");
     const normalizedCategory = (leaveCategory || "").toLowerCase().replace(/\s+/g, "-");
-    const isExtraDayPay = normalizedCategory === "extra-day-pay";
+    const normalizedLeaveType = (leaveType || "").toLowerCase().trim();
 
-    if (!isExtraDayPay && leaveStartDate.isBefore(today)) {
+    const isSickLeave = normalizedLeaveType === "sick leave";
+    const isEmergencyLeave = normalizedLeaveType === "emergency leave";
+    const isEarnedLeave = normalizedLeaveType === "earned leave" || normalizedCategory === "extra-day-pay";
+    const isRestrictedBackdateType = isSickLeave || isEmergencyLeave || isEarnedLeave;
+
+    if (isRestrictedBackdateType) {
+      if (leaveStartDate.isAfter(today) || leaveEndDate.isAfter(today)) {
+        return NextResponse.json({
+          error: "Cannot apply leave for future dates",
+          details: {
+            message: "Sick, Emergency, and Earned leaves can only be applied for past/current dates based on policy."
+          }
+        }, { status: 400 });
+      }
+
+      const currentMonthStart = today.startOf("month");
+      const previousMonthStart = today.subtract(1, "month").startOf("month");
+      const canUsePreviousMonth = today.date() <= 7;
+
+      const isWithinAllowedWindow = (dateValue: dayjs.Dayjs) => {
+        const inCurrentMonth = !dateValue.isBefore(currentMonthStart, "day");
+        const inPreviousMonth = canUsePreviousMonth && !dateValue.isBefore(previousMonthStart, "day") && dateValue.isBefore(currentMonthStart, "day");
+        return inCurrentMonth || inPreviousMonth;
+      };
+
+      if (!isWithinAllowedWindow(leaveStartDate) || !isWithinAllowedWindow(leaveEndDate)) {
+        return NextResponse.json({
+          error: "Selected dates are outside allowed backdate window",
+          details: {
+            message: canUsePreviousMonth
+              ? "For Sick, Emergency, and Earned leaves, select dates from current month or previous month only."
+              : "For Sick, Emergency, and Earned leaves, select dates from current month only."
+          }
+        }, { status: 400 });
+      }
+    } else if (leaveStartDate.isBefore(today)) {
       return NextResponse.json({
         error: "Cannot apply leave for past dates",
         details: {

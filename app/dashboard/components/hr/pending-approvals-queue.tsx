@@ -1,6 +1,6 @@
 "use client"
 
-import { Card, Button, Table, Badge, message, Tooltip } from "antd"
+import { Card, Button, Table, Badge, message, Tooltip, Modal, Input } from "antd"
 import { 
   CheckCircleOutlined, 
   CloseCircleOutlined,
@@ -17,6 +17,9 @@ export function PendingApprovalsQueue() {
   const [loading, setLoading] = useState<string | null>(null)
   const [pendingApprovals, setPendingApprovals] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [rejectModalVisible, setRejectModalVisible] = useState(false)
+  const [rejectingLeaveId, setRejectingLeaveId] = useState<string | null>(null)
+  const [rejectReason, setRejectReason] = useState("")
 
   const fetchPendingApprovals = async () => {
     try {
@@ -68,7 +71,7 @@ export function PendingApprovalsQueue() {
     }
   }
 
-  const handleReject = async (leaveId: string) => {
+  const handleReject = async (leaveId: string, reason: string): Promise<boolean> => {
     setLoading(leaveId)
     try {
       const response = await fetch('/api/leave-management', {
@@ -78,7 +81,8 @@ export function PendingApprovalsQueue() {
         },
         body: JSON.stringify({
           leaveId,
-          action: 'reject'
+          action: 'reject',
+          reason
         })
       })
 
@@ -88,14 +92,43 @@ export function PendingApprovalsQueue() {
         message.success('Leave rejected successfully')
         // Refresh only this component's data
         await fetchPendingApprovals()
+        return true
       } else {
         message.error(result.error || 'Failed to reject leave')
+        return false
       }
     } catch (error) {
       console.error('Error rejecting leave:', error)
       message.error('Failed to reject leave')
+      return false
     } finally {
       setLoading(null)
+    }
+  }
+
+  const openRejectModal = (leaveId: string) => {
+    setRejectingLeaveId(leaveId)
+    setRejectReason("")
+    setRejectModalVisible(true)
+  }
+
+  const handleRejectConfirm = async () => {
+    const trimmedReason = rejectReason.trim()
+
+    if (!trimmedReason) {
+      message.warning('Please provide cancellation reason before rejecting')
+      return
+    }
+
+    if (!rejectingLeaveId) {
+      return
+    }
+
+    const success = await handleReject(rejectingLeaveId, trimmedReason)
+    if (success) {
+      setRejectModalVisible(false)
+      setRejectingLeaveId(null)
+      setRejectReason("")
     }
   }
 
@@ -161,7 +194,7 @@ export function PendingApprovalsQueue() {
             icon={<CloseCircleOutlined />}
             loading={loading === record.id}
             disabled={loading !== null}
-            onClick={() => handleReject(record.id)}
+            onClick={() => openRejectModal(record.id)}
           >
             Reject
           </Button>
@@ -171,46 +204,76 @@ export function PendingApprovalsQueue() {
   ]
 
   return (
-    <Card 
-      title={
-        <span className="flex items-center gap-2">
-          <ClockCircleOutlined />
-          Pending Approvals Queue
-          <Tooltip title="Leave requests awaiting HR/Admin review are shown here." placement="top">
-            <InfoCircleOutlined className="text-slate-400 hover:text-slate-600" />
-          </Tooltip>
-        </span>
-      }
-      extra={
-        pendingApprovals.length > 0 && (
-          <Badge count={pendingApprovals.length} style={{ backgroundColor: '#f59e0b' }} />
-        )
-      }
-      loading={isLoading}
-    >
-      {pendingApprovals.length > 0 ? (
-        <>
-          <Table 
-            dataSource={pendingApprovals.slice(0, 5)}
-            columns={approvalColumns}
-            pagination={false}
-            rowKey="id"
-            scroll={{ x: 800 }}
+    <>
+      <Card 
+        title={
+          <span className="flex items-center gap-2">
+            <ClockCircleOutlined />
+            Pending Approvals Queue
+            <Tooltip title="Leave requests awaiting HR/Admin review are shown here." placement="top">
+              <InfoCircleOutlined className="text-slate-400 hover:text-slate-600" />
+            </Tooltip>
+          </span>
+        }
+        extra={
+          pendingApprovals.length > 0 && (
+            <Badge count={pendingApprovals.length} style={{ backgroundColor: '#f59e0b' }} />
+          )
+        }
+        loading={isLoading}
+      >
+        {pendingApprovals.length > 0 ? (
+          <>
+            <Table 
+              dataSource={pendingApprovals.slice(0, 5)}
+              columns={approvalColumns}
+              pagination={false}
+              rowKey="id"
+              scroll={{ x: 800 }}
+            />
+            {pendingApprovals.length > 5 && (
+              <div className="text-center mt-4">
+                <Button type="primary" onClick={() => router.push('/leaves?tab=approvals&status=applied')}>
+                  View All {pendingApprovals.length} Pending Requests
+                </Button>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="text-center py-12 text-gray-500">
+            <CheckCircleOutlined style={{ fontSize: 64, opacity: 0.3 }} />
+            <p className="mt-4 text-lg">All caught up! No pending approvals.</p>
+          </div>
+        )}
+      </Card>
+
+      <Modal
+        title="Reject Leave Request"
+        open={rejectModalVisible}
+        onCancel={() => {
+          setRejectModalVisible(false)
+          setRejectingLeaveId(null)
+          setRejectReason("")
+        }}
+        onOk={handleRejectConfirm}
+        okText="Confirm Rejection"
+        cancelText="Cancel"
+        okButtonProps={{
+          danger: true,
+          loading: rejectingLeaveId ? loading === rejectingLeaveId : false,
+          disabled: !rejectReason.trim(),
+        }}
+      >
+        <div className="pt-2">
+          <p className="text-sm text-gray-600 mb-3">Please provide the cancellation reason for rejecting this leave request.</p>
+          <Input.TextArea
+            rows={4}
+            value={rejectReason}
+            onChange={(e) => setRejectReason(e.target.value)}
+            placeholder="Enter cancellation reason"
           />
-          {pendingApprovals.length > 5 && (
-            <div className="text-center mt-4">
-              <Button type="primary" onClick={() => router.push('/leaves?tab=approvals&status=applied')}>
-                View All {pendingApprovals.length} Pending Requests
-              </Button>
-            </div>
-          )}
-        </>
-      ) : (
-        <div className="text-center py-12 text-gray-500">
-          <CheckCircleOutlined style={{ fontSize: 64, opacity: 0.3 }} />
-          <p className="mt-4 text-lg">All caught up! No pending approvals.</p>
         </div>
-      )}
-    </Card>
+      </Modal>
+    </>
   )
 }

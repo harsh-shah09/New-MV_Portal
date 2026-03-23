@@ -360,7 +360,7 @@ export default function LeavesPage() {
           const suggested = details.suggestedDates || {}
 
           Modal.confirm({
-            title: '⚠️ Merge with existing leave',
+            title: 'Merge with existing leave',
             width: 700,
             content: (
               <div className="space-y-3">
@@ -401,7 +401,7 @@ export default function LeavesPage() {
           };
 
           Modal.confirm({
-            title: '⚠️ Leave Rules Applied',
+            title: 'Leave Rules Applied',
             width: 700,
             content: (
               <div className="space-y-3">
@@ -425,15 +425,9 @@ export default function LeavesPage() {
                   </div>
                   {details.sandwichApplied && (
                     <>
-                      {details.nonWorkingDaysInRange > 0 && (
-                        <div className="flex justify-between text-orange-700">
-                          <span className="font-medium">+ Non-working days in range:</span>
-                          <span className="font-semibold">{details.nonWorkingDaysInRange ?? 0}</span>
-                        </div>
-                      )}
                       {(details.sameRequestSandwichDays ?? details.sandwichExtra ?? 0) > 0 && (
                         <div className="flex justify-between text-orange-700">
-                          <span className="font-medium">+ Sandwich days (adjacent to request):</span>
+                          <span className="font-medium">+ Sandwich days (Non-working days):</span>
                           <span className="font-semibold">{details.sameRequestSandwichDays ?? details.sandwichExtra}</span>
                         </div>
                       )}
@@ -518,7 +512,7 @@ export default function LeavesPage() {
     if (!leave) return
 
     Modal.confirm({
-      title: '🗑️ Cancel Leave Request',
+      title: 'Cancel Leave Request',
       content: (
         <div>
           <p>Are you sure you want to cancel this leave request?</p>
@@ -578,7 +572,7 @@ export default function LeavesPage() {
     const isSingleDayLeave = leave.startDate === leave.endDate
 
     Modal.confirm({
-      title: '⚠️ Withdraw Approved Leave',
+      title: 'Withdraw Approved Leave',
       content: (
         <div>
           <p className="text-orange-600 font-medium mb-3">⚠️ You are about to withdraw an approved leave!</p>
@@ -660,7 +654,7 @@ export default function LeavesPage() {
     const leave = pendingApprovals.find((l) => l.id === leaveId)
 
     Modal.confirm({
-      title: '✅ Approve Leave Request',
+      title: 'Approve Leave Request',
       content: leave ? (
         <div>
           <p className="mb-3">Are you sure you want to approve this leave request?</p>
@@ -749,7 +743,7 @@ export default function LeavesPage() {
     const leave = pendingApprovals.find((l) => l.id === leaveId)
 
     Modal.confirm({
-      title: '⚠️ Approve Withdrawal Request',
+      title: 'Approve Withdrawal Request',
       content: leave ? (
         <div>
           <p className="mb-3">Are you sure you want to approve this withdrawal request?</p>
@@ -1349,7 +1343,7 @@ export default function LeavesPage() {
           </Form.Item>
 
           <Form.Item label="Leave Category">
-            <Input value="Loss of Pay" disabled />
+            <Input value="Loss of Pay" disabled/>
           </Form.Item>
 
           <Form.Item

@@ -29,6 +29,7 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
   const [form] = Form.useForm()
   const [duration, setDuration] = useState(0)
   const [leaveCategory, setLeaveCategory] = useState<string>("")
+  const [selectedLeaveType, setSelectedLeaveType] = useState<string>("")
   const [holidays, setHolidays] = useState<Holiday[]>([])
   const [holidayMap, setHolidayMap] = useState<Map<string, string>>(new Map())
 
@@ -58,13 +59,20 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
 
   // Recalculate duration when dates change
   const onValuesChange = (changedValues: any, allValues: any) => {
-      if (changedValues.leaveCategory) {
+      if (Object.prototype.hasOwnProperty.call(changedValues, 'leaveCategory')) {
           setLeaveCategory(changedValues.leaveCategory)
+          setSelectedLeaveType("")
+          setDuration(0)
           // Reset fields when category changes
           form.setFieldsValue({
             leaveType: undefined,
+            session: undefined,
             reason: undefined,
           })
+      }
+
+      if (Object.prototype.hasOwnProperty.call(changedValues, 'leaveType')) {
+        setSelectedLeaveType(changedValues.leaveType || "")
       }
       
       // Always recalculate duration when dates change or session changes
@@ -113,12 +121,43 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
   }
 
   // Disable dates function for loss-of-pay category
-  const disabledDate = (current: Dayjs) => {
-    // to disable disableDate
-    // return false
+  const shouldRestrictToBackdateWindow = () => {
+    const leaveType = selectedLeaveType || form.getFieldValue('leaveType')
+    const isSickLeave = leaveType === 'Sick Leave'
+    const isEmergencyLeave = leaveType === 'Emergency Leave'
+    const isEarnedLeave = leaveType === 'Earned Leave' || leaveCategory === 'extra-day-pay'
 
+    return isSickLeave || isEmergencyLeave || isEarnedLeave
+  }
+
+  const isOutsideAllowedBackdateWindow = (current: Dayjs) => {
+    const today = dayjs().startOf('day')
+    const date = current.startOf('day')
+
+    if (date.isAfter(today, 'day')) {
+      return true
+    }
+
+    const currentMonthStart = today.startOf('month')
+    const previousMonthStart = today.subtract(1, 'month').startOf('month')
+    const previousMonthEnd = today.subtract(1, 'month').endOf('month')
+    const canApplyPreviousMonth = today.date() <= 7
+
+    const isInCurrentMonthPastOrToday = !date.isBefore(currentMonthStart, 'day')
+    const isInPreviousMonth = canApplyPreviousMonth
+      && !date.isBefore(previousMonthStart, 'day')
+      && !date.isAfter(previousMonthEnd, 'day')
+
+    return !(isInCurrentMonthPastOrToday || isInPreviousMonth)
+  }
+
+  const disabledDate = (current: Dayjs) => {
     if (!current || leaveCategory !== 'loss-of-pay') {
       return false
+    }
+
+    if (shouldRestrictToBackdateWindow()) {
+      return isOutsideAllowedBackdateWindow(current)
     }
 
     // Check if it's a weekend (Saturday or Sunday)
@@ -130,6 +169,14 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
     
     // Disable if it's a weekend or holiday for loss-of-pay
     return isWeekend || isHoliday
+  }
+
+  const disabledDateForExtraDayPay = (current: Dayjs) => {
+    if (!current || leaveCategory !== 'extra-day-pay') {
+      return false
+    }
+
+    return isOutsideAllowedBackdateWindow(current)
   }
 
   const handleFinish = (values: any) => {
@@ -249,8 +296,8 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
         onValuesChange={onValuesChange}
         initialValues={{
             leaveCategory: '',
-            leaveType: 'Planned Leave',
-            session: 'Full Day',
+          leaveType: undefined,
+          session: undefined,
             startDate: dayjs(),
             endDate: dayjs()
         }}
@@ -266,6 +313,7 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
           {/* Leave Category Selection */}
           <Form.Item name="leaveCategory" label="Leave Category" rules={[{ required: true }]}>
               <Select placeholder="Select leave category">
+                <Option value="" disabled>Please select leave category</Option>
                   <Option value="loss-of-pay">Loss of Pay</Option>
                   <Option value="extra-day-pay">Extra Day Pay</Option>
               </Select>
@@ -276,7 +324,8 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Form.Item name="leaveType" label="Leave Type" rules={[{ required: true }]}>
-                    <Select>
+                  <Select placeholder="Select leave type">
+                    <Option value="" disabled>Please select leave type</Option>
                         <Option value="Planned Leave">Planned Leave</Option>
                         <Option value="Sick Leave">Sick Leave</Option>
                         <Option value="Emergency Leave">Emergency Leave</Option>
@@ -296,7 +345,8 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
                 </Form.Item>
                 
                 <Form.Item name="session" label="Session" rules={[{ required: true }]}>
-                    <Select>
+                  <Select placeholder="Select session">
+                    <Option value="" disabled>Please select session</Option>
                         <Option value="Session-1">Session-1</Option>
                         <Option value="Session-2">Session-2</Option>
                         <Option value="Full Day">Full Day</Option>
@@ -333,11 +383,11 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Form.Item name="startDate" label="Start Date" rules={[{ required: true }]}>
-                     <DatePicker className="w-full" format="YYYY-MM-DD" dateRender={dateFullCellRender} />
+                   <DatePicker className="w-full" format="YYYY-MM-DD" dateRender={dateFullCellRender} disabledDate={disabledDateForExtraDayPay} />
                 </Form.Item>
                 
                 <Form.Item name="endDate" label="End Date" rules={[{ required: true }]}>
-                     <DatePicker className="w-full" format="YYYY-MM-DD" dateRender={dateFullCellRender} />
+                   <DatePicker className="w-full" format="YYYY-MM-DD" dateRender={dateFullCellRender} disabledDate={disabledDateForExtraDayPay} />
                 </Form.Item>
                 
                 <Form.Item label="Duration">
@@ -345,7 +395,8 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
                 </Form.Item>
                 
                 <Form.Item name="session" label="Session" rules={[{ required: true }]}>
-                    <Select>
+                  <Select placeholder="Select session">
+                    <Option value="" disabled>Please select session</Option>
                         <Option value="Session-1">Session-1</Option>
                         <Option value="Session-2">Session-2</Option>
                         <Option value="Full Day">Full Day</Option>
