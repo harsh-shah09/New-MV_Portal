@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useQuery } from "@tanstack/react-query"
-import { Button, Spin } from "antd"
+import { Button, Select, Spin } from "antd"
 import { CalendarRange, Plus, Edit2, Trash2, X, Calendar, ChevronDown } from "lucide-react"
 import { PageContainer } from "@/components/page-container"
 import { PageHeader } from "@/components/page-header"
@@ -258,15 +258,15 @@ export default function HolidaysPage() {
         <div className="flex items-center gap-3">
           {/* Year Filter */}
           <div className="relative">
-            <select
+            <Select
               value={selectedYear}
-              onChange={(e) => setSelectedYear(e.target.value)}
-              className="appearance-none bg-card border border-border rounded-lg px-4 py-2 pr-10 font-medium text-foreground focus:ring-2 focus:ring-primary focus:border-transparent outline-none cursor-pointer shadow-sm"
+              size="large"
+              onChange={(e) => setSelectedYear(e)}
             >
               {availableYears.map(year => (
-                <option key={year} value={year}>{year}</option>
+                <Select.Option key={year} value={year}>{year}</Select.Option>
               ))}
-            </select>
+            </Select>
             <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
           </div>
 
