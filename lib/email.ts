@@ -5,7 +5,7 @@
 
 import nodemailer from 'nodemailer';
 import { google } from 'googleapis';
-import { GetCommand } from '@aws-sdk/lib-dynamodb';
+import { GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { db } from '@/lib/dynamodb';
 
 interface EmailParams {
@@ -65,6 +65,53 @@ async function getGoogleIntegration(employeeId: string): Promise<GoogleIntegrati
   return result.Item as GoogleIntegrationItem;
 }
 
+async function persistGoogleIntegration(employeeId: string, integration: GoogleIntegrationItem): Promise<void> {
+  await db.send(new UpdateCommand({
+    TableName: 'MV_Portal',
+    Key: {
+      Employee_Id: employeeId,
+      SortKey: 'GOOGLE_INTEGRATION',
+    },
+    UpdateExpression: 'SET access_token = :accessToken, refresh_token = :refreshToken, expiry_date = :expiryDate, token_type = :tokenType, updated_at = :updatedAt',
+    ExpressionAttributeValues: {
+      ':accessToken': integration.access_token || null,
+      ':refreshToken': integration.refresh_token || null,
+      ':expiryDate': integration.expiry_date || null,
+      ':tokenType': integration.token_type || null,
+      ':updatedAt': new Date().toISOString(),
+    },
+  }));
+}
+
+function isAuthError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+
+  const maybe = error as { code?: string | number; status?: number; response?: { status?: number } };
+  const status = maybe.status || maybe.response?.status;
+
+  if (status === 401 || status === 403) {
+    return true;
+  }
+
+  if (typeof maybe.code === 'string') {
+    return ['invalid_grant', 'unauthorized_client', 'invalid_client'].includes(maybe.code);
+  }
+
+  return false;
+}
+
+async function sendWithCurrentCredentials(oauth2Client: any, params: EmailParams): Promise<void> {
+  const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
+  const raw = encodeGmailMessage(params.to, params.subject, params.body);
+
+  await gmail.users.messages.send({
+    userId: 'me',
+    requestBody: { raw },
+  });
+}
+
 function encodeGmailMessage(to: string, subject: string, html: string): string {
   const mimeMessage = [
     `To: ${to}`,
@@ -87,13 +134,14 @@ async function sendViaUserGoogleAccount(params: EmailParams): Promise<boolean> {
     return false;
   }
 
-  const oauth2Client = createOAuth2Client();
-  if (!oauth2Client) {
+  const integration = await getGoogleIntegration(params.senderEmployeeId);
+  if (!integration?.access_token && !integration?.refresh_token) {
     return false;
   }
 
-  const integration = await getGoogleIntegration(params.senderEmployeeId);
-  if (!integration?.refresh_token) {
+  const oauth2Client = createOAuth2Client();
+  if (!oauth2Client) {
+    console.warn('Google OAuth client not configured. Skipping refresh flow.');
     return false;
   }
 
@@ -104,20 +152,45 @@ async function sendViaUserGoogleAccount(params: EmailParams): Promise<boolean> {
     token_type: integration.token_type,
   });
 
-  const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
-  const raw = encodeGmailMessage(params.to, params.subject, params.body);
+  try {
+    await sendWithCurrentCredentials(oauth2Client, params);
+    return true;
+  } catch (error) {
+    if (!isAuthError(error) || !integration.refresh_token) {
+      console.warn('Google send failed without refresh retry:', error);
+      return false;
+    }
 
-  await gmail.users.messages.send({
-    userId: 'me',
-    requestBody: { raw },
-  });
+    try {
+      const refreshedToken = await oauth2Client.getAccessToken();
+      const refreshedAccessToken = refreshedToken?.token || oauth2Client.credentials?.access_token;
 
-  return true;
+      if (!refreshedAccessToken) {
+        console.warn('Refresh token flow did not return a new access token.');
+        return false;
+      }
+
+      const refreshedCredentials = oauth2Client.credentials;
+      await persistGoogleIntegration(params.senderEmployeeId, {
+        access_token: refreshedAccessToken,
+        refresh_token: refreshedCredentials.refresh_token || integration.refresh_token,
+        expiry_date: refreshedCredentials.expiry_date ?? undefined,
+        token_type: refreshedCredentials.token_type ?? undefined,
+      });
+
+      await sendWithCurrentCredentials(oauth2Client, params);
+      console.log('✅ Email sent via user Google account after token refresh');
+      return true;
+    } catch (refreshError) {
+      console.warn('Google token refresh/send retry failed:', refreshError);
+      return false;
+    }
+  }
 }
 
 export async function hasGoogleWorkspaceIntegration(employeeId: string): Promise<boolean> {
   const integration = await getGoogleIntegration(employeeId);
-  return !!integration?.refresh_token;
+  return !!(integration?.access_token || integration?.refresh_token);
 }
 
 /**
