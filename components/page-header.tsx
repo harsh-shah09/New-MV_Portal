@@ -13,7 +13,7 @@ interface PageHeaderProps {
 
 export function PageHeader({ title, subtitle, children, className }: PageHeaderProps) {
   return (
-    <div className={cn("bg-white border border-gray-100 flex gap-4 justify-between items-center mb-3 p-4 rounded-2xl shadow-sm items-start sm:items-center ", className)}>
+    <div className={cn("bg-white border border-gray-100 flex flex-col sm:flex-row gap-4 justify-between mb-3 p-4 rounded-2xl shadow-sm", className)}>
       <motion.div 
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
@@ -33,8 +33,7 @@ export function PageHeader({ title, subtitle, children, className }: PageHeaderP
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.5, delay: 0.1 }}
-          className="flex gap-3 items-center w-full sm:w-auto flex-1 justify-end"
-        >
+          className="flex flex-wrap sm:flex-nowrap gap-2 sm:gap-3 items-stretch sm:items-center w-full sm:w-auto justify-end"        >
           {children}
         </motion.div>
       )}

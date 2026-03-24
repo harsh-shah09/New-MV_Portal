@@ -272,21 +272,14 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
         setWarningMsg(null)
     } else {
         const expParsed = decimalToYearsMonths(employee.Experience__c)
+        console.log(employee)
         setFormData({
              Employee_Name__c: employee.Employee_Name__c,
              Employee_Email__c: employee.Employee_Email__c,
              Employee_Phone__c: employee.Employee_Phone__c,
              Birthdate__c: employee.Birthdate__c,
              Gender__c: employee.Gender__c,
-             
-             Employee_Address__c: employee.Employee_Address__c || {}, 
-    
-             Employee_Address__Street__s: employee.Employee_Address__c?.street || '',
-             Employee_Address__City__s: employee.Employee_Address__c?.city || '',
-             Employee_Address__StateCode__s: employee.Employee_Address__c?.state || '',
-             Employee_Address__PostalCode__s: employee.Employee_Address__c?.postalCode || '',
-             Employee_Address__CountryCode__s: employee.Employee_Address__c?.country || '',
-
+             Employee_Address__c: employee.Employee_Current_Address__c || {}, 
              Emergency_Contact_Name__c: employee.Emergency_Contact_Name__c,
              Emergency_Contact_Number__c: employee.Emergency_Contact_Number__c,
              exp_years: expParsed.years,
@@ -315,16 +308,20 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                 payload.Employee_Email__c = payload.Employee_Email__c?.trim();
                 payload.Employee_Phone__c = payload.Employee_Phone__c?.trim()?.replace(/[\s-]/g, '');
         payload.Emergency_Contact_Number__c = payload.Emergency_Contact_Number__c?.trim()?.replace(/[\s-]/g, '');
-        payload.Employee_Address__c = {
+        payload.Employee_Current_Address__c = JSON.stringify(
+            {
             street: formData.Employee_Address__Street__s,
             city: formData.Employee_Address__City__s,
             state: formData.Employee_Address__StateCode__s,
             postalCode: formData.Employee_Address__PostalCode__s,
             country: formData.Employee_Address__CountryCode__s
-        };
+        }
+        );
+        console.log(payload);
         
         // Remove flattened address fields from payload
         delete payload.Employee_Address__Street__s;
+        delete payload.Employee_Address__c;
         delete payload.Employee_Address__City__s;
         delete payload.Employee_Address__StateCode__s;
         delete payload.Employee_Address__PostalCode__s;
