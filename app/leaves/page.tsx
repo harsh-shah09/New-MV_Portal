@@ -76,6 +76,18 @@ export default function LeavesPage() {
   console.log("Current User:", currentUser)
   const { leaves, pendingApprovals, setLeaves, setPendingApprovals, updateLeave } = useLeaveStore()
 
+  const promptGoogleWorkspaceAuthentication = () => {
+    Modal.confirm({
+      title: "Google Workspace authentication required",
+      content: "Please connect your Google Workspace account before applying for leave.",
+      okText: "Connect Now",
+      cancelText: "Later",
+      onOk: () => {
+        router.push('/dashboard?tab=integration')
+      },
+    })
+  }
+
   // Handle URL parameters for filtering
   useEffect(() => {
     const typeParam = searchParams.get('type')
@@ -285,6 +297,11 @@ export default function LeavesPage() {
 
       const result = await response.json()
       if (!response.ok) {
+        if (result?.code === 'GOOGLE_AUTH_REQUIRED') {
+          toast.error(result?.error || 'Please connect Google Workspace to continue.', { id: toastId })
+          promptGoogleWorkspaceAuthentication()
+          return
+        }
         toast.error(result?.error || 'Failed to apply leave for employee', { id: toastId })
         return
       }
@@ -474,6 +491,11 @@ export default function LeavesPage() {
         }
 
         if (!response.ok) {
+          if (result?.code === 'GOOGLE_AUTH_REQUIRED') {
+            toast.error(result?.error || 'Please connect Google Workspace to continue.', { id: toastId, duration: 6000 })
+            promptGoogleWorkspaceAuthentication()
+            return
+          }
           // Check if there's a detailed message from the backend (e.g., duplicate leave)
           const errorMessage = result?.details?.message || result?.error || "Failed to submit leave request"
           toast.error(errorMessage, { id: toastId, duration: 6000 })
@@ -505,62 +527,6 @@ export default function LeavesPage() {
     }
 
     await submit(data)
-  }
-
-  const handleCancel = async (leaveId: string) => {
-    const leave = leaves.find((l) => l.id === leaveId)
-    if (!leave) return
-
-    Modal.confirm({
-      title: 'Cancel Leave Request',
-      content: (
-        <div>
-          <p>Are you sure you want to cancel this leave request?</p>
-          <div className="mt-3 p-3 bg-gray-50 rounded">
-            <div className="text-sm">
-              <div><strong>Type:</strong> {leave.leaveType || leave.leaveCategory}</div>
-              <div><strong>Dates:</strong> {leave.startDate} to {leave.endDate}</div>
-              <div><strong>Duration:</strong> {leave.duration} day(s)</div>
-            </div>
-          </div>
-          <p className="mt-3 text-red-600 text-sm">This action cannot be undone.</p>
-        </div>
-      ),
-      okText: 'Yes, Cancel Leave',
-      cancelText: 'No, Keep It',
-      okButtonProps: { danger: true },
-      onOk: async () => {
-        const toastId = toast.loading("Cancelling leave request...")
-        try {
-          const response = await fetch("/api/leave-management", {
-            method: "PATCH",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              leaveId,
-              action: "cancel",
-            }),
-          })
-
-          if (!response.ok) {
-            const error = await response.json()
-            toast.error(error.error || "Failed to cancel leave", { id: toastId })
-            return
-          }
-
-          // Update local state
-          updateLeave({
-            ...leave,
-            status: "cancelled",
-          })
-          toast.success("Leave request cancelled successfully", { id: toastId })
-        } catch (error) {
-          console.error("Error cancelling leave:", error)
-          toast.error("Failed to cancel leave. Please try again.", { id: toastId })
-        }
-      },
-    })
   }
 
   const handleWithdraw = async (leaveId: string) => {
@@ -970,7 +936,7 @@ export default function LeavesPage() {
                   </Select>
                 </div>
               </div>
-              <LeaveTable leaves={filteredMyLeaves} onCancel={handleCancel} onWithdraw={handleWithdraw} />
+              <LeaveTable leaves={filteredMyLeaves} onWithdraw={handleWithdraw} />
             </div>
           )}
 
@@ -1286,7 +1252,7 @@ export default function LeavesPage() {
               {/* Leave Table */}
               <div className="mt-4">
                 {filteredLeaves.length > 0 ? (
-                  <LeaveTable leaves={filteredLeaves} onCancel={handleCancel} onWithdraw={handleWithdraw} showActions={false} />
+                  <LeaveTable leaves={filteredLeaves} onWithdraw={handleWithdraw} showActions={false} />
                 ) : (
                   <div className="text-center py-8 text-gray-500">
                     {allLeaves.length === 0 ? 'No leave records found' : 'No leaves match the selected filters'}

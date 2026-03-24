@@ -4,12 +4,23 @@
  */
 
 import nodemailer from 'nodemailer';
+import { google } from 'googleapis';
+import { GetCommand } from '@aws-sdk/lib-dynamodb';
+import { db } from '@/lib/dynamodb';
 
 interface EmailParams {
   to: string;
   subject: string;
   body: string;
   contentType?: string;
+  senderEmployeeId?: string;
+}
+
+interface GoogleIntegrationItem {
+  access_token?: string;
+  refresh_token?: string;
+  expiry_date?: number;
+  token_type?: string;
 }
 
 /**
@@ -25,26 +36,115 @@ function createTransporter() {
   });
 }
 
+function createOAuth2Client() {
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || 'http://localhost:8080';
+  const redirectUri = `${baseUrl}/api/integrations/google/callback`;
+
+  if (!clientId || !clientSecret) {
+    return null;
+  }
+
+  return new google.auth.OAuth2(clientId, clientSecret, redirectUri);
+}
+
+async function getGoogleIntegration(employeeId: string): Promise<GoogleIntegrationItem | null> {
+  const result = await db.send(new GetCommand({
+    TableName: 'MV_Portal',
+    Key: {
+      Employee_Id: employeeId,
+      SortKey: 'GOOGLE_INTEGRATION',
+    },
+  }));
+
+  if (!result.Item) {
+    return null;
+  }
+
+  return result.Item as GoogleIntegrationItem;
+}
+
+function encodeGmailMessage(to: string, subject: string, html: string): string {
+  const mimeMessage = [
+    `To: ${to}`,
+    `Subject: ${subject}`,
+    'MIME-Version: 1.0',
+    'Content-Type: text/html; charset=UTF-8',
+    '',
+    html,
+  ].join('\r\n');
+
+  return Buffer.from(mimeMessage)
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/g, '');
+}
+
+async function sendViaUserGoogleAccount(params: EmailParams): Promise<boolean> {
+  if (!params.senderEmployeeId) {
+    return false;
+  }
+
+  const oauth2Client = createOAuth2Client();
+  if (!oauth2Client) {
+    return false;
+  }
+
+  const integration = await getGoogleIntegration(params.senderEmployeeId);
+  if (!integration?.refresh_token) {
+    return false;
+  }
+
+  oauth2Client.setCredentials({
+    access_token: integration.access_token,
+    refresh_token: integration.refresh_token,
+    expiry_date: integration.expiry_date,
+    token_type: integration.token_type,
+  });
+
+  const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
+  const raw = encodeGmailMessage(params.to, params.subject, params.body);
+
+  await gmail.users.messages.send({
+    userId: 'me',
+    requestBody: { raw },
+  });
+
+  return true;
+}
+
+export async function hasGoogleWorkspaceIntegration(employeeId: string): Promise<boolean> {
+  const integration = await getGoogleIntegration(employeeId);
+  return !!integration?.refresh_token;
+}
+
 /**
  * Send email notification using Gmail
  */
-export async function sendEmail({ to, subject, body, contentType = 'text/plain' }: EmailParams): Promise<void> {
+export async function sendEmail({ to, subject, body, contentType = 'text/plain', senderEmployeeId }: EmailParams): Promise<void> {
   try {
     console.log('📧 Sending email:', { to, subject, contentType });
-    
+
+    const wasSentViaGoogle = await sendViaUserGoogleAccount({ to, subject, body, contentType, senderEmployeeId });
+    if (wasSentViaGoogle) {
+      console.log('✅ Email sent via user Google account to:', to);
+      return;
+    }
+
     const transporter = createTransporter();
-    
+
     const mailOptions: any = {
       from: process.env.GMAIL_USER,
       to,
       subject,
+      html: body,
     };
-    
-    mailOptions.html = body;
 
     await transporter.sendMail(mailOptions);
-    
-    console.log('✅ Email sent successfully to:', to);
+
+    console.log('✅ Email sent via fallback mailbox to:', to);
   } catch (error) {
     console.error('❌ Error sending email:', error);
     // Don't throw - we don't want email failures to break the application

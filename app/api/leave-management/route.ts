@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import dayjs from "dayjs";
 import { verifyToken } from "@/lib/auth-utils";
 import { getSalesforceConnection, sendInAppNotifications } from "@/lib/salesforce";
-import { sendEmailAsync, getHREmail } from "@/lib/email";
+import { sendEmailAsync, getHREmail, hasGoogleWorkspaceIntegration } from "@/lib/email";
 import { calculateLeaveDays, type LeaveDateInput } from "@/lib/leave-policy";
 import {
   newLeaveRequestToTeamLead,
@@ -698,6 +698,18 @@ export async function POST(request: NextRequest) {
 
     const conn = await getSalesforceConnection();
 
+    const hasGoogleIntegration = await hasGoogleWorkspaceIntegration(employeeId);
+    if (!hasGoogleIntegration) {
+      return NextResponse.json(
+        {
+          error: "Please authenticate Google Workspace before applying for leave.",
+          code: "GOOGLE_AUTH_REQUIRED",
+          redirectTo: "/dashboard?tab=integration",
+        },
+        { status: 400 }
+      );
+    }
+
     // Special flow: HR/Admin applying leave for other employees
     if (applyForOthers === true) {
       const isHR = role === 'HR';
@@ -840,6 +852,7 @@ export async function POST(request: NextRequest) {
             to: employeeEmail,
             subject: employeeEmailTemplate.subject,
             body: employeeEmailTemplate.html,
+            senderEmployeeId: employeeId,
           });
         }
 
@@ -858,6 +871,7 @@ export async function POST(request: NextRequest) {
             to: teamLeadEmail,
             subject: teamLeadEmailTemplate.subject,
             body: teamLeadEmailTemplate.html,
+            senderEmployeeId: employeeId,
           });
         }
 
@@ -1689,7 +1703,8 @@ export async function POST(request: NextRequest) {
               sendEmailAsync({
                 to: adminEmail,
                 subject: emailTemplate.subject,
-                body: emailTemplate.html
+                body: emailTemplate.html,
+                senderEmployeeId: employeeId,
               });
               console.log("Email sent to Admin:", adminEmail);
             }
@@ -1723,7 +1738,8 @@ export async function POST(request: NextRequest) {
           sendEmailAsync({
             to: getHREmail(),
             subject: emailTemplate.subject,
-            body: emailTemplate.html
+            body: emailTemplate.html,
+            senderEmployeeId: employeeId,
           });
           console.log("Email sent to HR for Team Lead leave:", getHREmail());
         }
@@ -1763,7 +1779,8 @@ export async function POST(request: NextRequest) {
             sendEmailAsync({
               to: teamLeadEmail,
               subject: emailTemplate.subject,
-              body: emailTemplate.html
+              body: emailTemplate.html,
+              senderEmployeeId: employeeId,
             });
             console.log("Email sent to Team Lead:", teamLeadEmail);
           }
@@ -2055,7 +2072,8 @@ export async function PATCH(request: NextRequest) {
                 sendEmailAsync({
                   to: hr.Employee_Email__c,
                   subject: emailData.subject,
-                  body: emailData.html
+                  body: emailData.html,
+                  senderEmployeeId: employeeId,
                 });
               }
             }
@@ -2086,7 +2104,8 @@ export async function PATCH(request: NextRequest) {
                 sendEmailAsync({
                   to: admin.Employee_Email__c,
                   subject: emailData.subject,
-                  body: emailData.html
+                  body: emailData.html,
+                  senderEmployeeId: employeeId,
                 });
               }
             }
@@ -2116,7 +2135,8 @@ export async function PATCH(request: NextRequest) {
             sendEmailAsync({
               to: emp.Employee_Email__c,
               subject: emailData.subject,
-              body: emailData.html
+              body: emailData.html,
+              senderEmployeeId: employeeId,
             });
           }
         }
@@ -2385,7 +2405,8 @@ export async function PATCH(request: NextRequest) {
             sendEmailAsync({
               to: emp.Employee_Email__c,
               subject: emailData.subject,
-              body: emailData.html
+              body: emailData.html,
+              senderEmployeeId: employeeId,
             });
           }
 
@@ -2415,7 +2436,8 @@ export async function PATCH(request: NextRequest) {
                 sendEmailAsync({
                   to: emp.Team_Lead__r.Employee_Email__c,
                   subject: `Withdrawal Approved: ${employeeName} - Leave from ${dayjs(leave.Start_Date__c).format('DD MMM YYYY')} to ${dayjs(leave.End_Date__c).format('DD MMM YYYY')}`,
-                  body: emailData.html
+                  body: emailData.html,
+                  senderEmployeeId: employeeId,
                 });
               }
             }
@@ -2506,7 +2528,8 @@ export async function PATCH(request: NextRequest) {
             sendEmailAsync({
               to: emp.Employee_Email__c,
               subject: emailData.subject,
-              body: emailData.html
+              body: emailData.html,
+              senderEmployeeId: employeeId,
             });
           }
 
@@ -2617,7 +2640,8 @@ export async function PATCH(request: NextRequest) {
               sendEmailAsync({
                 to: employeeEmail,
                 subject: emailTemplate.subject,
-                body: emailTemplate.html
+                body: emailTemplate.html,
+                senderEmployeeId: employeeId,
               });
             }
 
@@ -2642,7 +2666,8 @@ export async function PATCH(request: NextRequest) {
             sendEmailAsync({
               to: getHREmail(),
               subject: emailTemplateHR.subject,
-              body: emailTemplateHR.html
+              body: emailTemplateHR.html,
+              senderEmployeeId: employeeId,
             });
 
             // Send in-app notification to HR
@@ -2674,7 +2699,8 @@ export async function PATCH(request: NextRequest) {
               sendEmailAsync({
                 to: employeeEmail,
                 subject: emailTemplate.subject,
-                body: emailTemplate.html
+                body: emailTemplate.html,
+                senderEmployeeId: employeeId,
               });
             }
 
@@ -2791,7 +2817,8 @@ export async function PATCH(request: NextRequest) {
               sendEmailAsync({
                 to: employeeEmail,
                 subject: emailTemplate.subject,
-                body: emailTemplate.html
+                body: emailTemplate.html,
+                senderEmployeeId: employeeId,
               });
             }
 
@@ -2834,7 +2861,8 @@ export async function PATCH(request: NextRequest) {
               sendEmailAsync({
                 to: employeeEmail,
                 subject: emailTemplate.subject,
-                body: emailTemplate.html
+                body: emailTemplate.html,
+                senderEmployeeId: employeeId,
               });
             }
 

@@ -141,70 +141,76 @@ export default function PayrollPage() {
     <RoleGuard>
       <PageContainer>
         <div className="w-full mx-auto flex-1 flex flex-col bg-white p-3 rounded-xl">
-        <PageHeader
-          title="Payroll Management"
-          subtitle="Manage employee payrolls and generate monthly summaries"
-        >
-          {view === "summary" && (
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => setIsGenerateModalOpen(true)} size="large">
-              Generate Payroll
-            </Button>
-          )}
-        </PageHeader>
-
-        {loadingSummaries ? (
-          <div className="flex justify-center items-center py-12">
-            <Spin size="large" />
-          </div>
-        ) : (
-          <>
+          <PageHeader
+            title="Payroll Management"
+            subtitle="Manage employee payrolls and generate monthly summaries"
+          >
             {view === "summary" && (
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-6">Payroll Summaries</h2>
-                <PayrollSummaryList
-                  summaries={payrollSummaries}
-                  onSelectSummary={handleSelectSummary}
-                  onDeleteSummary={handleDeleteSummary}
-                />
-              </div>
+              <Button type="primary" icon={<PlusOutlined />} onClick={() => setIsGenerateModalOpen(true)} size="large">
+                Generate Payroll
+              </Button>
             )}
+          </PageHeader>
 
-            {view === "employees" && selectedSummary && (
-              <div className="space-y-6">
-                <div className="flex items-center gap-4">
-                  <Button icon={<ArrowLeftOutlined />} onClick={handleBackToSummary}>
-                    Back to Summaries
-                  </Button>
-                  <h2 className="text-2xl font-bold text-gray-900">
-                    {selectedSummary.month} {selectedSummary.year} - Employee Payrolls
-                  </h2>
-                </div>
-                {loadingEmployees ? (
-                  <div className="flex justify-center items-center py-12">
-                    <Spin size="large" />
-                  </div>
-                ) : (
-                  <PayrollEmployeeList
-                    employees={employeePayrolls}
-                    month={selectedSummary.month}
-                    year={selectedSummary.year}
-                    onSelectEmployee={handleSelectEmployee}
+          {loadingSummaries ? (
+            <div className="flex justify-center items-center py-12">
+              <Spin size="large" />
+            </div>
+          ) : (
+            <>
+              {view === "summary" && (
+                <div className="rounded-xl border border-slate-200 bg-slate-50/40 p-5 sm:p-6 shadow-sm">
+                  <h2 className="text-2xl font-bold text-gray-900 mb-6">Payroll Summaries</h2>
+                  {/* <div className="rounded-lg border border-slate-200 bg-white p-3 sm:p-4"> */}
+                  <PayrollSummaryList
+                    summaries={payrollSummaries}
+                    onSelectSummary={handleSelectSummary}
+                    onDeleteSummary={handleDeleteSummary}
                   />
-                )}
-              </div>
-            )}
+                  {/* </div> */}
+                </div>
+              )}
 
-            {view === "detail" && selectedEmployee && (
-              <PayrollEmployeeDetailView employee={selectedEmployee} onBack={handleBackToEmployees} />
-            )}
-          </>
-        )}
+              {view === "employees" && selectedSummary && (
+                <div className="rounded-xl border border-slate-200 bg-slate-50/40 p-5 sm:p-6 shadow-sm">
+                  <div className="space-y-6">
+                    <div className="flex items-center gap-4">
+                      <Button icon={<ArrowLeftOutlined />} onClick={handleBackToSummary}>
+                        Back to Summaries
+                      </Button>
+                      <h2 className="text-2xl font-bold text-gray-900">
+                        {selectedSummary.month} {selectedSummary.year} - Employee Payrolls
+                      </h2>
+                    </div>
+                    {loadingEmployees ? (
+                      <div className="flex justify-center items-center py-12">
+                        <Spin size="large" />
+                      </div>
+                    ) : (
+                      <PayrollEmployeeList
+                        employees={employeePayrolls}
+                        month={selectedSummary.month}
+                        year={selectedSummary.year}
+                        onSelectEmployee={handleSelectEmployee}
+                      />
+                    )}
+                  </div>
+                </div>
+              )}
 
-        <GeneratePayrollModal
-          open={isGenerateModalOpen}
-          onClose={() => setIsGenerateModalOpen(false)}
-          onGenerate={handleGeneratePayroll}
-        />
+              {view === "detail" && selectedEmployee && (
+                <div className="rounded-xl border border-slate-200 bg-slate-50/40 p-5 sm:p-6 shadow-sm">
+                  <PayrollEmployeeDetailView employee={selectedEmployee} onBack={handleBackToEmployees} />
+                </div>
+              )}
+            </>
+          )}
+
+          <GeneratePayrollModal
+            open={isGenerateModalOpen}
+            onClose={() => setIsGenerateModalOpen(false)}
+            onGenerate={handleGeneratePayroll}
+          />
         </div>
       </PageContainer>
     </RoleGuard>
