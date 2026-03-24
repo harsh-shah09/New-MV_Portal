@@ -2694,7 +2694,7 @@ export async function PATCH(request: NextRequest) {
       // afterUpdate: Send email notifications based on approval type
       try {
         const empData = await conn.query<any>(`
-          SELECT Id, Employee_Name__c, Employee_Email__c, Team_Lead__r.Employee_Name__c
+          SELECT Id, Employee_Name__c, Employee_Email__c, Team_Lead__r.Employee_Name__c, Team_Lead__r.Employee_Email__c
           FROM Employee__c
           WHERE Id = '${oldLeave.Employee__c}'
           LIMIT 1
@@ -2705,6 +2705,7 @@ export async function PATCH(request: NextRequest) {
           const employeeEmail = emp.Employee_Email__c;
           const employeeName = emp.Employee_Name__c;
           const teamLeadName = emp.Team_Lead__r?.Employee_Name__c;
+          const teamLeadEmail = emp.Team_Lead__r?.Employee_Email__c;
 
           if (isTeamLead && !oldLeave.TL_Approval__c) {
             // TL just approved - send email to employee
@@ -2789,6 +2790,7 @@ export async function PATCH(request: NextRequest) {
               const emailTemplate = await leaveApprovedFinal({
                 recipientName: employeeName,
                 approverTitle,
+                employeeName,
                 leaveType: oldLeave.Leave_Type__c || 'N/A',
                 startDate: oldLeave.Start_Date__c || 'N/A',
                 endDate: oldLeave.End_Date__c || 'N/A',
@@ -2798,6 +2800,24 @@ export async function PATCH(request: NextRequest) {
                 to: employeeEmail,
                 subject: emailTemplate.subject,
                 body: emailTemplate.html,
+                senderEmployeeId: employeeId,
+              });
+            }
+
+            if (teamLeadEmail) {
+              const teamLeadEmailTemplate = await leaveApprovedFinal({
+                recipientName: teamLeadName || 'Team Lead',
+                employeeName,
+                approverTitle,
+                leaveType: oldLeave.Leave_Type__c || 'N/A',
+                startDate: oldLeave.Start_Date__c || 'N/A',
+                endDate: oldLeave.End_Date__c || 'N/A',
+                duration: oldLeave.Total_Days__c || 0
+              });
+              sendEmailAsync({
+                to: teamLeadEmail,
+                subject: `${employeeName}'s Leave Request Approved - Final Confirmation`,
+                body: teamLeadEmailTemplate.html,
                 senderEmployeeId: employeeId,
               });
             }
