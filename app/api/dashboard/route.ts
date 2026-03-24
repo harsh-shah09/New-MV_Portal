@@ -56,7 +56,7 @@ export async function GET(req: NextRequest) {
                            Leave_Type__c, Leave_Category__c, Start_Date__c, 
                            End_Date__c, Total_Days__c, TL_Approval__c
                     FROM Leave__c
-                    WHERE Status__c = 'Applied'
+                    WHERE Status__c = 'Applied' AND Employee__r.Role__c != 'HR'
                     ORDER BY Start_Date__c ASC
                 `);
             } else {
@@ -81,6 +81,8 @@ export async function GET(req: NextRequest) {
                 duration: record.Total_Days__c,
                 tlApproved: record.TL_Approval__c
             }));
+
+            console.log('Pending Approvals:', pendingApprovals);
 
             // Get approved today count
             const today = dayjs().format('YYYY-MM-DD');

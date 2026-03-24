@@ -28,6 +28,7 @@ export function EmployeeDashboard({ data }: EmployeeDashboardProps) {
   const recentLeaves = data?.recentLeaves || []
   const upcomingLeaves = data?.upcomingLeaves || []
   const pendingRequests = data?.pendingRequests || []
+  const pendingApprovals = data?.pendingApprovals || []
   const holidays = data?.holidays || []
   const teamMembers = data?.teamMembers || []
   const isTeamLead = data?.isTeamLead === true
@@ -53,7 +54,7 @@ console.log(data)
       <Row gutter={[16, 16]}>
         {isTeamLead && (
           <Col xs={24} lg={24}>
-            <PendingApprovalsQueue />
+            <PendingApprovalsQueue initialPendingApprovals={pendingApprovals} dashboardView="default" />
           </Col>
         )}
         <Col xs={24} lg={24}>

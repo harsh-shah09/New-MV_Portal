@@ -12,10 +12,15 @@ import type { ColumnsType } from 'antd/es/table'
 import dayjs from "dayjs"
 import { useState, useEffect } from "react"
 
-export function PendingApprovalsQueue() {
+interface PendingApprovalsQueueProps {
+  initialPendingApprovals?: any[]
+  dashboardView?: "default" | "hr"
+}
+
+export function PendingApprovalsQueue({ initialPendingApprovals = [], dashboardView = "default" }: PendingApprovalsQueueProps) {
   const router = useRouter()
   const [loading, setLoading] = useState<string | null>(null)
-  const [pendingApprovals, setPendingApprovals] = useState<any[]>([])
+  const [pendingApprovals, setPendingApprovals] = useState<any[]>(initialPendingApprovals)
   const [isLoading, setIsLoading] = useState(true)
   const [rejectModalVisible, setRejectModalVisible] = useState(false)
   const [rejectingLeaveId, setRejectingLeaveId] = useState<string | null>(null)
@@ -24,7 +29,8 @@ export function PendingApprovalsQueue() {
   const fetchPendingApprovals = async () => {
     try {
       setIsLoading(true)
-      const response = await fetch('/api/dashboard')
+      const query = dashboardView === 'hr' ? '?view=hr' : ''
+      const response = await fetch(`/api/dashboard${query}`)
       if (response.ok) {
         const data = await response.json()
         setPendingApprovals(data?.pendingApprovals || [])
@@ -37,8 +43,12 @@ export function PendingApprovalsQueue() {
   }
 
   useEffect(() => {
+    setPendingApprovals(initialPendingApprovals)
+  }, [initialPendingApprovals])
+
+  useEffect(() => {
     fetchPendingApprovals()
-  }, [])
+  }, [dashboardView])
 
   const handleApprove = async (leaveId: string) => {
     setLoading(leaveId)

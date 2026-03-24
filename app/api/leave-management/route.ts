@@ -27,8 +27,8 @@ import type { LeaveRequest } from "@/types";
  */
 interface LeaveConfig {
   annualLeaveBalance: number;
-  enableOnePlusTwoRule: boolean;
-  enableSandwichRule: boolean;
+  OnePlusTwoRule: boolean;
+  SandwichRule: boolean;
   sandwichRuleAppliesTo: string[];
   penaltyAppliesTo: string[];
   minWorkingDayNoticePeriod: number;
@@ -53,8 +53,8 @@ async function fetchLeaveConfigurations(conn: any): Promise<LeaveConfig> {
 
     // Parse configurations with defaults
     const annualLeaveBalance = parseFloat(configMap.get('Annual_Leave_Balance') || '18');
-    const enableOnePlusTwoRule = configMap.get('Enable_One_plus_two_rule')?.toLowerCase() === 'true';
-    const enableSandwichRule = configMap.get('Enable_Sandwitch_Rule')?.toLowerCase() === 'true';
+    const OnePlusTwoRule = configMap.get('One_plus_two_rule')?.toLowerCase() === 'true';
+    const SandwichRule = configMap.get('Sandwitch_Rule')?.toLowerCase() === 'true';
     const sandwichRuleAppliesTo = (configMap.get('Sandwitch_Rule_Applies_to') || '')
       .split(',').map(role => role.trim()).filter(Boolean);
     const penaltyAppliesTo = (configMap.get('penalty_applies_to') || '')
@@ -64,8 +64,8 @@ async function fetchLeaveConfigurations(conn: any): Promise<LeaveConfig> {
 
     console.log('[Leave Config] Fetched configurations:', {
       annualLeaveBalance,
-      enableOnePlusTwoRule,
-      enableSandwichRule,
+      OnePlusTwoRule,
+      SandwichRule,
       sandwichRuleAppliesTo,
       penaltyAppliesTo,
       minWorkingDayNoticePeriod,
@@ -74,8 +74,8 @@ async function fetchLeaveConfigurations(conn: any): Promise<LeaveConfig> {
 
     return {
       annualLeaveBalance,
-      enableOnePlusTwoRule,
-      enableSandwichRule,
+      OnePlusTwoRule,
+      SandwichRule,
       sandwichRuleAppliesTo,
       penaltyAppliesTo,
       minWorkingDayNoticePeriod,
@@ -86,8 +86,8 @@ async function fetchLeaveConfigurations(conn: any): Promise<LeaveConfig> {
     // Return defaults if fetch fails
     return {
       annualLeaveBalance: 18,
-      enableOnePlusTwoRule: true,
-      enableSandwichRule: true,
+      OnePlusTwoRule: true,
+      SandwichRule: true,
       sandwichRuleAppliesTo: ['Developer'],
       penaltyAppliesTo: ['Developer'],
       minWorkingDayNoticePeriod: 5,
@@ -222,7 +222,7 @@ function createRuleCalculationDetails(
   const applyRules = effectiveLeaveCategory === "Loss of Pay" && (leaveType || "") === "Planned Leave";
   const sandwichRuleAppliesToUser = leaveConfig.sandwichRuleAppliesTo.includes(role || "");
   const penaltyAppliesToUser = leaveConfig.penaltyAppliesTo.includes(role || "");
-  const applySandwichRule = applyRules && !isHalfDay && leaveConfig.enableSandwichRule && sandwichRuleAppliesToUser;
+  const applySandwichRule = applyRules && !isHalfDay && leaveConfig.SandwichRule && sandwichRuleAppliesToUser;
 
   let workingDaysInRange = 0;
   let nonWorkingDaysInRange = 0;
@@ -292,7 +292,7 @@ function createRuleCalculationDetails(
   const sandwichExtra = sandwichApplied ? sandwichDates.length : 0;
 
   let onePlusTwoExtra = 0;
-  if (applyRules && !isHalfDay && leaveConfig.enableOnePlusTwoRule && penaltyAppliesToUser) {
+  if (applyRules && !isHalfDay && leaveConfig.OnePlusTwoRule && penaltyAppliesToUser) {
     const countWorkingDaysBetween = (fromDate: dayjs.Dayjs, toDate: dayjs.Dayjs): number => {
       let workingDays = 0;
       let current = fromDate.clone();
@@ -1203,7 +1203,7 @@ export async function POST(request: NextRequest) {
     const computedDuration = isHalfDay ? baseCalendarDays * 0.5 : baseCalendarDays;
     const applyRules = leaveCategory === 'loss-of-pay' && leaveType === 'Planned Leave';
     // Sandwich rule applies only if: enabled, user role is eligible, not half-day leave
-    const applySandwichRule = applyRules && !isHalfDay && leaveConfig.enableSandwichRule && sandwichRuleAppliesToUser;
+    const applySandwichRule = applyRules && !isHalfDay && leaveConfig.SandwichRule && sandwichRuleAppliesToUser;
 
     // Block leaves that fall entirely on weekends/holidays (ONLY for Loss of Pay)
     // Extra Day Pay can ONLY be applied on weekends/holidays
@@ -1390,7 +1390,7 @@ export async function POST(request: NextRequest) {
     // Server-side One+Two rule calculation (planned leave within minimum working day notice period)
     // Only applies to full-day leaves, NOT half-day leaves
     let onePlusTwoExtra = 0;
-    if (applyRules && !isHalfDay && leaveConfig.enableOnePlusTwoRule && penaltyAppliesToUser) {
+    if (applyRules && !isHalfDay && leaveConfig.OnePlusTwoRule && penaltyAppliesToUser) {
       // Helper to count working days between two dates
       const countWorkingDaysBetween = (fromDate: dayjs.Dayjs, toDate: dayjs.Dayjs): number => {
         let workingDays = 0;

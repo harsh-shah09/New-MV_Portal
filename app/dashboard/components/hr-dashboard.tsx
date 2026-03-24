@@ -33,6 +33,7 @@ export function HRDashboard({ data }: HRDashboardProps) {
   const leaveAnalytics = data?.leaveAnalytics || {}
   const employeesOnLeave = data?.employeesOnLeave || []
   const approvedTodayLeaves = data?.approvedTodayLeaves || []
+  const pendingApprovals = data?.pendingApprovals || []
 
   const scrollToElement = (elementId: string) => {
     const element = document.getElementById(elementId)
@@ -60,7 +61,7 @@ export function HRDashboard({ data }: HRDashboardProps) {
       <Row gutter={[16, 16]}>
       {/* Pending Approvals Queue */}
       <Col xs={24} lg={24}>
-        <PendingApprovalsQueue />
+        <PendingApprovalsQueue initialPendingApprovals={pendingApprovals} dashboardView="hr" />
       </Col>
       {/* Analytics and Stats Row */}
         <Col xs={24} lg={12}>

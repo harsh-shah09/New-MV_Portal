@@ -522,7 +522,7 @@ export default function AdminConsole() {
                                                         <label className="block text-sm font-semibold text-slate-700 mb-2">
                                                             {record.MasterLabel}
                                                         </label>
-                                                        {['Enable_One_plus_two_rule', 'Enable_Sandwitch_Rule'].includes(record.DeveloperName) ? (
+                                                        {['One_plus_two_rule', 'Sandwitch_Rule'].includes(record.DeveloperName) ? (
                                                             <select
                                                                 value={record.Value__c || 'false'}
                                                                 onChange={(e) => handleInputChange('Leave_Configurations__mdt', record, e.target.value)}
