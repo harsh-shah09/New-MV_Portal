@@ -158,7 +158,7 @@ export function AssetAssignmentModal({ visible, onCancel, onSuccess, asset, curr
 
         {/* ASSIGNMENT SWITCH */}
         <Form.Item name="assignToNewPerson" valuePropName="checked">
-            <Switch 
+            <Switch     
                 checkedChildren="Assign to New Person" 
                 unCheckedChildren="Do Not Reassign" 
                 onChange={(checked) => setIsAssigning(checked)}
@@ -176,6 +176,7 @@ export function AssetAssignmentModal({ visible, onCancel, onSuccess, asset, curr
                     <Select 
                         className="w-full"
                         showSearch 
+                        size='large'
                         placeholder="Select Employee"
                         optionFilterProp="children"
                         filterOption={(input, option: any) => (option?.children as unknown as string).toLowerCase().includes(input.toLowerCase())}
@@ -194,14 +195,14 @@ export function AssetAssignmentModal({ visible, onCancel, onSuccess, asset, curr
                         label="Assigned Date" 
                         rules={[{ required: true, message: 'Date required' }]}
                     >
-                        <DatePicker className="w-full" />
+                        <DatePicker className="w-full" size='large'/>
                     </Form.Item>
 
                      <Form.Item 
                         name="conditionOnAssignment" 
                         label="Condition" 
                     >
-                         <Select>
+                         <Select size='large'>
                             <Select.Option value="New">New</Select.Option>
                             <Select.Option value="Second-hand">Second hand</Select.Option>
                         </Select>
@@ -209,14 +210,14 @@ export function AssetAssignmentModal({ visible, onCancel, onSuccess, asset, curr
                 </div>
 
                 <Form.Item name="remarks" label="Remarks">
-                    <Input.TextArea rows={2} />
+                    <Input.TextArea rows={2} size='large' placeholder='Enter Remarks'/>
                 </Form.Item>
             </div>
         )}
 
          <div className="flex flex-col sm:flex-row justify-end gap-2 pt-4">
-            <Button onClick={onCancel}>Cancel</Button>
-            <Button type="primary" htmlType="submit" loading={loading}>
+            <Button onClick={onCancel} size='large'>Cancel</Button>
+            <Button type="primary" htmlType="submit" loading={loading} size='large'>
                 {isAssigning ? 'Save Assignment' : (currentAssignment ? 'Return Asset' : 'Close')}
             </Button>
         </div>

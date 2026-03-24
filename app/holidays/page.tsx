@@ -284,81 +284,148 @@ export default function HolidaysPage() {
       </PageHeader>
 
       {filteredHolidays.length === 0 ? (
-        <div className="text-center py-16 bg-card rounded-xl shadow-sm border border-border">
-          <div className="w-24 h-24 mx-auto mb-4 bg-muted rounded-full flex items-center justify-center">
-            <Calendar className="w-12 h-12 text-muted-foreground" />
+          <div className="text-center py-10 sm:py-16 bg-card rounded-xl shadow-sm border border-border px-4">
+            <div className="w-16 h-16 sm:w-24 sm:h-24 mx-auto mb-4 bg-muted rounded-full flex items-center justify-center">
+              <Calendar className="w-8 h-8 sm:w-12 sm:h-12 text-muted-foreground" />
+            </div>
+            <h3 className="text-lg sm:text-xl font-bold text-foreground mb-2">
+              No Holidays for {selectedYear}
+            </h3>
+            <p className="text-sm sm:text-base text-muted-foreground">
+              No holidays have been added for this year yet.
+            </p>
           </div>
-          <h3 className="text-xl font-bold text-foreground mb-2">No Holidays for {selectedYear}</h3>
-          <p className="text-muted-foreground">No holidays have been added for this year yet.</p>
-        </div>
-      ) : (
-        <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-muted text-muted-foreground">
-                <tr>
-                  <th className="px-6 py-4 text-left text-sm font-bold uppercase tracking-wider">#</th>
-                  <th className="px-6 py-4 text-left text-sm font-bold uppercase tracking-wider">Holiday Name</th>
-                  <th className="px-6 py-4 text-left text-sm font-bold uppercase tracking-wider">Date</th>
-                  <th className="px-6 py-4 text-left text-sm font-bold uppercase tracking-wider">Day</th>
-                  {isHR && (
-                    <th className="px-6 py-4 text-center text-sm font-bold uppercase tracking-wider">Actions</th>
-                  )}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {filteredHolidays.map((holiday, index) => {
-                  const holidayDate = new Date(holiday.date)
-                  const formattedDate = holidayDate.toLocaleDateString('en-US', { 
-                    month: 'long', 
-                    day: 'numeric',
-                    year: 'numeric'
-                  })
-                  
-                  return (
-                    <tr key={holiday.id} className="hover:bg-muted/50 transition-colors">
-                      <td className="px-6 py-4 text-sm font-medium text-muted-foreground">
-                        {index + 1}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="text-base font-semibold text-foreground">{holiday.name}</span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="text-sm text-foreground">{formattedDate}</span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+        ) : (
+          <>
+            {/* 📱 Mobile View (Card Layout) */}
+            <div className="block md:hidden space-y-4">
+              {filteredHolidays.map((holiday, index) => {
+                const holidayDate = new Date(holiday.date)
+                const formattedDate = holidayDate.toLocaleDateString('en-US', {
+                  month: 'long',
+                  day: 'numeric',
+                  year: 'numeric'
+                })
+
+                return (
+                  <div
+                    key={holiday.id}
+                    className="bg-card border border-border rounded-xl p-4 shadow-sm"
+                  >
+                    <div className="flex justify-between items-start mb-2">
+                      <h4 className="font-semibold text-foreground">
+                        {holiday.name}
+                      </h4>
+                      <span className="text-xs text-muted-foreground">
+                        #{index + 1}
+                      </span>
+                    </div>
+
+                    <div className="text-sm text-muted-foreground space-y-1">
+                      <p><span className="font-medium text-foreground">Date:</span> {formattedDate}</p>
+                      <p>
+                        <span className="font-medium text-foreground">Day:</span>{" "}
+                        <span className="inline-block px-2 py-0.5 rounded bg-blue-100 text-blue-800 text-xs">
                           {holiday.day}
                         </span>
-                      </td>
+                      </p>
+                    </div>
+
+                    {isHR && (
+                      <div className="flex gap-2 mt-3">
+                        <button
+                          onClick={() => handleEdit(holiday)}
+                          className="flex-1 flex items-center justify-center gap-1 p-2 text-blue-600 bg-blue-50 rounded-lg"
+                        >
+                          <Edit2 className="w-4 h-4" /> Edit
+                        </button>
+                        <button
+                          onClick={() => openDeleteConfirm(holiday.id)}
+                          className="flex-1 flex items-center justify-center gap-1 p-2 text-red-600 bg-red-50 rounded-lg"
+                        >
+                          <Trash2 className="w-4 h-4" /> Delete
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* 💻 Desktop Table */}
+            <div className="hidden md:block bg-card rounded-xl shadow-sm border border-border overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[600px]">
+                  <thead className="bg-muted text-muted-foreground">
+                    <tr>
+                      <th className="px-4 lg:px-6 py-3 text-left text-xs lg:text-sm font-bold uppercase">#</th>
+                      <th className="px-4 lg:px-6 py-3 text-left text-xs lg:text-sm font-bold uppercase">Holiday Name</th>
+                      <th className="px-4 lg:px-6 py-3 text-left text-xs lg:text-sm font-bold uppercase">Date</th>
+                      <th className="px-4 lg:px-6 py-3 text-left text-xs lg:text-sm font-bold uppercase">Day</th>
                       {isHR && (
-                        <td className="px-6 py-4">
-                          <div className="flex items-center justify-center gap-2">
-                            <button
-                              onClick={() => handleEdit(holiday)}
-                              className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                              title="Edit"
-                            >
-                              <Edit2 className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => openDeleteConfirm(holiday.id)}
-                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                              title="Delete"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
+                        <th className="px-4 lg:px-6 py-3 text-center text-xs lg:text-sm font-bold uppercase">Actions</th>
                       )}
                     </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+                  </thead>
+
+                  <tbody className="divide-y divide-border">
+                    {filteredHolidays.map((holiday, index) => {
+                      const holidayDate = new Date(holiday.date)
+                      const formattedDate = holidayDate.toLocaleDateString('en-US', {
+                        month: 'long',
+                        day: 'numeric',
+                        year: 'numeric'
+                      })
+
+                      return (
+                        <tr key={holiday.id} className="hover:bg-muted/50 transition-colors">
+                          <td className="px-4 lg:px-6 py-3 text-xs lg:text-sm text-muted-foreground">
+                            {index + 1}
+                          </td>
+
+                          <td className="px-4 lg:px-6 py-3">
+                            <span className="text-sm lg:text-base font-semibold text-foreground">
+                              {holiday.name}
+                            </span>
+                          </td>
+
+                          <td className="px-4 lg:px-6 py-3 text-sm">
+                            {formattedDate}
+                          </td>
+
+                          <td className="px-4 lg:px-6 py-3">
+                            <span className="px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-800">
+                              {holiday.day}
+                            </span>
+                          </td>
+
+                          {isHR && (
+                            <td className="px-4 lg:px-6 py-3">
+                              <div className="flex justify-center gap-2">
+                                <button
+                                  onClick={() => handleEdit(holiday)}
+                                  className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
+                                >
+                                  <Edit2 className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => openDeleteConfirm(holiday.id)}
+                                  className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </td>
+                          )}
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </>
+        )}
 
       {/* Bulk Add Modal */}
       {showBulkModal && (
