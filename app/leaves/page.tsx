@@ -75,6 +75,7 @@ export default function LeavesPage() {
 
   console.log("Current User:", currentUser)
   const { leaves, pendingApprovals, setLeaves, setPendingApprovals, updateLeave } = useLeaveStore()
+  console.log("Leaves from store:", pendingApprovals)
 
   const promptGoogleWorkspaceAuthentication = () => {
     Modal.confirm({

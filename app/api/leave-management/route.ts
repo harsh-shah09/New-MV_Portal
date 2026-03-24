@@ -520,6 +520,7 @@ export async function GET(request: NextRequest) {
         SELECT 
           Id, 
           Employee__c,
+          Employee__r.Name,
           Employee__r.Employee_Name__c,
           Employee__r.Role__c,
           Employee__r.Title__c,
@@ -541,14 +542,13 @@ export async function GET(request: NextRequest) {
       `);
 
       console.log("Fetched pending approvals for HR:", pendingLeaveRecords);
-
       pendingApprovals = pendingLeaveRecords.records.map((record: any) => {
         const parsedDetails = parseRuleCalculationDetails(record.Rule_Calculation_Details__c);
         const partialRequest = (parsedDetails as any)?.partialWithdrawalRequest;
 
         return {
           id: record.Id,
-          employeeId: record.Employee__c,
+          employeeId: record.Employee__r.Name,
           employeeName: record.Employee__r?.Employee_Name__c || "Unknown",
           leaveType: record.Leave_Category__c === 'Extra Day Pay' ? 'Extra Day Pay' : (record.Leave_Type__c || ""),
           leaveCategory: record.Leave_Category__c,
