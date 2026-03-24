@@ -1315,7 +1315,7 @@ export default function LeavesPage() {
           <Form.Item
             name="leaveType"
             label="Leave Type"
-            rules={[{ required: true, message: 'Please select leave type' }]}
+            rules={[{ required: true, message: 'Select leave type' }]}
           >
             <Select>
               <Select.Option value="Sick Leave">Sick Leave</Select.Option>

@@ -4,6 +4,7 @@ import dayjs from "dayjs";
 import { verifyToken } from "@/lib/auth-utils";
 import { getSalesforceConnection, sendInAppNotifications } from "@/lib/salesforce";
 import { sendEmailAsync, getHREmail, hasGoogleWorkspaceIntegration } from "@/lib/email";
+import { createLeaveCalendarEventForEmployee, deleteLeaveCalendarEventForEmployee } from "@/lib/google-calendar";
 import { calculateLeaveDays, type LeaveDateInput } from "@/lib/leave-policy";
 import {
   newLeaveRequestToTeamLead,
@@ -831,6 +832,27 @@ export async function POST(request: NextRequest) {
 
       // Keep leave summary/balance in sync for direct-approved apply-for-others flow
       await updateLeaveBalance(conn, approvedLeaveRecord, 'approve');
+
+      const createdEventId = await createLeaveCalendarEventForEmployee({
+        employeeId: targetEmployeeId,
+        employeeName: targetEmployee.Employee_Name__c || 'Employee',
+        leaveType,
+        leaveCategory: approvedLeaveRecord.Leave_Category__c,
+        startDate: parsedStart.format('YYYY-MM-DD'),
+        endDate: parsedEnd.format('YYYY-MM-DD'),
+        reason: reason || `Applied by ${approverTitle}`,
+        approvedBy: approverTitle,
+      });
+
+      console.log('📅 [Leave] applyForOthers calendar creation result:', {
+        leaveId: createResult.id,
+        targetEmployeeId,
+        createdEventId,
+      });
+
+      if (createdEventId) {
+        await persistLeaveEventId(conn, createResult.id, createdEventId, 'applyForOthers-approved');
+      }
 
       try {
         const employeeName = targetEmployee.Employee_Name__c || 'Employee';
@@ -2168,7 +2190,7 @@ export async function PATCH(request: NextRequest) {
       const leaveRecordQuery = await conn.query<any>(`
         SELECT Id, Employee__c, Status__c, Leave_Category__c, Leave_Type__c, Total_Days__c, Total_Days_After_Rule__c, 
                Start_Date__c, End_Date__c, Session__c, Reason__c, CreatedDate, Employee__r.Role__c,
-               Sandwich_Rule__c, Rule_Calculation_Details__c
+           Sandwich_Rule__c, Rule_Calculation_Details__c, Event_ID__c
         FROM Leave__c
         WHERE Id = '${leaveId}'
         LIMIT 1
@@ -2217,11 +2239,22 @@ export async function PATCH(request: NextRequest) {
       const leaveConfig = await fetchLeaveConfigurations(conn);
       const employeeRole = leave.Employee__r?.Role__c || "";
       const createdReferenceDate = dayjs(leave.CreatedDate || new Date().toISOString()).startOf("day");
+      const leavesToRecreateEvents: Array<{
+        leaveId: string;
+        startDate: string;
+        endDate: string;
+      }> = [];
+
+      await deleteLeaveCalendarEventForEmployee({
+        employeeId: leave.Employee__c,
+        eventId: leave.Event_ID__c,
+      });
 
       if (isFullWithdrawal) {
         await conn.sobject('Leave__c').update({
           Id: leaveId,
           Status__c: 'Withdrawn',
+          Event_ID__c: null,
           Withdrawal_Result_Date__c: new Date().toISOString(),
           Rule_Calculation_Details__c: leave.Rule_Calculation_Details__c,
         });
@@ -2269,12 +2302,19 @@ export async function PATCH(request: NextRequest) {
             Status__c: 'Approved',
             Start_Date__c: retainedStart.format("YYYY-MM-DD"),
             End_Date__c: retainedEnd.format("YYYY-MM-DD"),
+            Event_ID__c: null,
             Total_Days__c: recalculated.totalDays,
             Total_Days_After_Rule__c: recalculated.totalDaysAfterRule,
             OnePlusTwo_Rule__c: recalculated.onePlusTwoRuleApplied,
             Sandwich_Rule__c: recalculated.sandwichApplied,
             Rule_Calculation_Details__c: buildUpdatedRuleDetails(recalculated),
             Withdrawal_Result_Date__c: new Date().toISOString(),
+          });
+
+          leavesToRecreateEvents.push({
+            leaveId,
+            startDate: retainedStart.format("YYYY-MM-DD"),
+            endDate: retainedEnd.format("YYYY-MM-DD"),
           });
 
           await updateLeaveBalance(conn, {
@@ -2323,6 +2363,7 @@ export async function PATCH(request: NextRequest) {
             Status__c: 'Approved',
             Start_Date__c: leftStart.format("YYYY-MM-DD"),
             End_Date__c: leftEnd.format("YYYY-MM-DD"),
+            Event_ID__c: null,
             Total_Days__c: leftRecalculated.totalDays,
             Total_Days_After_Rule__c: leftRecalculated.totalDaysAfterRule,
             OnePlusTwo_Rule__c: leftRecalculated.onePlusTwoRuleApplied,
@@ -2331,7 +2372,13 @@ export async function PATCH(request: NextRequest) {
             Withdrawal_Result_Date__c: new Date().toISOString(),
           });
 
-          await conn.sobject('Leave__c').create({
+          leavesToRecreateEvents.push({
+            leaveId,
+            startDate: leftStart.format("YYYY-MM-DD"),
+            endDate: leftEnd.format("YYYY-MM-DD"),
+          });
+
+          const rightLeaveCreateResult = await conn.sobject('Leave__c').create({
             Employee__c: leave.Employee__c,
             Leave_Type__c: leave.Leave_Type__c,
             Leave_Category__c: leave.Leave_Category__c,
@@ -2347,7 +2394,15 @@ export async function PATCH(request: NextRequest) {
             Rule_Calculation_Details__c: buildUpdatedRuleDetails(rightRecalculated),
             HR_Approval__c: 'Approved',
             Approved_Date__c: new Date().toISOString(),
-          });
+          }) as any;
+
+          if (rightLeaveCreateResult?.success && rightLeaveCreateResult?.id) {
+            leavesToRecreateEvents.push({
+              leaveId: rightLeaveCreateResult.id,
+              startDate: rightStart.format("YYYY-MM-DD"),
+              endDate: rightEnd.format("YYYY-MM-DD"),
+            });
+          }
 
           await updateLeaveBalance(conn, {
             Employee__c: leave.Employee__c,
@@ -2366,6 +2421,30 @@ export async function PATCH(request: NextRequest) {
           }, 'approve');
 
           responseMessage = "Partial withdrawal approved and leave split into two approved records";
+        }
+      }
+
+      if (leavesToRecreateEvents.length > 0) {
+        for (const leaveSlice of leavesToRecreateEvents) {
+          const recreatedEventId = await createLeaveCalendarEventForEmployee({
+            employeeId: leave.Employee__c,
+            leaveType: leave.Leave_Type__c || leave.Leave_Category__c || 'Leave',
+            leaveCategory: leave.Leave_Category__c,
+            startDate: leaveSlice.startDate,
+            endDate: leaveSlice.endDate,
+            reason: leave.Reason__c,
+            approvedBy: isAdmin ? 'Admin' : 'HR',
+          });
+
+          console.log('📅 [Leave] withdrawal calendar recreation result:', {
+            leaveId: leaveSlice.leaveId,
+            employeeId: leave.Employee__c,
+            recreatedEventId,
+            startDate: leaveSlice.startDate,
+            endDate: leaveSlice.endDate,
+          });
+
+          await persistLeaveEventId(conn, leaveSlice.leaveId, recreatedEventId || null, 'withdrawal-recreate');
         }
       }
 
@@ -2565,7 +2644,7 @@ export async function PATCH(request: NextRequest) {
       }
 
       const leaveRecordQuery = await conn.query<any>(`
-        SELECT Id, Status__c, Employee__c, Employee__r.Role__c,Employee__r.Base_Salary__c, Leave_Category__c, Leave_Type__c, Total_Days__c, Total_Days_After_Rule__c, HR_Approval__c, TL_Approval__c, Start_Date__c, End_Date__c, Actual_Deduction__c, After_Rule_Deduction__c
+        SELECT Id, Status__c, Employee__c, Employee__r.Role__c,Employee__r.Base_Salary__c, Leave_Category__c, Leave_Type__c, Total_Days__c, Total_Days_After_Rule__c, HR_Approval__c, TL_Approval__c, Start_Date__c, End_Date__c, Actual_Deduction__c, After_Rule_Deduction__c, Event_ID__c
         FROM Leave__c
         WHERE Id = '${leaveId}'
         LIMIT 1
@@ -2686,8 +2765,27 @@ export async function PATCH(request: NextRequest) {
             }
           } else if ((isHR || isAdmin) && !oldLeave.HR_Approval__c) {
             // HR or Admin just approved - send email to employee
+            const approverTitle = isAdmin ? 'Admin' : 'HR';
+
+            const createdEventId = await createLeaveCalendarEventForEmployee({
+              employeeId: oldLeave.Employee__c,
+              employeeName,
+              leaveType: oldLeave.Leave_Type__c || oldLeave.Leave_Category__c || 'Leave',
+              leaveCategory: oldLeave.Leave_Category__c,
+              startDate: oldLeave.Start_Date__c,
+              endDate: oldLeave.End_Date__c,
+              approvedBy: approverTitle,
+            });
+
+            console.log('📅 [Leave] final approval calendar creation result:', {
+              leaveId: oldLeave.Id,
+              employeeId: oldLeave.Employee__c,
+              createdEventId,
+            });
+
+            await persistLeaveEventId(conn, oldLeave.Id, createdEventId || null, 'final-approval');
+
             if (employeeEmail) {
-              const approverTitle = isAdmin ? 'Admin' : 'HR';
               const emailTemplate = await leaveApprovedFinal({
                 recipientName: employeeName,
                 approverTitle,
@@ -2705,7 +2803,6 @@ export async function PATCH(request: NextRequest) {
             }
 
             // Send in-app notification to employee
-            const approverTitle = isAdmin ? 'Admin' : 'HR';
             await sendInAppNotifications(
               [oldLeave.Employee__c],
               `Your leave request from ${dayjs(oldLeave.Start_Date__c).format('DD MMM YYYY')} to ${dayjs(oldLeave.End_Date__c).format('DD MMM YYYY')} has been approved by ${approverTitle}. Enjoy your leave!`,
@@ -2992,6 +3089,54 @@ async function updateLeaveBalance(conn: any, leaveRecord: any, action: 'approve'
   } catch (error) {
     console.error('Error updating Leave Balance:', error);
     throw error; // Re-throw to handle in calling function
+  }
+}
+
+async function persistLeaveEventId(
+  conn: any,
+  leaveId: string,
+  eventId: string | null,
+  context: string
+): Promise<boolean> {
+  try {
+    console.log('📅 [Leave] Persisting Event_ID__c...', {
+      context,
+      leaveId,
+      eventId,
+    });
+
+    const updateResult = await conn.sobject('Leave__c').update({
+      Id: leaveId,
+      Event_ID__c: eventId,
+    });
+
+    const resultList = Array.isArray(updateResult) ? updateResult : [updateResult];
+    const hasFailure = resultList.some((item: any) => item?.success !== true);
+
+    if (hasFailure) {
+      console.error('❌ [Leave] Failed to persist Event_ID__c', {
+        context,
+        leaveId,
+        eventId,
+        updateResult: resultList,
+      });
+      return false;
+    }
+
+    console.log('✅ [Leave] Event_ID__c persisted', {
+      context,
+      leaveId,
+      eventId,
+    });
+    return true;
+  } catch (error) {
+    console.error('❌ [Leave] Exception while persisting Event_ID__c', {
+      context,
+      leaveId,
+      eventId,
+      error,
+    });
+    return false;
   }
 }
 /**

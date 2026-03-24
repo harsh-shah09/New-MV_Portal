@@ -313,7 +313,7 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
           {/* Leave Category Selection */}
           <Form.Item name="leaveCategory" label="Leave Category" rules={[{ required: true }]}>
               <Select placeholder="Select leave category">
-                <Option value="" disabled>Please select leave category</Option>
+                <Option value="" disabled>Select leave category</Option>
                   <Option value="loss-of-pay">Loss of Pay</Option>
                   <Option value="extra-day-pay">Extra Day Pay</Option>
               </Select>
@@ -325,7 +325,7 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Form.Item name="leaveType" label="Leave Type" rules={[{ required: true }]}>
                   <Select placeholder="Select leave type">
-                    <Option value="" disabled>Please select leave type</Option>
+                    <Option value="" disabled>Select leave type</Option>
                         <Option value="Planned Leave">Planned Leave</Option>
                         <Option value="Sick Leave">Sick Leave</Option>
                         <Option value="Emergency Leave">Emergency Leave</Option>
