@@ -16,8 +16,7 @@ async function getOAuth2Client() {
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
     
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:8080';
-    const redirectUri = `http://localhost:8080/api/integrations/google/callback`;
-    console.log(redirectUri);
+    const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/api/integrations/google/callback`;
     if (!clientId || !clientSecret) {
         throw new Error("Missing Google Client ID or Secret in Environment Variables");
     }
