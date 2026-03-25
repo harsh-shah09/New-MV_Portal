@@ -12,6 +12,7 @@ import { EmployeesOnLeave } from "./hr/employees-on-leave"
 import { LeavesApprovedToday } from "./hr/leaves-approved-today"
 import { GoogleIntegration } from "./employee/google-integration"
 import { PageHeader } from "@/components/page-header"
+import EmployeeBirthday from './employee/employee-birthday'
 
 interface HRDashboardProps {
   data: any
@@ -35,7 +36,7 @@ export function HRDashboard({ data, dashboardRole = "HR" }: HRDashboardProps) {
   const employeesOnLeave = data?.employeesOnLeave || []
   const approvedTodayLeaves = data?.approvedTodayLeaves || []
   const pendingApprovals = data?.pendingApprovals || []
-
+  const birthdayToday = data?.birthdayToday || []
   const scrollToElement = (elementId: string) => {
     const element = document.getElementById(elementId)
     if (element) {
@@ -75,17 +76,20 @@ export function HRDashboard({ data, dashboardRole = "HR" }: HRDashboardProps) {
 
       {/* Recent Activities and Quick Actions */}
       <Row gutter={[16, 16]}>
-        <Col xs={24} lg={16}>
-          <RecentActivities recentActivities={recentActivities} />
-        </Col>
         <Col xs={24} lg={8}>
           <HRQuickActions />
         </Col>
-        <Col xs={24} lg={24} id="on-leave-today-widget">
+        <Col xs={24} lg={8}>
+        <EmployeeBirthday data={birthdayToday} />
+        </Col>
+        <Col xs={24} lg={8}>
+          <RecentActivities recentActivities={recentActivities} />
+        </Col>
+        <Col xs={12} lg={12} id="on-leave-today-widget">
         {/* Employees On Leave Today */}
         <EmployeesOnLeave employeesOnLeave={employeesOnLeave} />
         </Col>
-        <Col xs={24} lg={24} id="approved-today-widget">
+        <Col xs={12} lg={12} id="approved-today-widget">
         {/* Leaves Approved Today */}
         <LeavesApprovedToday approvedTodayLeaves={approvedTodayLeaves} />
         </Col>

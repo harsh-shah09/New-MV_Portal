@@ -37,7 +37,13 @@ export async function GET(req: NextRequest) {
         const { searchParams } = new URL(req.url);
         const requestedViewMode = searchParams.get('view') === 'hr' ? 'hr' : 'default';
         const viewMode = canAccessHRView ? requestedViewMode : 'default';
-
+        const today = dayjs().format('YYYY-MM-DD');
+        const birthdayquery =  await conn.query(`
+            SELECT Id , Name , Employee_Name__c,Role__c , Title__c ,Profile_Photo__c,Department__c
+            FROM Employee__c
+            WHERE Birthdate__c = ${today} AND Status__c = 'Active' AND Active__c = true`);
+        const birthdayToday = birthdayquery.records;
+        console.log(birthdayToday)
         // HR/Admin Dashboard Data
         if (viewMode === 'hr' && canAccessHRView) {
             const hrDashboardLeaveFilter = isAdmin
@@ -98,7 +104,6 @@ export async function GET(req: NextRequest) {
             console.log('Pending Approvals:', pendingApprovals);
 
             // Get approved today count
-            const today = dayjs().format('YYYY-MM-DD');
             const approvedTodayQuery = await conn.query(`
                 SELECT COUNT(Id) approvedCount
                 FROM Leave__c
@@ -133,12 +138,7 @@ export async function GET(req: NextRequest) {
                 approvedDate: record.Approved_Date__c,
             }));
 
-            const birthdayquery =  await conn.query(`
-                SELECT Id , Name , Employee_Name__c,Role__c , Title__c ,Profile_Photo__c,Department__c
-                FROM Employee__c
-                WHERE Birthdate__c = ${today} AND Status__c = 'Active' AND Active__c = true`);
-            const birthdayToday = birthdayquery.records;
-            console.log(birthdayToday)
+            
             // Get on leave today count
             const onLeaveTodayQuery = await conn.query(`
                 SELECT COUNT(Id) onLeaveCount
@@ -433,7 +433,7 @@ export async function GET(req: NextRequest) {
             pendingApprovals: teamLeadPendingApprovals,
             holidays,
             teamMembers,
-        
+            birthdayToday
         });
 
     } catch (error) {
