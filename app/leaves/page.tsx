@@ -899,30 +899,44 @@ export default function LeavesPage() {
         </div>
 
         <div className="p-6">
-          {selectedTab === "my-requests" && (
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <h2 className="text-lg font-semibold text-gray-900">My Leave Requests</h2>
+        {selectedTab === "my-requests" && (
+            <div className="space-y-5">
+              {/* Header + Filters */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <h2 className="text-xl font-semibold text-gray-900">My Leave Requests</h2>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Track and manage your leave applications
+                  </p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <RefreshButton onClick={refetch} loading={isLoading} size="large" label="" className="h-10 w-10 p-0" />
+
+                {/* Filters & Refresh - Stacks nicely on mobile */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                  <RefreshButton 
+                    onClick={refetch} 
+                    loading={isLoading} 
+                    size="large" 
+                    label="" 
+                    className="h-10 w-10 p-0 flex-shrink-0" 
+                  />
+
                   <Select
                     placeholder="Filter by Leave Type"
-                    style={{ width: 200 }}
+                    style={{ width: '100%', minWidth: 180 }}
                     value={filters.leaveType || undefined}
                     onChange={(value) => setFilters({ ...filters, leaveType: value || "" })}
                     allowClear
                   >
-                    <Select.Option value="">All Leaves</Select.Option>
+                    <Select.Option value="">All Leave Types</Select.Option>
                     <Select.Option value="Sick Leave">Sick Leave</Select.Option>
                     <Select.Option value="Emergency Leave">Emergency Leave</Select.Option>
                     <Select.Option value="Planned Leave">Planned Leave</Select.Option>
                     <Select.Option value="Extra Day Pay">Extra Day Pay</Select.Option>
                   </Select>
+
                   <Select
                     placeholder="Filter by Status"
-                    style={{ width: 180 }}
+                    style={{ width: '100%', minWidth: 160 }}
                     value={filters.status || undefined}
                     onChange={(value) => setFilters({ ...filters, status: value || "" })}
                     allowClear
@@ -937,7 +951,12 @@ export default function LeavesPage() {
                   </Select>
                 </div>
               </div>
-              <LeaveTable leaves={filteredMyLeaves} onWithdraw={handleWithdraw} />
+
+              {/* Leave Table / Cards */}
+              <LeaveTable 
+                leaves={filteredMyLeaves} 
+                onWithdraw={handleWithdraw} 
+              />
             </div>
           )}
 
@@ -976,7 +995,7 @@ export default function LeavesPage() {
                         <div key={leave.id} className="bg-gradient-to-r from-slate-50 to-blue-50 border border-gray-200 rounded-lg hover:border-blue-300 hover:shadow-md transition-all">
                           <div className="p-5">
                             {/* Header */}
-                            <div className="flex items-center justify-between mb-4">
+                            <div className="flex flex-col md:flex-row sm:flex-row gap-2 items-center justify-between mb-4">
                               <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-semibold text-sm">
                                   {leave.employeeName.charAt(0).toUpperCase()}
