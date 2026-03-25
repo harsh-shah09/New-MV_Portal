@@ -25,6 +25,7 @@ export async function generateNDAPDF(htmlContent: string , isPayslip: boolean = 
     await page.setContent(htmlContent, { waitUntil: 'load' })
 
     const pdfBuffer = await page.pdf({
+      path : undefined,
       format: 'A4',
       printBackground: true,
       margin: { top: '20px', right: '20px', bottom: '20px', left: '20px' }
