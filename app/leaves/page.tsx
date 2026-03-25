@@ -24,6 +24,13 @@ interface EmployeeOption {
   active?: boolean
 }
 
+interface EmployeeLeaveKpi {
+  annualLeaveRemaining: number
+  sickLeaveCount: number
+  emergencyLeaveCount: number
+  plannedLeaveCount: number
+}
+
 export default function LeavesPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -50,14 +57,44 @@ export default function LeavesPage() {
     dateRange: [null, null] as [any, any],
   })
 
+  const normalizedEmployeeSearch = filters.employeeName.trim().toLowerCase()
+  const searchedEmployeeLeaves = normalizedEmployeeSearch
+    ? allLeaves.filter((leave) => leave.employeeName?.toLowerCase().includes(normalizedEmployeeSearch))
+    : []
+  const searchedEmployeeIds = Array.from(
+    new Set(
+      searchedEmployeeLeaves
+        .map((leave) => leave.employeeId)
+        .filter((employeeId): employeeId is string => Boolean(employeeId))
+    )
+  )
+  const searchedEmployeeId = searchedEmployeeIds.length === 1 ? searchedEmployeeIds[0] : ""
+  const searchedEmployeeName = searchedEmployeeId
+    ? searchedEmployeeLeaves.find((leave) => leave.employeeId === searchedEmployeeId)?.employeeName || ""
+    : ""
+
   console.log("Current User:", currentUser)
   const { leaves, pendingApprovals, setLeaves, setPendingApprovals, updateLeave } = useLeaveStore()
+  console.log("Leaves from store:", pendingApprovals)
+
+  const promptGoogleWorkspaceAuthentication = () => {
+    Modal.confirm({
+      title: "Google Workspace authentication required",
+      content: "Please connect your Google Workspace account before applying for leave.",
+      okText: "Connect Now",
+      cancelText: "Later",
+      onOk: () => {
+        router.push('/dashboard?tab=integration')
+      },
+    })
+  }
 
   // Handle URL parameters for filtering
   useEffect(() => {
     const typeParam = searchParams.get('type')
     const statusParam = searchParams.get('status')
     const tabParam = searchParams.get('tab')
+    const openRequestParam = searchParams.get('openRequest')
 
     if (tabParam === 'approvals') {
       setSelectedTab('approvals')
@@ -72,7 +109,16 @@ export default function LeavesPage() {
         status: statusParam || ""
       }))
     }
-  }, [searchParams])
+
+    if (openRequestParam === 'true' || openRequestParam === '1') {
+      setShowForm(true)
+
+      const nextParams = new URLSearchParams(searchParams.toString())
+      nextParams.delete('openRequest')
+      const nextQuery = nextParams.toString()
+      router.replace(nextQuery ? `/leaves?${nextQuery}` : '/leaves')
+    }
+  }, [searchParams, router])
 
   // Apply filters to my leaves
   useEffect(() => {
@@ -114,6 +160,18 @@ export default function LeavesPage() {
       setPendingApprovals(data.pendingApprovals || [])
     }
   }, [data, setLeaves, setPendingApprovals])
+
+  const { data: searchedEmployeeKpi, isLoading: isLoadingSearchedEmployeeKpi } = useQuery<EmployeeLeaveKpi>({
+    queryKey: ["searched-employee-leave-kpi", searchedEmployeeId],
+    enabled: Boolean(searchedEmployeeId),
+    queryFn: async () => {
+      const response = await fetch(`/api/leave-management/employee-kpi?employeeId=${encodeURIComponent(searchedEmployeeId)}`)
+      if (!response.ok) {
+        throw new Error("Failed to fetch searched employee leave KPI")
+      }
+      return response.json()
+    },
+  })
 
   // Fetch all leaves for HR/Admin
   const fetchAllLeaves = async () => {
@@ -240,6 +298,11 @@ export default function LeavesPage() {
 
       const result = await response.json()
       if (!response.ok) {
+        if (result?.code === 'GOOGLE_AUTH_REQUIRED') {
+          toast.error(result?.error || 'Please connect Google Workspace to continue.', { id: toastId })
+          promptGoogleWorkspaceAuthentication()
+          return
+        }
         toast.error(result?.error || 'Failed to apply leave for employee', { id: toastId })
         return
       }
@@ -315,7 +378,7 @@ export default function LeavesPage() {
           const suggested = details.suggestedDates || {}
 
           Modal.confirm({
-            title: '⚠️ Merge with existing leave',
+            title: 'Merge with existing leave',
             width: 700,
             content: (
               <div className="space-y-3">
@@ -356,7 +419,7 @@ export default function LeavesPage() {
           };
 
           Modal.confirm({
-            title: '⚠️ Leave Rules Applied',
+            title: 'Leave Rules Applied',
             width: 700,
             content: (
               <div className="space-y-3">
@@ -380,15 +443,9 @@ export default function LeavesPage() {
                   </div>
                   {details.sandwichApplied && (
                     <>
-                      {details.nonWorkingDaysInRange > 0 && (
-                        <div className="flex justify-between text-orange-700">
-                          <span className="font-medium">+ Non-working days in range:</span>
-                          <span className="font-semibold">{details.nonWorkingDaysInRange ?? 0}</span>
-                        </div>
-                      )}
                       {(details.sameRequestSandwichDays ?? details.sandwichExtra ?? 0) > 0 && (
                         <div className="flex justify-between text-orange-700">
-                          <span className="font-medium">+ Sandwich days (adjacent to request):</span>
+                          <span className="font-medium">+ Sandwich days (Non-working days):</span>
                           <span className="font-semibold">{details.sameRequestSandwichDays ?? details.sandwichExtra}</span>
                         </div>
                       )}
@@ -435,6 +492,11 @@ export default function LeavesPage() {
         }
 
         if (!response.ok) {
+          if (result?.code === 'GOOGLE_AUTH_REQUIRED') {
+            toast.error(result?.error || 'Please connect Google Workspace to continue.', { id: toastId, duration: 6000 })
+            promptGoogleWorkspaceAuthentication()
+            return
+          }
           // Check if there's a detailed message from the backend (e.g., duplicate leave)
           const errorMessage = result?.details?.message || result?.error || "Failed to submit leave request"
           toast.error(errorMessage, { id: toastId, duration: 6000 })
@@ -468,62 +530,6 @@ export default function LeavesPage() {
     await submit(data)
   }
 
-  const handleCancel = async (leaveId: string) => {
-    const leave = leaves.find((l) => l.id === leaveId)
-    if (!leave) return
-
-    Modal.confirm({
-      title: '🗑️ Cancel Leave Request',
-      content: (
-        <div>
-          <p>Are you sure you want to cancel this leave request?</p>
-          <div className="mt-3 p-3 bg-gray-50 rounded">
-            <div className="text-sm">
-              <div><strong>Type:</strong> {leave.leaveType || leave.leaveCategory}</div>
-              <div><strong>Dates:</strong> {leave.startDate} to {leave.endDate}</div>
-              <div><strong>Duration:</strong> {leave.duration} day(s)</div>
-            </div>
-          </div>
-          <p className="mt-3 text-red-600 text-sm">This action cannot be undone.</p>
-        </div>
-      ),
-      okText: 'Yes, Cancel Leave',
-      cancelText: 'No, Keep It',
-      okButtonProps: { danger: true },
-      onOk: async () => {
-        const toastId = toast.loading("Cancelling leave request...")
-        try {
-          const response = await fetch("/api/leave-management", {
-            method: "PATCH",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              leaveId,
-              action: "cancel",
-            }),
-          })
-
-          if (!response.ok) {
-            const error = await response.json()
-            toast.error(error.error || "Failed to cancel leave", { id: toastId })
-            return
-          }
-
-          // Update local state
-          updateLeave({
-            ...leave,
-            status: "cancelled",
-          })
-          toast.success("Leave request cancelled successfully", { id: toastId })
-        } catch (error) {
-          console.error("Error cancelling leave:", error)
-          toast.error("Failed to cancel leave. Please try again.", { id: toastId })
-        }
-      },
-    })
-  }
-
   const handleWithdraw = async (leaveId: string) => {
     const leave = leaves.find((l) => l.id === leaveId)
     if (!leave) return
@@ -533,7 +539,7 @@ export default function LeavesPage() {
     const isSingleDayLeave = leave.startDate === leave.endDate
 
     Modal.confirm({
-      title: '⚠️ Withdraw Approved Leave',
+      title: 'Withdraw Approved Leave',
       content: (
         <div>
           <p className="text-orange-600 font-medium mb-3">⚠️ You are about to withdraw an approved leave!</p>
@@ -615,7 +621,7 @@ export default function LeavesPage() {
     const leave = pendingApprovals.find((l) => l.id === leaveId)
 
     Modal.confirm({
-      title: '✅ Approve Leave Request',
+      title: 'Approve Leave Request',
       content: leave ? (
         <div>
           <p className="mb-3">Are you sure you want to approve this leave request?</p>
@@ -704,7 +710,7 @@ export default function LeavesPage() {
     const leave = pendingApprovals.find((l) => l.id === leaveId)
 
     Modal.confirm({
-      title: '⚠️ Approve Withdrawal Request',
+      title: 'Approve Withdrawal Request',
       content: leave ? (
         <div>
           <p className="mb-3">Are you sure you want to approve this withdrawal request?</p>
@@ -931,7 +937,7 @@ export default function LeavesPage() {
                   </Select>
                 </div>
               </div>
-              <LeaveTable leaves={filteredMyLeaves} onCancel={handleCancel} onWithdraw={handleWithdraw} />
+              <LeaveTable leaves={filteredMyLeaves} onWithdraw={handleWithdraw} />
             </div>
           )}
 
@@ -1207,10 +1213,47 @@ export default function LeavesPage() {
                 </div> */}
               </Card>
 
+              {searchedEmployeeId && (
+                <Card className="rounded-xl shadow-sm border-border bg-card text-card-foreground mb-6" bodyStyle={{ padding: '16px' }}>
+                  <div className="mb-3">
+                    <h3 className="text-base font-semibold text-gray-900">Leave KPI{searchedEmployeeName ? ` - ${searchedEmployeeName}` : ''}</h3>
+                  </div>
+
+                  <Spin spinning={isLoadingSearchedEmployeeKpi}>
+                    <Row gutter={[16, 16]}>
+                      <Col xs={24} sm={12} lg={6}>
+                        <Card className="border border-emerald-100 bg-emerald-50/50" bodyStyle={{ padding: '14px 16px' }}>
+                          <p className="text-xs text-emerald-700 mb-1">Annual Leave Remaining</p>
+                          <p className="text-2xl font-bold text-emerald-800">{searchedEmployeeKpi?.annualLeaveRemaining ?? 0}</p>
+                        </Card>
+                      </Col>
+                      <Col xs={24} sm={12} lg={6}>
+                        <Card className="border border-blue-100 bg-blue-50/50" bodyStyle={{ padding: '14px 16px' }}>
+                          <p className="text-xs text-blue-700 mb-1">Sick Leave</p>
+                          <p className="text-2xl font-bold text-blue-800">{searchedEmployeeKpi?.sickLeaveCount ?? 0}</p>
+                        </Card>
+                      </Col>
+                      <Col xs={24} sm={12} lg={6}>
+                        <Card className="border border-orange-100 bg-orange-50/50" bodyStyle={{ padding: '14px 16px' }}>
+                          <p className="text-xs text-orange-700 mb-1">Emergency Leave</p>
+                          <p className="text-2xl font-bold text-orange-800">{searchedEmployeeKpi?.emergencyLeaveCount ?? 0}</p>
+                        </Card>
+                      </Col>
+                      <Col xs={24} sm={12} lg={6}>
+                        <Card className="border border-violet-100 bg-violet-50/50" bodyStyle={{ padding: '14px 16px' }}>
+                          <p className="text-xs text-violet-700 mb-1">Planned Leave</p>
+                          <p className="text-2xl font-bold text-violet-800">{searchedEmployeeKpi?.plannedLeaveCount ?? 0}</p>
+                        </Card>
+                      </Col>
+                    </Row>
+                  </Spin>
+                </Card>
+              )}
+
               {/* Leave Table */}
               <div className="mt-4">
                 {filteredLeaves.length > 0 ? (
-                  <LeaveTable leaves={filteredLeaves} onCancel={handleCancel} onWithdraw={handleWithdraw} showActions={false} />
+                  <LeaveTable leaves={filteredLeaves} onWithdraw={handleWithdraw} showActions={false} />
                 ) : (
                   <div className="text-center py-8 text-gray-500">
                     {allLeaves.length === 0 ? 'No leave records found' : 'No leaves match the selected filters'}
@@ -1267,13 +1310,13 @@ export default function LeavesPage() {
           </Form.Item>
 
           <Form.Item label="Leave Category">
-            <Input value="Loss of Pay" disabled />
+            <Input value="Loss of Pay" disabled/>
           </Form.Item>
 
           <Form.Item
             name="leaveType"
             label="Leave Type"
-            rules={[{ required: true, message: 'Please select leave type' }]}
+            rules={[{ required: true, message: 'Select leave type' }]}
           >
             <Select>
               <Select.Option value="Sick Leave">Sick Leave</Select.Option>

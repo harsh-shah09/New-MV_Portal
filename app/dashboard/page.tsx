@@ -10,12 +10,14 @@ import { verifySession } from "@/lib/auth"
 import { PageContainer } from "@/components/page-container"
 import { Switch } from "antd"
 
+const DASHBOARD_VIEW_STORAGE_KEY = "dashboard-view-mode"
+
 
 export default function DashboardPage() {
   const router = useRouter()
   const [role, setRole] = useState<string | null>(null)
   const [title, setTitle] = useState<string | null>(null)
-  const [viewMode, setViewMode] = useState<'hr' | 'employee'>('hr')
+  const [viewMode, setViewMode] = useState<"default" | "hr">("default")
   
   useEffect(() => {
     let mounted = true
@@ -35,6 +37,38 @@ export default function DashboardPage() {
     return () => { mounted = false }
   }, [])
 
+  useEffect(() => {
+    if (!role) return
+
+    const isHR = role === "HR"
+    const isAdmin = role === "Admin"
+    const canAccessHRView = isHR || isAdmin
+
+    if (!canAccessHRView) {
+      setViewMode("default")
+      return
+    }
+
+    const savedView = window.localStorage.getItem(DASHBOARD_VIEW_STORAGE_KEY)
+    if (savedView === "hr" || savedView === "default") {
+      setViewMode(savedView)
+    } else {
+      setViewMode("default")
+    }
+  }, [role])
+
+  const isHR = role === "HR"
+  const isAdmin = role === "Admin"
+  const canAccessHRView = isHR || isAdmin
+
+  const handleViewModeChange = (checked: boolean) => {
+    if (!canAccessHRView) return
+
+    const nextViewMode = checked ? "hr" : "default"
+    setViewMode(nextViewMode)
+    window.localStorage.setItem(DASHBOARD_VIEW_STORAGE_KEY, nextViewMode)
+  }
+
   const { data, isLoading, isFetching } = useQuery({
     queryKey: ["dashboard", role, viewMode],
     queryFn: () => fetch(`/api/dashboard?view=${viewMode}`).then((res) => {
@@ -52,26 +86,23 @@ export default function DashboardPage() {
 
   if (isLoading || isFetching || !role) return <DashboardSkeleton />
 
-  const isHR = role === 'HR'
-  const isAdmin = role === 'Admin'
-
   return (
     <PageContainer>
-      <div className="bg-white p-2 rounded-xl">
-      {isHR && (
-        <div className="flex justify-end mb-4">
-          <div className="flex items-center gap-3 bg-white px-4 py-2 rounded-lg shadow-sm border">
-            <span className="text-sm font-medium text-gray-700">My Dashboard</span>
-            <Switch
-              checked={viewMode === 'hr'}
-              onChange={(checked) => setViewMode(checked ? 'hr' : 'employee')}
-              className="bg-gray-300"
-            />
-            <span className="text-sm font-medium text-gray-700">HR Dashboard</span>
+      <div className="bg-white p-2 sm:p-4 rounded-xl flex flex-col gap-2 sm:gap-4">
+        {canAccessHRView && (
+          <div className="flex w-full justify-center sm:justify-end px-2 pt-2">
+            <div className={`${window.innerWidth > 1024 ? 'absolute top-[3.5%]' : ''} flex items-center gap-2 sm:gap-3 bg-white px-3 sm:px-4 py-2 sm:py-2 rounded-xl shadow-sm border border-slate-100`}>
+              <span className="text-xs sm:text-sm font-medium text-slate-600">My Dashboard</span>
+              <Switch
+                checked={viewMode === 'hr'}
+                onChange={handleViewModeChange}
+                className="bg-slate-200"
+              />
+              <span className="text-xs sm:text-sm font-medium text-slate-600">HR Dashboard</span>
+            </div>
           </div>
-        </div>
-      )}
-      {(isHR && viewMode === 'hr') || isAdmin ? (
+        )}
+      {viewMode === 'hr' && canAccessHRView ? (
         <HRDashboard data={data} />
       ) : (
         <EmployeeDashboard data={data} />

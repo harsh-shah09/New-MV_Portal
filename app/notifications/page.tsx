@@ -54,11 +54,11 @@ export default function NotificationsPage() {
                 body: JSON.stringify({ notificationId, isRead: true })
             })
             if (!res.ok) throw new Error('Failed to mark as read')
-            toast.success('Notification cleared')
+            toast.success('Notification Marked as Read')
             refetch()
             queryClient.invalidateQueries({ queryKey: ['notifications'] })
         } catch (error) {
-            toast.error('Failed to clear notification')
+            toast.error('Failed to mark notification as read')
         }
     }
 
@@ -81,11 +81,11 @@ export default function NotificationsPage() {
             
             if (!res.ok) throw new Error('Failed to clear notifications')
             
-            toast.success(`Cleared ${unreadList.length} notifications`)
+            toast.success(`${unreadList.length} notifications marked as read`)
             refetch()
             queryClient.invalidateQueries({ queryKey: ['notifications'] })
         } catch (error) {
-            toast.error('Failed to clear all notifications')
+            toast.error('Failed to mark all notifications as read')
         } finally {
             setClearing(false)
         }
@@ -129,6 +129,7 @@ export default function NotificationsPage() {
                         <RefreshButton
                             onClick={refetch}
                             loading={isFetching}
+                            label=""
                             className="mt-1"
                         />
                     </div>
@@ -149,7 +150,7 @@ export default function NotificationsPage() {
 
                                 return (
                                 <List.Item 
-                                    className={`group relative mb-3 rounded-xl px-4 py-4 transition-colors hover:bg-slate-50 ${isRead ? 'opacity-70' : 'bg-blue-50/30'}`}
+                                    className={`group relative mb-3 rounded-xl px-4 py-4 transition-colors hover:bg-slate-50 ${isRead ? 'opacity-70' : 'bg-blue-50/30'} ${showAll && !isRead ? 'shadow-md shadow-blue-100/80' : ''}`}
                                 >
                                     {!isRead && (
                                         <button

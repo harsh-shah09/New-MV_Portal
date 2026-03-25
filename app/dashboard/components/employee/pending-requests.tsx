@@ -10,6 +10,33 @@ interface PendingRequestsProps {
 }
 
 export function PendingRequests({ pendingRequests }: PendingRequestsProps) {
+  const getStatusMeta = (rawStatus: any) => {
+    const normalizedStatus = String(rawStatus || "")
+      .trim()
+      .toLowerCase()
+      .replace(/[_-]+/g, " ")
+      .replace(/\s+/g, " ")
+
+    const statusMap: Record<string, "success" | "warning" | "processing" | "error" | "default"> = {
+      approved: "success",
+      pending: "warning",
+      applied: "processing",
+      rejected: "error",
+      cancelled: "default",
+      withdrawn: "default",
+      "withdrawal pending": "warning",
+    }
+
+    const label = normalizedStatus
+      ? normalizedStatus.replace(/\b\w/g, (char) => char.toUpperCase())
+      : "N/A"
+
+    return {
+      status: statusMap[normalizedStatus] || "default",
+      label,
+    }
+  }
+
   const leaveColumns: ColumnsType<any> = [
     {
       title: 'Type',
@@ -40,15 +67,8 @@ export function PendingRequests({ pendingRequests }: PendingRequestsProps) {
       dataIndex: 'status',
       key: 'status',
       render: (status) => {
-        const colors: any = {
-          approved: 'success',
-          pending: 'warning',
-          applied: 'processing',
-          rejected: 'error',
-          cancelled: 'default',
-          withdrawn: 'default'
-        }
-        return <Badge status={colors[status]} text={status.charAt(0).toUpperCase() + status.slice(1)} />
+        const statusMeta = getStatusMeta(status)
+        return <Badge status={statusMeta.status} text={statusMeta.label} />
       }
     }
   ]

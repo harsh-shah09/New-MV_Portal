@@ -8,12 +8,11 @@ import { formatDate } from "@/lib/utils"
 
 interface LeaveTableProps {
   leaves: LeaveRequest[]
-  onCancel: (id: string) => void
   onWithdraw?: (id: string) => void
   showActions?: boolean
 }
 
-export function LeaveTable({ leaves, onCancel, onWithdraw, showActions = true }: LeaveTableProps) {
+export function LeaveTable({ leaves, onWithdraw, showActions = true }: LeaveTableProps) {
   const columns: ColumnsType<LeaveRequest> = [
     {
       title: 'Employee',
@@ -74,18 +73,6 @@ export function LeaveTable({ leaves, onCancel, onWithdraw, showActions = true }:
       align: 'center',
       render: (_, record) => (
         <Space size="small">
-          {record.status === 'applied' && (
-            <Tooltip title="Cancel Request">
-              <Button
-                type="text"
-                danger
-                icon={<CloseOutlined />}
-                onClick={() => onCancel(record.id)}
-              >
-                Cancel
-              </Button>
-            </Tooltip>
-          )}
           {record.status === 'approved' && onWithdraw && (
             <Tooltip title="Withdraw Request">
               <Button

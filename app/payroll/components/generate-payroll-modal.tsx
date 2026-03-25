@@ -81,7 +81,8 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
       })
 
       if (!response.ok) {
-        throw new Error("Failed to generate payroll")
+        const err = await response.json().catch(() => ({}))
+        throw new Error(err?.error || "Failed to generate payroll")
       }
 
       const data = await response.json()
@@ -89,9 +90,9 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
       setOriginalEmployeeData(data.employees || [])
       setShowResults(true)
       message.success(`Payroll generated for ${selectedMonth} ${selectedYear} - ${data.totalEmployees} employees`)
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error generating payroll:", error)
-      message.error("Failed to generate payroll. Please try again.")
+      message.error(error?.message || "Failed to generate payroll. Please try again.")
     } finally {
       setLoading(false)
     }

@@ -2,7 +2,6 @@
 import { NextResponse } from 'next/server';
 import { google } from 'googleapis';
 import { verifySession } from '@/lib/auth';
-import { getAllConfigurations } from '@/lib/admin-config';
 import { getEmployeeById, updateEmployee } from '@/lib/salesforce';
 import { db } from '@/lib/dynamodb';
 import { PutCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
@@ -17,8 +16,7 @@ async function getOAuth2Client() {
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
     
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:8080';
-    const redirectUri = `http://localhost:8080/api/integrations/google/callback`;
-    console.log(redirectUri);
+    const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/api/integrations/google/callback`;
     if (!clientId || !clientSecret) {
         throw new Error("Missing Google Client ID or Secret in Environment Variables");
     }

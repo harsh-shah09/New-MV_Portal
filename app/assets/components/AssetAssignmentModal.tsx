@@ -104,13 +104,13 @@ export function AssetAssignmentModal({ visible, onCancel, onSuccess, asset, curr
       onCancel={onCancel}
       footer={null}
       destroyOnClose
-      width={600}
-      style={{ maxWidth: '95vw', top: 20 }}
+      width="100%"
+      style={{ maxWidth: 600, top: 20 }}
       className="mobile-modal"
     >
       <div className="mb-4">
-          <p className="text-sm text-gray-500">Asset: <b>{asset?.AMS_Product__r?.Name || asset?.AMS_Category__c}</b> ({asset?.AMS_Asset_Serial_Number__c})</p>
-          <div className="flex items-center gap-2 mt-2">
+          <p className="text-sm text-gray-500 break-words">Asset: <b>{asset?.AMS_Product__r?.Name || asset?.AMS_Category__c}</b> ({asset?.AMS_Asset_Serial_Number__c})</p>
+          <div className="flex flex-wrap items-center gap-2 mt-2">
               <span className="text-gray-600">Current Status:</span> 
               <Tag color={currentAssignment ? "blue" : "green"}>
                   {currentAssignment ? `Assigned to ${asset?.AMS_Assigned_To__r?.Employee_Name__c || 'Unknown'}` : "Un-Assigned"}
@@ -135,7 +135,7 @@ export function AssetAssignmentModal({ visible, onCancel, onSuccess, asset, curr
                 <p className="text-xs text-gray-500 mb-3">
                     Assigned to: {asset?.AMS_Assigned_To__r?.Employee_Name__c} since {currentAssignment.AMS_Assigned_Date__c}
                 </p>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <Form.Item 
                         name="conditionOnReturn" 
                         label="Condition on Return" 
@@ -158,7 +158,7 @@ export function AssetAssignmentModal({ visible, onCancel, onSuccess, asset, curr
 
         {/* ASSIGNMENT SWITCH */}
         <Form.Item name="assignToNewPerson" valuePropName="checked">
-            <Switch 
+            <Switch     
                 checkedChildren="Assign to New Person" 
                 unCheckedChildren="Do Not Reassign" 
                 onChange={(checked) => setIsAssigning(checked)}
@@ -174,7 +174,9 @@ export function AssetAssignmentModal({ visible, onCancel, onSuccess, asset, curr
                     rules={[{ required: true, message: 'Required' }]}
                 >
                     <Select 
+                        className="w-full"
                         showSearch 
+                        size='large'
                         placeholder="Select Employee"
                         optionFilterProp="children"
                         filterOption={(input, option: any) => (option?.children as unknown as string).toLowerCase().includes(input.toLowerCase())}
@@ -193,14 +195,14 @@ export function AssetAssignmentModal({ visible, onCancel, onSuccess, asset, curr
                         label="Assigned Date" 
                         rules={[{ required: true, message: 'Date required' }]}
                     >
-                        <DatePicker className="w-full" />
+                        <DatePicker className="w-full" size='large'/>
                     </Form.Item>
 
                      <Form.Item 
                         name="conditionOnAssignment" 
                         label="Condition" 
                     >
-                         <Select>
+                         <Select size='large'>
                             <Select.Option value="New">New</Select.Option>
                             <Select.Option value="Second-hand">Second hand</Select.Option>
                         </Select>
@@ -208,14 +210,14 @@ export function AssetAssignmentModal({ visible, onCancel, onSuccess, asset, curr
                 </div>
 
                 <Form.Item name="remarks" label="Remarks">
-                    <Input.TextArea rows={2} />
+                    <Input.TextArea rows={2} size='large' placeholder='Enter Remarks'/>
                 </Form.Item>
             </div>
         )}
 
-         <div className="flex justify-end gap-2 pt-4">
-            <Button onClick={onCancel}>Cancel</Button>
-            <Button type="primary" htmlType="submit" loading={loading}>
+         <div className="flex flex-col sm:flex-row justify-end gap-2 pt-4">
+            <Button onClick={onCancel} size='large'>Cancel</Button>
+            <Button type="primary" htmlType="submit" loading={loading} size='large'>
                 {isAssigning ? 'Save Assignment' : (currentAssignment ? 'Return Asset' : 'Close')}
             </Button>
         </div>
@@ -224,13 +226,13 @@ export function AssetAssignmentModal({ visible, onCancel, onSuccess, asset, curr
       {history.length > 0 && (
           <>
             <Divider orientation="horizontal" className="text-gray-500 text-sm">Assignment History</Divider>
-            <div className="max-h-60 overflow-y-auto px-4">
+            <div className="max-h-60 overflow-y-auto px-2 sm:px-4">
                 <Timeline
                     items={history.map(h => ({
                         color: h.AMS_Returned_Date__c ? 'gray' : 'green',
                         dot: h.AMS_Returned_Date__c ? <ClockCircleOutlined /> : <UserOutlined />,
                         children: (
-                            <div className="mb-4">
+                            <div className="mb-4 break-words">
                                 <div className="font-semibold text-gray-800">
                                     {h.AMS_Assigned_Person__r?.Employee_Name__c || 'Unknown Employee'}
                                 </div>
@@ -268,6 +270,16 @@ export function AssetAssignmentModal({ visible, onCancel, onSuccess, asset, curr
   );
 }
 
+const colorMap: Record<string, string> = {
+  blue: 'bg-blue-100 text-blue-800',
+  green: 'bg-green-100 text-green-800',
+  gray: 'bg-gray-100 text-gray-800',
+};
+
 function Tag({ children, color }: { children: React.ReactNode, color: string }) {
-    return <span className={`px-2 py-1 rounded text-xs font-semibold bg-${color}-100 text-${color}-800`}>{children}</span>
+  return (
+    <span className={`px-2 py-1 rounded text-xs font-semibold ${colorMap[color] || 'bg-gray-100 text-gray-800'}`}>
+      {children}
+    </span>
+  );
 }

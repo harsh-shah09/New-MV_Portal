@@ -5,6 +5,7 @@ import type { ColumnsType } from 'antd/es/table';
 import { EyeOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import type { Employee } from "@/types"
 import { formatDate } from "@/lib/utils"
+import { cp } from 'fs';
 
 interface EmployeeTableProps {
   employees: Employee[]
@@ -46,15 +47,6 @@ export function EmployeeTable({ employees, onEdit, onDelete, onView, loading, is
       key: 'position',
     },
     {
-        title: 'Department',
-        dataIndex: 'department',
-        key: 'department',
-        responsive: ['lg'],
-        render: (dept) => (
-             <Tag color="cyan">{dept}</Tag>
-        )
-    },
-    {
       title: 'Join Date',
       dataIndex: 'joinDate',
       key: 'joinDate',
@@ -67,17 +59,26 @@ export function EmployeeTable({ employees, onEdit, onDelete, onView, loading, is
   if (isHR) {
       columns.push({
           title: 'Account Status',
-          dataIndex: 'status',
-          key: 'status',
-          render: (status) => {
-               let color = 'default';
-               if (status?.toLowerCase() === 'active') color = 'success';
-               if (status?.toLowerCase() === 'on notice') color = 'warning';
-               if (status?.toLowerCase() === 'terminated') color = 'error';
-               
-               return <Tag color={color} className="capitalize">{status}</Tag>
+          dataIndex: 'active',
+          key: 'active',
+          render: (active ) => {               
+               return active ? <Tag color='success' className="capitalize">Active</Tag> : <Tag color='error' className="capitalize">Inactive</Tag> 
           }
       });
+      columns.splice(2 , 0 , {
+        title : 'Employment Status',
+        dataIndex: 'status',
+        key: 'status',
+        render: (status) => {
+              let color = 'default';
+              if (status?.toLowerCase() === 'active') color = 'success';
+              if (status?.toLowerCase() === 'on notice') color = 'warning';
+              if (status?.toLowerCase() === 'terminated') color = 'error';
+              
+              return <Tag color={color} className="capitalize">{status}</Tag>
+        }
+      })
+
   }
 
   if(onView || onEdit || onDelete){

@@ -47,7 +47,7 @@ export default function EmployeesClient({ role }: EmployeesClientProps) {
       // Map Salesforce data to Employee type
       return rawData.map((record: any) => {
         // Parse Address
-        let addressStr = record.Employee_Address__c || '';
+        let addressStr = record.Employee_Current_Address__c || '';
         let street = '', city = '', state = '', zipCode = '', country = '';
         
         try {
@@ -82,7 +82,7 @@ export default function EmployeesClient({ role }: EmployeesClientProps) {
             department: record.Department__c || 'Un-Assigned',
             position: record.Role__c || '',
             joinDate: record.Joining_Date__c || '',
-            status: record.Status__c || 'inactive',
+            status: record.Status__c,
             active: record.Active__c,
             salary: record.Base_Salary__c || 0,
             profilePhoto: record.Profile_Photo__c,
@@ -113,7 +113,7 @@ export default function EmployeesClient({ role }: EmployeesClientProps) {
       (emp.phone && emp.phone.includes(searchTerm))
 
     const matchesDepartment = !department || emp.department === department
-    const matchesStatus = !status || emp.status.toLowerCase() === status
+    const matchesStatus = !status || emp.status.toLowerCase() === status.toLowerCase()
     
     // Account Status Filter
     let matchesAccountStatus = true;
@@ -143,7 +143,7 @@ export default function EmployeesClient({ role }: EmployeesClientProps) {
             Base_Salary__c: data.salary,
             Status__c: data.status,
             // Store structured address object (API will JSON.stringify it)
-            Employee_Address__c: {
+            Employee_Current_Address__c: {
                 street: data.personalDetails?.address || '',
                 city: data.personalDetails?.city || '',
                 state: data.personalDetails?.state || '',
@@ -340,13 +340,13 @@ export default function EmployeesClient({ role }: EmployeesClientProps) {
     <PageContainer>
       <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 bg-white p-3 rounded-xl flex flex-col gap-4">
         <PageHeader title="Employees" subtitle="Manage your workforce">
-            <RefreshButton onClick={refetch} label="" size="large" loading={isFetching} />
+            <RefreshButton onClick={refetch} label="" size="large" loading={isFetching}/>
 
-            <div>
+            {/* <div>
               <Button type="primary" onClick={() => setShowForm(true)} size="large" icon={<Plus size={16}/>}>
                 Add Employee
               </Button>
-            </div>
+            </div> */}
         </PageHeader>
 
         <EmployeeFilters

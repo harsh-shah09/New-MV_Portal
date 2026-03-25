@@ -2,11 +2,12 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Modal, Steps, Form, Input, Button, Upload, message, Result } from "antd"
-import { UploadOutlined, BankOutlined, UserOutlined, FileTextOutlined, CheckCircleOutlined, CameraOutlined } from "@ant-design/icons"
+import { Modal, Steps, Form, Input, Button, Upload, message, Collapse ,Checkbox , Divider , Card} from "antd"
+import { UploadOutlined, BankOutlined, UserOutlined, FileTextOutlined, CheckCircleOutlined, CameraOutlined, GoogleOutlined } from "@ant-design/icons"
 import { useQueryClient } from "@tanstack/react-query"
 import Confetti from "react-confetti"
 import { motion, AnimatePresence } from "framer-motion"
+import { Check, AlertCircle, Loader2, Trash2 } from "lucide-react"
 
 export function OnboardingWizard() {
     const [open, setOpen] = useState(false)
@@ -17,6 +18,18 @@ export function OnboardingWizard() {
     const queryClient = useQueryClient()
     const [showConfetti, setShowConfetti] = useState(false)
     const [profileFile, setProfileFile] = useState<File | null>(null)
+    const [passbookFile, setPassbookFile] = useState<File | null>(null)
+    const [passbookUploading, setPassbookUploading] = useState(false)
+    const [passbookUploaded, setPassbookUploaded] = useState(false)
+    const [userRole, setUserRole] = useState('')
+
+    // Google integration state (for step 4)
+    const [googleConnected, setGoogleConnected] = useState(false)
+    const [googleLoading, setGoogleLoading] = useState(false)
+    const [googleChecking, setGoogleChecking] = useState(false)
+    const [googleNotification, setGoogleNotification] = useState<{ type: 'success' | 'error', message: string } | null>(null)
+
+    const documents = ['Aadhar Card', 'PAN Card', 'Degree Certificate'];
 
     useEffect(() => {
         // Check status on mount
@@ -25,18 +38,96 @@ export function OnboardingWizard() {
             .then(data => {
                 if (data.showOnboarding) {
                     setOpen(true)
-                    // If backend returns 0 or null, start at step 1
                     setCurrentStep(data.currentStep || 1)
                 }
             })
             .catch(err => console.error(err))
     }, [])
+
+    useEffect(() => {
+        if (open) {
+            checkGoogleStatus()
+        }
+    }, [open])
+
+    // Check Google connection status
+    const checkGoogleStatus = async () => {
+        try {
+            setGoogleChecking(true)
+            const res = await fetch('/api/integrations/google?action=status')
+            if (res.ok) {
+                const data = await res.json()
+                setGoogleConnected(data.connected)
+            }
+        } catch (e) {
+            console.error(e)
+        } finally {
+            setGoogleChecking(false)
+        }
+    }
+
+    const handleGoogleConnect = async () => {
+        try {
+            setGoogleLoading(true)
+            const res = await fetch('/api/integrations/google')
+            if (!res.ok) throw new Error("Failed")
+            const data = await res.json()
+            window.location.href = data.url
+        } catch (e) {
+            setGoogleNotification({ type: 'error', message: "Failed to initiate connection. Please try again." })
+            setGoogleLoading(false)
+        }
+    }
+
+    const handleGoogleDisconnect = async () => {
+        try {
+            setGoogleLoading(true)
+            const res = await fetch('/api/integrations/google?action=disconnect')
+            if (!res.ok) throw new Error("Failed")
+            setGoogleConnected(false)
+            setGoogleNotification({ type: 'success', message: "Disconnected from Google Workspace" })
+        } catch (e) {
+            setGoogleNotification({ type: 'error', message: "Failed to disconnect. Please try again." })
+        } finally {
+            setGoogleLoading(false)
+        }
+    }
+
     const stepItems = [
         { title: 'Profile Picture', icon: <CameraOutlined /> },
         { title: 'Personal Info', icon: <UserOutlined /> },
         { title: 'Bank Details', icon: <BankOutlined /> },
-        { title: 'Documents', icon: <FileTextOutlined /> }
+        { title: 'Google Sync', icon: <GoogleOutlined /> },
+        { title: 'Documents', icon: <FileTextOutlined /> },
     ]
+
+    const handlePassbookUpload = async (file: File) => {        
+        if (!file) return
+        if (file.size > 10 * 1024 * 1024) {
+            message.error("File size exceeds 10MB limit.")
+            return
+        }
+        setPassbookUploading(true)
+        const formData = new FormData()
+        formData.append('file', file)
+        formData.append('type', 'Passbook')
+        formData.append('step', '3_passbook')
+        console.log(formData)
+        try {
+            const res = await fetch('/api/auth/onboarding-status', {
+                method: 'POST',
+                body: formData
+            })
+            console.log(res)
+            if (!res.ok) throw new Error('Upload Failed')
+            setPassbookUploaded(true)
+            message.success(`${file.name} uploaded successfully`)
+        } catch (err) {
+            message.error(`${file.name} upload failed`)
+        } finally {
+            setPassbookUploading(false)
+        }
+    }
 
     const handleNext = async () => {
         try {
@@ -61,6 +152,13 @@ export function OnboardingWizard() {
                          body: JSON.stringify({ step: 1, data: {} })
                      })
                  }
+            } else if (currentStep === 4) {
+                // Google Integration step — just advance, no mandatory action
+                await fetch('/api/auth/onboarding-status', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ step: 4, data: {} })
+                })
             } else {
                 // Standard JSON steps
                 const values = await form.validateFields()
@@ -84,12 +182,12 @@ export function OnboardingWizard() {
         }
     }
 
-    const handleDocumentUpload = async (options: any) => {
+    const handleDocumentUpload = async (options: any , doc : any) => {
         const { file, onSuccess, onError } = options
         const formData = new FormData()
         formData.append('file', file)
-        formData.append('type', 'ID Proof') // Default or ask user
-        formData.append('step', '4') // Docs step
+        formData.append('type', doc)
+        formData.append('step', '5') // Docs step (was 4, now 5)
 
         try {
             const res = await fetch('/api/auth/onboarding-status', {
@@ -113,11 +211,23 @@ export function OnboardingWizard() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: 'complete' })
             })
+            // Fetch role for tour
+            // try {
+            //     const meRes = await fetch('/api/me')
+            //     if (meRes.ok) {
+            //         const me = await meRes.json()
+            //         setUserRole(me.role || 'Employee')
+            //     }
+            // } catch (_) {}
             setLoading(false)
             setOpen(false)
             setShowConfetti(true)
-            message.success("Onboarding Completed!")
-            setTimeout(() => setShowConfetti(false), 5000)
+            message.success("Onboarding Completed! Starting your portal tour... 🎉")
+            // Start tour globally after confetti delay
+            setTimeout(() => {
+                setShowConfetti(false)
+                window.dispatchEvent(new CustomEvent('mv:tour:autostart'))
+            }, 3000)
         } catch (e) {
              setLoading(false)
         }
@@ -153,7 +263,7 @@ export function OnboardingWizard() {
                 // Personal Info
                 return (
                     <div className="py-4">
-                        <p className="mb-4 text-gray-500">Please verify your personal details.</p>
+                        <p className="mb-4 text-gray-500">Current Address</p>
                         <Form.Item name="street" label="Street Address" rules={[{ required: true }]}>
                             <Input placeholder="123 Main St" />
                         </Form.Item>
@@ -173,12 +283,58 @@ export function OnboardingWizard() {
                                 <Input />
                             </Form.Item>
                         </div>
-                        <Form.Item name="emergencyContact" label="Emergency Contact Name" rules={[{ required: true }]}>
-                            <Input />
+                        <Divider/>
+                          <p className="mb-4 text-gray-500">Permanent Address</p>
+                         <Form.Item
+                            name="sameAsCurrent"
+                            valuePropName="checked"
+                            className="mb-3"
+                            >
+                            <Checkbox>
+                                Same as Current Address
+                            </Checkbox>
                         </Form.Item>
-                        <Form.Item name="emergencyPhone" label="Emergency Contact Phone" rules={[{ required: true }]}>
+                        <Form.Item shouldUpdate={(prev, curr) => prev.sameAsCurrent !== curr.sameAsCurrent} noStyle>
+                            {({ getFieldValue }) => {
+                                const isSame = getFieldValue('sameAsCurrent');
+
+                                if (isSame) return null; // hide when checked
+
+                                return (
+                                <>
+                                    <Form.Item name="permanentstreet" label="Street Address" rules={[{ required: true }]}>
+                                    <Input placeholder="123 Main St" />
+                                    </Form.Item>
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                    <Form.Item name="permanentcity" label="City" rules={[{ required: true }]}>
+                                        <Input />
+                                    </Form.Item>
+                                    <Form.Item name="permanentstate" label="State" rules={[{ required: true }]}>
+                                        <Input />
+                                    </Form.Item>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                    <Form.Item name="permanentpostalCode" label="Postal Code" rules={[{ required: true }]}>
+                                        <Input />
+                                    </Form.Item>
+                                    <Form.Item name="permanentcountry" label="Country" rules={[{ required: true }]}>
+                                        <Input />
+                                    </Form.Item>
+                                    </div>
+
+                                </>
+                                );
+                            }}
+                            </Form.Item>
+                             <Divider />
+                            <Form.Item name="emergencyContact" label="Emergency Contact Name" rules={[{ required: true }]}>
                             <Input />
-                        </Form.Item>
+                            </Form.Item>
+                            <Form.Item name="emergencyPhone" label="Emergency Contact Phone" rules={[{ required: true }]}>
+                            <Input />
+                            </Form.Item>
                     </div>
                 )
             case 3:
@@ -187,6 +343,9 @@ export function OnboardingWizard() {
                         <p className="mb-4 text-gray-500">We need your bank details for payroll processing.</p>
                         <Form.Item name="bankName" label="Bank Name" rules={[{ required: true }]}>
                             <Input prefix={<BankOutlined />} />
+                        </Form.Item>
+                        <Form.Item name="bankbranch" label="Bank Branch Name" rules={[{ required: true }]}>
+                            <Input />
                         </Form.Item>
                         <Form.Item name="accountNumber" label="Account Number" rules={[{ required: true }]}>
                             <Input />
@@ -197,22 +356,160 @@ export function OnboardingWizard() {
                         <Form.Item name="ifscCode" label="IFSC / Routing Code" rules={[{ required: true }]}>
                             <Input />
                         </Form.Item>
+
+                        {/* Passbook Upload */}
+                        <div className="mt-4">
+                            <p className="text-sm font-medium text-gray-700 mb-2">Passbook / Bank Statement <span className="text-gray-400">(Optional)</span></p>
+                            <Upload.Dragger
+                                name="passbook"
+                                multiple={false}
+                                showUploadList={passbookFile ? true : false}
+                                beforeUpload={(file) => {
+                                    setPassbookFile(file)
+                                    handlePassbookUpload(file)
+                                    return false
+                                }}
+                                className="!bg-gray-50 hover:!bg-blue-50 transition rounded-lg"
+                                disabled={passbookUploading}
+                            >
+                                <p className="ant-upload-drag-icon">
+                                    {passbookUploaded
+                                        ? <Check className="w-6 h-6 text-green-500 mx-auto" />
+                                        : <UploadOutlined className="text-xl text-blue-500" />
+                                    }
+                                </p>
+                                <p className="text-xs text-gray-500 mt-1">
+                                    {passbookUploading
+                                        ? 'Uploading…'
+                                        : passbookUploaded
+                                        ? 'Passbook uploaded ✓'
+                                        : 'Click or drag passbook / bank statement'}
+                                </p>
+                            </Upload.Dragger>
+                        </div>
                      </div>
                 )
+
             case 4:
+                // Google Integration
+                return (
+                    <div className="py-4">
+                        <p className="mb-6 text-gray-500 text-center">
+                            Connect your Google account to receive leave notifications via Gmail and sync approved leaves to your calendar. This step is optional.
+                        </p>
+
+                        {googleNotification && (
+                            <div className={`mb-4 px-4 py-3 rounded-lg flex items-center gap-2 text-sm font-medium ${
+                                googleNotification.type === 'success' ? 'bg-green-50 text-green-700 border border-green-100' : 'bg-red-50 text-red-700 border border-red-100'
+                            }`}>
+                                {googleNotification.type === 'success' ? <Check className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+                                {googleNotification.message}
+                                <button onClick={() => setGoogleNotification(null)} className="ml-auto opacity-60 hover:opacity-100">✕</button>
+                            </div>
+                        )}
+
+                        <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm max-w-md mx-auto">
+                            <div className="flex items-center gap-4 mb-4">
+                                <div className="w-12 h-12 bg-white border border-slate-100 rounded-xl flex items-center justify-center p-2 shadow-sm">
+                                    <svg viewBox="0 0 24 24" className="w-8 h-8">
+                                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-slate-800">Google Workspace</h3>
+                                    <p className="text-sm text-slate-500">Gmail &amp; Calendar Sync</p>
+                                </div>
+                                <div className={`ml-auto px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 border ${
+                                    googleConnected
+                                    ? "bg-green-50 text-green-700 border-green-100"
+                                    : "bg-slate-50 text-slate-500 border-slate-100"
+                                }`}>
+                                    {googleConnected ? (
+                                        <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse inline-block" />
+                                    ) : (
+                                        <span className="w-2 h-2 rounded-full bg-slate-300 inline-block" />
+                                    )}
+                                    {googleConnected ? "Connected" : "Not Connected"}
+                                </div>
+                            </div>
+
+                            <p className="text-sm text-slate-600 mb-5 leading-relaxed">
+                                Seamlessly integrate with your Google account to enable automatic leave notifications and sync approved leaves directly to your calendar.
+                            </p>
+
+                            {googleChecking ? (
+                                <div className="h-10 bg-slate-100 rounded-xl animate-pulse" />
+                            ) : !googleConnected ? (
+                                <button
+                                    onClick={handleGoogleConnect}
+                                    disabled={googleLoading}
+                                    className="w-full bg-white border border-slate-200 hover:border-blue-400 hover:bg-blue-50/50 text-slate-700 hover:text-blue-600 font-semibold py-3 rounded-xl transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed shadow-sm"
+                                >
+                                    {googleLoading ? (
+                                        <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+                                    ) : (
+                                        <>
+                                            <img src="https://www.google.com/favicon.ico" className="w-4 h-4" alt="Google" />
+                                            Connect Google Account
+                                        </>
+                                    )}
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={handleGoogleDisconnect}
+                                    disabled={googleLoading}
+                                    className="w-full bg-slate-50 border border-slate-200 hover:bg-red-50 hover:border-red-200 text-slate-600 hover:text-red-600 font-semibold py-3 rounded-xl transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                                >
+                                    {googleLoading ? (
+                                        <Loader2 className="w-5 h-5 animate-spin" />
+                                    ) : (
+                                        <><Trash2 className="w-4 h-4" /> Disconnect</>
+                                    )}
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                )
+
+            case 5:
+                // Documents (was case 4)
                 return (
                      <div className="py-4 text-center">
                         <p className="mb-6 text-gray-500">Please upload your ID proof and other relevant documents (Optional).</p>
-                        <Upload.Dragger 
-                            customRequest={(opts) => handleDocumentUpload(opts)} 
-                            multiple={true}
-                            listType="picture"
+                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                        {documents.map((doc) => (
+                        <Card
+                            key={doc}
+                            className="rounded-xl shadow-sm hover:shadow-md transition"
+                            bodyStyle={{ padding: '16px' }}
                         >
-                            <p className="ant-upload-drag-icon">
-                                <UploadOutlined />
+                            {/* Title */}
+                            <p className="text-sm font-medium text-gray-700 mb-3">
+                            {doc}
                             </p>
-                            <p className="ant-upload-text">Click or drag file to this area to upload</p>
-                        </Upload.Dragger>
+
+                            {/* Upload Box */}
+                            <Upload.Dragger
+                            name={doc}
+                            customRequest={(opts) => handleDocumentUpload(opts, doc)}
+                            multiple={false}
+                            showUploadList={true}
+                            className="!bg-gray-50 hover:!bg-blue-50 transition rounded-lg"
+                            >
+                            <p className="ant-upload-drag-icon">
+                                <UploadOutlined className="text-xl text-blue-500" />
+                            </p>
+                            <p className="text-xs text-gray-500">
+                                Click or drag file
+                            </p>
+                            </Upload.Dragger>
+                        </Card>
+                        ))}
+                    </div>
+                        
                      </div>
                 )
             default:

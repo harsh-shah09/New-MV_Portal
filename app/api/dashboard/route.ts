@@ -26,17 +26,20 @@ export async function GET(req: NextRequest) {
 
         const { employeeId, email, recordId, name, role, title } = payload;
         const currentEmployeeId = employeeId || name || recordId;
+        const isTeamLead = role === 'Developer' && title === 'Team Lead';
         
         const conn = await getSalesforceConnection();
         const isHR = role === 'HR';
         const isAdmin = role === 'Admin';
+        const canAccessHRView = isHR || isAdmin;
 
-        // Get view mode from query params (for HR users)
+        // Get view mode from query params
         const { searchParams } = new URL(req.url);
-        const viewMode = searchParams.get('view') || 'hr';
+        const requestedViewMode = searchParams.get('view') === 'hr' ? 'hr' : 'default';
+        const viewMode = canAccessHRView ? requestedViewMode : 'default';
 
-        // HR/Admin Dashboard Data (only show if Admin OR if HR with HR view mode)
-        if ((isAdmin) || (isHR && viewMode === 'hr')) {
+        // HR/Admin Dashboard Data
+        if (viewMode === 'hr' && canAccessHRView) {
             // Get total employees
             const employeeQuery = await conn.query(`
                 SELECT COUNT(Id) totalEmployees
@@ -47,18 +50,18 @@ export async function GET(req: NextRequest) {
 
             // Get pending approvals count
             let pendingApprovalsQuery;
-            if (isAdmin) {
+            if (isAdmin || isHR) {
                 pendingApprovalsQuery = await conn.query(`
-                    SELECT Id, Employee__c, Employee__r.Employee_Name__c, 
+                    SELECT Id, Name, Employee__c, Employee__r.Employee_Name__c, 
                            Leave_Type__c, Leave_Category__c, Start_Date__c, 
                            End_Date__c, Total_Days__c, TL_Approval__c
                     FROM Leave__c
-                    WHERE Status__c = 'Applied' AND Employee__r.Role__c = 'HR'
+                    WHERE Status__c = 'Applied' AND Employee__r.Role__c != 'HR'
                     ORDER BY Start_Date__c ASC
                 `);
             } else {
                 pendingApprovalsQuery = await conn.query(`
-                    SELECT Id, Employee__c, Employee__r.Employee_Name__c, 
+                    SELECT Id,Name, Employee__c, Employee__r.Employee_Name__c, 
                            Leave_Type__c, Leave_Category__c, Start_Date__c, 
                            End_Date__c, Total_Days__c, TL_Approval__c
                     FROM Leave__c
@@ -69,7 +72,7 @@ export async function GET(req: NextRequest) {
 
             const pendingApprovals = pendingApprovalsQuery.records.map((record: any) => ({
                 id: record.Id,
-                employeeId: record.Employee__c,
+                employeeId: record.Name,
                 employeeName: record.Employee__r?.Employee_Name__c || "Unknown",
                 leaveType: record.Leave_Category__c === 'Extra Day Pay' ? 'Extra Day Pay' : record.Leave_Type__c,
                 leaveCategory: record.Leave_Category__c,
@@ -78,6 +81,8 @@ export async function GET(req: NextRequest) {
                 duration: record.Total_Days__c,
                 tlApproved: record.TL_Approval__c
             }));
+
+            console.log('Pending Approvals:', pendingApprovals);
 
             // Get approved today count
             const today = dayjs().format('YYYY-MM-DD');
@@ -88,6 +93,36 @@ export async function GET(req: NextRequest) {
             `);
             const approvedToday = approvedTodayQuery.records[0]?.approvedCount || 0;
 
+            const approvedTodayLeavesQuery = await conn.query(`
+                SELECT Id, Employee__c, Employee__r.Employee_Name__c,
+                       Employee__r.Employee_Email__c, Leave_Type__c,
+                       Leave_Category__c, Start_Date__c, End_Date__c,
+                       Total_Days__c, Approved_Date__c
+                FROM Leave__c
+                WHERE Approved_Date__c = ${today}
+                AND Status__c = 'Approved'
+                ORDER BY Start_Date__c ASC
+            `);
+
+            const approvedTodayLeaves = approvedTodayLeavesQuery.records.map((record: any) => ({
+                id: record.Id,
+                employeeId: record.Employee__c,
+                employeeName: record.Employee__r?.Employee_Name__c || "Unknown",
+                employeeEmail: record.Employee__r?.Employee_Email__c,
+                leaveType: record.Leave_Category__c === 'Extra Day Pay' ? 'Extra Day Pay' : record.Leave_Type__c,
+                leaveCategory: record.Leave_Category__c,
+                startDate: record.Start_Date__c,
+                endDate: record.End_Date__c,
+                duration: record.Total_Days__c,
+                approvedDate: record.Approved_Date__c,
+            }));
+
+            const birthdayquery =  await conn.query(`
+                SELECT Id , Name , Employee_Name__c,Role__c , Title__c ,Profile_Photo__c,Department__c
+                FROM Employee__c
+                WHERE Birthdate__c = ${today} AND Status__c = 'Active' AND Active__c = true`);
+            const birthdayToday = birthdayquery.records;
+            console.log(birthdayToday)
             // Get on leave today count
             const onLeaveTodayQuery = await conn.query(`
                 SELECT COUNT(Id) onLeaveCount
@@ -190,7 +225,9 @@ export async function GET(req: NextRequest) {
                 leaveAnalytics,
                 recentActivities,
                 departmentStats: [],
-                employeesOnLeave
+                employeesOnLeave,
+                approvedTodayLeaves,
+                birthdayToday
             });
         }
 
@@ -281,6 +318,32 @@ export async function GET(req: NextRequest) {
             status: record.Status__c?.toLowerCase() || 'pending'
         }));
 
+        let teamLeadPendingApprovals: any[] = [];
+        if (isTeamLead) {
+            const teamLeadApprovalsQuery = await conn.query(`
+                SELECT Id, Name, Employee__c, Employee__r.Employee_Name__c,
+                       Leave_Type__c, Leave_Category__c, Start_Date__c,
+                       End_Date__c, Total_Days__c, TL_Approval__c
+                FROM Leave__c
+                WHERE Status__c = 'Applied'
+                AND Employee__r.Team_Lead__c = '${currentEmployeeId}'
+                AND (TL_Approval__c = null OR TL_Approval__c = '')
+                ORDER BY Start_Date__c ASC
+            `);
+
+            teamLeadPendingApprovals = teamLeadApprovalsQuery.records.map((record: any) => ({
+                id: record.Id,
+                employeeId: record.Name,
+                employeeName: record.Employee__r?.Employee_Name__c || "Unknown",
+                leaveType: record.Leave_Category__c === 'Extra Day Pay' ? 'Extra Day Pay' : record.Leave_Type__c,
+                leaveCategory: record.Leave_Category__c,
+                startDate: record.Start_Date__c,
+                endDate: record.End_Date__c,
+                duration: record.Total_Days__c,
+                tlApproved: record.TL_Approval__c
+            }));
+        }
+
         // Get upcoming holidays
         const holidaysQuery = await conn.query(`
             SELECT Name, Date__c, Day__c
@@ -341,12 +404,15 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({
             employeeName,
             employeeId: currentEmployeeId,
+            isTeamLead,
             leaveBalance,
             recentLeaves,
             upcomingLeaves,
             pendingRequests,
+            pendingApprovals: teamLeadPendingApprovals,
             holidays,
-            teamMembers
+            teamMembers,
+        
         });
 
     } catch (error) {

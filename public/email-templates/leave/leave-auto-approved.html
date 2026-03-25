@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>HR Leave Request</title>
+  <title>Leave Auto-Approved</title>
   <style>
     * {
       margin: 0;
@@ -21,14 +21,14 @@
       max-width: 600px;
       margin: 0 auto;
       background-color: #ffffff;
-      border: 2px solid #67e8f9;
+      border: 2px solid #bfdbfe;
       border-radius: 12px;
       overflow: hidden;
-      outline: 1px solid #cffafe;
+      outline: 1px solid #dbeafe;
       box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     }
     .header {
-      background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
+      background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
       color: #ffffff;
       padding: 30px 20px;
       text-align: center;
@@ -37,6 +37,10 @@
       font-size: 28px;
       font-weight: 700;
       margin-bottom: 8px;
+    }
+    .header .icon {
+      font-size: 48px;
+      margin-bottom: 10px;
     }
     .header p {
       font-size: 16px;
@@ -59,16 +63,16 @@
       line-height: 1.6;
     }
     .info-card {
-      background: linear-gradient(to right, #f9fafb, #ffffff);
-      border: 1px solid #e5e7eb;
-      border-left: 4px solid #06b6d4;
+      background: linear-gradient(to right, #eff6ff, #ffffff);
+      border: 1px solid #dbeafe;
+      border-left: 4px solid #3b82f6;
       border-radius: 8px;
       padding: 20px;
       margin: 18px 0;
       box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
     }
     .info-card h3 {
-      color: #06b6d4;
+      color: #2563eb;
       font-size: 17px;
       margin-bottom: 12px;
       font-weight: 600;
@@ -137,16 +141,6 @@
       background: linear-gradient(to right, transparent, #e5e7eb, transparent);
       margin: 20px 0;
     }
-    .badge {
-      display: inline-block;
-      padding: 4px 12px;
-      background-color: #cffafe;
-      color: #155e75;
-      border-radius: 12px;
-      font-size: 12px;
-      font-weight: 600;
-      margin-left: 8px;
-    }
     @media only screen and (max-width: 600px) {
       .email-wrapper {
         border-radius: 0;
@@ -174,28 +168,33 @@
 <body>
   <div class="email-wrapper">
     <div class="header">
-      <h1>🏢 HR Leave Request</h1>
-      <p>Admin Approval Required</p>
+      <div class="icon">⚡</div>
+      <h1>Leave Auto-Approved</h1>
+      <p>Approval completed by {{approverTitle}}</p>
     </div>
-    
+
     <div class="content">
       <div class="greeting">
         Dear <strong>{{recipientName}}</strong>,
       </div>
-      
+
       <div class="message">
-        A leave request has been submitted by <strong>{{employeeName}}</strong> from the Human Resources department<span class="badge">HR</span>. This request requires your approval as Admin.
+        {{approverTitle}} has applied and auto-approved leave on behalf of <strong>{{employeeName}}</strong>.
       </div>
-      
+
       <div class="info-card">
-        <h3>📅 Leave Request Details</h3>
+        <h3>📅 Leave Details</h3>
         <div class="info-row">
-          <span class="info-label">HR Employee</span>
+          <span class="info-label">Employee</span>
           <span class="info-value">{{employeeName}}</span>
         </div>
         <div class="info-row">
           <span class="info-label">Leave Type</span>
           <span class="info-value">{{leaveType}}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Category</span>
+          <span class="info-value">Loss of Pay</span>
         </div>
         <div class="info-row">
           <span class="info-label">Start Date</span>
@@ -207,21 +206,21 @@
         </div>
         <div class="info-row">
           <span class="info-label">Total Duration</span>
-          <span class="info-value"><strong>{{durat    ion}} day(s)</strong></span>
+          <span class="info-value"><strong>{{duration}} day(s)</strong></span>
         </div>
       </div>
-      
+
       <div class="alert alert-info">
-        <strong>ℹ️ Note:</strong> HR leave requests require Admin-level approval. Please ensure adequate HR coverage is available during the requested leave period before approving.
+        <strong>ℹ️ FYI:</strong> This leave has already been approved in the system and leave balance has been updated accordingly.
       </div>
-      
+
       <div class="divider"></div>
-      
-      <div class="message" style="margin-bottom: 0;">
-        Please log in to the <strong>MV Portal HRMS</strong> to review and approve or reject this request.
+
+      <div class="message" style="margin-bottom: 0; text-align: center; color: #2563eb; font-weight: 600; font-size: 16px;">
+        You can review this request in the HRMS portal.
       </div>
     </div>
-    
+
     <div class="footer">
       <p>© {{year}} MV Clouds Private Limited. All rights reserved.</p>
       <p>D-404, The First Synthesis, B/H Keshav Baugh Party Plot</p>

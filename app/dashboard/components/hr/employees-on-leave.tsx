@@ -1,7 +1,7 @@
 "use client"
 
-import { Card, Avatar, Empty } from "antd"
-import { UserOutlined, CalendarOutlined } from "@ant-design/icons"
+import { Card, Avatar, Empty, Tooltip } from "antd"
+import { UserOutlined, CalendarOutlined, InfoCircleOutlined } from "@ant-design/icons"
 import dayjs from "dayjs"
 
 interface EmployeesOnLeaveProps {
@@ -15,6 +15,9 @@ export function EmployeesOnLeave({ employeesOnLeave }: EmployeesOnLeaveProps) {
         <span className="flex items-center gap-2">
           <UserOutlined />
           Employees On Leave Today ({employeesOnLeave.length})
+          <Tooltip title="Employees with approved leave for today are listed here." placement="top">
+            <InfoCircleOutlined className="text-slate-400 hover:text-slate-600" />
+          </Tooltip>
         </span>
       }
       className="h-full"

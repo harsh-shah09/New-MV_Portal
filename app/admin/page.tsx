@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
+
 import {
     Settings,
     FileText,
@@ -32,8 +33,17 @@ const formatLabel = (str: string) => {
     return str.replace(/_/g, ' ').replace(/([A-Z])/g, ' $1').trim();
 };
 
+type AdminTab = "admin" | "documents" | "email" | "leave" | "payroll" | "users" | "integration" | "assets";
+
+const VALID_TABS: AdminTab[] = ["admin", "documents", "leave", "payroll", "users", "integration", "email", "assets"];
+
+function hashToTab(hash: string): AdminTab {
+    const stripped = hash.replace(/^#/, '') as AdminTab;
+    return VALID_TABS.includes(stripped) ? stripped : "admin";
+}
+
 export default function AdminConsole() {
-    const [activeTab, setActiveTab] = useState<"admin" | "documents" | "email" | "leave" | "payroll" | "users" | "integration" | "assets">("admin");
+    const [activeTab, setActiveTab] = useState<AdminTab>("admin");
     const [configs, setConfigs] = useState<any>(null);
     const [users, setUsers] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
@@ -58,7 +68,14 @@ export default function AdminConsole() {
     // Email Editor State
     const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
 
-    // Fetch configs
+    // Read + sync hash on mount and hash changes
+    useEffect(() => {
+        const syncTab = () => setActiveTab(hashToTab(window.location.hash));
+        syncTab(); // initial
+        window.addEventListener("hashchange", syncTab);
+        return () => window.removeEventListener("hashchange", syncTab);
+    }, []);
+
     useEffect(() => {
         fetchConfigs();
     }, []);
@@ -295,13 +312,16 @@ export default function AdminConsole() {
         );
     }
 
-    const TabButton = ({ id, label, icon: Icon }: any) => (
+    const TabButton = ({ id, label, icon: Icon }: { id: AdminTab; label: string; icon: React.ElementType }) => (
         <button
-            onClick={() => setActiveTab(id)}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all duration-200 ${activeTab === id
+            onClick={() => {
+                window.location.hash = id;
+            }}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all duration-200 ${
+                activeTab === id
                     ? "bg-blue-600 text-white shadow-lg shadow-blue-500/30"
                     : "text-slate-600 hover:bg-slate-100"
-                }`}
+            }`}
         >
             <Icon className={`w-5 h-5 ${activeTab === id ? "text-white" : "text-slate-400"}`} />
             {label}
@@ -484,9 +504,9 @@ export default function AdminConsole() {
                                                                             input.value = '';
                                                                         }
                                                                     }}
-                                                                    className="px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-black transition"
+                                                                    className="flex gap-1 items-center px-4 py-2 bg-blue-600 text-white shadow-lg shadow-blue-500/30 rounded-lg text-sm font-medium hover:bg-blue-800 transition cursor-pointer"
                                                                 >
-                                                                    Add
+                                                                   <Plus size={16}/> Add
                                                                 </button>
                                                             </div>
                                                         </div>
@@ -502,7 +522,7 @@ export default function AdminConsole() {
                                                         <label className="block text-sm font-semibold text-slate-700 mb-2">
                                                             {record.MasterLabel}
                                                         </label>
-                                                        {['Enable_One_plus_two_rule', 'Enable_Sandwitch_Rule'].includes(record.DeveloperName) ? (
+                                                        {['One_plus_two_rule', 'Sandwitch_Rule'].includes(record.DeveloperName) ? (
                                                             <select
                                                                 value={record.Value__c || 'false'}
                                                                 onChange={(e) => handleInputChange('Leave_Configurations__mdt', record, e.target.value)}

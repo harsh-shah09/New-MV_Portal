@@ -30,7 +30,7 @@ export function EmployeeFilters({
   return (
     <Card className="rounded-xl shadow-sm border-border bg-card text-card-foreground mb-6" styles={{body : { padding: '16px' }}}>
       <Row gutter={[16, 16]}>
-        <Col xs={24} md={6}>
+        <Col xs={24} md={8}>
           <label className="block text-sm font-medium text-muted-foreground mb-1.5">
             Name
           </label>
@@ -45,7 +45,7 @@ export function EmployeeFilters({
           />
         </Col>
 
-        <Col xs={24} md={6}>
+        {/* <Col xs={24} md={6}>
           <label className="block text-sm font-medium text-muted-foreground mb-1.5">
             Department
           </label>
@@ -65,9 +65,9 @@ export function EmployeeFilters({
             <Option value="Marketing">Marketing</Option>
             <Option value="Finance">Finance</Option>
           </Select>
-        </Col>
+        </Col> */}
 
-        <Col xs={24} md={6}>
+        <Col xs={24} md={8}>
           <label className="block text-sm font-medium text-muted-foreground mb-1.5">
             Employment Status
           </label>
@@ -88,7 +88,7 @@ export function EmployeeFilters({
           </Select>
         </Col>
         
-        <Col xs={24} md={6}>
+        <Col xs={24} md={8}>
           <label className="block text-sm font-medium text-muted-foreground mb-1.5">
             Account Status
           </label>

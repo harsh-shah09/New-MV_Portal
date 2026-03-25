@@ -2,7 +2,6 @@
 import { NextResponse } from 'next/server';
 import { google } from 'googleapis';
 import { verifySession } from '@/lib/auth';
-import { getAllConfigurations } from '@/lib/admin-config';
 import { db } from '@/lib/dynamodb';
 import { PutCommand } from '@aws-sdk/lib-dynamodb';
 

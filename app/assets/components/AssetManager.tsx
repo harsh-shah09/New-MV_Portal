@@ -161,6 +161,7 @@ export function AssetManager({ initialAssets }: AssetManagerProps) {
           onClick={refreshAssets}
           loading={loading}
           size='large'
+          className="w-full sm:w-auto"
         />
         <Button
           type="primary"
@@ -176,13 +177,12 @@ export function AssetManager({ initialAssets }: AssetManagerProps) {
       {/* ── Filter / Action Bar ── */}
       <Card
         className="rounded-xl shadow-sm border-border bg-card text-card-foreground"
-        styles={{ body: { padding: '14px 16px' } }}
+        styles={{ body: { padding: '12px 12px' } }}
         style={{ marginBottom: '10px' }}
       >
-        <Row gutter={[12, 12]} align="middle" wrap>
-
+        <Row gutter={[12, 12]} align="top" wrap>  
           {/* 🔍 Search — takes remaining space */}
-          <Col xs={24} sm={24} md={8} lg={9} xl={10}>
+          <Col xs={24} sm={24} md={10} lg={9} xl={10}>
             <label className="block text-xs font-medium text-muted-foreground mb-1">Search</label>
             <Input
               prefix={<SearchOutlined className="text-gray-400" />}
@@ -195,7 +195,7 @@ export function AssetManager({ initialAssets }: AssetManagerProps) {
           </Col>
 
           {/* 🗂 Category Filter */}
-          <Col xs={12} sm={8} md={5} lg={5} xl={5}>
+          <Col xs={12} sm={12} md={5} lg={5} xl={5}>
             <label className="block text-xs font-medium text-muted-foreground mb-1">Category</label>
             <Select
               options={categoryOptions}
@@ -208,7 +208,7 @@ export function AssetManager({ initialAssets }: AssetManagerProps) {
           </Col>
 
           {/* 🔖 Status Filter */}
-          <Col xs={12} sm={8} md={4} lg={4} xl={4}>
+          <Col xs={12} sm={12} md={4} lg={4} xl={4}>
             <label className="block text-xs font-medium text-muted-foreground mb-1">Status</label>
             <Select
               options={STATUS_OPTIONS}
@@ -220,12 +220,9 @@ export function AssetManager({ initialAssets }: AssetManagerProps) {
           </Col>
 
           {/* 🔘 Right-side action buttons */}
-          <Col xs={24} sm={8} md={7} lg={6} xl={5}>
+          <Col xs={24} sm={24} md={5} lg={6} xl={5}>
             {/* Spacer matches the label height in other columns */}
-            <label className="block text-xs font-medium text-muted-foreground mb-1 invisible select-none">
-              &nbsp;
-            </label>
-            <div className="flex gap-3 justify-end items-center">
+            <div className="mt-2 sm:mt-5 flex flex-col sm:flex-row gap-2 sm:gap-3 justify-stretch sm:justify-end items-stretch sm:items-center">              
               <Button
                 icon={<AppstoreOutlined />}
                 loading={catalogLoading}
@@ -234,6 +231,7 @@ export function AssetManager({ initialAssets }: AssetManagerProps) {
                   router.push('/assets/products');
                 }}
                 size='large'
+                className="w-full sm:w-auto"
               >
                 Catalog
               </Button>

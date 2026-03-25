@@ -10,8 +10,8 @@ import dayjs from "dayjs"
  */
 interface LeaveConfig {
   annualLeaveBalance: number
-  enableOnePlusTwoRule: boolean
-  enableSandwichRule: boolean
+  OnePlusTwoRule: boolean
+  SandwichRule: boolean
   sandwichRuleAppliesTo: string[]
   penaltyAppliesTo: string[]
   minWorkingDayNoticePeriod: number
@@ -43,8 +43,8 @@ async function fetchLeaveConfigurations(conn: any): Promise<LeaveConfig> {
 
     // Parse configurations with defaults
     const annualLeaveBalance = parseFloat(configMap.get('Annual_Leave_Balance') || '18')
-    const enableOnePlusTwoRule = configMap.get('Enable_One_plus_two_rule')?.toLowerCase() === 'true'
-    const enableSandwichRule = configMap.get('Enable_Sandwitch_Rule')?.toLowerCase() === 'true'
+    const OnePlusTwoRule = configMap.get('One_plus_two_rule')?.toLowerCase() === 'true'
+    const SandwichRule = configMap.get('Sandwitch_Rule')?.toLowerCase() === 'true'
     const sandwichRuleAppliesTo = (configMap.get('Sandwitch_Rule_Applies_to') || '')
       .split(',').map(role => role.trim()).filter(Boolean)
     const penaltyAppliesTo = (configMap.get('penalty_applies_to') || '')
@@ -54,8 +54,8 @@ async function fetchLeaveConfigurations(conn: any): Promise<LeaveConfig> {
 
     return {
       annualLeaveBalance,
-      enableOnePlusTwoRule,
-      enableSandwichRule,
+      OnePlusTwoRule,
+      SandwichRule,
       sandwichRuleAppliesTo,
       penaltyAppliesTo,
       minWorkingDayNoticePeriod,
@@ -65,8 +65,8 @@ async function fetchLeaveConfigurations(conn: any): Promise<LeaveConfig> {
     console.error('Error fetching leave configurations:', error)
     return {
       annualLeaveBalance: 18,
-      enableOnePlusTwoRule: true,
-      enableSandwichRule: true,
+      OnePlusTwoRule: true,
+      SandwichRule: true,
       sandwichRuleAppliesTo: ['Developer'],
       penaltyAppliesTo: ['Developer'],
       minWorkingDayNoticePeriod: 5,
@@ -155,7 +155,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid month" }, { status: 400 })
     }
 
-    const selectedPeriod = new Date(Number(year), monthIndex, 1)
+    const parsedYear = Number(year)
+    if (!Number.isFinite(parsedYear)) {
+      return NextResponse.json({ error: "Invalid year" }, { status: 400 })
+    }
+
+    const selectedPeriod = new Date(parsedYear, monthIndex, 1)
     const currentDate = new Date()
     const currentPeriod = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)
 
@@ -175,13 +180,32 @@ export async function POST(request: NextRequest) {
 
     const conn = await getSalesforceConnection()
 
+    const existingSummaryQuery = await conn.query<any>(`
+      SELECT Id, Name, Status__c
+      FROM Payroll_Summary__c
+      WHERE Payroll_Month__c = '${month}'
+      AND Payroll_Year__c = ${parsedYear}
+      LIMIT 1
+    `)
+
+    if ((existingSummaryQuery.records || []).length > 0) {
+      return NextResponse.json(
+        {
+          error: `Payroll already exists for ${month} ${parsedYear}`,
+          payrollSummaryId: existingSummaryQuery.records[0].Id,
+          status: existingSummaryQuery.records[0].Status__c || "Draft",
+        },
+        { status: 409 }
+      )
+    }
+
     // Fetch leave configurations
     const leaveConfig = await fetchLeaveConfigurations(conn)
     
     console.log('⚙️  LEAVE CONFIGURATIONS:')
-    console.log('  • Sandwich Rule Enabled:', leaveConfig.enableSandwichRule)
+    console.log('  • Sandwich Rule Enabled:', leaveConfig.SandwichRule)
     console.log('  • Sandwich Applies To:', leaveConfig.sandwichRuleAppliesTo.join(', '))
-    console.log('  • 1+2 Rule Enabled:', leaveConfig.enableOnePlusTwoRule)
+    console.log('  • 1+2 Rule Enabled:', leaveConfig.OnePlusTwoRule)
     console.log('  • 1+2 Applies To:', leaveConfig.penaltyAppliesTo.join(', '))
     console.log('  • Min Notice Period:', leaveConfig.minWorkingDayNoticePeriod, 'working days')
     console.log('  • Penalty Per Day:', leaveConfig.penaltyDaysPerDay, 'days')
@@ -217,8 +241,8 @@ export async function POST(request: NextRequest) {
     console.log(`  ✓ Fetched ${employeeRecords.totalSize} active employees`)
 
     // Calculate the date range for the selected month
-    const startDate = new Date(year, monthIndex, 1)
-    const endDate = new Date(year, monthIndex + 1, 0)
+    const startDate = new Date(parsedYear, monthIndex, 1)
+    const endDate = new Date(parsedYear, monthIndex + 1, 0)
 
     // Format dates as YYYY-MM-DD without timezone conversion
     const formatDate = (date: Date) => {
@@ -402,8 +426,8 @@ export async function POST(request: NextRequest) {
       const sandwichRuleAppliesToUser = leaveConfig.sandwichRuleAppliesTo.includes(employeeRole)
       const penaltyAppliesToUser = leaveConfig.penaltyAppliesTo.includes(employeeRole)
       
-      const applySandwichRule = applyRules && !isHalfDay && leaveConfig.enableSandwichRule && sandwichRuleAppliesToUser
-      const applyOnePlusTwoRule = applyRules && !isHalfDay && leaveConfig.enableOnePlusTwoRule && penaltyAppliesToUser
+      const applySandwichRule = applyRules && !isHalfDay && leaveConfig.SandwichRule && sandwichRuleAppliesToUser
+      const applyOnePlusTwoRule = applyRules && !isHalfDay && leaveConfig.OnePlusTwoRule && penaltyAppliesToUser
       
       console.log(`   Rules Evaluation:`)
       console.log(`     • applyRules: ${applyRules} (category: '${leaveCategory}' → '${normalizedCategory}', type: '${leaveType}' → '${normalizedType}')`)

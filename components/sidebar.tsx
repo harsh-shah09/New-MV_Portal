@@ -107,11 +107,33 @@ export function Sidebar({
     return () => window.removeEventListener("resize", checkMobile)
   }, [])
 
+  // Open/close sidebar during guided tour on mobile
+  useEffect(() => {
+    const onTourStart = () => {
+      if (window.innerWidth < 1024) {
+        // Small delay so joyride initialises after the sidebar slides in
+        setTimeout(() => setOpen?.(true), 50);
+      }
+    };
+    const onTourEnd = () => {
+      if (window.innerWidth < 1024) {
+        setOpen?.(false);
+      }
+    };
+    window.addEventListener('mv:tour:start', onTourStart);
+    window.addEventListener('mv:tour:end',   onTourEnd);
+    return () => {
+      window.removeEventListener('mv:tour:start', onTourStart);
+      window.removeEventListener('mv:tour:end',   onTourEnd);
+    };
+  }, [setOpen]);
+
   const handleLogout = async () => {
     setShowLogoutConfirm(true)
   }
 
   const confirmLogout = async () => {
+    window.localStorage.clear()
     await logout()
     // Clear all React Query cache
     queryClient.clear()
@@ -131,7 +153,7 @@ export function Sidebar({
       <div className="absolute top-0 left-0 w-full h-64 bg-cyan-100/30 blur-[100px] z-0"></div>
 
       {/* Logo Section */}
-      <div className="relative z-10 flex items-center gap-3 p-6 border-b border-slate-100">
+      <Link href={'/'} className="relative z-10 flex items-center gap-3 p-6 border-b border-slate-100">
         <div className="relative group cursor-pointer">
           <div className="absolute -inset-1 bg-gradient-to-r from-cyan-400 to-blue-600 rounded-lg blur opacity-20 group-hover:opacity-40 transition duration-1000 group-hover:duration-200"></div>
           <div className="relative bg-white rounded-lg p-1.5 ring-1 ring-slate-100 shadow-sm">
@@ -148,7 +170,7 @@ export function Sidebar({
           <span className="font-bold text-lg tracking-tight bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">MV Portal</span>
           <span className="text-[10px] uppercase tracking-wider text-slate-500 font-medium">HR Management</span>
         </div>
-      </div>
+      </Link>
 
       {/* Navigation */}
       <div className="relative z-10 flex-1 overflow-y-auto py-6 px-3 space-y-1 scrollbar-hide">
@@ -157,12 +179,15 @@ export function Sidebar({
         </div>
         {navItems.map((item) => {
           const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`)
+          // derive tour key: "/my-payrolls" → "my-payrolls"
+          const tourKey = item.href.replace(/^\//, '')
 
           return (
             <Link
               key={item.href}
               href={item.href}
               onClick={() => isMobile && setOpen?.(false)}
+              data-tour={tourKey}
               className="block"
             >
               <div

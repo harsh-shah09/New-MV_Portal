@@ -272,21 +272,14 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
         setWarningMsg(null)
     } else {
         const expParsed = decimalToYearsMonths(employee.Experience__c)
+        console.log(employee)
         setFormData({
              Employee_Name__c: employee.Employee_Name__c,
              Employee_Email__c: employee.Employee_Email__c,
              Employee_Phone__c: employee.Employee_Phone__c,
              Birthdate__c: employee.Birthdate__c,
              Gender__c: employee.Gender__c,
-             
-             Employee_Address__c: employee.Employee_Address__c || {}, 
-    
-             Employee_Address__Street__s: employee.Employee_Address__c?.street || '',
-             Employee_Address__City__s: employee.Employee_Address__c?.city || '',
-             Employee_Address__StateCode__s: employee.Employee_Address__c?.state || '',
-             Employee_Address__PostalCode__s: employee.Employee_Address__c?.postalCode || '',
-             Employee_Address__CountryCode__s: employee.Employee_Address__c?.country || '',
-
+             Employee_Address__c: employee.Employee_Current_Address__c || {}, 
              Emergency_Contact_Name__c: employee.Emergency_Contact_Name__c,
              Emergency_Contact_Number__c: employee.Emergency_Contact_Number__c,
              exp_years: expParsed.years,
@@ -315,16 +308,20 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                 payload.Employee_Email__c = payload.Employee_Email__c?.trim();
                 payload.Employee_Phone__c = payload.Employee_Phone__c?.trim()?.replace(/[\s-]/g, '');
         payload.Emergency_Contact_Number__c = payload.Emergency_Contact_Number__c?.trim()?.replace(/[\s-]/g, '');
-        payload.Employee_Address__c = {
+        payload.Employee_Current_Address__c = JSON.stringify(
+            {
             street: formData.Employee_Address__Street__s,
             city: formData.Employee_Address__City__s,
             state: formData.Employee_Address__StateCode__s,
             postalCode: formData.Employee_Address__PostalCode__s,
             country: formData.Employee_Address__CountryCode__s
-        };
+        }
+        );
+        console.log(payload);
         
         // Remove flattened address fields from payload
         delete payload.Employee_Address__Street__s;
+        delete payload.Employee_Address__c;
         delete payload.Employee_Address__City__s;
         delete payload.Employee_Address__StateCode__s;
         delete payload.Employee_Address__PostalCode__s;
@@ -828,88 +825,93 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
             )}
       
       {/* Header Profile Card */}
-      <div className="relative bg-white rounded-3xl p-8 border border-slate-100 shadow-xl overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-[340px] md:h-40 bg-gradient-to-r from-cyan-500 to-blue-600"></div>
-        
-        <div className="relative flex flex-col md:flex-row gap-6 items-center md:items-center mt-6">
-           {/* Avatar */}
-           <div className="relative group shrink-0">
-              <div className="w-32 h-32 rounded-full border-4 border-white shadow-lg bg-slate-200 flex items-center justify-center overflow-hidden">
-                  {employee.Profile_Photo__c && !uploadMutation.isPending ? (
-                      <Image key={employee.Profile_Photo__c} src={employee.Profile_Photo__c} alt="Profile" width={128} height={128} className="w-full h-full object-cover" />
-                  ) : uploadMutation.isPending ? (
-                      <Spin size="small" />
-                  ) : (
-                      <User className="w-12 h-12 text-slate-400" />
-                  )}
-              </div>
-              <button 
-                onClick={() => fileInputRef.current?.click()}
-                className="absolute bottom-1 right-1 p-2 rounded-full bg-slate-900 text-white shadow-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black"
-                title="Change Photo"
-               >
-                 <Camera className="w-4 h-4" />
+      <div className="relative bg-gradient-to-r from-cyan-500 to-blue-600 rounded-3xl overflow-hidden shadow-2xl">
+
+        <div className="relative flex flex-col sm:flex-row items-center sm:items-center gap-5 px-6 py-6 sm:py-5 sm:px-8">
+          {/* Avatar */}
+          <div className="relative group shrink-0">
+            <div className="w-24 h-24 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-full border-[3px] border-white/80 shadow-xl bg-white/20 backdrop-blur-md flex items-center justify-center overflow-hidden">
+              {employee.Profile_Photo__c && !uploadMutation.isPending ? (
+                <Image key={employee.Profile_Photo__c} src={employee.Profile_Photo__c} alt="Profile" width={96} height={96} className="w-full h-full object-cover" />
+              ) : uploadMutation.isPending ? (
+                <Spin size="small" />
+              ) : (
+                <User className="w-10 h-10 text-white/70" />
+              )}
+            </div>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="absolute bottom-0.5 right-0.5 p-1.5 rounded-full bg-black/60 text-white shadow-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black"
+              title="Change Photo"
+            >
+              <Camera className="w-3.5 h-3.5" />
+            </button>
+            <input type="file" hidden ref={fileInputRef} accept="image/*" onChange={handleFileChange} />
+          </div>
+
+          {/* Info */}
+          <div className="flex-1 min-w-0 text-center sm:text-left">
+            <h1 className="text-2xl sm:text-3xl font-bold text-white leading-tight truncate">
+              {employee.Employee_Name__c}
+            </h1>
+            <div className="flex flex-wrap items-center justify-center sm:justify-start gap-x-3 gap-y-1 text-white/80 mt-1.5 text-sm">
+              <span className="flex font-bold items-center gap-1.5">
+                <Briefcase className="w-3.5 h-3.5 shrink-0" />
+                {employee.Role__c || 'Role not set'}
+              </span>
+              <span className="w-1 h-1 rounded-full bg-white/40 hidden sm:inline-block"></span>
+              <span className="flex font-bold items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 shrink-0" />
+                {(employee.Employee_Current_Address__c && employee.Employee_Current_Address__c.city) || 'Location not set'}
+              </span>
+            </div>
+          </div>
+
+          {/* Action Button */}
+          {canToggleUserActive && (
+            <div className="shrink-0">
+              <button
+                onClick={() => {
+                  const isActivating = !employee.Active__c;
+                  Modal.confirm({
+                    title: `Are you sure you want to ${isActivating ? 'activate' : 'deactivate'} this user?`,
+                    content: isActivating
+                      ? 'By activating this user, a welcome email with account setup instructions will be sent automatically.'
+                      : 'Deactivating this user will prevent them from logging in.',
+                    okText: isActivating ? 'Activate & Send Email' : 'Deactivate',
+                    okType: isActivating ? 'primary' : 'danger',
+                    cancelText: 'Cancel',
+                    onOk: async () => {
+                      try {
+                        const res = await fetch(`/api/employees/${employeeId}/toggle-active`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ active: isActivating })
+                        });
+                        if (!res.ok) throw new Error('Failed');
+                        message.success(`User ${isActivating ? 'activated' : 'deactivated'} successfully`);
+                        queryClient.invalidateQueries({ queryKey: ['employee', employeeId] });
+                      } catch (e) {
+                        message.error('Failed to update status');
+                      }
+                    }
+                  });
+                }}
+                className={cn(
+                  'flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all border shadow-lg',
+                  employee.Active__c
+                    ? 'bg-red-600/90 text-white border-red-500/50 hover:bg-red-700'
+                    : 'bg-green-600/90 text-white border-green-500/50 hover:bg-green-700'
+                )}
+              >
+                <Power className="w-4 h-4" />
+                {employee.Active__c ? 'Deactivate' : 'Activate'}
               </button>
-              <input type="file" hidden ref={fileInputRef} accept="image/*" onChange={handleFileChange} />
-           </div>
-
-           {/* Info */}
-           <div className="flex-1 w-full text-center md:text-left mb-2">
-               <div className="flex flex-col md:flex-row md:items-center gap-4 justify-between">
-                   <div>
-                       <h1 className="text-3xl font-bold text-white">{employee.Employee_Name__c}</h1>
-                       <div className="flex items-center justify-center md:justify-start gap-3 text-cyan-50 mt-1">
-                          <span className="flex items-center gap-1"><Briefcase className="w-4 h-4" /> {employee.Role__c || "Role not set"}</span>
-                          <span className="w-1 h-1 rounded-full bg-cyan-200"></span>
-                          <span className="flex items-center gap-1"><MapPin className="w-4 h-4" /> {employee.Employee_Address__c.city || "Location not set"}</span>
-                       </div>
-                   </div>
-                   <div className="flex gap-3 justify-center items-center">
-                                             {canToggleUserActive && (
-                           <button
-                             onClick={() => {
-                                 const isActivating = !employee.Active__c;
-                                 Modal.confirm({
-                                     title: `Are you sure you want to ${isActivating ? 'activate' : 'deactivate'} this user?`,
-                                     content: isActivating 
-                                         ? 'By activating this user, a welcome email with account setup instructions will be sent automatically.' 
-                                         : 'Deactivating this user will prevent them from logging in.',
-                                     okText: isActivating ? 'Activate & Send Email' : 'Deactivate',
-                                     okType: isActivating ? 'primary' : 'danger',
-                                     cancelText: 'Cancel',
-                                     onOk: async () => {
-                                         try {
-                                             const res = await fetch(`/api/employees/${employeeId}/toggle-active`, {
-                                                 method: 'POST',
-                                                 headers: { 'Content-Type': 'application/json' },
-                                                 body: JSON.stringify({ active: isActivating })
-                                             });
-                                             if (!res.ok) throw new Error('Failed');
-                                             message.success(`User ${isActivating ? 'activated' : 'deactivated'} successfully`);
-                                             queryClient.invalidateQueries({ queryKey: ["employee", employeeId] });
-                                         } catch (e) {
-                                             message.error("Failed to update status");
-                                         }
-                                     }
-                                 });
-                             }}
-                             className={cn(
-                                 "flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold transition border",
-                                 employee.Active__c 
-                                     ? "bg-red-50 text-red-600 border-red-100 hover:bg-red-100" 
-                                     : "bg-green-50 text-green-600 border-green-100 hover:bg-green-100"
-                             )}
-                         >
-                             <Power className="w-4 h-4" /> 
-                             {employee.Active__c ? 'Deactivate' : 'Activate'}
-                         </button>
-                       )}
-
-                   </div>
-               </div>
-           </div>
+            </div>
+          )}
         </div>
       </div>
+
 
       {warningMsg && (
           <div className="bg-orange-50 border-l-4 border-orange-500 p-4 rounded-r-lg shadow-sm flex items-start gap-4 animate-in slide-in-from-top-2">
@@ -932,7 +934,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
              <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-2 space-y-1">
                  {[
                      { id: "personal", label: "Personal Details", icon: User },
-                     { id: "employment", label: "Employment Info", icon: Building2 },
+                     { id: "employment", label: "Employment Details", icon: Building2 },
                      { id: "assets", label: "Assets", icon: Laptop },
                      { id: "bank", label: "Bank Details", icon: CreditCard },
                      { id: "documents", label: "Documents", icon: FileText },
@@ -963,12 +965,12 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                          <p className="text-slate-400 text-xs uppercase tracking-wider">Status</p>
                          <p className="font-semibold flex items-center gap-2">
                              <span className="w-2 h-2 rounded-full bg-green-400"></span> 
-                             {employee.Status__c || "Active"}
+                             {employee.Status__c}
                          </p>
                      </div>
                      <div>
                          <p className="text-slate-400 text-xs uppercase tracking-wider">Employee ID</p>
-                         <p className="font-mono">{employee.Employee_Id__c || 'Not set'}</p>
+                         <p className="font-mono">{employee.Name || 'Not set'}</p>
                      </div>
                  </div>
              </div>
@@ -1027,17 +1029,17 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
 
                                   <div className="border-t border-slate-100 pt-8">
                                       <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
-                                          <MapPin className="w-5 h-5 text-indigo-500" /> Address
+                                          <MapPin className="w-5 h-5 text-indigo-500" />Current Address
                                       </h2>
                                       <div className="grid grid-cols-1 gap-y-6">
-                                          <Field label="Street" value={employee.Employee_Address__c?.street} fieldKey="Employee_Address__Street__s" isEditing={isEditing} formData={formData} setFormData={setFormData} />
+                                          <Field label="Street" value={employee.Employee_Current_Address__c?.street} fieldKey="Employee_Address__Street__s" isEditing={isEditing} formData={formData} setFormData={setFormData} />
                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                              <Field label="City" value={employee.Employee_Address__c?.city} fieldKey="Employee_Address__City__s" isEditing={isEditing} formData={formData} setFormData={setFormData} />
-                                              <Field label="State" value={employee.Employee_Address__c?.state} fieldKey="Employee_Address__StateCode__s" isEditing={isEditing} formData={formData} setFormData={setFormData} />
+                                              <Field label="City" value={employee.Employee_Current_Address__c?.city} fieldKey="Employee_Address__City__s" isEditing={isEditing} formData={formData} setFormData={setFormData} />
+                                              <Field label="State" value={employee.Employee_Current_Address__c?.state} fieldKey="Employee_Address__StateCode__s" isEditing={isEditing} formData={formData} setFormData={setFormData} />
                                            </div>
                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                              <Field label="Zip / Postal" value={employee.Employee_Address__c?.postalCode} fieldKey="Employee_Address__PostalCode__s" isEditing={isEditing} formData={formData} setFormData={setFormData} />
-                                              <Field label="Country" value={employee.Employee_Address__c?.country} fieldKey="Employee_Address__CountryCode__s" isEditing={isEditing} formData={formData} setFormData={setFormData} />
+                                              <Field label="Zip / Postal" value={employee.Employee_Current_Address__c?.postalCode} fieldKey="Employee_Address__PostalCode__s" isEditing={isEditing} formData={formData} setFormData={setFormData} />
+                                              <Field label="Country" value={employee.Employee_Current_Address__c?.country} fieldKey="Employee_Address__CountryCode__s" isEditing={isEditing} formData={formData} setFormData={setFormData} />
                                            </div>
                                           {/* Coordinates & Accuracy */}
                                           {/* <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -1050,7 +1052,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
 
                                   <div className="border-t border-slate-100 pt-8">
                                       <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
-                                          <Phone className="w-5 h-5 text-red-500" /> Emergency Contact
+                                          <Phone className="w-5 h-5 text-blue-500" /> Emergency Contact
                                       </h2>
                                       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                                           <Field label="Contact Name" value={employee.Emergency_Contact_Name__c} fieldKey="Emergency_Contact_Name__c" isEditing={isEditing} formData={formData} setFormData={setFormData} error={errors.Emergency_Contact_Name__c} />
@@ -1070,7 +1072,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                                       onClick={handleEditToggle}
                                                       className="flex items-center gap-2 px-5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold transition"
                                                   >
-                                                      <Edit3 className="w-4 h-4" /> Edit Employment Info
+                                                      <Edit3 className="w-4 h-4" /> Edit Employment Details
                                                   </button>
                                               ) : (
                                                   <div className="flex items-center gap-2">

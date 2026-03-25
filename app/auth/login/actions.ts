@@ -8,7 +8,8 @@ import nodemailer from 'nodemailer';
 import { cookies } from 'next/headers';
 import { v4 as uuidv4 } from 'uuid';
 import { redirect } from 'next/navigation';
-
+import { getSpecificConfigurations } from '@/lib/admin-config';
+import { sendEmail } from '@/lib/email'
 const loginSchema = z.object({
   identifier: z.string().min(1, 'Email or Employee ID is required'),
   password: z.string().min(1, 'Password is required'),
@@ -179,10 +180,6 @@ export async function forgotPasswordAction(identifier: string) {
     const employee = await findEmployee(identifier);
     
     if (!employee) {
-      // Return success even if not found to prevent enumeration, or error if prefered.
-      // User asked: "if email or employee id is already filled then send mail... and update... show the message"
-      // I'll return specific error if empty to UI, but if identifier provided and not found, maybe error?
-      // Prompt implies "if filled... send mail".
       return { error: 'Employee not found' }; 
     }
 
@@ -191,7 +188,7 @@ export async function forgotPasswordAction(identifier: string) {
       return { error: 'System error: Database connection failed' };
     }
 
-    // Update Pass_Reset_Active__c to false
+    // Update Pass_Reset_Active__c to true
     try {
         await conn.sobject("Employee__c").update({
             Id: employee.Id,
@@ -199,11 +196,6 @@ export async function forgotPasswordAction(identifier: string) {
         });
     } catch (dbError) {
         console.error("Salesforce update error:", dbError);
-        // Continue to send email? Or fail? 
-        // If updating the flag is critical, maybe fail. 
-        // But maybe we just log it. 
-        // Let's assume we proceed or return error. 
-        // I'll return error to be safe.
         return { error: 'Failed to update employee record' };
     }
 
@@ -212,30 +204,55 @@ export async function forgotPasswordAction(identifier: string) {
         return { error: 'No email address found for this employee' };
     }
 
-    // Send Email
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: process.env.GMAIL_USER,
-        pass: process.env.GMAIL_APP_PASSWORD,
-      },
-    });
+    // --- Load email template from Email_Templates__mdt ---
+    const resetLink = `${process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/auth/change-password?id=${employee.Id}`;
+    let emailHtml: string;
+
     try {
-        await transporter.sendMail({
-            from: process.env.GMAIL_USER,
+        const configs = await getSpecificConfigurations(['emailTemplates']);
+        const templates = configs.emailTemplates || [];
+        const forgotTemplate = templates.find(
+            (t: any) => (t.MasterLabel || '').toLowerCase() === 'forgot-password'
+        );
+
+        if (forgotTemplate?.Value__c) {
+            // Replace placeholders in the template
+            const getCurrentYear = () => new Date().getFullYear().toString();
+            emailHtml = forgotTemplate.Value__c
+                .replace('{{employee.Name}}', employee.Employee_Name__c)
+                .replace('resetLink', `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/auth/change-password?id=${employee.Id}`)
+                .replace('{{year}}' ,getCurrentYear())
+        } else {
+            // Fallback inline template
+            emailHtml = `
+            <div style="font-family: Arial, sans-serif; color: #333;">
+              <h2>Password Reset Request</h2>
+              <p>Hello <strong>${employee.Name}</strong>,</p>
+              <p>A password reset has been requested for your account.</p>
+              <p>Please click the button below to reset your password:</p>
+              <a href="${resetLink}" style="display: inline-block; background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Reset Password</a>
+              <p>If you did not request this, please ignore this email.</p>
+            </div>`;
+        }
+    } catch (templateErr) {
+        console.error("Error loading email template:", templateErr);
+        // Fallback if template fetch fails
+        emailHtml = `
+        <div style="font-family: Arial, sans-serif; color: #333;">
+          <h2>Password Reset Request</h2>
+          <p>Hello <strong>${employee.Name}</strong>,</p>
+          <p>Please click the button below to reset your password:</p>
+          <a href="${resetLink}" style="display: inline-block; background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Reset Password</a>
+          <p>If you did not request this, please ignore this email.</p>
+        </div>`;
+    }
+
+    // Send Email
+    try {
+        await sendEmail({
             to: email,
             subject: 'Password Reset Link - MV Portal',
-            text: `Hello ${employee.Name},\n\nA password reset has been requested for your account. \n\nPlease click the link below to reset your password:\n\n${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/auth/change-password?id=${employee.Id}\n\nIf you did not request this, please ignore this email.`,
-          html: `
-          <div style="font-family: Arial, sans-serif; color: #333;">
-            <h2>Password Reset Request</h2>
-            <p>Hello <strong>${employee.Name}</strong>,</p>
-            <p>A password reset has been requested for your account.</p>
-            <p>Please click the button below to reset your password:</p>
-            <a href="${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/auth/change-password?id=${employee.Id}" style="display: inline-block; background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Reset Password</a>
-            <p>If you did not request this, please ignore this email.</p>
-          </div>
-          `
+            body: emailHtml,
         });
     } catch (emailError) {
         console.error("Email send error:", emailError);
@@ -249,3 +266,4 @@ export async function forgotPasswordAction(identifier: string) {
     return { error: 'An unexpected error occurred.' };
   }
 }
+
