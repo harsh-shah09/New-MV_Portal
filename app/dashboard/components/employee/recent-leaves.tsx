@@ -92,6 +92,7 @@ export function RecentLeaves({ recentLeaves }: RecentLeavesProps) {
         columns={leaveColumns}
         pagination={false}
         rowKey="id"
+        scroll={{x: 'max-content'}}
       />
     </Card>
   )
