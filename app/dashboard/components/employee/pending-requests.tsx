@@ -94,6 +94,7 @@ export function PendingRequests({ pendingRequests }: PendingRequestsProps) {
           columns={leaveColumns}
           pagination={false}
           size="small"
+          scroll={{x: 'max-content'}}
         />
       ) : (
         <div className="text-center py-8 text-gray-500">

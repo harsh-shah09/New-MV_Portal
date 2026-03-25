@@ -24,10 +24,10 @@ const BirthdayKpiCard: React.FC<BirthdayKpiCardProps> = ({ data }) => {
       <div className="flex justify-between items-center mb-4">
         <div>
           <h2 className="text-lg font-semibold text-gray-700">
-            🎂 Today’s Birthdays
+            Today’s Birthdays
           </h2>
           <p className="text-sm text-gray-400">
-            Celebrate your team 🎉
+            Celebrate your team
           </p>
         </div>
 
@@ -43,7 +43,7 @@ const BirthdayKpiCard: React.FC<BirthdayKpiCardProps> = ({ data }) => {
       {/* Content */}
       {data?.length === 0 ? (
         <div className="text-center py-6 text-gray-400">
-          No birthdays today 🎈
+          No birthdays today 
         </div>
       ) : (
         <div className="max-h-64 overflow-y-auto space-y-3 pr-2 bg-blue-50 rounded-xl">
