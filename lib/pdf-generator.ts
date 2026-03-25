@@ -2,7 +2,7 @@ import puppeteer from 'puppeteer'
 import type { Browser } from 'puppeteer'
 import fs from 'fs'
 import path from 'path'
-
+import {generateNDAPDF} from '@/app/nda/actions'
 interface Leave {
   id: string
   leaveType: string
@@ -106,28 +106,13 @@ const getBrowser = async (): Promise<Browser> => {
 }
 
 export async function generatePayslipPDF(payslipData: PayslipData): Promise<Buffer> {
-  const browser = await getBrowser()
-  const page = await browser.newPage()
 
   try {
     // Generate HTML for the payslip
     const html = generatePayslipHTML(payslipData)
+    const pdfBuffer = await generateNDAPDF(html , true)
     
-    await page.setContent(html, { waitUntil: 'networkidle0', timeout: 60000 })
-    
-    // Generate PDF
-    const pdfBuffer = await page.pdf({
-      format: 'A4',
-      printBackground: true,
-      margin: {
-        top: '20px',
-        right: '20px',
-        bottom: '20px',
-        left: '20px'
-      }
-    })
-
-    return Buffer.from(pdfBuffer)
+    return pdfBuffer as Buffer;
   } catch (error) {
     console.error('[PDF] PDF generation failed', {
       employeeId: payslipData.employeeId,
@@ -137,13 +122,7 @@ export async function generatePayslipPDF(payslipData: PayslipData): Promise<Buff
       error,
     })
     throw error
-  } finally {
-    try {
-      await page.close()
-    } catch (error) {
-      console.warn('[PDF] Failed to close page', { error })
-    }
-  }
+  } 
 }
 
 function generatePayslipHTML(payslip: PayslipData): string {

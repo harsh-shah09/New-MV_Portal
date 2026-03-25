@@ -15,9 +15,10 @@ import { PageHeader } from "@/components/page-header"
 
 interface HRDashboardProps {
   data: any
+  dashboardRole?: "HR" | "Admin"
 }
 
-export function HRDashboard({ data }: HRDashboardProps) {
+export function HRDashboard({ data, dashboardRole = "HR" }: HRDashboardProps) {
   const router = useRouter()
 
   const stats = data?.stats || {
@@ -46,8 +47,8 @@ export function HRDashboard({ data }: HRDashboardProps) {
     <div className="space-y-6">
       {/* Header Section */}
       <PageHeader 
-        title="HR Dashboard" 
-        subtitle="Manage your organization's leave requests and employee data"
+        title={`${dashboardRole} Dashboard`}
+        subtitle={dashboardRole === "Admin" ? "Manage organization-wide leave requests and employee data" : "Manage your organization's leave requests and employee data"}
       />
 
       {/* KPI Stats */}

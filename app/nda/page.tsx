@@ -208,8 +208,7 @@ export default function NDAPage() {
             setLoadingTemplate(true);
 
             const base64Pdf = await generateNDAPDF(previewContent);
-
-            const binaryString = window.atob(base64Pdf);
+            const binaryString = window.atob(base64Pdf as any);
             const len = binaryString.length;
             const bytes = new Uint8Array(len);
             for (let i = 0; i < len; i++) {
