@@ -53,7 +53,7 @@ export default function DashboardPage() {
     if (savedView === "hr" || savedView === "default") {
       setViewMode(savedView)
     } else {
-      setViewMode("default")
+      setViewMode(isAdmin ? "hr" : "default")
     }
   }, [role])
 
@@ -71,7 +71,7 @@ export default function DashboardPage() {
 
   const { data, isLoading, isFetching } = useQuery({
     queryKey: ["dashboard", role, viewMode],
-    queryFn: () => fetch(`/api/dashboard?view=${viewMode}`).then((res) => {
+    queryFn: () => fetch(`/api/dashboard?view=${viewMode}&role=${role}`).then((res) => {
       if (!res.ok) {
         if (res.status === 401) {
           router.push("/auth/login")
@@ -98,12 +98,12 @@ export default function DashboardPage() {
                 onChange={handleViewModeChange}
                 className="bg-slate-200"
               />
-              <span className="text-xs sm:text-sm font-medium text-slate-600">HR Dashboard</span>
+              <span className="text-xs sm:text-sm font-medium text-slate-600">{isAdmin ? 'Admin Dashboard' : 'HR Dashboard'}</span>
             </div>
           </div>
         )}
       {viewMode === 'hr' && canAccessHRView ? (
-        <HRDashboard data={data} />
+        <HRDashboard data={data} dashboardRole={isAdmin ? 'Admin' : 'HR'} />
       ) : (
         <EmployeeDashboard data={data} />
       )}

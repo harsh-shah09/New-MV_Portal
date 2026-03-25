@@ -967,6 +967,8 @@ export default function LeavesPage() {
                       const displayDuration = hasRequestedWithdrawalRange
                         ? dayjs(displayEndDate).diff(dayjs(displayStartDate), 'day') + 1
                         : leave.duration
+                      const isHalfDaySession = leave.session === 'Session-1' || leave.session === 'Session-2'
+                      const sessionLabel = leave.session === 'Session-1' ? 'Session 1' : leave.session === 'Session-2' ? 'Session 2' : leave.session
                       // For withdrawal requests, always show action buttons regardless of previous approval status
                       const alreadyActioned = leave.isWithdrawalRequest ? false : (isTeamLead ? (tlApproved || tlRejected) : (hrApproved || hrRejected))
 
@@ -1048,6 +1050,9 @@ export default function LeavesPage() {
                                   {hasRequestedWithdrawalRange ? 'Requested Duration' : 'Duration'}
                                 </p>
                                 <p className="text-sm font-medium text-gray-900">{displayDuration} {displayDuration === 1 ? 'Day' : 'Days'}</p>
+                                {!hasRequestedWithdrawalRange && isHalfDaySession && (
+                                  <p className="text-xs text-gray-500 mt-1">{sessionLabel}</p>
+                                )}
                                 {hasRequestedWithdrawalRange && (
                                   <p className="text-xs text-gray-500 mt-1">Original: {leave.duration} {leave.duration === 1 ? 'Day' : 'Days'}</p>
                                 )}
@@ -1288,9 +1293,6 @@ export default function LeavesPage() {
           layout="vertical"
           className="mt-4"
           onFinish={handleSubmitApplyForOthers}
-          initialValues={{
-            leaveType: 'Sick Leave',
-          }}
         >
           <Form.Item
             name="employeeId"
@@ -1318,7 +1320,7 @@ export default function LeavesPage() {
             label="Leave Type"
             rules={[{ required: true, message: 'Select leave type' }]}
           >
-            <Select>
+            <Select placeholder="Select Leave Type">
               <Select.Option value="Sick Leave">Sick Leave</Select.Option>
               <Select.Option value="Emergency Leave">Emergency Leave</Select.Option>
             </Select>

@@ -253,6 +253,7 @@ export async function forgotPasswordAction(identifier: string) {
             to: email,
             subject: 'Password Reset Link - MV Portal',
             body: emailHtml,
+          senderEmployeeId: employee.Id
         });
     } catch (emailError) {
         console.error("Email send error:", emailError);

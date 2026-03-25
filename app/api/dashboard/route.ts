@@ -40,6 +40,10 @@ export async function GET(req: NextRequest) {
 
         // HR/Admin Dashboard Data
         if (viewMode === 'hr' && canAccessHRView) {
+            const hrDashboardLeaveFilter = isAdmin
+                ? ""
+                : "AND Employee__r.Role__c NOT IN ('HR', 'Admin')";
+
             // Get total employees
             const employeeQuery = await conn.query(`
                 SELECT COUNT(Id) totalEmployees
@@ -50,13 +54,22 @@ export async function GET(req: NextRequest) {
 
             // Get pending approvals count
             let pendingApprovalsQuery;
-            if (isAdmin || isHR) {
+            if (isAdmin) {
                 pendingApprovalsQuery = await conn.query(`
                     SELECT Id, Name, Employee__c, Employee__r.Employee_Name__c, 
                            Leave_Type__c, Leave_Category__c, Start_Date__c, 
                            End_Date__c, Total_Days__c, TL_Approval__c
                     FROM Leave__c
-                    WHERE Status__c = 'Applied' AND Employee__r.Role__c != 'HR'
+                    WHERE Status__c = 'Applied'
+                    ORDER BY Start_Date__c ASC
+                `);
+            } else if (isHR) {
+                pendingApprovalsQuery = await conn.query(`
+                    SELECT Id, Name, Employee__c, Employee__r.Employee_Name__c, 
+                           Leave_Type__c, Leave_Category__c, Start_Date__c, 
+                           End_Date__c, Total_Days__c, TL_Approval__c
+                    FROM Leave__c
+                    WHERE Status__c = 'Applied' ${hrDashboardLeaveFilter}
                     ORDER BY Start_Date__c ASC
                 `);
             } else {
@@ -89,7 +102,9 @@ export async function GET(req: NextRequest) {
             const approvedTodayQuery = await conn.query(`
                 SELECT COUNT(Id) approvedCount
                 FROM Leave__c
-                WHERE Approved_Date__c = ${today} AND Status__c = 'Approved'
+                WHERE Approved_Date__c = ${today}
+                AND Status__c = 'Approved'
+                ${hrDashboardLeaveFilter}
             `);
             const approvedToday = approvedTodayQuery.records[0]?.approvedCount || 0;
 
@@ -101,6 +116,7 @@ export async function GET(req: NextRequest) {
                 FROM Leave__c
                 WHERE Approved_Date__c = ${today}
                 AND Status__c = 'Approved'
+                ${hrDashboardLeaveFilter}
                 ORDER BY Start_Date__c ASC
             `);
 
@@ -130,6 +146,7 @@ export async function GET(req: NextRequest) {
                 WHERE Start_Date__c <= ${today} 
                 AND End_Date__c >= ${today}
                 AND Status__c = 'Approved'
+                ${hrDashboardLeaveFilter}
             `);
             const onLeaveToday = onLeaveTodayQuery.records[0]?.onLeaveCount || 0;
 
@@ -143,6 +160,7 @@ export async function GET(req: NextRequest) {
                 WHERE Start_Date__c <= ${today} 
                 AND End_Date__c >= ${today}
                 AND Status__c = 'Approved'
+                ${hrDashboardLeaveFilter}
                 ORDER BY Start_Date__c ASC
             `);
 
@@ -164,6 +182,7 @@ export async function GET(req: NextRequest) {
                 FROM Leave__c
                 WHERE Status__c = 'Approved'
                 AND CALENDAR_YEAR(Start_Date__c) = ${new Date().getFullYear()}
+                ${hrDashboardLeaveFilter}
                 GROUP BY Leave_Type__c
             `);
 
@@ -201,6 +220,7 @@ export async function GET(req: NextRequest) {
                        Leave_Type__c, CreatedDate
                 FROM Leave__c
                 WHERE CreatedDate >= LAST_N_DAYS:7
+                ${hrDashboardLeaveFilter}
                 ORDER BY CreatedDate DESC
                 LIMIT 20
             `);
@@ -213,6 +233,7 @@ export async function GET(req: NextRequest) {
             }));
 
             return NextResponse.json({
+                dashboardRole: isAdmin ? 'Admin' : 'HR',
                 stats: {
                     totalEmployees,
                     pendingApprovals: pendingApprovals.length,

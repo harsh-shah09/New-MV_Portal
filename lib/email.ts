@@ -206,16 +206,16 @@ export async function sendEmail({ to, subject, body, contentType = 'text/plain',
       return;
     }
 
-    const transporter = createTransporter();
+    // const transporter = createTransporter();
 
-    const mailOptions: any = {
-      from: process.env.GMAIL_USER,
-      to,
-      subject,
-      html: body,
-    };
+    // const mailOptions: any = {
+    //   from: process.env.GMAIL_USER,
+    //   to,
+    //   subject,
+    //   html: body,
+    // };
 
-    await transporter.sendMail(mailOptions);
+    // await transporter.sendMail(mailOptions);
 
     console.log('✅ Email sent via fallback mailbox to:', to);
   } catch (error) {

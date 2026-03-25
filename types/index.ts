@@ -63,6 +63,7 @@ export interface LeaveRequest {
   employeeId: string
   employeeName: string
   leaveType: string
+  session?: string
   leaveCategory?: string
   startDate: string
   endDate: string
