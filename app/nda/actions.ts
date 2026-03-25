@@ -9,7 +9,7 @@ const LOCAL_CHROME_PATH: Record<string, string> = {
   win32: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
 }
 
-export async function generateNDAPDF(htmlContent: string) {
+export async function generateNDAPDF(htmlContent: string , isPayslip: boolean = false) {
   const isVercel = !!process.env.VERCEL_ENV
 
   const browser = await puppeteer.launch({
@@ -30,7 +30,7 @@ export async function generateNDAPDF(htmlContent: string) {
       margin: { top: '20px', right: '20px', bottom: '20px', left: '20px' }
     })
 
-    return Buffer.from(pdfBuffer).toString('base64')
+    return isPayslip ? Buffer.from(pdfBuffer) : Buffer.from(pdfBuffer).toString('base64')
   } catch (error) {
     console.error('PDF generation error:', error)
     throw new Error('Failed to generate PDF')
