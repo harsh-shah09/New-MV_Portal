@@ -131,6 +131,19 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
       }
 
       const data = await res.json()
+
+      if (data?.payrollSummaryTxtContent) {
+        const blob = new Blob([data.payrollSummaryTxtContent], { type: "text/plain;charset=utf-8" })
+        const downloadUrl = URL.createObjectURL(blob)
+        const anchor = document.createElement("a")
+        anchor.href = downloadUrl
+        anchor.download = data?.payrollSummaryTxtFileName || `Payroll_Summary_${selectedMonth}_${selectedYear}.txt`
+        document.body.appendChild(anchor)
+        anchor.click()
+        anchor.remove()
+        URL.revokeObjectURL(downloadUrl)
+      }
+
       message.success("Payroll saved as Draft")
 
       // Let parent update UI/state
