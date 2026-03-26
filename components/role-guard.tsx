@@ -96,7 +96,7 @@ export function RoleGuard({ children, requiredRoles }: RoleGuardProps) {
                             </p>
 
                             {/* Action Buttons */}
-                            <div className="flex flex-col sm:flex-row gap-3 w-full">
+                            <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
                                 <button
                                     onClick={() => router.back()}
                                     className="flex items-center justify-center gap-2 px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors duration-200 font-medium"

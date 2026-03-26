@@ -92,14 +92,17 @@ export function Sidebar({
     }
   })
 
-  const unreadCount = notifications?.filter((n: any) =>
+  
+  const unreadNotifications = notifications?.filter((n: any) =>
     n.Status__c === 'Unread' ||
     n.Is_Read__c === false ||
     n.Is_Read__c === 'false' ||
     !n.Is_Read__c
-  )?.length || 0;
-  const latestNotif = notifications?.[0];
+  ) || [];
 
+  const unreadCount = unreadNotifications.length;
+
+  const latestNotif = unreadCount > 0 ? unreadNotifications[0] : null;
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 1024)
     checkMobile()
