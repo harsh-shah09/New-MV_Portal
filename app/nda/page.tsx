@@ -4,7 +4,7 @@ import Link from "next/link"
 import { useState, useEffect, useRef } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { Select, Button, Spin, message, Card, Tabs, Empty, Input, Table, Tag, Modal, Upload, Form } from "antd"
-import { Download, FileText, User, Search, Printer, FileCheck, UploadCloud, RefreshCw } from "lucide-react"
+import { Download, FileText, User, Search, Printer, FileCheck, UploadCloud, RefreshCw, Maximize2, Minimize2, X, Settings2 } from "lucide-react"
 import { UploadOutlined } from '@ant-design/icons'
 import { generateNDAPDF } from "./actions"
 import { RoleGuard } from "@/components/role-guard"
@@ -47,6 +47,8 @@ export default function NDAPage() {
     const [selectedRequest, setSelectedRequest] = useState<any>(null);
     const [uploadFile, setUploadFile] = useState<File | null>(null);
     const [uploading, setUploading] = useState(false);
+    const [isFullscreen, setIsFullscreen] = useState(false);
+    const [isControlsOpen, setIsControlsOpen] = useState(false);
 
     // Fetch Employees
     const { data: employees, isLoading: loadingEmployees } = useQuery({
@@ -325,10 +327,38 @@ export default function NDAPage() {
                                     </span>
                                 ),
                                 children: (
-                                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-2 flex-1">
+                                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-2 lg:gap-6 flex-1 relative overflow-hidden lg:overflow-visible">
 
-                                        {/* Left Sidebar: Controls */}
-                                        <div className="lg:col-span-4 space-y-4 h-fit sticky top-6">
+                                        {/* Mobile Toggle Button */}
+                                        <div className="lg:hidden mb-2 rounded-2xl bg-white border border-slate-200 p-4 shadow-sm flex items-center justify-between z-[50]">
+                                            <div>
+                                                <h3 className="font-bold text-slate-800 flex items-center gap-2"><Settings2 className="w-4 h-4 text-blue-500" /> Document Settings</h3>
+                                                <p className="text-xs text-slate-500 mt-1">Select employee & template to begin</p>
+                                            </div>
+                                            <Button type="primary" size="large" className="rounded-xl shadow-lg shadow-blue-500/30" onClick={() => setIsControlsOpen(true)}>Configure</Button>
+                                        </div>
+
+                                        {/* Mobile Drawer Backdrop */}
+                                        {isControlsOpen && (
+                                            <div 
+                                                className="fixed inset-0 bg-black/60 z-[110] lg:hidden animate-in fade-in" 
+                                                onClick={() => setIsControlsOpen(false)}
+                                            />
+                                        )}
+
+                                        {/* Left Sidebar: Controls (Becomes Mobile Drawer) */}
+                                        <div className={`fixed inset-y-0 right-0 z-[120] w-[340px] max-w-[90vw] bg-slate-50 shadow-2xl transform transition-transform duration-300 ease-in-out ${isControlsOpen ? 'translate-x-0' : 'translate-x-full'} lg:static lg:translate-x-0 lg:z-auto lg:w-full lg:bg-transparent lg:shadow-none lg:col-span-4 flex flex-col`}>
+                                            
+                                            {/* Mobile Drawer Header */}
+                                            <div className="lg:hidden flex shrink-0 items-center justify-between p-4 bg-white border-b border-slate-200">
+                                                <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2"><Settings2 className="w-5 h-5 text-blue-500" /> Options</h3>
+                                                <button onClick={() => setIsControlsOpen(false)} className="p-2 bg-slate-100 hover:bg-slate-200 rounded-full transition-colors">
+                                                    <X className="w-5 h-5 text-slate-600" />
+                                                </button>
+                                            </div>
+
+                                            {/* Scrollable Constraints */}
+                                            <div className="p-4 lg:p-0 flex-1 overflow-y-auto lg:h-fit lg:sticky lg:top-6 lg:max-h-[75vh] space-y-4 pb-24 lg:pb-0">
 
                                             {/* Employee Selector Card */}
                                             <div className="bg-card rounded-2xl shadow-sm border border-border p-6 transition-all hover:shadow-md">
@@ -466,39 +496,68 @@ export default function NDAPage() {
                                             </div>
 
                                             {/* Actions */}
-                                            <Button
-                                                type="primary"
-                                                size="large"
-                                                icon={<Download className="w-4 h-4" />}
-                                                className="w-full h-12 rounded-xl text-base font-semibold shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40 transition-all active:scale-[0.98]"
-                                                disabled={!previewContent}
-                                                onClick={handleDownload}
-                                                loading={loadingTemplate}
-                                            >
-                                                {loadingTemplate ? 'Loading Template...' : 'Download PDF'}
-                                            </Button>
+                                            <div className="sticky bottom-0 bg-slate-50 p-4 lg:p-0 border-t border-slate-200 lg:border-transparent lg:static mt-auto lg:mt-0 shadow-[0_-10px_10px_-10px_rgba(0,0,0,0.1)] lg:shadow-none">
+                                                <Button
+                                                    type="primary"
+                                                    size="large"
+                                                    icon={<Download className="w-4 h-4" />}
+                                                    className="w-full h-12 rounded-xl text-base font-semibold shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40 transition-all active:scale-[0.98]"
+                                                    disabled={!previewContent}
+                                                    onClick={handleDownload}
+                                                    loading={loadingTemplate}
+                                                >
+                                                    {loadingTemplate ? 'Loading...' : 'Download PDF'}
+                                                </Button>
+                                            </div>
 
+                                            </div>
                                         </div>
 
                                         {/* Right Main: Preview */}
-                                        <div className="lg:col-span-8 flex flex-col h-[600px] lg:h-[calc(100vh-140px)] sticky top-6">
-                                            <div className="bg-muted/30 rounded-2xl p-4 lg:p-8 flex-1 overflow-auto shadow-inner border border-border relative group">
+                                        <div className={`${isFullscreen ? 'fixed inset-0 z-[100] bg-background/95 backdrop-blur-sm p-4 md:p-8 flex flex-col animate-in fade-in' : 'lg:max-h-[75vh] lg:col-span-8 flex flex-col lg:sticky lg:top-6 mt-4 lg:mt-0'}`}>
+                                            <div className={`bg-muted/30 rounded-2xl flex-1 overflow-auto shadow-inner border border-border relative group ${isFullscreen ? 'p-4 md:p-8 pb-32 max-w-5xl mx-auto w-full' : 'p-4 lg:p-8 min-h-[500px] lg:min-h-0'}`}>
+                                                {/* Fullscreen Toggle */}
+                                                <button
+                                                    onClick={() => setIsFullscreen(!isFullscreen)}
+                                                    className="absolute top-4 right-4 z-10 p-2.5 bg-white/80 backdrop-blur-md rounded-xl shadow-lg border border-slate-200 hover:bg-slate-50 transition-all text-slate-600 hover:text-blue-600 hover:scale-105"
+                                                    title={isFullscreen ? "Exit Full Screen" : "View Full Screen"}
+                                                >
+                                                    {isFullscreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
+                                                </button>
+
                                                 {previewContent ? (
-                                                    <div className="w-full min-w-[210mm] lg:min-w-0 max-w-[210mm] bg-white shadow-2xl animate-in zoom-in-95 duration-500 origin-top flex flex-col mx-auto transition-transform">
+                                                    <div className={`bg-white shadow-2xl animate-in zoom-in-95 duration-500 origin-top flex flex-col mx-auto transition-transform ${isFullscreen ? 'w-full' : 'w-full md:min-w-[210mm] lg:min-w-0 max-w-full md:max-w-[210mm]'}`}>
                                                         {/* Print Header/Toolbar could go here */}
                                                         <div id="nda-preview-content"
                                                             contentEditable
-                                                            className="text-slate-900 text-sm md:text-base leading-relaxed flex-1 font-serif"
+                                                            className="text-slate-900 text-sm md:text-base leading-relaxed flex-1 font-serif overflow-x-auto overflow-y-hidden"
                                                             dangerouslySetInnerHTML={{ __html: previewContent }}
                                                         />
                                                     </div>
                                                 ) : (
                                                     <div className="h-full flex flex-col items-center justify-center text-muted-foreground opacity-60">
                                                         <FileText className="w-24 h-24 mb-4 stroke-1" />
-                                                        <p className="text-lg font-medium">Select an employee & template to preview</p>
+                                                        <p className="text-lg font-medium text-center px-4">Select an employee & template to preview</p>
                                                     </div>
                                                 )}
                                             </div>
+                                            
+                                            {/* Download Button visible dynamically in Full Screen */}
+                                            {isFullscreen && (
+                                                <div className="fixed bottom-8 left-1/2 -translate-x-1/2 shadow-2xl rounded-2xl z-[110] animate-in slide-in-from-bottom-8">
+                                                    <Button
+                                                        type="primary"
+                                                        size="large"
+                                                        icon={<Download className="w-5 h-5" />}
+                                                        className="h-14 px-8 rounded-xl text-lg font-semibold shadow-xl shadow-blue-500/30 hover:shadow-blue-500/50 transition-all active:scale-[0.98]"
+                                                        disabled={!previewContent}
+                                                        onClick={handleDownload}
+                                                        loading={loadingTemplate}
+                                                    >
+                                                        {loadingTemplate ? 'Generating PDF...' : 'Download PDF'}
+                                                    </Button>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 )

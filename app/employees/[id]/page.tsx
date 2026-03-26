@@ -10,7 +10,7 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
   return (
     <div className="min-h-screen bg-slate-50/50">
         <div className="w-full px-6 lg:px-10 pt-6 pb-0">
-            {role === 'HR' || role === 'Admin' && (
+            {(role === 'HR' || role === 'Admin') && (
             <Link 
                 href="/employees" 
                 className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg shadow-sm text-slate-600 hover:text-blue-600 hover:border-blue-200 hover:shadow-md transition-all font-medium"

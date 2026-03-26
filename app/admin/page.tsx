@@ -20,7 +20,9 @@ import {
     Check,
     Trash2,
     DollarSign,
-    Package
+    Package,
+    ChevronLeft,
+    ChevronRight
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { message, Modal, Spin } from "antd";
@@ -322,44 +324,44 @@ export default function AdminConsole() {
             onClick={() => {
                 window.location.hash = id;
             }}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all duration-200 ${activeTab === id
+            className={`w-full flex flex-col lg:flex-row items-center justify-center lg:justify-start gap-1 lg:gap-3 px-2 lg:px-4 py-3 rounded-xl font-medium transition-all duration-200 text-center lg:text-left ${activeTab === id
                     ? "bg-blue-600 text-white shadow-lg shadow-blue-500/30"
                     : "text-slate-600 hover:bg-slate-100"
                 }`}
         >
-            <Icon className={`w-5 h-5 ${activeTab === id ? "text-white" : "text-slate-400"}`} />
-            {label}
+            <Icon className={`w-5 h-5 lg:w-5 lg:h-5 ${activeTab === id ? "text-white" : "text-slate-400"}`} />
+            <span className="text-xs sm:text-sm">{label}</span>
         </button>
     );
 
     return (
         <RoleGuard>
             <div className="min-h-screen bg-slate-50 p-6 lg:p-10">
-                <div className="max-w-7xl mx-auto space-y-8">
+                <div className="w-full mx-auto space-y-4 lg:space-y-8">
 
                     {/* Header */}
-                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm animate-in fade-in slide-in-from-top-4">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 sm:p-6 rounded-3xl border border-slate-100 shadow-sm animate-in fade-in slide-in-from-top-4">
                         <div>
-                            <h1 className="text-3xl font-bold text-slate-900">Admin Console</h1>
-                            <p className="text-slate-500 mt-1">Manage system configurations, documents, and templates</p>
+                            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Admin Console</h1>
+                            <p className="text-slate-500 mt-1 text-sm sm:text-base">Manage system configurations, documents, and templates</p>
                         </div>
                         <button
                             onClick={saveChanges}
                             disabled={unsavedChanges.length === 0 || saving}
-                            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-semibold transition shadow-lg ${unsavedChanges.length > 0
+                            className={`flex w-full md:w-auto items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold transition shadow-lg ${unsavedChanges.length > 0
                                 ? "bg-blue-600 text-white hover:bg-blue-700 shadow-blue-500/20"
                                 : "bg-slate-100 text-slate-400 cursor-not-allowed"
                                 }`}
                         >
                             {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-                            Save Changes ({unsavedChanges.length})
+                            Save Changes {unsavedChanges.length > 0 ? `(${unsavedChanges.length})` : ''}
                         </button>
                     </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 lg:gap-8">
                         {/* Sidebar */}
                         <div className="lg:col-span-1 space-y-4">
-                            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-2 space-y-1">
+                            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-2 grid grid-cols-2 sm:grid-cols-3 lg:flex lg:flex-col gap-2">
                                 <TabButton id="admin" label="General Settings" icon={Settings} />
                                 <TabButton id="documents" label="Documents Config" icon={FileText} />
                                 <TabButton id="leave" label="Leave Rules" icon={Calendar} />
@@ -382,7 +384,7 @@ export default function AdminConsole() {
 
                         {/* Content */}
                         <div className="lg:col-span-3">
-                            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-8 min-h-[600px]">
+                            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 sm:p-6 lg:p-8 min-h-[600px]">
                                 <AnimatePresence mode="wait">
                                     <motion.div
                                         key={activeTab}
@@ -397,7 +399,7 @@ export default function AdminConsole() {
                                                     <Package className="w-5 h-5 text-indigo-500" /> Asset Management
                                                 </h2>
                                                 {configs.assets?.map((record: any) => (
-                                                    <div key={record.Id} className="flex items-center justify-between p-6 bg-white border border-slate-200 rounded-2xl shadow-sm">
+                                                    <div key={record.Id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-6 bg-white border border-slate-200 rounded-2xl shadow-sm gap-4">
                                                         <div>
                                                             <div className="font-semibold text-slate-800 text-lg mb-1">{record.MasterLabel}</div>
                                                             <div className="text-slate-500 text-sm">System-wide configuration for Asset Management module.</div>
@@ -479,7 +481,7 @@ export default function AdminConsole() {
                                                                 })}
                                                             </div>
 
-                                                            <div className="flex gap-2">
+                                                            <div className="flex flex-col sm:flex-row gap-2">
                                                                 <input
                                                                     id={`add-doc-${record.Id}`}
                                                                     type="text"
@@ -708,8 +710,8 @@ export default function AdminConsole() {
                                                             }
 
                                                             return (
-                                                                <div className="p-4 border-t border-slate-200 flex items-center justify-between bg-slate-50">
-                                                                    <div className="text-sm text-slate-500">
+                                                                <div className="p-4 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between bg-slate-50 gap-4 sm:gap-0">
+                                                                    <div className="text-sm text-slate-500 text-center sm:text-left">
                                                                         Showing {start} to {end} of {filteredUsers.length} entries
                                                                     </div>
                                                                     <div className="flex items-center gap-2">
@@ -749,8 +751,10 @@ export default function AdminConsole() {
                                                     <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
                                                         <Workflow className="w-5 h-5 text-orange-500" /> Google Connected Users
                                                     </h2>
-                                                    <div className="flex items-center gap-3 w-full md:w-auto">
-                                                        <RefreshButton onClick={fetchConnectedUsers} label="" loading={loadingIntegrations} />
+                                                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto">
+                                                        <div className="flex justify-center sm:block">
+                                                            <RefreshButton onClick={fetchConnectedUsers} label="" loading={loadingIntegrations} />
+                                                        </div>
                                                         <div className="relative w-full md:w-64">
                                                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                                                             <input
@@ -884,27 +888,27 @@ export default function AdminConsole() {
                                                                 }
 
                                                                 return (
-                                                                    <div className="p-4 border-t border-slate-200 flex items-center justify-between bg-slate-50">
-                                                                        <div className="text-sm text-slate-500">
+                                                                    <div className="p-4 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between bg-slate-50 gap-4 sm:gap-0">
+                                                                        <div className="text-sm text-slate-500 text-center sm:text-left">
                                                                             Showing {start} to {end} of {filteredIntegrations.length} entries
                                                                         </div>
                                                                         <div className="flex items-center gap-2">
                                                                             <button
                                                                                 disabled={currentPageIntegrations === 1}
                                                                                 onClick={() => setCurrentPageIntegrations(prev => prev - 1)}
-                                                                                className="px-3 py-1.5 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                                                                className="rounded-lg font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                                                             >
-                                                                                Previous
+                                                                                <ChevronLeft size={16}/>
                                                                             </button>
-                                                                            <span className="text-xs text-slate-400 px-1">
-                                                                                {currentPageIntegrations} / {totalPages}
+                                                                            <span className="text-xs text-slate-400 border border-border border-cyan-100 rounded-lg p-3 text-cyan-500 font-bold">
+                                                                                {currentPageIntegrations}
                                                                             </span>
                                                                             <button
                                                                                 disabled={currentPageIntegrations >= totalPages}
                                                                                 onClick={() => setCurrentPageIntegrations(prev => prev + 1)}
-                                                                                className="px-3 py-1.5 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                                                                className="rounded-lg font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                                                             >
-                                                                                Next
+                                                                                <ChevronRight size={16}/>
                                                                             </button>
                                                                         </div>
                                                                     </div>

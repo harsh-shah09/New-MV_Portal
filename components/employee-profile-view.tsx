@@ -201,6 +201,9 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
+    
+    // Always validate based on the activeTab
+    if (activeTab === 'personal') {
         const employeeName = formData.Employee_Name__c?.trim()
         const email = formData.Employee_Email__c?.trim()
         const phone = formData.Employee_Phone__c?.trim()
@@ -217,8 +220,8 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
         if (!email) {
             newErrors.Employee_Email__c = "Email address is required"
         } else if (!emailPattern.test(email)) {
-      newErrors.Employee_Email__c = "Please enter a valid email address"
-    }
+             newErrors.Employee_Email__c = "Please enter a valid email address"
+        }
 
         if (!phone) {
             newErrors.Employee_Phone__c = "Phone number is required"
@@ -234,30 +237,33 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
             newErrors.Gender__c = "Gender is required"
         } else if (!["Male", "Female"].includes(gender)) {
             newErrors.Gender__c = "Please select a valid gender"
-    }
+        }
 
         if (emergencyPhone && (!normalizedEmergencyPhone || !phonePattern.test(normalizedEmergencyPhone))) {
             newErrors.Emergency_Contact_Number__c = "Emergency contact must be 10 digits or +91 followed by 10 digits"
-    }
+        }
 
-    // Date Validation
-    if (formData.Birthdate__c) {
-      const dob = new Date(formData.Birthdate__c)
-      if (dob > new Date()) {
-        newErrors.Birthdate__c = "Date of birth cannot be in the future"
-      }
-    }
-
-    if (formData.Joining_Date__c && formData.Birthdate__c) {
-        if (new Date(formData.Joining_Date__c) < new Date(formData.Birthdate__c)) {
-            newErrors.Joining_Date__c = "Joining date cannot be before birth date"
+        // Date Validation
+        if (formData.Birthdate__c) {
+          const dob = new Date(formData.Birthdate__c)
+          if (dob > new Date()) {
+            newErrors.Birthdate__c = "Date of birth cannot be in the future"
+          }
         }
     }
-    
-    // Required Employment Fields - only for non-Employee roles
-    if (currentUserRole !== "Employee") {
-        if (!formData.Role__c) newErrors.Role__c = "Role is required"
-        if (!formData.Department__c) newErrors.Department__c = "Department is required"
+
+    if (activeTab === 'employment') {
+        if (formData.Joining_Date__c && formData.Birthdate__c) {
+            if (new Date(formData.Joining_Date__c) < new Date(formData.Birthdate__c)) {
+                newErrors.Joining_Date__c = "Joining date cannot be before birth date"
+            }
+        }
+        
+        // Required Employment Fields - only for non-Employee roles
+        if (currentUserRole !== "Employee") {
+            if (!formData.Role__c) newErrors.Role__c = "Role is required"
+            if (!formData.Department__c) newErrors.Department__c = "Department is required"
+        }
     }
 
     setErrors(newErrors)
@@ -931,7 +937,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
           
           {/* Sidebar Nav */}
           <div className="lg:col-span-1">
-             <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-2 space-y-1">
+             <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-2 grid grid-cols-2 md:grid-cols-3 lg:flex lg:flex-col gap-2">
                  {[
                      { id: "personal", label: "Personal Details", icon: User },
                      { id: "employment", label: "Employment Details", icon: Building2 },
@@ -945,32 +951,33 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                         key={tab.id}
                         onClick={() => handleTabChange(tab.id as TabId)}
                         className={cn(
-                            "w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all duration-200",
+                            "w-full flex flex-col lg:flex-row items-center justify-center lg:justify-start gap-1 lg:gap-3 px-2 lg:px-4 py-3 rounded-xl font-medium transition-all duration-200 text-center lg:text-left",
                             activeTab === tab.id 
                                 ? "bg-blue-50 text-blue-700 shadow-sm" 
                                 : "text-slate-600 hover:bg-slate-50"
                         )}
                      >
                         <tab.icon className={cn("w-5 h-5", activeTab === tab.id ? "text-blue-600" : "text-slate-400")} />
-                        {tab.label}
+                        <span className="text-sm">{tab.label}</span>
                      </button>
                  ))}
              </div>
 
              {/* Quick Stats or Info */}
-             <div className="mt-6 bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-6 text-white shadow-xl">
-                 <h3 className="font-bold text-lg mb-4">Employee Status</h3>
-                 <div className="space-y-4">
-                     <div>
-                         <p className="text-slate-400 text-xs uppercase tracking-wider">Status</p>
-                         <p className="font-semibold flex items-center gap-2">
-                             <span className="w-2 h-2 rounded-full bg-green-400"></span> 
+             <div className="mt-4 lg:mt-6 bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-4 lg:p-6 text-white shadow-xl flex flex-row lg:flex-col justify-between items-center lg:items-start gap-4 lg:gap-0 lg:space-y-4">
+                 <h3 className="font-bold text-lg hidden lg:block mb-4">Employee Status</h3>
+                 <div className="flex flex-row lg:flex-col justify-around w-full lg:space-y-4">
+                     <div className="text-center lg:text-left">
+                         <p className="text-slate-400 text-[10px] lg:text-xs uppercase tracking-wider mb-1 lg:mb-0">Status</p>
+                         <p className="font-semibold flex items-center justify-center lg:justify-start gap-1.5 lg:gap-2 text-sm lg:text-base">
+                             <span className="w-1.5 h-1.5 lg:w-2 lg:h-2 rounded-full bg-green-400"></span> 
                              {employee.Status__c}
                          </p>
                      </div>
-                     <div>
-                         <p className="text-slate-400 text-xs uppercase tracking-wider">Employee ID</p>
-                         <p className="font-mono">{employee.Name || 'Not set'}</p>
+                     <div className="w-px h-8 bg-slate-700 block lg:hidden" />
+                     <div className="text-center lg:text-left">
+                         <p className="text-slate-400 text-[10px] lg:text-xs uppercase tracking-wider mb-1 lg:mb-0">Employee ID</p>
+                         <p className="font-mono text-sm lg:text-base">{employee.Name || 'Not set'}</p>
                      </div>
                  </div>
              </div>
@@ -988,36 +995,38 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                          transition={{ duration: 0.2 }}
                       >
                           {activeTab === "personal" && (
-                              <div className="space-y-8 relative">
+                              <div className="space-y-8">
                                   <div>
-                                      <div className="flex justify-end mb-4 absolute right-0">
-                                          {!isEditing ? (
-                                              <button
-                                                  onClick={handleEditToggle}
-                                                  className="flex items-center gap-2 px-5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold transition"
-                                              >
-                                                  <Edit3 className="w-4 h-4" /> Edit Personal Details
-                                              </button>
-                                          ) : (
-                                              <div className="flex items-center gap-2">
+                                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                                          <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2 m-0">
+                                              <User className="w-5 h-5 text-blue-500" /> Basic Information
+                                          </h2>
+                                          <div className="flex w-full sm:w-auto justify-end">
+                                              {!isEditing ? (
                                                   <button
                                                       onClick={handleEditToggle}
-                                                      className="flex items-center gap-2 px-5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold transition"
+                                                      className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold transition text-sm sm:text-base"
                                                   >
-                                                      <X className="w-4 h-4" /> Cancel
+                                                      <Edit3 className="w-4 h-4" /> Edit Details
                                                   </button>
-                                                  <button
-                                                      onClick={handleSave}
-                                                      className="flex items-center gap-2 px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold transition shadow-lg shadow-blue-500/20"
-                                                  >
-                                                      {updateMutation.isPending ? <Spin size="small" /> : <Save className="w-4 h-4" />} Save Changes
-                                                  </button>
-                                              </div>
-                                          )}
+                                              ) : (
+                                                  <div className="flex w-full items-center gap-3">
+                                                      <button
+                                                          onClick={handleEditToggle}
+                                                          className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold transition text-sm sm:text-base"
+                                                      >
+                                                          <X className="w-4 h-4" /> Cancel
+                                                      </button>
+                                                      <button
+                                                          onClick={handleSave}
+                                                          className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold transition shadow-lg shadow-blue-500/20 text-sm sm:text-base"
+                                                      >
+                                                          {updateMutation.isPending ? <Spin size="small" /> : <Save className="w-4 h-4" />} Save
+                                                      </button>
+                                                  </div>
+                                              )}
+                                          </div>
                                       </div>
-                                      <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
-                                          <User className="w-5 h-5 text-blue-500" /> Basic Information
-                                      </h2>
                                       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                                           <Field label="Employee Name" value={employee.Employee_Name__c} fieldKey="Employee_Name__c" isEditing={isEditing} formData={formData} setFormData={setFormData} error={errors.Employee_Name__c} placeholder="e.g. John Doe" required />
                                           <Field label="Email Address" value={employee.Employee_Email__c} fieldKey="Employee_Email__c" type="email" isEditing={isEditing} formData={formData} setFormData={setFormData} error={errors.Employee_Email__c} placeholder="e.g. john@example.com" required />
@@ -1063,38 +1072,40 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                           )}
 
                           {activeTab === "employment" && (
-                               <div className="space-y-8 relative">
+                               <div className="space-y-8">
                                   <div>
-                                      {['HR', 'Admin'].includes(currentUserRole) && (
-                                          <div className="flex justify-end mb-4 absolute right-0">
-                                              {!isEditing ? (
-                                                  <button
-                                                      onClick={handleEditToggle}
-                                                      className="flex items-center gap-2 px-5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold transition"
-                                                  >
-                                                      <Edit3 className="w-4 h-4" /> Edit Employment Details
-                                                  </button>
-                                              ) : (
-                                                  <div className="flex items-center gap-2">
+                                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                                          <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2 m-0">
+                                              <Briefcase className="w-5 h-5 text-blue-500" /> Employment Details
+                                          </h2>
+                                          {['HR', 'Admin'].includes(currentUserRole) && (
+                                              <div className="flex w-full sm:w-auto justify-end">
+                                                  {!isEditing ? (
                                                       <button
                                                           onClick={handleEditToggle}
-                                                          className="flex items-center gap-2 px-5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold transition"
+                                                          className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold transition text-sm sm:text-base"
                                                       >
-                                                          <X className="w-4 h-4" /> Cancel
+                                                          <Edit3 className="w-4 h-4" /> Edit Details
                                                       </button>
-                                                      <button
-                                                          onClick={handleSave}
-                                                          className="flex items-center gap-2 px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold transition shadow-lg shadow-blue-500/20"
-                                                      >
-                                                          {updateMutation.isPending ? <Spin size="small" /> : <Save className="w-4 h-4" />} Save Changes
-                                                      </button>
-                                                  </div>
-                                              )}
-                                          </div>
-                                      )}
-                                      <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
-                                          <Briefcase className="w-5 h-5 text-blue-500" /> Employment Details
-                                      </h2>
+                                                  ) : (
+                                                      <div className="flex w-full items-center gap-3">
+                                                          <button
+                                                              onClick={handleEditToggle}
+                                                              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold transition text-sm sm:text-base"
+                                                          >
+                                                              <X className="w-4 h-4" /> Cancel
+                                                          </button>
+                                                          <button
+                                                              onClick={handleSave}
+                                                              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold transition shadow-lg shadow-blue-500/20 text-sm sm:text-base"
+                                                          >
+                                                              {updateMutation.isPending ? <Spin size="small" /> : <Save className="w-4 h-4" />} Save
+                                                          </button>
+                                                      </div>
+                                                  )}
+                                              </div>
+                                          )}
+                                      </div>
                                       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                                           <Field 
                                             label="Department" 
@@ -1583,7 +1594,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                                       Add an extra layer of security to your account by requiring a verification code from your authenticator app when you sign in on a new device.
                                                   </p>
                                               </div>
-                                              <div>
+                                              <div className="w-full md:w-auto flex flex-col shrink-0">
                                                   {employee.Is2FAEnabled__c ? (
                                                       <button 
                                                           onClick={() => {
@@ -1591,7 +1602,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                                                   handleDisable2FA()
                                                               }
                                                           }}
-                                                          className="px-4 py-2 bg-red-50 text-red-600 border border-red-200 rounded-lg text-sm font-semibold hover:bg-red-100 transition"
+                                                          className="w-full md:w-auto px-6 py-2 bg-red-50 text-red-600 border border-red-200 rounded-lg text-sm font-semibold hover:bg-red-100 transition whitespace-nowrap"
                                                       >
                                                           Disable 2FA
                                                       </button>
@@ -1599,7 +1610,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                                       <button 
                                                           onClick={handleSetup2FA}
                                                           disabled={is2FALoading}
-                                                          className="px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-semibold hover:bg-black transition shadow-lg flex items-center gap-2"
+                                                          className="w-full md:w-auto px-6 py-2 bg-slate-900 text-white rounded-lg text-sm font-semibold hover:bg-black transition shadow-lg flex items-center justify-center gap-2 whitespace-nowrap text-center"
                                                       >
                                                           {is2FALoading ? <Spin size="small" className="invert" /> : <Lock className="w-4 h-4" />}
                                                           Enable 2FA
@@ -1612,8 +1623,8 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
 
                                   {/* 2FA Setup Modal */}
                                   {show2FAModal && (
-                                      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
-                                          <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-lg relative overflow-hidden">
+                                      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm animate-in fade-in">
+                                          <div className="bg-white rounded-2xl shadow-2xl p-6 sm:p-8 w-full max-w-lg max-h-[90vh] overflow-y-auto relative">
                                               <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-purple-500 to-indigo-600"></div>
                                               
                                               <button onClick={() => setShow2FAModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600">
