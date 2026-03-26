@@ -174,7 +174,7 @@ export default function HandbookClient({ role, userId }: HandbookClientProps) {
                                 </Tag>
                              </div>
                              <h3 className="font-semibold text-gray-800 mb-1 line-clamp-2 text-base" title={doc.Name}>
-                                 {doc.Document_Category__c}
+                                 {doc.Name}
                              </h3>
                              <p className="text-xs text-gray-400 mt-auto pt-4 border-t border-gray-50 flex justify-between items-center">
                                  <span>Uploaded</span>

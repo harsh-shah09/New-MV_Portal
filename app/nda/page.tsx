@@ -16,7 +16,7 @@ const AUTO_REPLACED_KEYS = new Set([
     'Employee_Role__c', 'Department__c', 'employee_Id', 'EmployeeId',
     'Joining_Date__c', 'joining_date', 'Base_Salary__c', 'Salary_CTC__c',
     'Seperation_Date__c', 'Employee_Title__c', 'Employee_ID__c',
-    'Employment_Duration__c', 'Email', 'Phone', 'Employee_Address',
+     'Email', 'Phone', 'Employee_Address',
     'Father_Name',
 ]);
 
@@ -161,7 +161,6 @@ export default function NDAPage() {
             replace('Seperation_Date__c', emp.Seperation_Date__c || new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }));
             replace('Employee_Title__c' , emp.Title__c + ' ' + emp.Role__c);
             replace('Employee_ID__c' , emp.Name);
-            replace('Employment_Duration__c' , ( emp.Seperation_Date__c - emp.Joining_Date__c ) / 365);
             replace('Email' , emp.Employee_Email__c);
             replace('Phone' , emp.Employee_Phone__c);
             
@@ -230,6 +229,10 @@ export default function NDAPage() {
             console.error('PDF Generation Error', err);
             message.error('Failed to generate PDF');
         } finally {
+            setSelectedEmpId(null)
+            setSelectedPartitionKey(null);
+            setSelectedTemplateFile(null);
+            setDynamicManualKeys([])
             setLoadingTemplate(false);
         }
     }
@@ -340,8 +343,8 @@ export default function NDAPage() {
                                                         className="w-full"
                                                         showSearch
                                                         allowClear
+                                                        value={selectedEmpId}
                                                         placeholder="Search employee..."
-                                                        optionFilterProp="children"
                                                         onChange={(value: any) => {
                                                             setSelectedEmpId(value);
                                                             if (!value) {

@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
     const fileUrl = await uploadFileToS3(buffer, file.name, file.type);
 
     await createDocumentRecord({
-        // Name: name || file.name,
+        Name: name || file.name,
         Document_Category__c: 'Handbook',
         Document_Type__c: type,
         File_URL__c: fileUrl,

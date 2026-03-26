@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query"
 import { hasPageAccess } from "@/lib/access-control"
 import { motion } from "framer-motion"
 import { ShieldX, ArrowLeft, Home } from "lucide-react"
+import { Spin } from "antd"
 
 interface RoleGuardProps {
     children: React.ReactNode
@@ -56,10 +57,7 @@ export function RoleGuard({ children, requiredRoles }: RoleGuardProps) {
     if (isChecking || isLoading) {
         return (
             <div className="flex items-center justify-center min-h-screen">
-                <div className="flex flex-col items-center gap-4">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-                    <p className="text-sm text-slate-600">Verifying access...</p>
-                </div>
+                <Spin size="large" tip = 'Loading...'/>
             </div>
         )
     }

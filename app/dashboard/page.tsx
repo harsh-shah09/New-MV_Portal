@@ -8,7 +8,7 @@ import { HRDashboard } from "./components/hr-dashboard"
 import { useQuery } from "@tanstack/react-query"
 import { verifySession } from "@/lib/auth"
 import { PageContainer } from "@/components/page-container"
-import { Switch } from "antd"
+import { Spin, Switch } from "antd"
 
 const DASHBOARD_VIEW_STORAGE_KEY = "dashboard-view-mode"
 
@@ -84,8 +84,13 @@ export default function DashboardPage() {
     enabled: !!role,
   })
 
-  if (isLoading || isFetching || !role) return <DashboardSkeleton />
-
+  if (isLoading || isFetching || !role) {
+    return(
+     <div className="w-full h-screen flex items-center justify-center">
+        <Spin size="large" tip="Loading Dashboard..." />
+      </div>
+    )
+  }
   return (
     <PageContainer>
       <div className="bg-white p-2 sm:p-4 rounded-xl flex flex-col gap-2 sm:gap-4">
