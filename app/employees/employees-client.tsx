@@ -182,7 +182,7 @@ export default function EmployeesClient({ role }: EmployeesClientProps) {
   if (isLoading) {
   return (
    <div className="w-full h-screen flex items-center justify-center">
-      <Spin size="large" tip="Loading Dashboard..." />
+      <Spin size="large" tip="Loading..." />
     </div>
   )
 }
