@@ -110,7 +110,7 @@ export default function DashboardPage() {
       {viewMode === 'hr' && canAccessHRView ? (
         <HRDashboard data={data} dashboardRole={isAdmin ? 'Admin' : 'HR'} />
       ) : (
-        <EmployeeDashboard data={data} />
+        <EmployeeDashboard data={data} hideTeamMembersWidget={isAdmin} />
       )}
       </div>
     </PageContainer>

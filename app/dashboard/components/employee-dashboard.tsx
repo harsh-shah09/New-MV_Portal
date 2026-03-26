@@ -14,9 +14,10 @@ import { PendingApprovalsQueue } from "./hr/pending-approvals-queue"
 import EmployeeBirthday from './employee/employee-birthday'
 interface EmployeeDashboardProps {
   data: any
+  hideTeamMembersWidget?: boolean
 }
 
-export function EmployeeDashboard({ data }: EmployeeDashboardProps) {
+export function EmployeeDashboard({ data, hideTeamMembersWidget = false }: EmployeeDashboardProps) {
   const leaveBalanceData = data?.leaveBalance || {
     annualLeaveRemaining: 0,
     sickLeaveCount: 0,
@@ -81,7 +82,7 @@ console.log(data)
       />
 
       {/* Team Members */}
-      <TeamOnLeave teamMembers={teamMembers} />
+      {!hideTeamMembersWidget && <TeamOnLeave teamMembers={teamMembers} />}
 
       {/* Leave Utilization Summary */}
       {/* <LeaveUtilizationSummary 

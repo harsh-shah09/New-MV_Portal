@@ -857,7 +857,7 @@ export default function LeavesPage() {
               onClick={openApplyForOthersModal}
               loading={isLoadingEmployees}
             >
-              Apply for Others
+              + On Behalf
             </Button>
           )}
         </div>
@@ -865,15 +865,17 @@ export default function LeavesPage() {
 
       <div className="bg-card rounded-xl shadow-sm border border-border mb-6 overflow-hidden">
         <div className="flex border-b border-border">
-          <button
-            onClick={() => setSelectedTab("my-requests")}
-            className={`flex-1 px-6 py-4 text-center font-medium transition ${selectedTab === "my-requests"
-              ? "text-primary border-b-2 border-primary bg-primary/5"
-              : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-              }`}
-          >
-            My Requests
-          </button>
+            {(currentUser?.role === 'HR' || currentUser?.role === 'Admin' || currentUser?.title === 'Team Lead') && (
+              <button
+                onClick={() => setSelectedTab("my-requests")}
+                className={`flex-1 px-6 py-4 text-center font-medium transition ${selectedTab === "my-requests"
+                  ? "text-primary border-b-2 border-primary bg-primary/5"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                  }`}
+              >
+                My Requests
+              </button>
+            )}
           {(currentUser?.role === 'HR' || currentUser?.role === 'Admin' || currentUser?.title === 'Team Lead') && (
             <button
               onClick={() => setSelectedTab("approvals")}
@@ -1351,14 +1353,14 @@ export default function LeavesPage() {
               label="Start Date"
               rules={[{ required: true, message: 'Please select start date' }]}
             >
-              <DatePicker className="w-full" format="YYYY-MM-DD" disabledDate={disabledApplyForOthersDate} />
+              <DatePicker className="w-full" placeholder="YYYY-MM-DD" format="YYYY-MM-DD" disabledDate={disabledApplyForOthersDate} />
             </Form.Item>
             <Form.Item
               name="endDate"
               label="End Date"
               rules={[{ required: true, message: 'Please select end date' }]}
             >
-              <DatePicker className="w-full" format="YYYY-MM-DD" disabledDate={disabledApplyForOthersDate} />
+              <DatePicker className="w-full" placeholder="YYYY-MM-DD" format="YYYY-MM-DD" disabledDate={disabledApplyForOthersDate} />
             </Form.Item>
           </div>
 
