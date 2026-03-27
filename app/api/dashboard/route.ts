@@ -38,7 +38,6 @@ export async function GET(req: NextRequest) {
         const requestedViewMode = searchParams.get('view') === 'hr' ? 'hr' : 'default';
         const viewMode = canAccessHRView ? requestedViewMode : 'default';
         const today = dayjs().format('YYYY-MM-DD');
-        console.log("today : ", today);
         const birthdayquery =  await conn.query(`
             SELECT Id , Name , Employee_Name__c,Role__c , Title__c ,Profile_Photo__c,Department__c
             FROM Employee__c
