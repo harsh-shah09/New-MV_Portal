@@ -62,6 +62,7 @@ export interface LeaveRequest {
   id: string
   employeeId: string
   employeeName: string
+  teamLeadName?: string
   leaveType: string
   session?: string
   leaveCategory?: string
