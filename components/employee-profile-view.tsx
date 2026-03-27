@@ -371,6 +371,12 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
   const [selectedDocTile, setSelectedDocTile] = useState<string | null>(null)
   const [tileUploadFile, setTileUploadFile] = useState<File | null>(null)
   const tileFileInputRef = useRef<HTMLInputElement>(null)
+  
+  // Passbook upload state
+  const [showPassbookUpload, setShowPassbookUpload] = useState(false)
+  const [passbookFile, setPassbookFile] = useState<File | null>(null)
+  const passbookFileInputRef = useRef<HTMLInputElement>(null)
+  
     const [isDocPreviewOpen, setIsDocPreviewOpen] = useState(false)
     const [docPreviewUrl, setDocPreviewUrl] = useState<string | null>(null)
     const [docPreviewTitle, setDocPreviewTitle] = useState<string>("Document Preview")
@@ -708,6 +714,23 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
       Experience_Documents: 'Experience Docs',
   }
 
+  // --- Passbook upload handler ---
+  const handlePassbookFileSelected = (file: File) => {
+      if (file.size > 10 * 1024 * 1024) {
+          message.error("File size exceeds 10MB limit.")
+          return
+      }
+      setPassbookFile(file)
+
+      const formData = new FormData()
+      formData.append("file", file)
+      formData.append("employeeId", employeeId)
+      formData.append("type", "document")
+      formData.append("category", "Personal")
+      formData.append("docType", "Passbook")
+      customDocMutation.mutate(formData)
+  }
+
   // --- Tile-based document upload handler ---
   const handleTileFileSelected = (file: File, docName: string) => {
       if (file.size > 10 * 1024 * 1024) {
@@ -818,17 +841,26 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
             : currentUserRole === 'HR'
             ? !['HR', 'Admin'].includes(viewedEmployeeRole)
             : false
-
+  if(isScreenActionLoading){
+    return(
+         <div className="fixed z-[999] overflow-hidden inset-0 backdrop-blur-xs flex items-center justify-center">
+            <div className="bg-white rounded-xl shadow-xl px-6 py-5 flex items-center gap-3 border border-slate-100">
+                <Spin size="large" />
+                <span className="text-sm font-semibold text-slate-700">Processing...</span>
+            </div>
+        </div>
+    )
+  }
   return (
-    <div className="w-full mx-auto p-6 lg:p-10 space-y-8 animate-in fade-in duration-500 relative">
-            {isScreenActionLoading && (
-                <div className="fixed inset-0 z-[999] bg-black/35 backdrop-blur-sm flex items-center justify-center">
+    <div className="w-full mx-auto p-6 lg:p-10 space-y-8 animate-in fade-in duration-500">
+            {/* {isScreenActionLoading && (
+                <div className="fixed z-[999] h-[80vh] overflow-hidden inset-0 backdrop-blur-sm flex items-center justify-center">
                     <div className="bg-white rounded-xl shadow-xl px-6 py-5 flex items-center gap-3 border border-slate-100">
                         <Spin size="large" />
                         <span className="text-sm font-semibold text-slate-700">Processing...</span>
                     </div>
                 </div>
-            )}
+            )} */}
       
       {/* Header Profile Card */}
       <div className="relative bg-gradient-to-r from-cyan-500 to-blue-600 rounded-3xl overflow-hidden shadow-2xl">
@@ -857,7 +889,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
 
           {/* Info */}
           <div className="flex-1 min-w-0 text-center sm:text-left">
-            <h1 className="text-2xl sm:text-3xl font-bold text-white leading-tight truncate">
+            <h1 className="text-2xl sm:text-3xl w-68 font-bold text-white leading-tight truncate capitalize">
               {employee.Employee_Name__c}
             </h1>
             <div className="flex flex-wrap items-center justify-center sm:justify-start gap-x-3 gap-y-1 text-white/80 mt-1.5 text-sm">
@@ -1276,17 +1308,17 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                       <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
                                           <Building2 className="w-5 h-5 text-purple-500" /> Bank Accounts
                                       </h2>
-                                      {canManageBankAccounts && (
+                                      
                                           <button 
                                             onClick={() => setShowBankForm(true)}
-                                            className="text-sm font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                                            className="text-sm font-semibold bg-slate-50 p-2 cursor-pointer hover:bg-slate-200 rounded-xl text-blue-600 hover:text-blue-700 flex items-center gap-1"
                                           >
                                               <Plus className="w-4 h-4" /> Add Account
                                           </button>
-                                      )}
+                                      
                                   </div>
 
-                                  {showBankForm && canManageBankAccounts && (
+                                  {showBankForm && (
                                       <div className="mb-6 p-6 bg-slate-50 border border-blue-100 rounded-xl animate-in fade-in slide-in-from-top-2">
                                           <h3 className="font-semibold text-slate-800 mb-4 flex items-center gap-2"><CreditCard className="w-4 h-4"/> Account Details</h3>
                                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -1299,7 +1331,40 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                               <input type="checkbox" id="primary" checked={bankFormData.Primary_Account__c} onChange={e => setBankFormData({...bankFormData, Primary_Account__c: e.target.checked})} />
                                               <label htmlFor="primary" className="text-sm text-slate-700">Set as Primary Account</label>
                                           </div>
-                                          <div className="flex justify-end gap-3">
+
+                                          {/* Passbook Upload in Bank Form */}
+                                          <div className="border-t border-slate-200 pt-4 mt-4">
+                                              <h4 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                                                  <FileText className="w-4 h-4 text-blue-500" /> Upload Passbook (Optional)
+                                              </h4>
+                                              <label className="flex flex-col items-center justify-center gap-3 p-4 border-2 border-dashed border-blue-300 rounded-lg cursor-pointer hover:bg-blue-50/50 transition">
+                                                  <input 
+                                                      ref={passbookFileInputRef}
+                                                      type="file" 
+                                                      className="sr-only"
+                                                      accept=".pdf,.jpg,.jpeg,.png"
+                                                      disabled={customDocMutation.isPending}
+                                                      onChange={(e) => {
+                                                          const file = e.target.files?.[0]
+                                                          if (file) handlePassbookFileSelected(file)
+                                                          e.target.value = ''
+                                                      }}
+                                                  />
+                                                  {customDocMutation.isPending ? (
+                                                      <Spin size="small" />
+                                                  ) : (
+                                                      <>
+                                                          <Upload className="w-5 h-5 text-blue-600" />
+                                                          <div className="text-center">
+                                                              <p className="text-xs font-medium text-slate-700">Click to upload</p>
+                                                              <p className="text-[11px] text-slate-500 mt-0.5">PDF, JPG, PNG (max 10MB)</p>
+                                                          </div>
+                                                      </>
+                                                  )}
+                                              </label>
+                                          </div>
+
+                                          <div className="flex justify-end gap-3 mt-4">
                                               <button onClick={() => { 
                                                 setBankFormData({
                                                     Name: "",
@@ -1338,7 +1403,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                                       </div>
                                                       <div className="flex items-center gap-2">
                                                           {bank.Primary_Account__c && <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full font-medium">Primary</span>}
-                                                          {canManageBankAccounts && !bank.Primary_Account__c && (
+                                                          {!bank.Primary_Account__c && (
                                                               <button
                                                                   onClick={() => setPrimaryBankMutation.mutate(bank.Id)}
                                                                   disabled={setPrimaryBankMutation.isPending}
@@ -1384,6 +1449,70 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                         </div>
                                       )
                                   )}
+
+                                  {/* Display uploaded passbook */}
+                                  {(() => {
+                                      const passbookDoc = employee.documents?.find(
+                                          (d: any) => d.Document_Type__c?.trim().toLowerCase() === 'passbook'
+                                      )
+                                      return passbookDoc ? (
+                                          <div className="border-t border-slate-100 pt-8 mt-8">
+                                              <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+                                                  <FileText className="w-5 h-5 text-blue-500" /> Passbook
+                                              </h2>
+                                              <div className="p-4 border border-slate-200 rounded-xl hover:shadow-md transition bg-white">
+                                                  <div className="flex justify-between items-start mb-3">
+                                                      <div className="flex items-center gap-3 flex-1">
+                                                          <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                                                              <FileText className="w-5 h-5 text-blue-600" />
+                                                          </div>
+                                                          <div>
+                                                              <h4 className="font-bold text-slate-800">Passbook</h4>
+                                                              <p className="text-xs text-slate-500">{passbookDoc.Status__c || 'Uploaded'}</p>
+                                                          </div>
+                                                      </div>
+                                                  </div>
+                                                  <div className="flex gap-2 mt-4">
+                                                      <button
+                                                          type="button"
+                                                          onClick={() => openDocumentPreview(passbookDoc.File_URL__c, 'Passbook')}
+                                                          className="flex-1 bg-white border border-slate-200 text-slate-600 text-xs font-semibold py-2 rounded-lg flex items-center justify-center gap-2 hover:bg-slate-50 transition"
+                                                      >
+                                                          <Eye className="w-3 h-3" /> View
+                                                      </button>
+                                                      {passbookDoc.File_URL__c && (
+                                                          <button
+                                                              type="button"
+                                                              onClick={() => handleDocumentDownload(passbookDoc.Id, 'Passbook')}
+                                                              className="flex-1 bg-white border border-slate-200 text-slate-600 text-xs font-semibold py-2 rounded-lg flex items-center justify-center gap-2 hover:bg-slate-50 transition"
+                                                          >
+                                                              <Download className="w-3 h-3" /> Download
+                                                          </button>
+                                                      )}
+                                                      {['HR', 'Admin'].includes(currentUserRole) && (
+                                                          <button
+                                                              onClick={() => {
+                                                                  Modal.confirm({
+                                                                      title: 'Delete this passbook?',
+                                                                      content: 'This action cannot be undone.',
+                                                                      okText: 'Delete',
+                                                                      okType: 'danger',
+                                                                      cancelText: 'Cancel',
+                                                                      centered: true,
+                                                                      onOk: () => deleteDocumentMutation.mutate(passbookDoc.Id)
+                                                                  })
+                                                              }}
+                                                              className="text-slate-400 hover:text-red-500 p-2 border border-slate-200 rounded-lg hover:border-red-200"
+                                                              title="Delete"
+                                                          >
+                                                              <Trash2 className="w-4 h-4" />
+                                                          </button>
+                                                      )}
+                                                  </div>
+                                              </div>
+                                          </div>
+                                      ) : null
+                                  })()}
                               </div>
                           )}
 

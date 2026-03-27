@@ -133,17 +133,16 @@ export default function EmailEditor({ template, onSave, onBack }: EmailEditorPro
         el.removeAttribute('contenteditable');
       });
 
-      const html = clone.outerHTML;
-
+      const html = clone.outerHTML;      
       return `<!DOCTYPE html>\n${html}`;
-    }
+    }    
     return content;
   };
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      const currentContent = mode === 'visual' ? syncContentFromIframe() : content;
+      const currentContent = syncContentFromIframe();
       await onSave(template.Id, currentContent);
       message.success("Template saved successfully");
     } catch (e) {
