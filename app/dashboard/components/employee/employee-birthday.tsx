@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { useRouter } from 'next/navigation';
 
 export interface Employee {
   Id: string;
@@ -17,6 +18,7 @@ interface BirthdayKpiCardProps {
 }
 
 const BirthdayKpiCard: React.FC<BirthdayKpiCardProps> = ({ data }) => {
+  const router = useRouter();
   return (
     <div className="bg-white rounded-2xl shadow-md p-5 hover:shadow-lg transition-all duration-300 w-full h-full">
       
@@ -24,10 +26,10 @@ const BirthdayKpiCard: React.FC<BirthdayKpiCardProps> = ({ data }) => {
       <div className="flex justify-between items-center mb-4">
         <div>
           <h2 className="text-lg font-semibold text-gray-700">
-            🎂 Today’s Birthdays
+            Today’s {data?.length > 1 ? 'Birthdays' : 'Birthday'}
           </h2>
           <p className="text-sm text-gray-400">
-            Celebrate your team 🎉
+            Celebrate your team
           </p>
         </div>
 
@@ -43,7 +45,7 @@ const BirthdayKpiCard: React.FC<BirthdayKpiCardProps> = ({ data }) => {
       {/* Content */}
       {data?.length === 0 ? (
         <div className="text-center py-6 text-gray-400">
-          No birthdays today 🎈
+          No birthdays today 
         </div>
       ) : (
         <div className="max-h-64 overflow-y-auto space-y-3 pr-2 bg-blue-50 rounded-xl">
@@ -51,15 +53,11 @@ const BirthdayKpiCard: React.FC<BirthdayKpiCardProps> = ({ data }) => {
             <div
               key={emp.Id}
               className="flex items-center gap-3 p-2 rounded-lg hover:bg-blue-50 transition cursor-pointer"
+              onClick={()=>router.push(`/employees/${emp.Id}`)}
             >
               {/* Avatar */}
               <img
-                src={
-                  emp.Profile_Photo__c ||
-                  `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                    emp.Employee_Name__c
-                  )}`
-                }
+                src={emp.Profile_Photo__c}
                 alt={emp.Employee_Name__c}
                 className="w-10 h-10 rounded-full object-cover border"
               />
@@ -69,9 +67,7 @@ const BirthdayKpiCard: React.FC<BirthdayKpiCardProps> = ({ data }) => {
                 <p className="text-sm font-medium text-gray-800">
                   {emp.Employee_Name__c}
                 </p>
-                <p className="text-xs text-gray-500">
-                  {emp.Title__c || emp.Role__c || 'Employee'}
-                </p>
+                <p className="text-xs text-gray-500">{`${emp.Title__c}  ${emp.Role__c}`}</p>
               </div>
 
               {/* Badge */}

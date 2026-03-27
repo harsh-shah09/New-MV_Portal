@@ -12,6 +12,8 @@ import { EmployeesOnLeave } from "./hr/employees-on-leave"
 import { LeavesApprovedToday } from "./hr/leaves-approved-today"
 import { GoogleIntegration } from "./employee/google-integration"
 import { PageHeader } from "@/components/page-header"
+import EmployeeBirthday from './employee/employee-birthday'
+import EmployeeAnniversary from '@/app/dashboard/components/employee/employee-anniversary'
 
 interface HRDashboardProps {
   data: any
@@ -35,7 +37,8 @@ export function HRDashboard({ data, dashboardRole = "HR" }: HRDashboardProps) {
   const employeesOnLeave = data?.employeesOnLeave || []
   const approvedTodayLeaves = data?.approvedTodayLeaves || []
   const pendingApprovals = data?.pendingApprovals || []
-
+  const birthdayToday = data?.birthdayToday || []
+  const anniversaryToday = data?.anniversaryToday || []
   const scrollToElement = (elementId: string) => {
     const element = document.getElementById(elementId)
     if (element) {
@@ -75,17 +78,24 @@ export function HRDashboard({ data, dashboardRole = "HR" }: HRDashboardProps) {
 
       {/* Recent Activities and Quick Actions */}
       <Row gutter={[16, 16]}>
-        <Col xs={24} lg={16}>
-          <RecentActivities recentActivities={recentActivities} />
-        </Col>
-        <Col xs={24} lg={8}>
+        <Col xs={12} lg={12}>
           <HRQuickActions />
         </Col>
-        <Col xs={24} lg={24} id="on-leave-today-widget">
+        <Col xs={12} lg={12}>
+          <RecentActivities recentActivities={recentActivities} />
+        </Col>
+        <Col xs={12} lg={12}>
+          <EmployeeBirthday data={birthdayToday} />
+        </Col>
+        <Col xs={12} lg={12}>
+          {/* Anniversary Here */}
+          <EmployeeAnniversary data={anniversaryToday} />
+        </Col>
+        <Col xs={12} lg={12} id="on-leave-today-widget">
         {/* Employees On Leave Today */}
         <EmployeesOnLeave employeesOnLeave={employeesOnLeave} />
         </Col>
-        <Col xs={24} lg={24} id="approved-today-widget">
+        <Col xs={12} lg={12} id="approved-today-widget">
         {/* Leaves Approved Today */}
         <LeavesApprovedToday approvedTodayLeaves={approvedTodayLeaves} />
         </Col>
@@ -94,9 +104,6 @@ export function HRDashboard({ data, dashboardRole = "HR" }: HRDashboardProps) {
       <GoogleIntegration />
       </Col>
       </Row>
-
-
-     
     </div>
   )
 }

@@ -203,7 +203,6 @@ export function AssetManager({ initialAssets }: AssetManagerProps) {
               onChange={setCategoryFilter}
               placeholder="All Categories"
               className="w-full"
-              suffixIcon={<FilterOutlined className="text-gray-400" />}
             />
           </Col>
 

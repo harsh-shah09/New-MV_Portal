@@ -20,7 +20,9 @@ import {
     Check,
     Trash2,
     DollarSign,
-    Package
+    Package,
+    ChevronLeft,
+    ChevronRight
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { message, Modal, Spin } from "antd";
@@ -49,6 +51,7 @@ export default function AdminConsole() {
     const [loading, setLoading] = useState(true);
     const [loadingUsers, setLoadingUsers] = useState(false);
     const [userSearch, setUserSearch] = useState("");
+    const [integrationSearch, setIntegrationSearch] = useState("");
     const [saving, setSaving] = useState(false);
     const [unsavedChanges, setUnsavedChanges] = useState<any[]>([]);
     // Pagination Controls
@@ -60,6 +63,10 @@ export default function AdminConsole() {
     useEffect(() => {
         setCurrentPageUsers(1);
     }, [userSearch]);
+
+    useEffect(() => {
+        setCurrentPageIntegrations(1);
+    }, [integrationSearch]);
 
     // Integration List State
     const [connectedUsers, setConnectedUsers] = useState<any[]>([]);
@@ -317,45 +324,44 @@ export default function AdminConsole() {
             onClick={() => {
                 window.location.hash = id;
             }}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all duration-200 ${
-                activeTab === id
+            className={`w-full flex flex-col lg:flex-row items-center justify-center lg:justify-start gap-1 lg:gap-3 px-2 lg:px-4 py-3 rounded-xl font-medium transition-all duration-200 text-center lg:text-left ${activeTab === id
                     ? "bg-blue-600 text-white shadow-lg shadow-blue-500/30"
                     : "text-slate-600 hover:bg-slate-100"
-            }`}
+                }`}
         >
-            <Icon className={`w-5 h-5 ${activeTab === id ? "text-white" : "text-slate-400"}`} />
-            {label}
+            <Icon className={`w-5 h-5 lg:w-5 lg:h-5 ${activeTab === id ? "text-white" : "text-slate-400"}`} />
+            <span className="text-xs sm:text-sm">{label}</span>
         </button>
     );
 
     return (
         <RoleGuard>
             <div className="min-h-screen bg-slate-50 p-6 lg:p-10">
-                <div className="max-w-7xl mx-auto space-y-8">
+                <div className="w-full mx-auto space-y-4 lg:space-y-8">
 
                     {/* Header */}
-                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm animate-in fade-in slide-in-from-top-4">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 sm:p-6 rounded-3xl border border-slate-100 shadow-sm animate-in fade-in slide-in-from-top-4">
                         <div>
-                            <h1 className="text-3xl font-bold text-slate-900">Admin Console</h1>
-                            <p className="text-slate-500 mt-1">Manage system configurations, documents, and templates</p>
+                            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Admin Console</h1>
+                            <p className="text-slate-500 mt-1 text-sm sm:text-base">Manage system configurations, documents, and templates</p>
                         </div>
                         <button
                             onClick={saveChanges}
                             disabled={unsavedChanges.length === 0 || saving}
-                            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-semibold transition shadow-lg ${unsavedChanges.length > 0
-                                    ? "bg-blue-600 text-white hover:bg-blue-700 shadow-blue-500/20"
-                                    : "bg-slate-100 text-slate-400 cursor-not-allowed"
+                            className={`flex w-full md:w-auto items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold transition shadow-lg ${unsavedChanges.length > 0
+                                ? "bg-blue-600 text-white hover:bg-blue-700 shadow-blue-500/20"
+                                : "bg-slate-100 text-slate-400 cursor-not-allowed"
                                 }`}
                         >
                             {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-                            Save Changes ({unsavedChanges.length})
+                            Save Changes {unsavedChanges.length > 0 ? `(${unsavedChanges.length})` : ''}
                         </button>
                     </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 lg:gap-8">
                         {/* Sidebar */}
                         <div className="lg:col-span-1 space-y-4">
-                            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-2 space-y-1">
+                            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-2 grid grid-cols-2 sm:grid-cols-3 lg:flex lg:flex-col gap-2">
                                 <TabButton id="admin" label="General Settings" icon={Settings} />
                                 <TabButton id="documents" label="Documents Config" icon={FileText} />
                                 <TabButton id="leave" label="Leave Rules" icon={Calendar} />
@@ -378,7 +384,7 @@ export default function AdminConsole() {
 
                         {/* Content */}
                         <div className="lg:col-span-3">
-                            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-8 min-h-[600px]">
+                            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 sm:p-6 lg:p-8 min-h-[600px]">
                                 <AnimatePresence mode="wait">
                                     <motion.div
                                         key={activeTab}
@@ -393,7 +399,7 @@ export default function AdminConsole() {
                                                     <Package className="w-5 h-5 text-indigo-500" /> Asset Management
                                                 </h2>
                                                 {configs.assets?.map((record: any) => (
-                                                    <div key={record.Id} className="flex items-center justify-between p-6 bg-white border border-slate-200 rounded-2xl shadow-sm">
+                                                    <div key={record.Id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-6 bg-white border border-slate-200 rounded-2xl shadow-sm gap-4">
                                                         <div>
                                                             <div className="font-semibold text-slate-800 text-lg mb-1">{record.MasterLabel}</div>
                                                             <div className="text-slate-500 text-sm">System-wide configuration for Asset Management module.</div>
@@ -475,7 +481,7 @@ export default function AdminConsole() {
                                                                 })}
                                                             </div>
 
-                                                            <div className="flex gap-2">
+                                                            <div className="flex flex-col sm:flex-row gap-2">
                                                                 <input
                                                                     id={`add-doc-${record.Id}`}
                                                                     type="text"
@@ -506,7 +512,7 @@ export default function AdminConsole() {
                                                                     }}
                                                                     className="flex gap-1 items-center px-4 py-2 bg-blue-600 text-white shadow-lg shadow-blue-500/30 rounded-lg text-sm font-medium hover:bg-blue-800 transition cursor-pointer"
                                                                 >
-                                                                   <Plus size={16}/> Add
+                                                                    <Plus size={16} /> Add
                                                                 </button>
                                                             </div>
                                                         </div>
@@ -616,72 +622,73 @@ export default function AdminConsole() {
                                                                         );
                                                                         const startIndex = (currentPageUsers - 1) * itemsPerPage;
                                                                         const paginatedUsers = filteredUsers.slice(startIndex, startIndex + itemsPerPage);
-                                                                        
+
                                                                         return paginatedUsers.map(user => (
-                                                                        <tr key={user.Id} className="hover:bg-slate-50/50 transition-colors">
-                                                                            <td className="px-6 py-4">
-                                                                                <div className="flex items-center gap-3">
-                                                                                    <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden">
-                                                                                        {user.Photo ? <img src={user.Photo} className="w-full h-full object-cover" /> : <span className="text-xs font-bold text-slate-500">{user.Name?.charAt(0)}</span>}
-                                                                                    </div>
-                                                                                    <div>
-                                                                                        <div className="font-medium text-slate-900">{user.Name}</div>
-                                                                                        <div className="text-xs text-slate-400">{user.Email}</div>
-                                                                                    </div>
-                                                                                </div>
-                                                                            </td>
-                                                                            <td className="px-6 py-4">
-                                                                                <select
-                                                                                    value={user.Role || 'Employee'}
-                                                                                    onChange={(e) => updateUser(user.Id, { Role__c: e.target.value })}
-                                                                                    className="bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs font-medium focus:ring-2 focus:ring-indigo-500 outline-none"
-                                                                                >
-                                                                                    <option value="Employee">Employee (Standard)</option>
-                                                                                    <option value="HR">HR (Manager)</option>
-                                                                                    <option value="Admin">Admin (Full Access)</option>
-                                                                                </select>
-                                                                            </td>
-                                                                            <td className="px-6 py-4">
-                                                                                {user.Role === 'Admin' ? (
-                                                                                    <div className="relative group/lock inline-block">
-                                                                                        <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-400 cursor-not-allowed select-none border border-slate-200">
-                                                                                            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                                                                                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                                                                                                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                                                                                            </svg>
-                                                                                             Enabled
-                                                                                        </span>
-                                                                                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 bg-slate-800 text-white text-xs rounded-lg whitespace-nowrap opacity-0 group-hover/lock:opacity-100 transition-opacity pointer-events-none z-10 shadow-lg">
-                                                                                            You cannot change the portal visibility of an Admin
-                                                                                            <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800"/>
+                                                                            <tr key={user.Id} className="hover:bg-slate-50/50 transition-colors">
+                                                                                <td className="px-6 py-4">
+                                                                                    <div className="flex items-center gap-3">
+                                                                                        <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden">
+                                                                                            {user.Photo ? <img src={user.Photo} className="w-full h-full object-cover" /> : <span className="text-xs font-bold text-slate-500">{user.Name?.charAt(0)}</span>}
+                                                                                        </div>
+                                                                                        <div>
+                                                                                            <div className="font-medium text-slate-900">{user.Name}</div>
+                                                                                            <div className="text-xs text-slate-400">{user.Email}</div>
                                                                                         </div>
                                                                                     </div>
-                                                                                ) : (
-                                                                                    <button
-                                                                                        onClick={() => {
-                                                                                            const data = {
-                                                                                                Active__c: user.Active__c ? false : true
-                                                                                            }
-                                                                                            console.log(data)
-                                                                                            updateUser(user.Id, data)
-                                                                                        }}
-                                                                                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${user.Active__c
+                                                                                </td>
+                                                                                <td className="px-6 py-4">
+                                                                                    <select
+                                                                                        value={user.Role || 'Employee'}
+                                                                                        onChange={(e) => updateUser(user.Id, { Role__c: e.target.value })}
+                                                                                        className="bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs font-medium focus:ring-2 focus:ring-indigo-500 outline-none"
+                                                                                    >
+                                                                                        <option value="Employee">Employee (Standard)</option>
+                                                                                        <option value="HR">HR (Manager)</option>
+                                                                                        <option value="Admin">Admin (Full Access)</option>
+                                                                                    </select>
+                                                                                </td>
+                                                                                <td className="px-6 py-4">
+                                                                                    {user.Role === 'Admin' ? (
+                                                                                        <div className="relative group/lock inline-block">
+                                                                                            <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-400 cursor-not-allowed select-none border border-slate-200">
+                                                                                                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                                                                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                                                                                                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                                                                                                </svg>
+                                                                                                Enabled
+                                                                                            </span>
+                                                                                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 bg-slate-800 text-white text-xs rounded-lg whitespace-nowrap opacity-0 group-hover/lock:opacity-100 transition-opacity pointer-events-none z-10 shadow-lg">
+                                                                                                You cannot change the portal visibility of an Admin
+                                                                                                <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800" />
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    ) : (
+                                                                                        <button
+                                                                                            onClick={() => {
+                                                                                                const data = {
+                                                                                                    Active__c: user.Active__c ? false : true
+                                                                                                }
+                                                                                                console.log(data)
+                                                                                                updateUser(user.Id, data)
+                                                                                            }}
+                                                                                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${user.Active__c
                                                                                                 ? "bg-green-100 text-green-700 hover:bg-green-200"
                                                                                                 : "bg-red-100 text-red-700 hover:bg-red-200"
-                                                                                            }`}
-                                                                                    >
-                                                                                        {user.Active__c ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
-                                                                                        {user.Active__c ? 'Enabled' : 'Disabled'}
-                                                                                    </button>
-                                                                                )}
-                                                                            </td>
-                                                                            <td className="px-6 py-4">
-                                                                                <span className={`inline-block w-2 h-2 rounded-full mr-2 ${user.Status === 'Active' ? 'bg-green-500' : 'bg-red-400'
-                                                                                    }`}></span>
-                                                                                {user.Status === 'Active' ? 'Active' : 'Inactive'}
-                                                                            </td>
-                                                                        </tr>
-                                                                    ))})()}
+                                                                                                }`}
+                                                                                        >
+                                                                                            {user.Active__c ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                                                                                            {user.Active__c ? 'Enabled' : 'Disabled'}
+                                                                                        </button>
+                                                                                    )}
+                                                                                </td>
+                                                                                <td className="px-6 py-4">
+                                                                                    <span className={`inline-block w-2 h-2 rounded-full mr-2 ${user.Status === 'Active' ? 'bg-green-500' : 'bg-red-400'
+                                                                                        }`}></span>
+                                                                                    {user.Status === 'Active' ? 'Active' : 'Inactive'}
+                                                                                </td>
+                                                                            </tr>
+                                                                        ))
+                                                                    })()}
                                                                 </tbody>
                                                             </table>
                                                         </div>
@@ -703,8 +710,8 @@ export default function AdminConsole() {
                                                             }
 
                                                             return (
-                                                                <div className="p-4 border-t border-slate-200 flex items-center justify-between bg-slate-50">
-                                                                    <div className="text-sm text-slate-500">
+                                                                <div className="p-4 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between bg-slate-50 gap-4 sm:gap-0">
+                                                                    <div className="text-sm text-slate-500 text-center sm:text-left">
                                                                         Showing {start} to {end} of {filteredUsers.length} entries
                                                                     </div>
                                                                     <div className="flex items-center gap-2">
@@ -740,11 +747,25 @@ export default function AdminConsole() {
 
                                         {activeTab === "integration" && (
                                             <div className="space-y-6">
-                                                <div className="flex justify-between items-center mb-6">
+                                                <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
                                                     <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
                                                         <Workflow className="w-5 h-5 text-orange-500" /> Google Connected Users
                                                     </h2>
-                                                    <RefreshButton onClick={fetchConnectedUsers} loading={loadingIntegrations} />
+                                                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto">
+                                                        <div className="flex justify-center sm:block">
+                                                            <RefreshButton onClick={fetchConnectedUsers} label="" loading={loadingIntegrations} />
+                                                        </div>
+                                                        <div className="relative w-full md:w-64">
+                                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                                            <input
+                                                                type="text"
+                                                                placeholder="Search connected users..."
+                                                                value={integrationSearch}
+                                                                onChange={e => setIntegrationSearch(e.target.value)}
+                                                                className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                                                            />
+                                                        </div>
+                                                    </div>
                                                 </div>
 
                                                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
@@ -754,89 +775,145 @@ export default function AdminConsole() {
                                                         </div>
                                                     ) : (
                                                         <>
-                                                        <div className="overflow-x-auto">
-                                                            <table className="w-full text-left">
-                                                                <thead className="bg-slate-50 border-b border-slate-200">
-                                                                    <tr>
-                                                                        <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Employee</th>
-                                                                        <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Connected Since</th>
-                                                                        <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
-                                                                        <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">Actions</th>
-                                                                    </tr>
-                                                                </thead>
-                                                                <tbody className="divide-y divide-slate-100">
-                                                                    {(() => {
-                                                                        const startIndex = (currentPageIntegrations - 1) * itemsPerPage;
-                                                                        const paginatedIntegrations = connectedUsers.slice(startIndex, startIndex + itemsPerPage);
-                                                                        return paginatedIntegrations.map((item) => {
-                                                                        const employee = users.find(u => u.Id === item.Employee_Id);
-                                                                        return (
-                                                                            <tr key={item.Employee_Id} className="hover:bg-slate-50/50 transition-colors">
-                                                                                <td className="px-6 py-4">
-                                                                                    <div className="flex items-center gap-3">
-                                                                                        <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden font-bold text-slate-500 text-xs">
-                                                                                            {employee?.Photo ? <img src={employee.Photo} className="w-full h-full object-cover" /> : (employee?.Name?.charAt(0) || '?')}
-                                                                                        </div>
-                                                                                        <div>
-                                                                                            <div className="font-medium text-slate-900">{employee?.Name || 'Unknown Employee'}</div>
-                                                                                            <div className="text-xs text-slate-400">{employee?.Email || 'No Email'}</div>
-                                                                                        </div>
-                                                                                    </div>
-                                                                                </td>
-                                                                                <td className="px-6 py-4 text-sm text-slate-600">
-                                                                                    {item.updated_at ? new Date(item.updated_at).toLocaleDateString() : 'N/A'}
-                                                                                </td>
-                                                                                <td className="px-6 py-4">
-                                                                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
-                                                                                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
-                                                                                        Active
-                                                                                    </span>
-                                                                                </td>
-                                                                                <td className="px-6 py-4 text-right">
-                                                                                    <button
-                                                                                        onClick={() => handleDeleteIntegration(item.Employee_Id)}
-                                                                                        className="text-red-500 hover:text-red-700 p-2 hover:bg-red-50 rounded-lg transition-colors"
-                                                                                        title="Revoke Access"
-                                                                                    >
-                                                                                        <Trash2 className="w-4 h-4" />
-                                                                                    </button>
+                                                            <div className="overflow-x-auto">
+                                                                <table className="w-full text-left">
+                                                                    <thead className="bg-slate-50 border-b border-slate-200">
+                                                                        <tr>
+                                                                            <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Employee</th>
+                                                                            <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Connected Since</th>
+                                                                            <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
+                                                                            <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">Actions</th>
+                                                                        </tr>
+                                                                    </thead>
+                                                                    <tbody className="divide-y divide-slate-100">
+                                                                        {(() => {
+                                                                            const filteredIntegrations = connectedUsers.filter((item) => {
+                                                                                const employee = users.find(u => u.Id === item.Employee_Id);
+                                                                                const query = integrationSearch.toLowerCase();
+
+                                                                                if (!query) return true;
+
+                                                                                return (
+                                                                                    employee?.Name?.toLowerCase().includes(query) ||
+                                                                                    employee?.Email?.toLowerCase().includes(query)
+                                                                                );
+                                                                            });
+                                                                            const startIndex = (currentPageIntegrations - 1) * itemsPerPage;
+                                                                            const paginatedIntegrations = filteredIntegrations.slice(startIndex, startIndex + itemsPerPage);
+                                                                            return paginatedIntegrations.map((item) => {
+                                                                                const employee = users.find(u => u.Id === item.Employee_Id);
+                                                                                return (
+                                                                                    <tr key={item.Employee_Id} className="hover:bg-slate-50/50 transition-colors">
+                                                                                        <td className="px-6 py-4">
+                                                                                            <div className="flex items-center gap-3">
+                                                                                                <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden font-bold text-slate-500 text-xs">
+                                                                                                    {employee?.Photo ? <img src={employee.Photo} className="w-full h-full object-cover" /> : (employee?.Name?.charAt(0) || '?')}
+                                                                                                </div>
+                                                                                                <div>
+                                                                                                    <div className="font-medium text-slate-900">{employee?.Name || 'Unknown Employee'}</div>
+                                                                                                    <div className="text-xs text-slate-400">{employee?.Email || 'No Email'}</div>
+                                                                                                </div>
+                                                                                            </div>
+                                                                                        </td>
+                                                                                        <td className="px-6 py-4 text-sm text-slate-600">
+                                                                                            {item.updated_at ? new Date(item.updated_at).toLocaleDateString() : 'N/A'}
+                                                                                        </td>
+                                                                                        <td className="px-6 py-4">
+                                                                                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
+                                                                                                <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+                                                                                                Active
+                                                                                            </span>
+                                                                                        </td>
+                                                                                        <td className="px-6 py-4 text-right">
+                                                                                            <button
+                                                                                                onClick={() => handleDeleteIntegration(item.Employee_Id)}
+                                                                                                className="text-red-500 hover:text-red-700 p-2 hover:bg-red-50 rounded-lg transition-colors"
+                                                                                                title="Revoke Access"
+                                                                                            >
+                                                                                                <Trash2 className="w-4 h-4" />
+                                                                                            </button>
+                                                                                        </td>
+                                                                                    </tr>
+                                                                                );
+                                                                            })
+                                                                        })()}
+                                                                        {(() => {
+                                                                            const filteredIntegrations = connectedUsers.filter((item) => {
+                                                                                const employee = users.find(u => u.Id === item.Employee_Id);
+                                                                                const query = integrationSearch.toLowerCase();
+
+                                                                                if (!query) return true;
+
+                                                                                return (
+                                                                                    employee?.Name?.toLowerCase().includes(query) ||
+                                                                                    employee?.Email?.toLowerCase().includes(query)
+                                                                                );
+                                                                            });
+
+                                                                            if (filteredIntegrations.length > 0) {
+                                                                                return null;
+                                                                            }
+
+                                                                            return (
+                                                                            <tr>
+                                                                                <td colSpan={4} className="px-6 py-12 text-center text-slate-400 italic">
+                                                                                    {integrationSearch
+                                                                                        ? `No connected users match "${integrationSearch}".`
+                                                                                        : 'No users have connected their Google Workspace account yet.'}
                                                                                 </td>
                                                                             </tr>
-                                                                        );
-                                                                    })})()}
-                                                                    {connectedUsers.length === 0 && (
-                                                                        <tr>
-                                                                            <td colSpan={4} className="px-6 py-12 text-center text-slate-400 italic">
-                                                                                No users have connected their Google Workspace account yet.
-                                                                            </td>
-                                                                        </tr>
-                                                                    )}
-                                                                </tbody>
-                                                            </table>
-                                                        </div>
-                                                        {connectedUsers.length > 0 && (
-                                                            <div className="p-4 border-t border-slate-200 flex items-center justify-between bg-slate-50">
-                                                                <div className="text-sm text-slate-500">
-                                                                    Showing {((currentPageIntegrations - 1) * itemsPerPage) + 1} to {Math.min(currentPageIntegrations * itemsPerPage, connectedUsers.length)} of {connectedUsers.length} entries
-                                                                </div>
-                                                                <div className="flex items-center gap-2">
-                                                                    <button 
-                                                                        disabled={currentPageIntegrations === 1}
-                                                                        onClick={() => setCurrentPageIntegrations(prev => prev - 1)}
-                                                                        className="px-3 py-1.5 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                                                    >
-                                                                        Previous
-                                                                    </button>
-                                                                    <button 
-                                                                        disabled={currentPageIntegrations >= Math.ceil(connectedUsers.length / itemsPerPage)}
-                                                                        onClick={() => setCurrentPageIntegrations(prev => prev + 1)}
-                                                                        className="px-3 py-1.5 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                                                    >
-                                                                        Next
-                                                                    </button>
-                                                                </div>
+                                                                            );
+                                                                        })()}
+                                                                    </tbody>
+                                                                </table>
                                                             </div>
-                                                        )}
+                                                            {(() => {
+                                                                const filteredIntegrations = connectedUsers.filter((item) => {
+                                                                    const employee = users.find(u => u.Id === item.Employee_Id);
+                                                                    const query = integrationSearch.toLowerCase();
+
+                                                                    if (!query) return true;
+
+                                                                    return (
+                                                                        employee?.Name?.toLowerCase().includes(query) ||
+                                                                        employee?.Email?.toLowerCase().includes(query)
+                                                                    );
+                                                                });
+                                                                const totalPages = Math.ceil(filteredIntegrations.length / itemsPerPage);
+                                                                const start = filteredIntegrations.length === 0 ? 0 : (currentPageIntegrations - 1) * itemsPerPage + 1;
+                                                                const end = Math.min(currentPageIntegrations * itemsPerPage, filteredIntegrations.length);
+
+                                                                if (filteredIntegrations.length === 0) {
+                                                                    return null;
+                                                                }
+
+                                                                return (
+                                                                    <div className="p-4 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between bg-slate-50 gap-4 sm:gap-0">
+                                                                        <div className="text-sm text-slate-500 text-center sm:text-left">
+                                                                            Showing {start} to {end} of {filteredIntegrations.length} entries
+                                                                        </div>
+                                                                        <div className="flex items-center gap-2">
+                                                                            <button
+                                                                                disabled={currentPageIntegrations === 1}
+                                                                                onClick={() => setCurrentPageIntegrations(prev => prev - 1)}
+                                                                                className="rounded-lg font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                                                            >
+                                                                                <ChevronLeft size={16}/>
+                                                                            </button>
+                                                                            <span className="text-xs text-slate-400 border border-border border-cyan-100 rounded-lg p-3 text-cyan-500 font-bold">
+                                                                                {currentPageIntegrations}
+                                                                            </span>
+                                                                            <button
+                                                                                disabled={currentPageIntegrations >= totalPages}
+                                                                                onClick={() => setCurrentPageIntegrations(prev => prev + 1)}
+                                                                                className="rounded-lg font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                                                            >
+                                                                                <ChevronRight size={16}/>
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })()}
                                                         </>
                                                     )}
                                                 </div>

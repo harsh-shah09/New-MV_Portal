@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { Input, Button, Card, Modal, Form, Select, Upload, message, Tag, Empty, Tooltip } from "antd"
+import { Input, Button, Card, Modal, Form, Select, Upload, message, Tag, Empty, Tooltip, Spin } from "antd"
 import { Search, Plus, FileText, Download, Eye, File as FileIcon } from "lucide-react"
 import { InboxOutlined, SearchOutlined } from "@ant-design/icons"
 import { PageHeader } from "@/components/page-header"
@@ -139,8 +139,8 @@ export default function HandbookClient({ role, userId }: HandbookClientProps) {
         </div>
         
         {isLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                 {[1,2,3,4].map(i => <Card key={i} loading className="rounded-xl h-64" />)}
+            <div className="w-full h-screen flex items-center justify-center">
+                <Spin size="large" tip="Loading..." />
             </div>
         ) : filteredDocs.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -174,7 +174,7 @@ export default function HandbookClient({ role, userId }: HandbookClientProps) {
                                 </Tag>
                              </div>
                              <h3 className="font-semibold text-gray-800 mb-1 line-clamp-2 text-base" title={doc.Name}>
-                                 {doc.Document_Category__c}
+                                 {doc.Name}
                              </h3>
                              <p className="text-xs text-gray-400 mt-auto pt-4 border-t border-gray-50 flex justify-between items-center">
                                  <span>Uploaded</span>

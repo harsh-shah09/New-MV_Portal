@@ -1,6 +1,6 @@
 "use client"
 
-import { Table, Tag, Button } from "antd"
+import { Table, Tag, Button, Grid } from "antd"
 import { EyeOutlined } from "@ant-design/icons"
 import type { ColumnsType } from "antd/es/table"
 import type { PayrollEmployeeDetail } from "@/types"
@@ -13,12 +13,15 @@ interface PayrollEmployeeListProps {
 }
 
 export function PayrollEmployeeList({ employees, month, year, onSelectEmployee }: PayrollEmployeeListProps) {
+  const screens = Grid.useBreakpoint()
+  const useFixedColumns = !!screens.lg
+
   const columns: ColumnsType<PayrollEmployeeDetail> = [
     {
       title: "Employee Name",
       dataIndex: "employeeName",
       key: "employeeName",
-      fixed: "left",
+      fixed: useFixedColumns ? "left" : undefined,
       width: 200,
     },
     {
@@ -72,7 +75,7 @@ export function PayrollEmployeeList({ employees, month, year, onSelectEmployee }
       title: "Action",
       key: "action",
       width: 120,
-      fixed: "right",
+      fixed: useFixedColumns ? "right" : undefined,
       render: (_, record) => (
         <Button
           type="primary"
@@ -166,6 +169,7 @@ export function PayrollEmployeeList({ employees, month, year, onSelectEmployee }
               pagination={false}
               rowKey="id"
               size="small"
+              scroll={{ x: 900 }}
             />
           </div>
         )}
@@ -203,6 +207,7 @@ export function PayrollEmployeeList({ employees, month, year, onSelectEmployee }
               pagination={false}
               rowKey="id"
               size="small"
+              scroll={{ x: 700 }}
             />
           </div>
         )}
@@ -223,24 +228,26 @@ export function PayrollEmployeeList({ employees, month, year, onSelectEmployee }
   }
 
   return (
-    <Table
-      columns={columns}
-      dataSource={employees}
-      rowKey="id"
-      pagination={{ pageSize: 10 }}
-      onRow={(record) => ({
-        onClick: () => onSelectEmployee(record),
-        style: { cursor: "pointer" },
-      })}
-      expandable={{
-        expandedRowRender,
-        rowExpandable: (record) => 
-          !!(record.leaves && record.leaves.length > 0) || 
-          !!(record.adjustments && record.adjustments.length > 0) ||
-          !!(record.bonus && record.bonus > 0),
-      }}
-      scroll={{ x: 1000 }}
-      className="bg-white rounded-lg shadow"
-    />
+    <div className="w-full min-w-0 overflow-x-auto">
+      <Table
+        columns={columns}
+        dataSource={employees}
+        rowKey="id"
+        pagination={{ pageSize: 10 }}
+        onRow={(record) => ({
+          onClick: () => onSelectEmployee(record),
+          style: { cursor: "pointer" },
+        })}
+        expandable={{
+          expandedRowRender,
+          rowExpandable: (record) => 
+            !!(record.leaves && record.leaves.length > 0) || 
+            !!(record.adjustments && record.adjustments.length > 0) ||
+            !!(record.bonus && record.bonus > 0),
+        }}
+        scroll={{ x: "max-content", y: 520 }}
+        className="bg-white rounded-lg shadow"
+      />
+    </div>
   )
 }

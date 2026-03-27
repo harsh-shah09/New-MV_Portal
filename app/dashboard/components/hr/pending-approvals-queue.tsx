@@ -21,7 +21,7 @@ export function PendingApprovalsQueue({ initialPendingApprovals = [], dashboardV
   const router = useRouter()
   const [loading, setLoading] = useState<string | null>(null)
   const [pendingApprovals, setPendingApprovals] = useState<any[]>(initialPendingApprovals)
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(false)
   const [rejectModalVisible, setRejectModalVisible] = useState(false)
   const [rejectingLeaveId, setRejectingLeaveId] = useState<string | null>(null)
   const [rejectReason, setRejectReason] = useState("")
@@ -44,11 +44,8 @@ export function PendingApprovalsQueue({ initialPendingApprovals = [], dashboardV
 
   useEffect(() => {
     setPendingApprovals(initialPendingApprovals)
+    setIsLoading(false)
   }, [initialPendingApprovals])
-
-  useEffect(() => {
-    fetchPendingApprovals()
-  }, [dashboardView])
 
   const handleApprove = async (leaveId: string) => {
     setLoading(leaveId)

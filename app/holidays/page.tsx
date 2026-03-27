@@ -269,12 +269,12 @@ export default function HolidaysPage() {
               value={selectedYear}
               size="large"
               onChange={(e) => setSelectedYear(e)}
+                suffixIcon={<ChevronDown className="w-4 h-4 text-muted-foreground pointer-events-none" />}
             >
               {availableYears.map(year => (
                 <Select.Option key={year} value={year}>{year}</Select.Option>
               ))}
             </Select>
-            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
           </div>
 
           {isHR && (

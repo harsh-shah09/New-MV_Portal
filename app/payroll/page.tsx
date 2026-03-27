@@ -140,13 +140,19 @@ export default function PayrollPage() {
   return (
     <RoleGuard>
       <PageContainer>
-        <div className="w-full mx-auto flex-1 flex flex-col bg-white p-3 rounded-xl">
+        <div className="w-full min-w-0 mx-auto flex-1 flex flex-col bg-white p-2 sm:p-3 lg:p-4 rounded-xl">
           <PageHeader
             title="Payroll Management"
             subtitle="Manage employee payrolls and generate monthly summaries"
           >
             {view === "summary" && (
-              <Button type="primary" icon={<PlusOutlined />} onClick={() => setIsGenerateModalOpen(true)} size="large">
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={() => setIsGenerateModalOpen(true)}
+                size="large"
+                className="w-full sm:w-auto"
+              >
                 Generate Payroll
               </Button>
             )}
@@ -159,8 +165,8 @@ export default function PayrollPage() {
           ) : (
             <>
               {view === "summary" && (
-                <div className="rounded-xl border border-slate-200 bg-slate-50/40 p-5 sm:p-6 shadow-sm">
-                  <h2 className="text-2xl font-bold text-gray-900 mb-6">Payroll Summaries</h2>
+                <div className="rounded-xl border border-slate-200 bg-slate-50/40 p-3 sm:p-5 lg:p-6 shadow-sm min-w-0">
+                  <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4 sm:mb-6">Payroll Summaries</h2>
                   {/* <div className="rounded-lg border border-slate-200 bg-white p-3 sm:p-4"> */}
                   <PayrollSummaryList
                     summaries={payrollSummaries}
@@ -172,13 +178,13 @@ export default function PayrollPage() {
               )}
 
               {view === "employees" && selectedSummary && (
-                <div className="rounded-xl border border-slate-200 bg-slate-50/40 p-5 sm:p-6 shadow-sm">
+                <div className="rounded-xl border border-slate-200 bg-slate-50/40 p-3 sm:p-5 lg:p-6 shadow-sm min-w-0">
                   <div className="space-y-6">
-                    <div className="flex items-center gap-4">
-                      <Button icon={<ArrowLeftOutlined />} onClick={handleBackToSummary}>
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+                      <Button icon={<ArrowLeftOutlined />} onClick={handleBackToSummary} className="w-full sm:w-auto">
                         Back to Summaries
                       </Button>
-                      <h2 className="text-2xl font-bold text-gray-900">
+                      <h2 className="text-xl sm:text-2xl font-bold text-gray-900 break-words">
                         {selectedSummary.month} {selectedSummary.year} - Employee Payrolls
                       </h2>
                     </div>
@@ -199,7 +205,7 @@ export default function PayrollPage() {
               )}
 
               {view === "detail" && selectedEmployee && (
-                <div className="rounded-xl border border-slate-200 bg-slate-50/40 p-5 sm:p-6 shadow-sm">
+                <div className="rounded-xl border border-slate-200 bg-slate-50/40 p-3 sm:p-5 lg:p-6 shadow-sm min-w-0">
                   <PayrollEmployeeDetailView employee={selectedEmployee} onBack={handleBackToEmployees} />
                 </div>
               )}

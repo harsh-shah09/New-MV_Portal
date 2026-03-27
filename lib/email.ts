@@ -14,6 +14,7 @@ interface EmailParams {
   body: string;
   contentType?: string;
   senderEmployeeId?: string;
+  isInfo?: boolean;
 }
 
 interface GoogleIntegrationItem {
@@ -26,12 +27,13 @@ interface GoogleIntegrationItem {
 /**
  * Create nodemailer transporter for Gmail
  */
-function createTransporter() {
+
+function createInfoTransporter() {
   return nodemailer.createTransport({
     service: 'gmail',
     auth: {
-      user: process.env.GMAIL_USER,
-      pass: process.env.GMAIL_APP_PASSWORD,
+      user: process.env.INFO_USER,
+      pass: process.env.INFO_GMAIL_APP_PASSWORD,
     },
   });
 }
@@ -196,9 +198,25 @@ export async function hasGoogleWorkspaceIntegration(employeeId: string): Promise
 /**
  * Send email notification using Gmail
  */
-export async function sendEmail({ to, subject, body, contentType = 'text/plain', senderEmployeeId }: EmailParams): Promise<void> {
+export async function sendEmail({ to, subject, body, contentType = 'text/plain', senderEmployeeId, isInfo = false }: EmailParams): Promise<void> {
   try {
-    console.log('📧 Sending email:', { to, subject, contentType });
+    console.log('📧 Sending email:', { to, subject, contentType, isInfo });
+
+    // If isInfo is true, use nodemailer with Gmail app password
+    if (isInfo) {
+      const transporter = createInfoTransporter();
+
+      const mailOptions: any = {
+        from: process.env.INFO_USER,
+        to: 'vivek.m@mvclouds.com',
+        subject,
+        html: body,
+      };
+
+      await transporter.sendMail(mailOptions);
+      console.log('✅ Email sent via nodemailer (Gmail app password) to:', to);
+      return;
+    }
 
     const wasSentViaGoogle = await sendViaUserGoogleAccount({ to, subject, body, contentType, senderEmployeeId });
     if (wasSentViaGoogle) {
@@ -206,21 +224,8 @@ export async function sendEmail({ to, subject, body, contentType = 'text/plain',
       return;
     }
 
-    // const transporter = createTransporter();
-
-    // const mailOptions: any = {
-    //   from: process.env.GMAIL_USER,
-    //   to,
-    //   subject,
-    //   html: body,
-    // };
-
-    // await transporter.sendMail(mailOptions);
-
-    console.log('✅ Email sent via fallback mailbox to:', to);
   } catch (error) {
     console.error('❌ Error sending email:', error);
-    // Don't throw - we don't want email failures to break the application
   }
 }
 

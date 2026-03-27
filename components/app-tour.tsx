@@ -16,8 +16,8 @@ function s(target: string, title: string, content: string, placement: Step["plac
 /* ─────────────────────────────────────────────
    Step definitions
 ───────────────────────────────────────────── */
-const WELCOME: Step = s("body", "👋 Welcome to MV Portal!", "Let's take a quick tour of all the features available to you. Click Next to begin, or skip any time.", "center");
-const FINISH: Step  = s("body", "🎉 You're all set!", "You've seen everything! The ﹖ button at the bottom-right restarts this tour whenever you need it.", "center");
+const WELCOME: Step = s("body", "Welcome to MV Portal!", "Let's take a quick tour of all the features available to you. Click Next to begin, or skip any time.", "center");
+const FINISH: Step  = s("body", "You're all set!", "You've seen everything! The ﹖ button at the bottom-right restarts this tour whenever you need it.", "center");
 
 function buildSteps(role: string): Step[] {
   const isHROrAdmin = role?.includes("HR") || role?.includes("Admin");
@@ -26,29 +26,29 @@ function buildSteps(role: string): Step[] {
   const steps: Step[] = [WELCOME];
 
   // Always visible
-  steps.push(s("[data-tour='dashboard']",  "📊 Dashboard",          "Your command centre. Get a real-time snapshot of leave balances, upcoming holidays, and key HR metrics."));
-  steps.push(s("[data-tour='leaves']",     "🌿 Leave",              "Apply for leaves, track your balance, and view your history — all in one place."));
-  steps.push(s("[data-tour='holidays']",   "📅 Holidays",           "Browse the company holiday calendar so you can plan your work and time off."));
-  steps.push(s("[data-tour='handbook']",   "📖 Handbook",           "Access HR policies, company guidelines, and important documents whenever you need them."));
+  steps.push(s("[data-tour='dashboard']",  "Dashboard",          "Your command centre. Get a real-time snapshot of leave balances, upcoming holidays, and key HR metrics."));
+  steps.push(s("[data-tour='leaves']",     "Leaves",              "Apply for leaves, track your balance, and view your history — all in one place."));
+  steps.push(s("[data-tour='holidays']",   "Holidays",           "Browse the company holiday calendar so you can plan your work and time off."));
+  steps.push(s("[data-tour='handbook']",   "Handbook",           "Access HR policies, company guidelines, and important documents whenever you need them."));
 
   // HR / Admin only
   if (isHROrAdmin) {
-    steps.push(s("[data-tour='employees']", "👥 Employees",          "Manage all employee profiles, update employment details, and handle onboarding."));
-    steps.push(s("[data-tour='assets']",    "🏷️ Assets",             "Track company assets assigned to employees — laptops, phones, and more."));
-    steps.push(s("[data-tour='payroll']",   "🏦 Payroll",            "Process payroll, manage payslips, and configure salary components for your team."));
+    steps.push(s("[data-tour='employees']", "Employees",          "Manage all employee profiles, update employment details, and handle onboarding."));
+    steps.push(s("[data-tour='assets']",    "Assets",             "Track company assets assigned to employees — laptops, phones, and more."));
+    steps.push(s("[data-tour='payroll']",   "Payroll",            "Process payroll, manage payslips, and configure salary components for your team."));
   }
 
   // Always visible (positioned after Payroll)
-  steps.push(s("[data-tour='my-payrolls']", "💰 My Payslips",       "Download and review your monthly payslips and payroll details securely."));
+  steps.push(s("[data-tour='my-payrolls']", "My Payslips",       "Download and review your monthly payslips and payroll details securely."));
 
   // HR / Admin only
   if (isHROrAdmin) {
-    steps.push(s("[data-tour='nda']",       "📋 Document Manager",  "Create, send, and manage NDAs and other employee documents digitally."));
+    steps.push(s("[data-tour='nda']",       "Document Manager",  "Create, send, and manage NDAs and other employee documents digitally."));
   }
 
   // Admin only
   if (isAdmin) {
-    steps.push(s("[data-tour='admin']",     "⚙️ Admin Console",     "Full control over system configurations, email templates, leave rules, user access, and more."));
+    steps.push(s("[data-tour='admin']",     "Admin Console",     "Full control over system configurations, email templates, leave rules, user access, and more."));
   }
 
   steps.push(FINISH);

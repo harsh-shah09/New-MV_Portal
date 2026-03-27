@@ -337,19 +337,21 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
                 </Form.Item>
                 
                 <Form.Item name="startDate" label="Start Date" rules={[{ required: true }]}>
-                     <DatePicker className="w-full" format="YYYY-MM-DD" dateRender={dateFullCellRender} disabledDate={disabledDate} />
+                     <DatePicker className="w-full" placeholder="YYYY-MM-DD" format="YYYY-MM-DD" dateRender={dateFullCellRender} disabledDate={disabledDate} />
                 </Form.Item>
                 
                 <Form.Item name="endDate" label="End Date" rules={[{ required: true }]}>
-                     <DatePicker className="w-full" format="YYYY-MM-DD" dateRender={dateFullCellRender} disabledDate={disabledDate} />
+                     <DatePicker className="w-full" placeholder="YYYY-MM-DD" format="YYYY-MM-DD" dateRender={dateFullCellRender} disabledDate={disabledDate} />
                 </Form.Item>
                 
                 <Form.Item name="session" label="Session" rules={[{ required: true }]}>
                   <Select placeholder="Select session">
+                    
                     <Option value="" disabled>Please select session</Option>
-                        <Option value="Session-1">Session-1</Option>
-                        <Option value="Session-2">Session-2</Option>
-                        <Option value="Full Day">Full Day</Option>
+                  <Option value="Full Day">Full Day</Option>
+                        <Option value="Session-1">Session-1 (1st Half)</Option>
+                        <Option value="Session-2">Session-2 (2nd Half)</Option>
+                        
                     </Select>
                 </Form.Item>
               </div>
@@ -383,11 +385,11 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Form.Item name="startDate" label="Start Date" rules={[{ required: true }]}>
-                   <DatePicker className="w-full" format="YYYY-MM-DD" dateRender={dateFullCellRender} disabledDate={disabledDateForExtraDayPay} />
+                   <DatePicker className="w-full" placeholder="YYYY-MM-DD" format="YYYY-MM-DD" dateRender={dateFullCellRender} disabledDate={disabledDateForExtraDayPay} />
                 </Form.Item>
                 
                 <Form.Item name="endDate" label="End Date" rules={[{ required: true }]}>
-                   <DatePicker className="w-full" format="YYYY-MM-DD" dateRender={dateFullCellRender} disabledDate={disabledDateForExtraDayPay} />
+                   <DatePicker className="w-full" placeholder="YYYY-MM-DD" format="YYYY-MM-DD" dateRender={dateFullCellRender} disabledDate={disabledDateForExtraDayPay} />
                 </Form.Item>
                 
                 <Form.Item label="Duration">

@@ -23,8 +23,9 @@ export function PayrollEmployeeDetailView({ employee, onBack }: PayrollEmployeeD
           <Descriptions
             title={`${employee.employeeName} - ${employee.payrollMonth} ${employee.year}`}
             bordered
-            column={1}
-            labelStyle={{ fontWeight: "600", width: "200px" }}
+            column={{ xs: 1, sm: 1, md: 1, lg: 1 }}
+            size="small"
+            labelStyle={{ fontWeight: "600", width: "140px" }}
           >
             <Descriptions.Item label="Employee Name">{employee.employeeName}</Descriptions.Item>
             <Descriptions.Item label="Payroll Month">
@@ -54,11 +55,11 @@ export function PayrollEmployeeDetailView({ employee, onBack }: PayrollEmployeeD
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Button icon={<ArrowLeftOutlined />} onClick={onBack}>
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+        <Button icon={<ArrowLeftOutlined />} onClick={onBack} className="w-full sm:w-auto">
           Back
         </Button>
-        <h2 className="text-2xl font-bold text-gray-900">Payroll Details</h2>
+        <h2 className="text-xl sm:text-2xl font-bold text-gray-900 break-words">Payroll Details</h2>
       </div>
 
       <Tabs activeKey={activeTab} onChange={setActiveTab} items={tabItems} />

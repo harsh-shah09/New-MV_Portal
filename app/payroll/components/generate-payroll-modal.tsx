@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Modal, Select, Button, message, Table, Spin, Tag, Dropdown } from "antd"
+import { Modal, Select, Button, message, Table, Spin, Tag, Dropdown, Grid } from "antd"
 import { PlusOutlined, DownOutlined } from "@ant-design/icons"
 import type { MenuProps } from "antd"
 import type { ColumnsType } from "antd/es/table"
@@ -35,6 +35,9 @@ const currentYear = new Date().getFullYear()
 const years = Array.from({ length: 5 }, (_, i) => currentYear - i)
 
 export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayrollModalProps) {
+  const screens = Grid.useBreakpoint()
+  const useFixedColumns = !!screens.lg
+
   const [selectedMonth, setSelectedMonth] = useState<string>("")
   const [selectedYear, setSelectedYear] = useState<number>(currentYear)
   const [loading, setLoading] = useState(false)
@@ -128,6 +131,19 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
       }
 
       const data = await res.json()
+
+      if (data?.payrollSummaryTxtContent) {
+        const blob = new Blob([data.payrollSummaryTxtContent], { type: "text/plain;charset=utf-8" })
+        const downloadUrl = URL.createObjectURL(blob)
+        const anchor = document.createElement("a")
+        anchor.href = downloadUrl
+        anchor.download = data?.payrollSummaryTxtFileName || `Payroll_Summary_${selectedMonth}_${selectedYear}.txt`
+        document.body.appendChild(anchor)
+        anchor.click()
+        anchor.remove()
+        URL.revokeObjectURL(downloadUrl)
+      }
+
       message.success("Payroll saved as Draft")
 
       // Let parent update UI/state
@@ -372,7 +388,7 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
       dataIndex: "employeeName",
       key: "employeeName",
       width: 200,
-      fixed: "left",
+      fixed: useFixedColumns ? "left" : undefined,
     },
     {
       title: "Email",
@@ -465,7 +481,7 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
       title: "Actions",
       key: "actions",
       width: 150,
-      fixed: "right",
+      fixed: useFixedColumns ? "right" : undefined,
       render: (_, record) => {
         const hasAdjustment = !!(record.adjustments && record.adjustments.length > 0)
         const hasBonus = !!(record.bonus && record.bonus > 0)
@@ -588,6 +604,7 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
               pagination={false}
               rowKey="id"
               size="small"
+              scroll={{ x: 900 }}
             />
           </div>
         )}
@@ -625,6 +642,7 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
               pagination={false}
               rowKey="id"
               size="small"
+              scroll={{ x: 700 }}
             />
           </div>
         )}
@@ -647,38 +665,53 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
   return (
     <Modal
       title={
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 pr-6">
           <Image
             src="/mv_logo.png"
             alt="MV Clouds Logo"
             width={40}
             height={40}
-            className="object-contain"
+            className="object-contain w-8 h-8 sm:w-10 sm:h-10"
           />
-          <span>{showResults ? `Payroll Preview - ${selectedMonth} ${selectedYear}` : "Generate Payroll"}</span>
+          <span className="text-sm sm:text-base break-words leading-snug">
+            {showResults ? `Payroll Preview - ${selectedMonth} ${selectedYear}` : "Generate Payroll"}
+          </span>
         </div>
       }
       open={open}
       onCancel={handleClose}
-      width={showResults ? 1200 : 500}
+      width={showResults ? "min(1200px, calc(100vw - 24px))" : "min(500px, calc(100vw - 24px))"}
+      centered
+      styles={{ body: { maxHeight: "calc(100vh - 220px)", overflowY: "auto", overflowX: "hidden" } }}
       footer={
         showResults
-          ? [
-              <Button key="cancel" onClick={handleClose}>
-                Cancel
-              </Button>,
-              <Button key="confirm" type="primary" onClick={handleConfirmGeneration} loading={saving} disabled={saving}>
-                Confirm & Save Payroll
-              </Button>,
-            ]
-          : [
-              <Button key="cancel" onClick={handleClose}>
-                Cancel
-              </Button>,
-              <Button key="generate" type="primary" onClick={handleGenerate} loading={loading}>
-                Generate Payroll
-              </Button>,
-            ]
+          ? (
+              <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+                <Button key="cancel" onClick={handleClose} className="w-full sm:w-auto">
+                  Cancel
+                </Button>
+                <Button
+                  key="confirm"
+                  type="primary"
+                  onClick={handleConfirmGeneration}
+                  loading={saving}
+                  disabled={saving}
+                  className="w-full sm:w-auto"
+                >
+                  Confirm & Save Payroll
+                </Button>
+              </div>
+            )
+          : (
+              <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+                <Button key="cancel" onClick={handleClose} className="w-full sm:w-auto">
+                  Cancel
+                </Button>
+                <Button key="generate" type="primary" onClick={handleGenerate} loading={loading} className="w-full sm:w-auto">
+                  Generate Payroll
+                </Button>
+              </div>
+            )
       }
     >
       {!showResults ? (
@@ -712,67 +745,69 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
           </div>
         </div>
       ) : (
-        <div className="py-4">
+        <div className="py-4 min-w-0">
           {loading ? (
             <div className="flex justify-center items-center py-12">
               <Spin size="large" />
             </div>
           ) : (
             <>
-              <div className="mb-4 p-4 bg-blue-50 rounded-lg">
+              <div className="mb-4 p-3 sm:p-4 bg-blue-50 rounded-lg">
                 <h3 className="font-semibold text-lg mb-2">Summary</h3>
-                <div className="grid grid-cols-6 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 2xl:grid-cols-6 gap-3 sm:gap-4">
                   <div>
                     <p className="text-sm text-gray-600">Total Employees</p>
-                    <p className="text-2xl font-bold">{employeeData.length}</p>
+                    <p className="text-xl sm:text-2xl font-bold">{employeeData.length}</p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Total Additions</p>
-                    <p className="text-2xl font-bold text-green-600">
+                    <p className="text-xl sm:text-2xl font-bold text-green-600">
                       ₹{employeeData.reduce((sum, emp) => sum + (emp.totalAdditions || 0), 0).toLocaleString()}
                     </p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Anniversary Bonus</p>
-                    <p className="text-2xl font-bold">
+                    <p className="text-xl sm:text-2xl font-bold">
                       ₹{employeeData.reduce((sum, emp) => sum + (emp.anniversaryBonus || 0), 0).toLocaleString()}
                     </p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Total Deductions</p>
-                    <p className="text-2xl font-bold text-red-600">
+                    <p className="text-xl sm:text-2xl font-bold text-red-600">
                       ₹{employeeData.reduce((sum, emp) => sum + (emp.totalDeductions || 0), 0).toLocaleString()}
                     </p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Security Deductions</p>
-                    <p className="text-2xl font-bold">
+                    <p className="text-xl sm:text-2xl font-bold">
                       ₹{employeeData.reduce((sum, emp) => sum + (emp.companySecurityDeduction || 0), 0).toLocaleString()}
                     </p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Net Payroll</p>
-                    <p className="text-2xl font-bold">
+                    <p className="text-xl sm:text-2xl font-bold">
                       ₹{employeeData.reduce((sum, emp) => sum + (emp.netSalary || 0), 0).toLocaleString()}
                     </p>
                   </div>
                 </div>
               </div>
-              <Table
-                columns={columns}
-                dataSource={employeeData}
-                rowKey="id"
-                pagination={{ pageSize: 10 }}
-                scroll={{ x: 1700 }}
-                expandable={{
-                  expandedRowRender,
-                  rowExpandable: (record) => 
-                    !!(record.leaves && record.leaves.length > 0) || 
-                    !!(record.adjustments && record.adjustments.length > 0) ||
-                    !!(record.bonus && record.bonus > 0),
-                }}
-                className="bg-white rounded-lg"
-              />
+              <div className="w-full min-w-0 overflow-x-auto">
+                <Table
+                  columns={columns}
+                  dataSource={employeeData}
+                  rowKey="id"
+                  pagination={{ pageSize: 10 }}
+                  scroll={{ x: "max-content", y: 420 }}
+                  expandable={{
+                    expandedRowRender,
+                    rowExpandable: (record) => 
+                      !!(record.leaves && record.leaves.length > 0) || 
+                      !!(record.adjustments && record.adjustments.length > 0) ||
+                      !!(record.bonus && record.bonus > 0),
+                  }}
+                  className="bg-white rounded-lg"
+                />
+              </div>
             </>
           )}
         </div>

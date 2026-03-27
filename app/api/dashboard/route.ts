@@ -37,7 +37,23 @@ export async function GET(req: NextRequest) {
         const { searchParams } = new URL(req.url);
         const requestedViewMode = searchParams.get('view') === 'hr' ? 'hr' : 'default';
         const viewMode = canAccessHRView ? requestedViewMode : 'default';
-
+        const today = dayjs().format('YYYY-MM-DD');
+        const birthdayquery =  await conn.query(`
+            SELECT Id , Name , Employee_Name__c,Role__c , Title__c ,Profile_Photo__c,Department__c
+            FROM Employee__c
+            WHERE Birthdate__c = ${today} AND Status__c = 'Active' AND Active__c = true`);
+        const birthdayToday = birthdayquery.records;
+        const anniversaryQuery = await conn.query(`
+            SELECT Id, Name, Employee_Name__c, Role__c, Title__c, Profile_Photo__c, Department__c, Onboarding_Date__c
+            FROM Employee__c
+            WHERE Onboarding_Date__c != null
+            AND Status__c = 'Active'
+            AND Active__c = true
+        `)
+        const todayMonthDay = dayjs().format('MM-DD')
+        const anniversaryToday = anniversaryQuery.records.filter((record: any) =>
+            dayjs(record.Onboarding_Date__c).format('MM-DD') === todayMonthDay
+        );
         // HR/Admin Dashboard Data
         if (viewMode === 'hr' && canAccessHRView) {
             const hrDashboardLeaveFilter = isAdmin
@@ -95,10 +111,7 @@ export async function GET(req: NextRequest) {
                 tlApproved: record.TL_Approval__c
             }));
 
-            console.log('Pending Approvals:', pendingApprovals);
-
             // Get approved today count
-            const today = dayjs().format('YYYY-MM-DD');
             const approvedTodayQuery = await conn.query(`
                 SELECT COUNT(Id) approvedCount
                 FROM Leave__c
@@ -133,12 +146,7 @@ export async function GET(req: NextRequest) {
                 approvedDate: record.Approved_Date__c,
             }));
 
-            const birthdayquery =  await conn.query(`
-                SELECT Id , Name , Employee_Name__c,Role__c , Title__c ,Profile_Photo__c,Department__c
-                FROM Employee__c
-                WHERE Birthdate__c = ${today} AND Status__c = 'Active' AND Active__c = true`);
-            const birthdayToday = birthdayquery.records;
-            console.log(birthdayToday)
+            
             // Get on leave today count
             const onLeaveTodayQuery = await conn.query(`
                 SELECT COUNT(Id) onLeaveCount
@@ -248,7 +256,8 @@ export async function GET(req: NextRequest) {
                 departmentStats: [],
                 employeesOnLeave,
                 approvedTodayLeaves,
-                birthdayToday
+                birthdayToday,
+                anniversaryToday
             });
         }
 
@@ -277,26 +286,6 @@ export async function GET(req: NextRequest) {
             emergencyLeaveCount: 0,
             plannedLeaveCount: 0
         };
-
-        // Get recent leaves
-        const recentLeavesQuery = await conn.query(`
-            SELECT Id, Leave_Type__c, Leave_Category__c, Start_Date__c, 
-                   End_Date__c, Total_Days__c, Status__c
-            FROM Leave__c
-            WHERE Employee__c = '${currentEmployeeId}'
-            ORDER BY Start_Date__c DESC
-            LIMIT 10
-        `);
-
-        const recentLeaves = recentLeavesQuery.records.map((record: any) => ({
-            id: record.Id,
-            leaveType: record.Leave_Category__c === 'Extra Day Pay' ? 'Extra Day Pay' : record.Leave_Type__c,
-            leaveCategory: record.Leave_Category__c,
-            startDate: record.Start_Date__c,
-            endDate: record.End_Date__c,
-            duration: record.Total_Days__c,
-            status: record.Status__c?.toLowerCase() || 'pending'
-        }));
 
         // Get upcoming approved leaves
         const upcomingLeavesQuery = await conn.query(`
@@ -427,13 +416,13 @@ export async function GET(req: NextRequest) {
             employeeId: currentEmployeeId,
             isTeamLead,
             leaveBalance,
-            recentLeaves,
             upcomingLeaves,
             pendingRequests,
             pendingApprovals: teamLeadPendingApprovals,
             holidays,
             teamMembers,
-        
+            birthdayToday,
+            anniversaryToday
         });
 
     } catch (error) {

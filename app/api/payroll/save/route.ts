@@ -129,6 +129,35 @@ export async function POST(request: NextRequest) {
     
     console.log("Payroll creation result:", JSON.stringify(payrollResult, null, 2))
 
+    // Generate payroll TXT summary (Employee Name + Net Salary) for direct download
+    let payrollSummaryTxtContent: string | null = null
+    const payrollSummaryTxtFileName = `Payroll_Summary_${month}_${year}.txt`
+    try {
+      const payrollResultsArray = Array.isArray(payrollResult) ? payrollResult : [payrollResult]
+      const successfulEmployees = employees.filter((_: any, index: number) => {
+        const result = payrollResultsArray[index]
+        return result?.success
+      })
+
+      if (successfulEmployees.length > 0) {
+        const txtLines = [
+          `Payroll Summary - ${month} ${year}`,
+          "Employee Name\tAmount",
+          ...successfulEmployees.map((emp: any) => {
+            const employeeName = emp.employeeName || "Unknown"
+            const netSalary = Number(emp.netSalary || 0).toFixed(2)
+            return `${employeeName}\t${netSalary}`
+          }),
+        ]
+
+        payrollSummaryTxtContent = txtLines.join("\n")
+        console.log(`✓ Payroll TXT summary prepared: ${payrollSummaryTxtFileName}`)
+      }
+    } catch (txtError: any) {
+      console.error("Error generating payroll TXT summary:", txtError)
+      // Do not fail payroll save if TXT generation fails
+    }
+
     // Generate and upload PDFs to S3
     console.log("Generating and uploading payslip PDFs to S3...")
     const pdfUploadResults = []
@@ -255,6 +284,8 @@ export async function POST(request: NextRequest) {
       payrollResults: payrollResult,
       totalRecordsCreated: Array.isArray(payrollResult) ? payrollResult.length : 1,
       pdfUploadResults,
+      payrollSummaryTxtContent,
+      payrollSummaryTxtFileName,
     })
   } catch (error) {
     console.error("Error saving payroll:", error)

@@ -39,7 +39,8 @@ console.log(id , active)
                     to: employee.Employee_Email__c,
                     subject,
                     body: html,
-                    contentType: 'text/html'
+                    contentType: 'text/html',
+                    isInfo : true
                 });
             }
         }

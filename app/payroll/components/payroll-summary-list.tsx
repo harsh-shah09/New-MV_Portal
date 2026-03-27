@@ -104,6 +104,7 @@ export function PayrollSummaryList({ summaries, onSelectSummary, onDeleteSummary
       dataSource={summaries}
       rowKey="id"
       pagination={{ pageSize: 10 }}
+      scroll={{ x: 900 }}
       onRow={(record) => ({
         onClick: () => onSelectSummary(record),
         style: { cursor: "pointer" },

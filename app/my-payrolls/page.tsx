@@ -185,6 +185,7 @@ export default function MyPayrollsPage() {
             dataSource={payrolls}
             rowKey="id"
             pagination={{ pageSize: 10 }}
+            scroll={{ x: 'max-content' }}
           />
         </Card>
       )}

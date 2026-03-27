@@ -4,7 +4,6 @@ import { Row, Col } from "antd"
 import { LeaveBalanceCards } from "./employee/leave-balance-cards"
 import { EmployeeQuickActions } from "./employee/employee-quick-actions"
 import { PendingRequests } from "./employee/pending-requests"
-import { RecentLeaves } from "./employee/recent-leaves"
 import { UpcomingLeavesHolidays } from "./employee/upcoming-leaves-holidays"
 import { LeaveUtilizationSummary } from "./employee/leave-utilization-summary"
 import { TeamOnLeave } from "./employee/team-on-leave"
@@ -12,11 +11,13 @@ import { GoogleIntegration } from "./employee/google-integration"
 import { PageHeader } from "@/components/page-header"
 import { PendingApprovalsQueue } from "./hr/pending-approvals-queue"
 import EmployeeBirthday from './employee/employee-birthday'
+import EmployeeAnniversary from './employee/employee-anniversary'
 interface EmployeeDashboardProps {
   data: any
+  hideTeamMembersWidget?: boolean
 }
 
-export function EmployeeDashboard({ data }: EmployeeDashboardProps) {
+export function EmployeeDashboard({ data, hideTeamMembersWidget = false }: EmployeeDashboardProps) {
   const leaveBalanceData = data?.leaveBalance || {
     annualLeaveRemaining: 0,
     sickLeaveCount: 0,
@@ -25,7 +26,6 @@ export function EmployeeDashboard({ data }: EmployeeDashboardProps) {
     earnedLeaveBalance: 0
   }
 
-  const recentLeaves = data?.recentLeaves || []
   const upcomingLeaves = data?.upcomingLeaves || []
   const pendingRequests = data?.pendingRequests || []
   const pendingApprovals = data?.pendingApprovals || []
@@ -63,16 +63,13 @@ console.log(data)
         <Col xs={24} lg={8}>
           <EmployeeQuickActions employeeId={data?.employeeId} />
         </Col>
-        <Col xs={24} lg={16}>
+        <Col xs={24} lg={8}>
           <EmployeeBirthday data={data?.birthdayToday || []} />
         </Col>
-        <Col lg={24} xs={24}>
-        <RecentLeaves recentLeaves={recentLeaves} />
+        <Col xs={24} lg={8}>
+          <EmployeeAnniversary data={data?.anniversaryToday || []} />
         </Col>
       </Row>
-
-      {/* Google Integration */}
-      <GoogleIntegration />
 
       {/* Upcoming Leaves and Holidays */}
       <UpcomingLeavesHolidays 
@@ -81,7 +78,10 @@ console.log(data)
       />
 
       {/* Team Members */}
-      <TeamOnLeave teamMembers={teamMembers} />
+      {!hideTeamMembersWidget && <TeamOnLeave teamMembers={teamMembers} />}
+
+      {/* Google Integration */}
+      <GoogleIntegration />
 
       {/* Leave Utilization Summary */}
       {/* <LeaveUtilizationSummary 

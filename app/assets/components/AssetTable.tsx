@@ -269,9 +269,8 @@ export function AssetTable({ assets, loading, onManageAssignment, onViewDetails,
             columns={columns} 
             dataSource={assets} 
             loading={loading}
-            pagination={{ pageSize: 10, simple: true, className: "px-4" }}
+            pagination={{ pageSize: 10 }}
             scroll={{ x: 'max-content' }}
-            size="middle"
         />
     </div>
   );

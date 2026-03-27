@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useQuery } from "@tanstack/react-query"
-import { Skeleton, Card, Space, Result, Button, message } from "antd"
+import { Skeleton, Card, Space, Result, Button, message, Spin } from "antd"
 
 import { EmployeeForm } from "./components/employee-form"
 import { EmployeeTable } from "./components/employee-table"
@@ -181,137 +181,8 @@ export default function EmployeesClient({ role }: EmployeesClientProps) {
 
   if (isLoading) {
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
-      {/* Header section */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 sm:mb-8">
-        <div className="space-y-3 w-full sm:w-auto">
-          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-            <Skeleton.Input 
-              active 
-              size="large" 
-              className="w-full sm:w-[200px] lg:w-[250px]"
-              style={{ height: 40 }}
-            />
-            <Skeleton.Input 
-              active 
-              size="small" 
-              className="w-full sm:w-[150px] lg:w-[180px]"
-            />
-          </div>
-        </div>
-        <Skeleton.Button 
-          active 
-          size="large" 
-          shape="default" 
-          className="w-full sm:w-[140px] lg:w-[160px] mt-2 sm:mt-0"
-        />
-      </div>
-
-      {/* Filter section */}
-      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-6 sm:mb-8">
-        <Skeleton.Input 
-          active 
-          size="large" 
-          className="w-full sm:flex-1 lg:max-w-[300px]"
-        />
-        <div className="flex gap-3 sm:gap-4">
-          <Skeleton.Input 
-            active 
-            size="large" 
-            className="w-1/2 sm:w-[150px] lg:w-[180px]"
-          />
-          <Skeleton.Input 
-            active 
-            size="large" 
-            className="w-1/2 sm:w-[150px] lg:w-[180px]"
-          />
-        </div>
-      </div>
-
-      {/* Table skeleton */}
-      <Card className="shadow-sm border-gray-100 rounded-xl overflow-hidden">
-        <div className="divide-y divide-gray-100">
-          {[1, 2, 3, 4].map((i) => (
-            <div 
-              key={i} 
-              className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-0"
-            >
-              {/* Avatar and text info */}
-              <div className="flex items-start sm:items-center gap-3 sm:gap-4 w-full sm:flex-1">
-                <Skeleton.Avatar 
-                  active 
-                  size="large" 
-                  shape="circle" 
-                  className="flex-shrink-0"
-                />
-                <div className="space-y-2 min-w-0 flex-1">
-                  <Skeleton.Input 
-                    active 
-                    size="small" 
-                    className="w-full max-w-[140px] sm:max-w-none sm:w-[140px]"
-                  />
-                  <Skeleton.Input 
-                    active 
-                    size="small" 
-                    className="w-full max-w-[180px] sm:max-w-none sm:w-[180px]"
-                  />
-                </div>
-              </div>
-
-              {/* Additional info columns - hidden on small screens */}
-              <div className="hidden sm:block sm:flex-1 ml-4">
-                <Skeleton.Input 
-                  active 
-                  size="small" 
-                  className="w-full max-w-[120px]"
-                />
-              </div>
-              
-              <div className="hidden md:block md:flex-1 ml-4">
-                <Skeleton.Input 
-                  active 
-                  size="small" 
-                  className="w-full max-w-[100px]"
-                />
-              </div>
-
-              {/* Action buttons */}
-              <div className="flex gap-2 self-end sm:self-auto sm:ml-4">
-                <Skeleton.Button 
-                  active 
-                  size="small" 
-                  shape="circle" 
-                  className="flex-shrink-0"
-                />
-                <Skeleton.Button 
-                  active 
-                  size="small" 
-                  shape="circle" 
-                  className="flex-shrink-0"
-                />
-              </div>
-
-              {/* Mobile view for additional columns */}
-              <div className="flex gap-4 sm:hidden w-full pt-2 border-t border-gray-100 mt-2">
-                <div className="flex-1">
-                  <Skeleton.Input 
-                    active 
-                    size="small" 
-                    className="w-full"
-                  />
-                </div>
-                <div className="flex-1">
-                  <Skeleton.Input 
-                    active 
-                    size="small" 
-                    className="w-full"
-                  />
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </Card>
+   <div className="w-full h-screen flex items-center justify-center">
+      <Spin size="large" tip="Loading..." />
     </div>
   )
 }

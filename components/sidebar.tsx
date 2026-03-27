@@ -92,14 +92,17 @@ export function Sidebar({
     }
   })
 
-  const unreadCount = notifications?.filter((n: any) =>
+  
+  const unreadNotifications = notifications?.filter((n: any) =>
     n.Status__c === 'Unread' ||
     n.Is_Read__c === false ||
     n.Is_Read__c === 'false' ||
     !n.Is_Read__c
-  )?.length || 0;
-  const latestNotif = notifications?.[0];
+  ) || [];
 
+  const unreadCount = unreadNotifications.length;
+
+  const latestNotif = unreadCount > 0 ? unreadNotifications[0] : null;
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 1024)
     checkMobile()
@@ -275,7 +278,7 @@ export function Sidebar({
                 {user?.role || 'Employee'}
               </span>
             </div>
-            <p className="text-xs text-slate-500 truncate">{user?.email || '...'}</p>
+            <p className="text-xs text-slate-500 truncate">View Profile</p>
           </div>
           <div className="flex flex-col gap-1">
             <button
