@@ -663,8 +663,6 @@ export async function POST(request: NextRequest) {
     // Verify the session token
     const payload = await verifyToken(session);
 
-    console.log("Payload 111:", payload);
-
     if (!payload) {
       return NextResponse.json({ error: "Invalid session" }, { status: 401 });
     }
@@ -1213,12 +1211,7 @@ export async function POST(request: NextRequest) {
     // Fetch dynamic leave configurations
     const leaveConfig = await fetchLeaveConfigurations(conn);
 
-    // Check if sandwich rule applies to this user's role
-    const sandwichRuleAppliesToUser = leaveConfig.sandwichRuleAppliesTo.includes(role);
-    // Check if penalty (one+two rule) applies to this user's role
-    const penaltyAppliesToUser = leaveConfig.penaltyAppliesTo.includes(role);
-
-    // --- Sandwich Rule Calculation ---
+    // --- Shared Rule Calculation Setup ---
     // Fetch holidays from custom setting Holidays_List__c
     const holidayQuery = await conn.query<any>(
       "SELECT Name, Date__c, Day__c, Year__c FROM Holidays_List__c"
@@ -1245,12 +1238,7 @@ export async function POST(request: NextRequest) {
 
     const baseCalendarDays = end.diff(start, "day") + 1;
     const isHalfDay = (sessionValue === "Session-1" || sessionValue === "Session-2");
-    const clientDuration = typeof duration === "number" ? duration : undefined;
-    // For session-based leaves: calculate as half-days (e.g., 5 days = 2.5 days)
-    const computedDuration = isHalfDay ? baseCalendarDays * 0.5 : baseCalendarDays;
     const applyRules = leaveCategory === 'loss-of-pay' && leaveType === 'Planned Leave';
-    // Sandwich rule applies only if: enabled, user role is eligible, not half-day leave
-    const applySandwichRule = applyRules && !isHalfDay && leaveConfig.SandwichRule && sandwichRuleAppliesToUser;
 
     // Block leaves that fall entirely on weekends/holidays (ONLY for Loss of Pay)
     // Extra Day Pay can ONLY be applied on weekends/holidays
@@ -1337,8 +1325,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Sandwich rule calculation (only for Loss of Pay and NOT for half-day leaves)
-    // Count working days in the leave range first
     let workingDaysInRange = 0;
     let nonWorkingDaysInRange = 0;
     let cursor = start.clone();
@@ -1351,195 +1337,47 @@ export async function POST(request: NextRequest) {
       }
       cursor = cursor.add(1, "day");
     }
+    const mergeInfoForRules: RuleCalculationDetails["mergeInfo"] | undefined = mergeContext
+      ? {
+          merged: true,
+          existingLeaveId: mergeContext.existingLeaveId,
+          previousStartDate: mergeContext.previousStartDate,
+          previousEndDate: mergeContext.previousEndDate,
+          newRequestStartDate: requestedStartDateStr,
+          newRequestEndDate: requestedEndDateStr,
+          mergedAt: new Date().toISOString(),
+          mergedBy: email || employeeId || name,
+          gapDates: mergeContext.gapDates,
+        }
+      : { merged: false };
 
-    const sandwichDateList: LeaveDateInput[] = [];
-    if (applySandwichRule && workingDaysInRange > 0) {
-      let sandwichCursor = start.clone();
-      const sandwichWindowEnd = end.add(3, "day");
-
-      while (sandwichCursor.isSame(sandwichWindowEnd) || sandwichCursor.isBefore(sandwichWindowEnd)) {
-        const dateKey = sandwichCursor.format("YYYY-MM-DD");
-        const isLeaveDay =
-          (sandwichCursor.isSame(start) || sandwichCursor.isAfter(start)) &&
-          (sandwichCursor.isSame(end) || sandwichCursor.isBefore(end)) &&
-          !isNonWorking(sandwichCursor);
-
-        sandwichDateList.push({
-          date: dateKey,
-          isLeaveDay,
-          isHalfDay,
-          leaveType,
-          leaveCategory,
-          isPublicHoliday: holidaySet.has(dateKey),
-          isWeekend: isWeekend(sandwichCursor),
-        });
-
-        sandwichCursor = sandwichCursor.add(1, "day");
-      }
-    }
-
-    const sandwichPolicy =
-      sandwichDateList.length > 0
-        ? calculateLeaveDays(sandwichDateList, {
-            allowedLeaveTypes: ["Planned Leave"],
-            allowedLeaveCategories: ["loss-of-pay", "loss of pay"],
-          })
-        : {
-            sandwichApplied: false,
-            sandwichDates: [] as string[],
-          };
-
-    const sandwichApplied = applySandwichRule && sandwichPolicy.sandwichApplied;
-    const sandwichDates = sandwichApplied ? sandwichPolicy.sandwichDates : [];
-    const sameRequestSandwichDates = new Set<string>(sandwichDates);
-    const preSandwichDates = sandwichDates.filter((dateValue) => dayjs(dateValue).isBefore(start, "day"));
-    const postSandwichDates = sandwichDates.filter((dateValue) => dayjs(dateValue).isAfter(end, "day"));
-    const insideSandwichDates = sandwichDates.filter(
-      (dateValue) =>
-        !dayjs(dateValue).isBefore(start, "day") &&
-        !dayjs(dateValue).isAfter(end, "day")
+    const recalculatedMetrics = createRuleCalculationDetails(
+      start,
+      end,
+      role,
+      leaveType,
+      leaveCategory,
+      sessionValue,
+      leaveConfig,
+      holidaySet,
+      today,
+      mergeInfoForRules
     );
 
-    const preSandwich = preSandwichDates.length;
-    const postSandwich = postSandwichDates.length;
-    const hasNonWorkingInside = insideSandwichDates.length > 0;
-
-    console.log('[Same-Request Sandwich] Pre-sandwich dates:', preSandwichDates);
-    console.log('[Same-Request Sandwich] Post-sandwich dates:', postSandwichDates);
-    console.log('[Same-Request Sandwich] All counted dates:', Array.from(sameRequestSandwichDates));
-
-    // Base leave days calculation:
-    // - For Extra Day Pay: Always use calendar days (weekends/holidays are the purpose)
-    // - For Loss of Pay: Base = working leave days; sandwich days are added separately
-    let rangeLeaveDays: number;
-    if (leaveCategory === 'extra-day-pay') {
-      rangeLeaveDays = baseCalendarDays;
-    } else {
-      rangeLeaveDays = workingDaysInRange;
-    }
-
-    console.log('[Half-Day Check] Before adjustment:', {
-      isHalfDay,
-      sessionValue,
-      workingDaysInRange,
-      rangeLeaveDays,
-      leaveCategory
-    });
-
-    // For half-day leaves, calculate as 0.5 per day
-    if (isHalfDay) {
-      rangeLeaveDays = rangeLeaveDays * 0.5;
-      console.log('[Half-Day Check] After 0.5 multiplication:', rangeLeaveDays);
-    }
-
-    const sandwichExtra = sandwichApplied ? sandwichDates.length : 0;
-
-    // Server-side One+Two rule calculation (planned leave within minimum working day notice period)
-    // Only applies to full-day leaves, NOT half-day leaves
-    let onePlusTwoExtra = 0;
-    if (applyRules && !isHalfDay && leaveConfig.OnePlusTwoRule && penaltyAppliesToUser) {
-      // Helper to count working days between two dates
-      const countWorkingDaysBetween = (fromDate: dayjs.Dayjs, toDate: dayjs.Dayjs): number => {
-        let workingDays = 0;
-        let current = fromDate.clone();
-
-        while (current.isBefore(toDate)) {
-          if (!isNonWorking(current)) {
-            workingDays++;
-          }
-          current = current.add(1, "day");
-        }
-
-        return workingDays;
-      };
-
-      // For full-day: penalty is penaltyDaysPerDay days per day
-      const penaltyMultiplier = leaveConfig.penaltyDaysPerDay;
-
-      // Only count penalty for WORKING days in the leave range
-      let cursorPenalty = start.startOf("day");
-      const endPenalty = end.startOf("day");
-      console.log(`[One+Two Rule] Today: ${today.format('YYYY-MM-DD')}, Start: ${start.format('YYYY-MM-DD')}, End: ${end.format('YYYY-MM-DD')}`);
-      console.log(`[One+Two Rule] Min notice period: ${leaveConfig.minWorkingDayNoticePeriod} working days, Penalty per day: ${penaltyMultiplier}`);
-
-      while (cursorPenalty.isSame(endPenalty) || cursorPenalty.isBefore(endPenalty)) {
-        // Only apply penalty if this is a working day
-        if (!isNonWorking(cursorPenalty)) {
-          // Count only working days between today and this leave day
-          const workingDaysInAdvance = countWorkingDaysBetween(today, cursorPenalty);
-          console.log(`[One+Two Rule] Checking ${cursorPenalty.format('YYYY-MM-DD')}: ${workingDaysInAdvance} working days in advance`);
-          if (workingDaysInAdvance < leaveConfig.minWorkingDayNoticePeriod) {
-            onePlusTwoExtra += penaltyMultiplier;
-            console.log(`[One+Two Rule] ✅ Penalty applied! Total penalty now: ${onePlusTwoExtra}`);
-          } else {
-            console.log(`[One+Two Rule] ❌ No penalty - sufficient notice`);
-          }
-        } else {
-          console.log(`[One+Two Rule] Skipping ${cursorPenalty.format('YYYY-MM-DD')} - non-working day`);
-        }
-        cursorPenalty = cursorPenalty.add(1, "day");
-      }
-    }
-    const onePlusTwoRuleApplied = applyRules && onePlusTwoExtra > 0;
-
-    const totalSandwichDays = sandwichExtra;
+    const rangeLeaveDays = recalculatedMetrics.totalDays;
+    const finalTotalAfterRules = recalculatedMetrics.totalDaysAfterRule;
+    const sandwichApplied = recalculatedMetrics.sandwichApplied;
     const anySandwichApplied = sandwichApplied;
+    const onePlusTwoRuleApplied = recalculatedMetrics.onePlusTwoRuleApplied;
+
+    const ruleCalculationDetails: RuleCalculationDetails = recalculatedMetrics.details;
+    const sandwichExtra = ruleCalculationDetails.sameRequestSandwich?.totalDays || 0;
+    const totalSandwichDays = ruleCalculationDetails.totalSandwichDays || 0;
+    const onePlusTwoExtra = ruleCalculationDetails.onePlusTwoRule?.extraDays || 0;
     const totalSandwichDeduction = rangeLeaveDays + totalSandwichDays;
-    const finalTotalAfterRules = totalSandwichDeduction + onePlusTwoExtra;
-
-    console.log("[Leave Rules] Input", {
-      startDate,
-      endDate,
-      sessionValue,
-      leaveCategory,
-      leaveType,
-      applyRules,
-      isHalfDay,
-      baseCalendarDays,
-      clientDuration,
-      computedDuration,
-      holidayCount: holidaySet.size,
-    });
-    console.log("[Leave Rules] Holidays", holidayDates);
-    console.log("[Leave Rules] Evaluation", {
-      workingDaysInRange,
-      nonWorkingDaysInRange,
-      hasNonWorkingInside,
-      preSandwich,
-      postSandwich,
-      sandwichApplied,
-      applySandwichRule,
-      rangeLeaveDays,
-      sandwichExtra,
-      totalSandwichDays,
-      anySandwichApplied,
-      totalSandwichDeduction,
-      onePlusTwoExtra,
-      onePlusTwoRuleApplied,
-      finalTotalAfterRules,
-    });
-
-    // Calculate effective leave period for display
-    let effectiveStartDate = finalStartDateStr;
-    let effectiveEndDate = finalEndDateStr;
-
-    // If sandwich is applied, find the actual effective start/end
-    if (anySandwichApplied) {
-      // If pre-sandwich days exist, the effective start is earlier
-      if (preSandwichDates.length > 0) {
-        const earliestPreDate = preSandwichDates.reduce((earliest, date) =>
-          dayjs(date).isBefore(dayjs(earliest)) ? date : earliest
-        );
-        effectiveStartDate = earliestPreDate;
-      }
-      // If post-sandwich days exist, the effective end is later
-      if (postSandwichDates.length > 0) {
-        const latestPostDate = postSandwichDates.reduce((latest, date) =>
-          dayjs(date).isAfter(dayjs(latest)) ? date : latest
-        );
-        effectiveEndDate = latestPostDate;
-      }
-    }
+    const effectiveStartDate = ruleCalculationDetails.effectiveStartDate || finalStartDateStr;
+    const effectiveEndDate = ruleCalculationDetails.effectiveEndDate || finalEndDateStr;
+    const sameRequestSandwichDatesList = ruleCalculationDetails.sameRequestSandwich?.countedLeaveDates || [];
 
     if (applyRules && (anySandwichApplied || onePlusTwoRuleApplied) && !rulesAlreadyConfirmed) {
       return NextResponse.json(
@@ -1555,7 +1393,7 @@ export async function POST(request: NextRequest) {
             nonWorkingDaysInRange,
             rangeLeaveDays,
             sameRequestSandwichDays: sandwichExtra,
-            sameRequestSandwichDatesList: sandwichApplied ? sandwichDates : [],
+            sameRequestSandwichDatesList,
             totalSandwichDays,
             totalSandwichDeduction,
             onePlusTwoExtra,
@@ -1570,54 +1408,6 @@ export async function POST(request: NextRequest) {
         { status: 409 }
       );
     }
-
-    // Build rule calculation details JSON
-    const ruleCalculationDetails: RuleCalculationDetails = {
-      // Basic info
-      requestedStartDate: requestedStartDateStr,
-      requestedEndDate: requestedEndDateStr,
-      effectiveStartDate,
-      effectiveEndDate,
-
-      // Days breakdown
-      baseCalendarDays,
-      rangeLeaveDays,
-
-      // Same-request sandwich details
-      sameRequestSandwich: {
-        applied: sandwichApplied,
-        preSandwichDates,
-        postSandwichDates,
-        countedLeaveDates: sandwichApplied ? sandwichDates : [],
-        totalDays: sandwichExtra
-      },
-
-      // 1+2 rule details
-      onePlusTwoRule: {
-        applied: onePlusTwoRuleApplied,
-        extraDays: onePlusTwoExtra
-      },
-
-      // Totals
-      totalSandwichDays,
-      finalTotalAfterRules,
-
-      // Merge audit
-      mergeInfo: mergeContext ? {
-        merged: true,
-        existingLeaveId: mergeContext.existingLeaveId,
-        previousStartDate: mergeContext.previousStartDate,
-        previousEndDate: mergeContext.previousEndDate,
-        newRequestStartDate: requestedStartDateStr,
-        newRequestEndDate: requestedEndDateStr,
-        mergedAt: new Date().toISOString(),
-        mergedBy: email || employeeId || name,
-        gapDates: mergeContext.gapDates,
-      } : { merged: false },
-
-      // Timestamp
-      calculatedAt: new Date().toISOString()
-    };
 
     // Prepare leave record based on category
     const saveStartDate = start.format('YYYY-MM-DD');
