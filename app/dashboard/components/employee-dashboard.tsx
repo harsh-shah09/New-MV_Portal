@@ -4,7 +4,6 @@ import { Row, Col } from "antd"
 import { LeaveBalanceCards } from "./employee/leave-balance-cards"
 import { EmployeeQuickActions } from "./employee/employee-quick-actions"
 import { PendingRequests } from "./employee/pending-requests"
-import { RecentLeaves } from "./employee/recent-leaves"
 import { UpcomingLeavesHolidays } from "./employee/upcoming-leaves-holidays"
 import { LeaveUtilizationSummary } from "./employee/leave-utilization-summary"
 import { TeamOnLeave } from "./employee/team-on-leave"
@@ -26,7 +25,6 @@ export function EmployeeDashboard({ data, hideTeamMembersWidget = false }: Emplo
     earnedLeaveBalance: 0
   }
 
-  const recentLeaves = data?.recentLeaves || []
   const upcomingLeaves = data?.upcomingLeaves || []
   const pendingRequests = data?.pendingRequests || []
   const pendingApprovals = data?.pendingApprovals || []
@@ -67,13 +65,7 @@ console.log(data)
         <Col xs={24} lg={16}>
           <EmployeeBirthday data={data?.birthdayToday || []} />
         </Col>
-        <Col lg={24} xs={24}>
-        <RecentLeaves recentLeaves={recentLeaves} />
-        </Col>
       </Row>
-
-      {/* Google Integration */}
-      <GoogleIntegration />
 
       {/* Upcoming Leaves and Holidays */}
       <UpcomingLeavesHolidays 
@@ -83,6 +75,9 @@ console.log(data)
 
       {/* Team Members */}
       {!hideTeamMembersWidget && <TeamOnLeave teamMembers={teamMembers} />}
+
+      {/* Google Integration */}
+      <GoogleIntegration />
 
       {/* Leave Utilization Summary */}
       {/* <LeaveUtilizationSummary 

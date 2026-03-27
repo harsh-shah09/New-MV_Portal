@@ -98,9 +98,6 @@ export function HRDashboard({ data, dashboardRole = "HR" }: HRDashboardProps) {
       <GoogleIntegration />
       </Col>
       </Row>
-
-
-     
     </div>
   )
 }

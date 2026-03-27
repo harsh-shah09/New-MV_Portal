@@ -278,26 +278,6 @@ export async function GET(req: NextRequest) {
             plannedLeaveCount: 0
         };
 
-        // Get recent leaves
-        const recentLeavesQuery = await conn.query(`
-            SELECT Id, Leave_Type__c, Leave_Category__c, Start_Date__c, 
-                   End_Date__c, Total_Days__c, Status__c
-            FROM Leave__c
-            WHERE Employee__c = '${currentEmployeeId}'
-            ORDER BY Start_Date__c DESC
-            LIMIT 10
-        `);
-
-        const recentLeaves = recentLeavesQuery.records.map((record: any) => ({
-            id: record.Id,
-            leaveType: record.Leave_Category__c === 'Extra Day Pay' ? 'Extra Day Pay' : record.Leave_Type__c,
-            leaveCategory: record.Leave_Category__c,
-            startDate: record.Start_Date__c,
-            endDate: record.End_Date__c,
-            duration: record.Total_Days__c,
-            status: record.Status__c?.toLowerCase() || 'pending'
-        }));
-
         // Get upcoming approved leaves
         const upcomingLeavesQuery = await conn.query(`
             SELECT Id, Leave_Type__c, Leave_Category__c, Start_Date__c, 
@@ -427,7 +407,6 @@ export async function GET(req: NextRequest) {
             employeeId: currentEmployeeId,
             isTeamLead,
             leaveBalance,
-            recentLeaves,
             upcomingLeaves,
             pendingRequests,
             pendingApprovals: teamLeadPendingApprovals,
