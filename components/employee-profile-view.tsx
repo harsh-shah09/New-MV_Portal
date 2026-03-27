@@ -34,7 +34,7 @@ import {
     Leaf
 } from "lucide-react"
 import { generate2FASecretAction, verifyAndEnable2FAAction, disable2FAAction, getEmployeeTitles } from "@/app/employees/[id]/actions"
-import { message, Spin, Select, Modal, Form, DatePicker, Space } from "antd"
+import { message, Spin, Select, Modal, Form, DatePicker, Space, Button } from "antd"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import dayjs from "dayjs"
 import { cn } from "@/lib/utils"
@@ -367,6 +367,13 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
     const [docFile, setDocFile] = useState<File | null>(null)
     const [docCategory, setDocCategory] = useState("Intern Docs")
     const [docType, setDocType] = useState("Resume")
+
+    // Custom document upload modal state
+    const [showCustomDocModal, setShowCustomDocModal] = useState(false)
+    const [customDocName, setCustomDocName] = useState("")
+    const [customDocCategory, setCustomDocCategory] = useState("Personal")
+    const [customDocFile, setCustomDocFile] = useState<File | null>(null)
+    const customDocFileInputRef = useRef<HTMLInputElement>(null)
 
     // Tile-based document upload state
     const [selectedDocTile, setSelectedDocTile] = useState<string | null>(null)
@@ -732,6 +739,33 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
         customDocMutation.mutate(formData)
     }
 
+    // --- Custom document upload handler ---
+    const handleCustomDocumentUpload = () => {
+        if (!customDocName.trim()) {
+            message.error("Please enter a document name")
+            return
+        }
+        if (!customDocFile) {
+            message.error("Please select a file")
+            return
+        }
+        if (customDocFile.size > 10 * 1024 * 1024) {
+            message.error("File size exceeds 10MB limit.")
+            return
+        }
+
+        const formData = new FormData()
+        formData.append("file", customDocFile)
+        formData.append("employeeId", employeeId)
+        formData.append("type", "document")
+        formData.append("category", customDocCategory)
+        formData.append("docType", customDocName.trim())
+        
+        customDocMutation.mutate(formData)
+        
+        // Reset modal on success (will happen in mutation success callback)
+    }
+
     // --- Tile-based document upload handler ---
     const handleTileFileSelected = (file: File, docName: string) => {
         if (file.size > 10 * 1024 * 1024) {
@@ -775,6 +809,10 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
             setShowDocModal(false)
             setDocFile(null)
             setDocWarning(null)
+            setShowCustomDocModal(false)
+            setCustomDocName("")
+            setCustomDocCategory("Personal")
+            setCustomDocFile(null)
             //   setUploadingType(null) // Reset loading state
             queryClient.invalidateQueries({ queryKey: ["employee", employeeId] })
         },
@@ -1611,9 +1649,18 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
 
                                         {/* ── All Uploaded Documents ── */}
                                         <div className="border-t border-slate-100 pt-6">
-                                            <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-                                                <Download className="w-4 h-4 text-slate-500" /> All Uploaded Documents
-                                            </h3>
+                                            <div className="flex justify-between items-center mb-4">
+                                                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                                                    <Download className="w-4 h-4 text-slate-500" /> All Uploaded Documents
+                                                </h3>
+                                                <Button
+                                                    type="primary"
+                                                    onClick={() => setShowCustomDocModal(true)}
+                                                    className="inline-flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition"
+                                                >
+                                                    <Upload className="w-4 h-4" /> Upload Document
+                                                </Button>
+                                            </div>
                                             {(() => {
                                                 const nonPayslipDocs = (employee.documents || []).filter(
                                                     (doc: any) => doc.Document_Type__c?.trim().toLowerCase() !== 'payslip'
@@ -1703,6 +1750,106 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                                 )
                                             })()}
                                         </div>
+
+                                        {/* Custom Document Upload Modal */}
+                                        <Modal
+                                            title="Upload Document"
+                                            open={showCustomDocModal}
+                                            onCancel={() => {
+                                                setShowCustomDocModal(false)
+                                                setCustomDocName("")
+                                                setCustomDocCategory("Personal")
+                                                setCustomDocFile(null)
+                                            }}
+                                            footer={[
+                                                <Button
+                                                    key="cancel"
+                                                    type="default"
+                                                    onClick={() => {
+                                                        setShowCustomDocModal(false)
+                                                        setCustomDocName("")
+                                                        setCustomDocCategory("Personal")
+                                                        setCustomDocFile(null)
+                                                    }}
+                                                    className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg text-sm"
+                                                >
+                                                    Cancel
+                                                </Button>,
+                                                <Button
+                                                    title="Upload Document"
+                                                    key="submit"
+                                                    type="primary"
+                                                    onClick={handleCustomDocumentUpload}
+                                                    disabled={customDocMutation.isPending || !customDocName.trim() || !customDocFile}
+                                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center gap-2"
+                                                >
+                                                    {customDocMutation.isPending && <Spin size="small" />}
+                                                    {customDocMutation.isPending ? "Uploading..." : "Upload"}
+                                                </Button>
+                                            ]}
+                                        >
+                                            <div className="space-y-4">
+                                                {/* Document Name */}
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                                                        Document Name <span className="text-red-500">*</span>
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        value={customDocName}
+                                                        onChange={(e) => setCustomDocName(e.target.value)}
+                                                        placeholder="e.g., Experience Certificate, Aadhaar, etc."
+                                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-400 outline-none transition"
+                                                    />
+                                                </div>
+
+                                                {/* Category */}
+                                                {/* <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                                                        Category <span className="text-red-500">*</span>
+                                                    </label>
+                                                    <select
+                                                        value={customDocCategory}
+                                                        onChange={(e) => setCustomDocCategory(e.target.value)}
+                                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-400 outline-none transition"
+                                                    >
+                                                        <option value="Personal">Personal</option>
+                                                        <option value="Intern Docs">Intern Docs</option>
+                                                        <option value="Fresher Docs">Fresher Docs</option>
+                                                        <option value="Experience Docs">Experience Docs</option>
+                                                        <option value="Other">Other</option>
+                                                    </select>
+                                                </div> */}
+
+                                                {/* File Upload */}
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                                                        Upload File <span className="text-red-500">*</span>
+                                                    </label>
+                                                    <label className="flex flex-col items-center justify-center gap-3 p-6 border-2 border-dashed border-blue-300 rounded-lg cursor-pointer hover:bg-blue-50/50 transition">
+                                                        <input
+                                                            ref={customDocFileInputRef}
+                                                            type="file"
+                                                            className="sr-only"
+                                                            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                                            onChange={(e) => {
+                                                                const file = e.target.files?.[0]
+                                                                if (file) {
+                                                                    setCustomDocFile(file)
+                                                                }
+                                                            }}
+                                                        />
+                                                        <Upload className="w-6 h-6 text-blue-600" />
+                                                        <div className="text-center">
+                                                            <p className="text-sm font-medium text-slate-700">
+                                                                {customDocFile ? customDocFile.name : "Click to upload or drag and drop"}
+                                                            </p>
+                                                            <p className="text-xs text-slate-500 mt-1">PDF, DOC, DOCX, JPG, PNG (max 10MB)</p>
+                                                        </div>
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        </Modal>
                                     </div>
                                 )}
 

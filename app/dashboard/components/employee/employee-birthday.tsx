@@ -26,7 +26,7 @@ const BirthdayKpiCard: React.FC<BirthdayKpiCardProps> = ({ data }) => {
       <div className="flex justify-between items-center mb-4">
         <div>
           <h2 className="text-lg font-semibold text-gray-700">
-            Today’s Birthdays
+            Today’s {data?.length > 1 ? 'Birthdays' : 'Birthday'}
           </h2>
           <p className="text-sm text-gray-400">
             Celebrate your team
@@ -57,12 +57,7 @@ const BirthdayKpiCard: React.FC<BirthdayKpiCardProps> = ({ data }) => {
             >
               {/* Avatar */}
               <img
-                src={
-                  emp.Profile_Photo__c ||
-                  `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                    emp.Employee_Name__c
-                  )}`
-                }
+                src={emp.Profile_Photo__c}
                 alt={emp.Employee_Name__c}
                 className="w-10 h-10 rounded-full object-cover border"
               />
@@ -72,9 +67,7 @@ const BirthdayKpiCard: React.FC<BirthdayKpiCardProps> = ({ data }) => {
                 <p className="text-sm font-medium text-gray-800">
                   {emp.Employee_Name__c}
                 </p>
-                <p className="text-xs text-gray-500">
-                  {emp.Title__c || emp.Role__c || 'Employee'}
-                </p>
+                <p className="text-xs text-gray-500">{`${emp.Title__c}  ${emp.Role__c}`}</p>
               </div>
 
               {/* Badge */}
