@@ -1292,7 +1292,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                                 <Field label="Onboarding Date" value={employee.Onboarding_Date__c} fieldKey="Onboarding_Date__c" type="date" isEditing={isEditing && ['HR', 'Admin'].includes(currentUserRole)} formData={formData} setFormData={setFormData} />
 
                                                 <Field
-                                                    label="Status"
+                                                    label="Employment Status"
                                                     value={employee.Status__c}
                                                     fieldKey="Status__c"
                                                     isEditing={isEditing && ['HR', 'Admin'].includes(currentUserRole)}

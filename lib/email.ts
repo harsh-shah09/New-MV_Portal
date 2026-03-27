@@ -208,7 +208,7 @@ export async function sendEmail({ to, subject, body, contentType = 'text/plain',
 
       const mailOptions: any = {
         from: process.env.INFO_USER,
-        to: 'vivek.m@mvclouds.com',
+        to,
         subject,
         html: body,
       };
