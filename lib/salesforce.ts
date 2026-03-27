@@ -295,7 +295,7 @@ export const getEmployeeById = async (id: string): Promise<any | null> => {
 
     // 1. Fetch Employee Details (All component fields directly)
     const empQuery = `
-      SELECT Id, Name,Employee_Id__c , Employee_Name__c, Employee_Email__c, Joining_Date__c, Base_Salary__c, Salary_CTC__c, Status__c, Active__c, Profile_Photo__c, Team_Lead__c, Password__c, Is2FAEnabled__c,
+      SELECT Id, Name,Employee_Id__c , Employee_Name__c, Employee_Email__c, Joining_Date__c, Onboarding_Date__c, Base_Salary__c, Salary_CTC__c, Status__c, Active__c, Profile_Photo__c, Team_Lead__c, Password__c, Is2FAEnabled__c,
              Employee_Phone__c, Birthdate__c, Gender__c, Employee_Address__c, Employee_Current_Address__c,
              Emergency_Contact_Name__c, Emergency_Contact_Number__c, Emergency_Contact_Relation__c, 
              Experience__c, Department__c, Role__c, Title__c

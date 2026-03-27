@@ -278,7 +278,7 @@ export function Sidebar({
                 {user?.role || 'Employee'}
               </span>
             </div>
-            <p className="text-xs text-slate-500 truncate">Click to view Profile</p>
+            <p className="text-xs text-slate-500 truncate">View Profile</p>
           </div>
           <div className="flex flex-col gap-1">
             <button

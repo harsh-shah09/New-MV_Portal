@@ -11,6 +11,7 @@ import { GoogleIntegration } from "./employee/google-integration"
 import { PageHeader } from "@/components/page-header"
 import { PendingApprovalsQueue } from "./hr/pending-approvals-queue"
 import EmployeeBirthday from './employee/employee-birthday'
+import EmployeeAnniversary from './employee/employee-anniversary'
 interface EmployeeDashboardProps {
   data: any
   hideTeamMembersWidget?: boolean
@@ -62,8 +63,11 @@ console.log(data)
         <Col xs={24} lg={8}>
           <EmployeeQuickActions employeeId={data?.employeeId} />
         </Col>
-        <Col xs={24} lg={16}>
+        <Col xs={24} lg={8}>
           <EmployeeBirthday data={data?.birthdayToday || []} />
+        </Col>
+        <Col xs={24} lg={8}>
+          <EmployeeAnniversary data={data?.anniversaryToday || []} />
         </Col>
       </Row>
 

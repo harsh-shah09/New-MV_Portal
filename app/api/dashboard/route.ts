@@ -38,12 +38,23 @@ export async function GET(req: NextRequest) {
         const requestedViewMode = searchParams.get('view') === 'hr' ? 'hr' : 'default';
         const viewMode = canAccessHRView ? requestedViewMode : 'default';
         const today = dayjs().format('YYYY-MM-DD');
+        console.log("today : ", today);
         const birthdayquery =  await conn.query(`
             SELECT Id , Name , Employee_Name__c,Role__c , Title__c ,Profile_Photo__c,Department__c
             FROM Employee__c
             WHERE Birthdate__c = ${today} AND Status__c = 'Active' AND Active__c = true`);
         const birthdayToday = birthdayquery.records;
-        console.log(birthdayToday)
+        const anniversaryQuery = await conn.query(`
+            SELECT Id, Name, Employee_Name__c, Role__c, Title__c, Profile_Photo__c, Department__c, Onboarding_Date__c
+            FROM Employee__c
+            WHERE Onboarding_Date__c != null
+            AND Status__c = 'Active'
+            AND Active__c = true
+        `)
+        const todayMonthDay = dayjs().format('MM-DD')
+        const anniversaryToday = anniversaryQuery.records.filter((record: any) =>
+            dayjs(record.Onboarding_Date__c).format('MM-DD') === todayMonthDay
+        );
         // HR/Admin Dashboard Data
         if (viewMode === 'hr' && canAccessHRView) {
             const hrDashboardLeaveFilter = isAdmin
@@ -100,8 +111,6 @@ export async function GET(req: NextRequest) {
                 duration: record.Total_Days__c,
                 tlApproved: record.TL_Approval__c
             }));
-
-            console.log('Pending Approvals:', pendingApprovals);
 
             // Get approved today count
             const approvedTodayQuery = await conn.query(`
@@ -248,7 +257,8 @@ export async function GET(req: NextRequest) {
                 departmentStats: [],
                 employeesOnLeave,
                 approvedTodayLeaves,
-                birthdayToday
+                birthdayToday,
+                anniversaryToday
             });
         }
 
@@ -412,7 +422,8 @@ export async function GET(req: NextRequest) {
             pendingApprovals: teamLeadPendingApprovals,
             holidays,
             teamMembers,
-            birthdayToday
+            birthdayToday,
+            anniversaryToday
         });
 
     } catch (error) {
