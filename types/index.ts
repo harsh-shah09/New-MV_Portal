@@ -80,6 +80,8 @@ export interface LeaveRequest {
   mergeExistingLeaveId ?: string
   withdrawalStartDate?: string
   withdrawalEndDate?: string
+  sandwichRuleApplicable?: boolean
+  onePlusTwoRuleApplicable?: boolean
 }
 
 export interface LeavePolicy {

@@ -204,7 +204,8 @@ function createRuleCalculationDetails(
   leaveConfig: LeaveConfig,
   holidaySet: Set<string>,
   createdReferenceDate: dayjs.Dayjs,
-  mergeInfo?: RuleCalculationDetails["mergeInfo"]
+  mergeInfo?: RuleCalculationDetails["mergeInfo"],
+  applyPolicyRules: boolean = true
 ): RecalculatedLeaveMetrics {
   const isWeekend = (d: dayjs.Dayjs) => {
     const day = d.day();
@@ -220,7 +221,10 @@ function createRuleCalculationDetails(
   const requestedEndDate = endDate.format("YYYY-MM-DD");
   const baseCalendarDays = endDate.diff(startDate, "day") + 1;
   const isHalfDay = sessionValue === "Session-1" || sessionValue === "Session-2";
-  const applyRules = effectiveLeaveCategory === "Loss of Pay" && (leaveType || "") === "Planned Leave";
+  const applyRules =
+    applyPolicyRules &&
+    effectiveLeaveCategory === "Loss of Pay" &&
+    (leaveType || "") === "Planned Leave";
   const sandwichRuleAppliesToUser = leaveConfig.sandwichRuleAppliesTo.includes(role || "");
   const penaltyAppliesToUser = leaveConfig.penaltyAppliesTo.includes(role || "");
   const applySandwichRule = applyRules && !isHalfDay && leaveConfig.SandwichRule && sandwichRuleAppliesToUser;
@@ -487,7 +491,6 @@ export async function GET(request: NextRequest) {
           Rule_Calculation_Details__c
         FROM Leave__c
         WHERE Status__c IN ('Applied', 'Withdrawal Pending')
-        AND Employee__r.Role__c = 'HR'
         ORDER BY Start_Date__c ASC
       `);
 
@@ -496,6 +499,12 @@ export async function GET(request: NextRequest) {
       pendingApprovals = pendingLeaveRecords.records.map((record: any) => {
         const parsedDetails = parseRuleCalculationDetails(record.Rule_Calculation_Details__c);
         const partialRequest = (parsedDetails as any)?.partialWithdrawalRequest;
+        const sandwichRuleApplicable =
+          parsedDetails?.sameRequestSandwich?.applied === true ||
+          (parsedDetails?.sameRequestSandwich?.totalDays || 0) > 0;
+        const onePlusTwoRuleApplicable =
+          parsedDetails?.onePlusTwoRule?.applied === true ||
+          (parsedDetails?.onePlusTwoRule?.extraDays || 0) > 0;
 
         return {
           id: record.Id,
@@ -515,6 +524,8 @@ export async function GET(request: NextRequest) {
           reason: record.Reason__c || '',
           tlApproved: record.TL_Approval__c,
           hrApproval: record.HR_Approval__c,
+          sandwichRuleApplicable,
+          onePlusTwoRuleApplicable,
           withdrawalStartDate: partialRequest?.requested ? partialRequest.withdrawalStartDate : undefined,
           withdrawalEndDate: partialRequest?.requested ? partialRequest.withdrawalEndDate : undefined,
         };
@@ -552,6 +563,12 @@ export async function GET(request: NextRequest) {
       pendingApprovals = pendingLeaveRecords.records.map((record: any) => {
         const parsedDetails = parseRuleCalculationDetails(record.Rule_Calculation_Details__c);
         const partialRequest = (parsedDetails as any)?.partialWithdrawalRequest;
+        const sandwichRuleApplicable =
+          parsedDetails?.sameRequestSandwich?.applied === true ||
+          (parsedDetails?.sameRequestSandwich?.totalDays || 0) > 0;
+        const onePlusTwoRuleApplicable =
+          parsedDetails?.onePlusTwoRule?.applied === true ||
+          (parsedDetails?.onePlusTwoRule?.extraDays || 0) > 0;
 
         return {
           id: record.Id,
@@ -571,6 +588,8 @@ export async function GET(request: NextRequest) {
           reason: record.Reason__c || '',
           tlApproved: record.TL_Approval__c,
           hrApproval: record.HR_Approval__c,
+          sandwichRuleApplicable,
+          onePlusTwoRuleApplicable,
           withdrawalStartDate: partialRequest?.requested ? partialRequest.withdrawalStartDate : undefined,
           withdrawalEndDate: partialRequest?.requested ? partialRequest.withdrawalEndDate : undefined,
         };
@@ -606,6 +625,12 @@ export async function GET(request: NextRequest) {
       pendingApprovals = pendingLeaveRecords.records.map((record: any) => {
         const parsedDetails = parseRuleCalculationDetails(record.Rule_Calculation_Details__c);
         const partialRequest = (parsedDetails as any)?.partialWithdrawalRequest;
+        const sandwichRuleApplicable =
+          parsedDetails?.sameRequestSandwich?.applied === true ||
+          (parsedDetails?.sameRequestSandwich?.totalDays || 0) > 0;
+        const onePlusTwoRuleApplicable =
+          parsedDetails?.onePlusTwoRule?.applied === true ||
+          (parsedDetails?.onePlusTwoRule?.extraDays || 0) > 0;
 
         return {
           id: record.Id,
@@ -624,6 +649,8 @@ export async function GET(request: NextRequest) {
           reason: record.Reason__c || '',
           tlApproved: record.TL_Approval__c,
           hrApproval: record.HR_Approval__c,
+          sandwichRuleApplicable,
+          onePlusTwoRuleApplicable,
           withdrawalStartDate: partialRequest?.requested ? partialRequest.withdrawalStartDate : undefined,
           withdrawalEndDate: partialRequest?.requested ? partialRequest.withdrawalEndDate : undefined,
         };
@@ -2432,6 +2459,7 @@ export async function PATCH(request: NextRequest) {
     // Handle approve action (HR, Team Lead, or Admin)
     if (action === "approve") {
       const { role, title, name: approverName } = payload;
+      const applyLeaveRules = body?.applyLeaveRules === true;
 
       // Check if user can approve leaves
       const isHR = role === 'HR';
@@ -2445,7 +2473,7 @@ export async function PATCH(request: NextRequest) {
       }
 
       const leaveRecordQuery = await conn.query<any>(`
-        SELECT Id, Status__c, Employee__c, Employee__r.Role__c,Employee__r.Base_Salary__c, Leave_Category__c, Leave_Type__c, Total_Days__c, Total_Days_After_Rule__c, HR_Approval__c, TL_Approval__c, Start_Date__c, End_Date__c, Actual_Deduction__c, After_Rule_Deduction__c, Event_ID__c
+        SELECT Id, Status__c, Employee__c, Employee__r.Role__c,Employee__r.Base_Salary__c, Leave_Category__c, Leave_Type__c, Total_Days__c, Total_Days_After_Rule__c, HR_Approval__c, TL_Approval__c, Start_Date__c, End_Date__c, Session__c, CreatedDate, Rule_Calculation_Details__c, Actual_Deduction__c, After_Rule_Deduction__c, Event_ID__c
         FROM Leave__c
         WHERE Id = '${leaveId}'
         LIMIT 1
@@ -2458,31 +2486,47 @@ export async function PATCH(request: NextRequest) {
       const oldLeave = leaveRecordQuery.records[0];
       const employeeRole = oldLeave.Employee__r?.Role__c;
 
-      // Admin can only approve HR leaves
-      if (isAdmin && employeeRole !== 'HR') {
-        return NextResponse.json({ error: "Admin can only approve HR leaves" }, { status: 403 });
-      }
-
       // Update approval based on role
       const updateData: any = {
         Id: leaveId,
       };
 
       if (isHR || isAdmin) {
+        const leaveConfig = await fetchLeaveConfigurations(conn);
+        const holidaySet = await getHolidaySet(conn);
+        const recalculated = createRuleCalculationDetails(
+          dayjs(oldLeave.Start_Date__c).startOf("day"),
+          dayjs(oldLeave.End_Date__c).startOf("day"),
+          employeeRole,
+          oldLeave.Leave_Type__c,
+          oldLeave.Leave_Category__c,
+          oldLeave.Session__c,
+          leaveConfig,
+          holidaySet,
+          dayjs(oldLeave.CreatedDate || new Date().toISOString()).startOf("day"),
+          undefined,
+          applyLeaveRules
+        );
+
         updateData.HR_Approval__c = 'Approved';
         updateData.Approved_Date__c = new Date().toISOString();
         // beforeUpdate: Sync Status__c with HR_Approval__c
         updateData.Status__c = 'Approved';
+        updateData.Total_Days__c = recalculated.totalDays;
+        updateData.Total_Days_After_Rule__c = recalculated.totalDaysAfterRule;
+        updateData.OnePlusTwo_Rule__c = recalculated.onePlusTwoRuleApplied;
+        updateData.Sandwich_Rule__c = recalculated.sandwichApplied;
+        updateData.Rule_Calculation_Details__c = JSON.stringify(recalculated.details);
         updateData.Actual_Deduction__c = calculateLeaveDeduction(
           oldLeave.Leave_Category__c,
           oldLeave.Start_Date__c,
-          oldLeave.Total_Days__c,
+          recalculated.totalDays,
           oldLeave.Employee__r?.Base_Salary__c
         );
         updateData.After_Rule_Deduction__c = calculateLeaveDeduction(
           oldLeave.Leave_Category__c,
           oldLeave.Start_Date__c,
-          oldLeave.Total_Days_After_Rule__c,
+          recalculated.totalDaysAfterRule,
           oldLeave.Employee__r?.Base_Salary__c
         );
 
@@ -2647,14 +2691,24 @@ export async function PATCH(request: NextRequest) {
             }
 
             // Update Leave Balance when HR/Admin approves (Status becomes Approved)
-            await updateLeaveBalance(conn, oldLeave, 'approve');
+            await updateLeaveBalance(conn, {
+              ...oldLeave,
+              Total_Days__c: updateData.Total_Days__c ?? oldLeave.Total_Days__c,
+              Total_Days_After_Rule__c: updateData.Total_Days_After_Rule__c ?? oldLeave.Total_Days_After_Rule__c,
+            }, 'approve');
           }
         }
       } catch (emailError) {
         console.error('Error sending approval notification:', emailError);
       }
 
-      return NextResponse.json({ success: true, message: "Leave approved successfully" });
+      return NextResponse.json({
+        success: true,
+        message: "Leave approved successfully",
+        ruleSettings: {
+          applyLeaveRules: isHR || isAdmin ? applyLeaveRules : null,
+        },
+      });
     }
 
     // Handle reject action (HR, Team Lead, or Admin)

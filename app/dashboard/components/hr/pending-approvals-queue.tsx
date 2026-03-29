@@ -25,6 +25,8 @@ export function PendingApprovalsQueue({ initialPendingApprovals = [], dashboardV
   const [rejectModalVisible, setRejectModalVisible] = useState(false)
   const [rejectingLeaveId, setRejectingLeaveId] = useState<string | null>(null)
   const [rejectReason, setRejectReason] = useState("")
+  const [ruleChoiceModalVisible, setRuleChoiceModalVisible] = useState(false)
+  const [ruleChoiceLeave, setRuleChoiceLeave] = useState<any | null>(null)
 
   const fetchPendingApprovals = async () => {
     try {
@@ -47,7 +49,7 @@ export function PendingApprovalsQueue({ initialPendingApprovals = [], dashboardV
     setIsLoading(false)
   }, [initialPendingApprovals])
 
-  const handleApprove = async (leaveId: string) => {
+  const handleApprove = async (leaveId: string, applyLeaveRules = false) => {
     setLoading(leaveId)
     try {
       const response = await fetch('/api/leave-management', {
@@ -57,14 +59,19 @@ export function PendingApprovalsQueue({ initialPendingApprovals = [], dashboardV
         },
         body: JSON.stringify({
           leaveId,
-          action: 'approve'
+          action: 'approve',
+          applyLeaveRules,
         })
       })
 
       const result = await response.json()
 
       if (response.ok) {
-        message.success('Leave approved successfully')
+        message.success(
+          dashboardView === 'hr'
+            ? `Leave approved successfully${applyLeaveRules ? ' with Sandwich and One+Two rules.' : ' without Sandwich and One+Two rules.'}`
+            : 'Leave approved successfully'
+        )
         // Refresh only this component's data
         await fetchPendingApprovals()
       } else {
@@ -76,6 +83,25 @@ export function PendingApprovalsQueue({ initialPendingApprovals = [], dashboardV
     } finally {
       setLoading(null)
     }
+  }
+
+  const closeRuleChoiceModal = () => {
+    setRuleChoiceModalVisible(false)
+    setRuleChoiceLeave(null)
+  }
+
+  const handleApproveFromRuleChoice = async (applyLeaveRules: boolean) => {
+    if (!ruleChoiceLeave?.id) return
+    await handleApprove(ruleChoiceLeave.id, applyLeaveRules)
+    closeRuleChoiceModal()
+  }
+
+  const shouldShowRulesPopup = (record: any): boolean => {
+    return (
+      dashboardView === 'hr' &&
+      record?.leaveType === 'Planned Leave' &&
+      (record?.sandwichRuleApplicable === true || record?.onePlusTwoRuleApplicable === true)
+    )
   }
 
   const handleReject = async (leaveId: string, reason: string): Promise<boolean> => {
@@ -191,7 +217,15 @@ export function PendingApprovalsQueue({ initialPendingApprovals = [], dashboardV
             icon={<CheckCircleOutlined />}
             loading={loading === record.id}
             disabled={loading !== null}
-            onClick={() => handleApprove(record.id)}
+            onClick={() => {
+              if (shouldShowRulesPopup(record)) {
+                setRuleChoiceLeave(record)
+                setRuleChoiceModalVisible(true)
+                return
+              }
+
+              handleApprove(record.id, false)
+            }}
           >
             Approve
           </Button>
@@ -253,6 +287,33 @@ export function PendingApprovalsQueue({ initialPendingApprovals = [], dashboardV
           </div>
         )}
       </Card>
+
+      <Modal
+        title="Apply Leave Rules?"
+        open={ruleChoiceModalVisible}
+        onCancel={closeRuleChoiceModal}
+        footer={[
+          <Button key="cancel" onClick={closeRuleChoiceModal}>
+            Cancel
+          </Button>,
+          <Button key="without-rules" onClick={() => handleApproveFromRuleChoice(false)}>
+            Approve Without Rules
+          </Button>,
+          <Button
+            key="apply-rules"
+            type="primary"
+            style={{ backgroundColor: '#10b981' }}
+            onClick={() => handleApproveFromRuleChoice(true)}
+          >
+            Apply Rules & Approve
+          </Button>,
+        ]}
+      >
+        <div>
+          <p className="mb-2">Do you want to apply Sandwich and One+Two rules on this leave before approval?</p>
+          <p className="text-sm text-gray-600">You can also approve without applying rules, or cancel.</p>
+        </div>
+      </Modal>
 
       <Modal
         title="Reject Leave Request"
