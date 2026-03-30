@@ -33,39 +33,39 @@ export function EmployeeStats({ stats }: EmployeeStatsProps) {
       className="h-full"
     >
       <Row gutter={[16, 16]}>
-        <Col span={12}>
+        <Col xs={24} sm={12}>
           <Card className="bg-blue-50 border-blue-200">
             <Statistic
               title={renderTooltipTitle("Active Employees", "Employees currently active and not on leave are shown here.")}
               value={stats.totalEmployees - stats.onLeaveToday}
-              styles={{content: { color: '#3b82f6', fontSize: '24px' }}}
+              styles={{content: { color: '#3b82f6', fontSize: '20px' }}}
             />
           </Card>
         </Col>
-        <Col span={12}>
+        <Col xs={24} sm={12}>
           <Card className="bg-green-50 border-green-200">
             <Statistic
               title={renderTooltipTitle("New Joiners (Month)", "Employees joined in the current month are shown here.")}
               value={stats.newJoinersThisMonth}
-              styles={{content: { color: '#10b981', fontSize: '24px' }}}
+              styles={{content: { color: '#10b981', fontSize: '20px' }}}
             />
           </Card>
         </Col>
-        <Col span={12}>
+        <Col xs={24} sm={12}>
           <Card className="bg-orange-50 border-orange-200">
             <Statistic
               title={renderTooltipTitle("Pending Documents", "Employee documents pending review or completion are shown here.")}
               value={stats.pendingDocuments}
-              styles={{content: { color: '#f59e0b', fontSize: '24px' }}}
+              styles={{content: { color: '#f59e0b', fontSize: '20px' }}}
             />
           </Card>
         </Col>
-        <Col span={12}>
+        <Col xs={24} sm={12}>
           <Card className="bg-purple-50 border-purple-200">
             <Statistic
               title={renderTooltipTitle("On Leave", "Employees with approved leave today are shown here.")}
               value={stats.onLeaveToday}
-              styles={{content: { color: '#8b5cf6', fontSize: '24px' }}}
+              styles={{content: { color: '#8b5cf6', fontSize: '20px' }}}
             />
           </Card>
         </Col>

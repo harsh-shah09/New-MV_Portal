@@ -23,6 +23,7 @@ export function RecentActivities({ recentActivities }: RecentActivitiesProps) {
       title: 'Activity',
       dataIndex: 'message',
       key: 'message',
+      width: 320,
       render: (text, record) => (
         <div className="flex items-center gap-2">
           {record.type === 'leave' && <CalendarOutlined className="text-blue-500" />}
@@ -36,6 +37,7 @@ export function RecentActivities({ recentActivities }: RecentActivitiesProps) {
       title: 'Time',
       dataIndex: 'timestamp',
       key: 'timestamp',
+      width: 120,
       render: (timestamp) => dayjs(timestamp).fromNow()
     }
   ]
@@ -56,6 +58,7 @@ export function RecentActivities({ recentActivities }: RecentActivitiesProps) {
         pagination={false}
         size="small"
         rowKey="id"
+        scroll={{ x: 520 }}
       />
     </Card>
   )

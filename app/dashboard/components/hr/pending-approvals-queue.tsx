@@ -181,6 +181,7 @@ export function PendingApprovalsQueue({ initialPendingApprovals = [], dashboardV
       title: 'Employee',
       dataIndex: 'employeeName',
       key: 'employeeName',
+      width: 180,
       render: (text, record) => (
         <div>
           <div className="font-medium">{text}</div>
@@ -192,24 +193,28 @@ export function PendingApprovalsQueue({ initialPendingApprovals = [], dashboardV
       title: 'Leave Type',
       dataIndex: 'leaveType',
       key: 'leaveType',
+      width: 150,
       render: (text, record) => <span className="capitalize">{text || record.leaveCategory}</span>
     },
     {
       title: 'Duration',
       dataIndex: 'duration',
       key: 'duration',
+      width: 110,
       render: (duration) => `${duration} day(s)`
     },
     {
       title: 'Start Date',
       dataIndex: 'startDate',
       key: 'startDate',
+      width: 130,
       render: (date) => dayjs(date).format('MMM DD, YYYY')
     },
     {
       title: 'TL Status',
       dataIndex: 'tlApproved',
       key: 'tlApproved',
+      width: 120,
       render: (status) => {
         if (!status) return <Badge status="default" text="N/A" />
         return status === 'Approved' 
@@ -220,8 +225,9 @@ export function PendingApprovalsQueue({ initialPendingApprovals = [], dashboardV
     {
       title: 'Actions',
       key: 'actions',
+      width: 220,
       render: (_, record) => (
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button 
             type="primary" 
             size="small" 
@@ -286,7 +292,8 @@ export function PendingApprovalsQueue({ initialPendingApprovals = [], dashboardV
               columns={approvalColumns}
               pagination={false}
               rowKey="id"
-              scroll={{ x: 800 }}
+              size="small"
+              scroll={{ x: 980 }}
             />
             {pendingApprovals.length > 5 && (
               <div className="text-center mt-4">
