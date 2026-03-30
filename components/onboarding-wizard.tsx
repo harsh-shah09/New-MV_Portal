@@ -633,17 +633,19 @@ export function OnboardingWizard() {
                 <div className="flex justify-between pt-6 border-t border-gray-100 mt-6">
                     <div className="flex gap-3">
                         <Button onClick={() => setOpen(false)}>Skip for Now</Button>
-                        {currentStep > 1 && currentStep <= stepItems.length && (
-                            <Button onClick={handlePrevious}>
-                                ← Previous
-                            </Button>
-                        )}
                     </div>
                     
                     {currentStep <= stepItems.length && (
+                        <div className="flex gap-3">
+                        {currentStep > 1 && currentStep <= stepItems.length && (
+                            <Button type="primary" size="large" onClick={handlePrevious}>
+                                ← Previous
+                            </Button>
+                        )}
                         <Button type="primary" size="large" onClick={handleNext} loading={loading}>
                             Next Step
                         </Button>
+                        </div>
                     )}
                      {currentStep > stepItems.length && (
                          <Button type="primary" size="large" onClick={handleFinish} loading={loading} className="bg-green-600 hover:bg-green-700">

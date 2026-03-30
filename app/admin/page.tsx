@@ -25,7 +25,7 @@ import {
     ChevronRight
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { message, Modal, Spin } from "antd";
+import { message, Modal, Select, Spin } from "antd";
 import EmailEditor from "@/components/admin/email-editor";
 import SafeHTMLPreview from "@/components/safe-html-preview";
 import { RoleGuard } from "@/components/role-guard";
@@ -528,15 +528,16 @@ export default function AdminConsole() {
                                                         <label className="block text-sm font-semibold text-slate-700 mb-2">
                                                             {record.MasterLabel}
                                                         </label>
-                                                        {['One_plus_two_rule', 'Sandwitch_Rule'].includes(record.DeveloperName) ? (
-                                                            <select
+                                                        {['One_plus_two_rule', 'Sandwich_Rule'].includes(record.DeveloperName) ? (
+                                                            <Select
                                                                 value={record.Value__c || 'false'}
-                                                                onChange={(e) => handleInputChange('Leave_Configurations__mdt', record, e.target.value)}
+                                                                onChange={(e) => handleInputChange('Leave_Configurations__mdt', record, e)}
                                                                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-                                                            >
-                                                                <option value="true">Enabled</option>
-                                                                <option value="false">Disabled</option>
-                                                            </select>
+                                                                options={[
+                                                                    { value: 'true', label: 'Enabled' },
+                                                                    { value: 'false', label: 'Disabled' }
+                                                                ]}
+                                                            />
                                                         ) : (
                                                             <input
                                                                 type="text"
@@ -558,14 +559,15 @@ export default function AdminConsole() {
                                                             {formatLabel(record.MasterLabel)}
                                                         </label>
                                                         {['Auto_Apply_Anniversary_Bonus'].includes(record.DeveloperName) ? (
-                                                            <select
+                                                            <Select
                                                                 value={record.Value__c || 'false'}
                                                                 onChange={(e) => handleInputChange('Payroll_Configurations__mdt', record, e.target.value)}
                                                                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-                                                            >
-                                                                <option value="true">Enabled</option>
-                                                                <option value="false">Disabled</option>
-                                                            </select>
+                                                                options={[
+                                                                    { value: 'true', label: 'Enabled' },
+                                                                    { value: 'false', label: 'Disabled' }
+                                                                ]}
+                                                            />
                                                         ) : (
                                                             <input
                                                                 type="text"
@@ -637,15 +639,19 @@ export default function AdminConsole() {
                                                                                     </div>
                                                                                 </td>
                                                                                 <td className="px-6 py-4">
-                                                                                    <select
+                                                                                    <Select
+                                                                                        size="small"
+                                                                                        dropdownMatchSelectWidth={false}
+                                                                                        dropdownStyle={{ width: 'max-content', minWidth: '100%' }}
                                                                                         value={user.Role || 'Employee'}
                                                                                         onChange={(e) => updateUser(user.Id, { Role__c: e.target.value })}
                                                                                         className="bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs font-medium focus:ring-2 focus:ring-indigo-500 outline-none"
-                                                                                    >
-                                                                                        <option value="Employee">Employee (Standard)</option>
-                                                                                        <option value="HR">HR (Manager)</option>
-                                                                                        <option value="Admin">Admin (Full Access)</option>
-                                                                                    </select>
+                                                                                        options={[
+                                                                                            { value: 'Employee', label: 'Employee (Standard)' },
+                                                                                            { value: 'HR', label: 'HR (Manager)' },
+                                                                                            { value: 'Admin', label: 'Admin (Full Access)' }
+                                                                                        ]}
+                                                                                    />
                                                                                 </td>
                                                                                 <td className="px-6 py-4">
                                                                                     {user.Role === 'Admin' ? (
@@ -714,23 +720,23 @@ export default function AdminConsole() {
                                                                     <div className="text-sm text-slate-500 text-center sm:text-left">
                                                                         Showing {start} to {end} of {filteredUsers.length} entries
                                                                     </div>
-                                                                    <div className="flex items-center gap-2">
+                                                                    <div className="flex items-center">
                                                                         <button
                                                                             disabled={currentPageUsers === 1}
                                                                             onClick={() => setCurrentPageUsers(prev => prev - 1)}
                                                                             className="px-3 py-1.5 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                                                         >
-                                                                            Previous
+                                                                            <ChevronLeft size={16}/>
                                                                         </button>
-                                                                        <span className="text-xs text-slate-400 px-1">
-                                                                            {currentPageUsers} / {totalPages}
+                                                                        <span className="text-sm text-cyan-500 border border-border rounded-lg border-cyan-500 px-2 py-1 font-bold text-slate-400">
+                                                                            {currentPageUsers}
                                                                         </span>
                                                                         <button
                                                                             disabled={currentPageUsers >= totalPages}
                                                                             onClick={() => setCurrentPageUsers(prev => prev + 1)}
                                                                             className="px-3 py-1.5 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                                                         >
-                                                                            Next
+                                                                            <ChevronRight size={16}/>
                                                                         </button>
                                                                     </div>
                                                                 </div>

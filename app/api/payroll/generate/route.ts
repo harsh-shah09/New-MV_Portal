@@ -44,8 +44,8 @@ async function fetchLeaveConfigurations(conn: any): Promise<LeaveConfig> {
     // Parse configurations with defaults
     const annualLeaveBalance = parseFloat(configMap.get('Annual_Leave_Balance') || '18')
     const OnePlusTwoRule = configMap.get('One_plus_two_rule')?.toLowerCase() === 'true'
-    const SandwichRule = configMap.get('Sandwitch_Rule')?.toLowerCase() === 'true'
-    const sandwichRuleAppliesTo = (configMap.get('Sandwitch_Rule_Applies_to') || '')
+    const SandwichRule = configMap.get('Sandwich_Rule')?.toLowerCase() === 'true'
+    const sandwichRuleAppliesTo = (configMap.get('Sandwich_Rule_Applies_to') || '')
       .split(',').map(role => role.trim()).filter(Boolean)
     const penaltyAppliesTo = (configMap.get('penalty_applies_to') || '')
       .split(',').map(role => role.trim()).filter(Boolean)
