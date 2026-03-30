@@ -99,8 +99,7 @@ export function PendingApprovalsQueue({ initialPendingApprovals = [], dashboardV
   const shouldShowRulesPopup = (record: any): boolean => {
     return (
       dashboardView === 'hr' &&
-      record?.leaveType === 'Planned Leave' &&
-      (record?.sandwichRuleApplicable === true || record?.onePlusTwoRuleApplicable === true)
+      record?.leaveType === 'Planned Leave'
     )
   }
 
