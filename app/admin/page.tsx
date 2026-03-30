@@ -596,7 +596,7 @@ export default function AdminConsole() {
 
                                         {activeTab === "users" && (
                                             <div className="space-y-6">
-                                                <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+                                                <div className="flex flex-col md:flex-row justify-between gap-4">
                                                     <div>
                                                         <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
                                                             <Users className="w-5 h-5 text-indigo-500" /> User Access
@@ -765,11 +765,11 @@ export default function AdminConsole() {
 
                                         {activeTab === "integration" && (
                                             <div className="space-y-6">
-                                                <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
+                                                <div className="flex flex-col md:flex-row justify-between gap-4 mb-6">
                                                     <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-                                                        <Workflow className="w-5 h-5 text-orange-500" /> Google Connected Users
+                                                        <Workflow className="text-orange-500" /> Google Connected Users
                                                     </h2>
-                                                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto">
+                                                    <div className="flex sm:flex-row items-center sm:items-center gap-3 w-full md:w-auto">
                                                         <div className="flex justify-center sm:block">
                                                             <RefreshButton onClick={fetchConnectedUsers} label="" loading={loadingIntegrations} />
                                                         </div>
