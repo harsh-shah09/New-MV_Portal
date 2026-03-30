@@ -728,7 +728,7 @@ export default function AdminConsole() {
                                                             }
 
                                                             return (
-                                                                <div className="p-4 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between bg-slate-50 gap-4 sm:gap-0">
+                                                                <div className="p-4 border-t border-slate-200 flex flex-row sm:flex-row items-center justify-between bg-slate-50 gap-4 sm:gap-0">
                                                                     <div className="text-sm text-slate-500 text-center sm:text-left">
                                                                         Showing {start} to {end} of {filteredUsers.length} entries
                                                                     </div>
@@ -906,7 +906,7 @@ export default function AdminConsole() {
                                                                 }
 
                                                                 return (
-                                                                    <div className="p-4 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between bg-slate-50 gap-4 sm:gap-0">
+                                                                    <div className="p-4 border-t border-slate-200 flex flex-row sm:flex-row items-center justify-between bg-slate-50 gap-4 sm:gap-0">
                                                                         <div className="text-sm text-slate-500 text-center sm:text-left">
                                                                             Showing {start} to {end} of {filteredIntegrations.length} entries
                                                                         </div>
