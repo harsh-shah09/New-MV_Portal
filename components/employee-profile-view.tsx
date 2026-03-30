@@ -924,10 +924,10 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                         </div>
                         <button
                             onClick={() => fileInputRef.current?.click()}
-                            className="absolute bottom-0.5 right-0.5 p-1.5 rounded-full bg-black/60 text-white shadow-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black"
+                            className="absolute bottom-0.5 right-0.5 p-2 sm:p-1.5 rounded-full bg-black/70 backdrop-blur-sm text-white shadow-md opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity hover:bg-black active:scale-95"
                             title="Change Photo"
                         >
-                            <Camera className="w-3.5 h-3.5" />
+                            <Camera className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
                         </button>
                         <input type="file" hidden ref={fileInputRef} accept="image/*" onChange={handleFileChange} />
                     </div>

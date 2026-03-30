@@ -41,7 +41,7 @@ export function MainNav() {
               <Link href="/" className="flex items-center gap-3 font-bold text-xl hover:opacity-90 transition-opacity group">
                 <div className="bg-white/10 p-1.5 rounded-lg backdrop-blur-sm group-hover:bg-white/20 transition-colors">
                   <Image 
-                    src="/mv_logo.png" 
+                    src="/mv_logo1.png" 
                     alt="MV Portal" 
                     width={48} 
                     height={48} 

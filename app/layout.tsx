@@ -14,15 +14,15 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       {
-        url: '/mv_logo.ico',
+        url: '/mv_logo1.png',
         media: '(prefers-color-scheme: light)',
       },
       {
-        url: '/mv_logo.ico',
+        url: '/mv_logo1.png',
         media: '(prefers-color-scheme: dark)',
       },
       {
-        url: '/mv_logo.ico',
+        url: '/mv_logo1.png',
         type: 'image/svg+xml',
       },
     ],

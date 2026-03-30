@@ -64,7 +64,7 @@ export default function LoginPage() {
                 transition={{ delay: 0.2 }}
              >
                 <div className="w-16 h-16 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center mb-8 border border-white/20 shadow-xl">
-                    <Image src="/mv_logo.png" alt="MV Portal Logo" width={40} height={40} className="object-contain" />
+                    <Image src="/mv_logo1.png" alt="MV Portal Logo" width={40} height={40} className="object-contain" />
                 </div>
                 <h1 className="text-5xl font-bold mb-6 leading-tight">
                     Welcome to <br />
@@ -101,7 +101,7 @@ export default function LoginPage() {
                 
                 <div className="text-center mb-10">
                     <div className="inline-block lg:hidden mb-4 p-3 bg-slate-50 rounded-xl">
-                        <Image src="/mv_logo.png" alt="Logo" width={40} height={40} />
+                        <Image src="/mv_logo1.png" alt="Logo" width={40} height={40} />
                     </div>
                     <h2 className="text-3xl font-bold text-slate-800 mb-2">Sign In</h2>
                     <p className="text-slate-500">Access your employee dashboard</p>
