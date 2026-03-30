@@ -69,7 +69,7 @@ export default function DashboardPage() {
     window.localStorage.setItem(DASHBOARD_VIEW_STORAGE_KEY, nextViewMode)
   }
 
-  const { data, isLoading, isFetching } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ["dashboard", role, viewMode],
     queryFn: () => fetch(`/api/dashboard?view=${viewMode}&role=${role}`).then((res) => {
       if (!res.ok) {
@@ -82,9 +82,13 @@ export default function DashboardPage() {
       return res.json()
     }),
     enabled: !!role,
+    staleTime: 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    retry: 1,
   })
 
-  if (isLoading || isFetching || !role) {
+  if (isLoading || !role) {
     return(
      <div className="w-full h-screen flex items-center justify-center">
         <Spin size="large" tip="Loading Dashboard..." />
