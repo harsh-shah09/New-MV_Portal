@@ -47,7 +47,7 @@ async function fetchLeaveConfigurations(conn: any): Promise<LeaveConfig> {
     const SandwichRule = configMap.get('Sandwich_Rule')?.toLowerCase() === 'true'
     const sandwichRuleAppliesTo = (configMap.get('Sandwich_Rule_Applies_to') || '')
       .split(',').map(role => role.trim()).filter(Boolean)
-    const penaltyAppliesTo = (configMap.get('penalty_applies_to') || '')
+    const penaltyAppliesTo = (configMap.get('One_Two_Applies_to') || '')
       .split(',').map(role => role.trim()).filter(Boolean)
     const minWorkingDayNoticePeriod = parseInt(configMap.get('minimum_working_working_day_notice_perio') || '5')
     const penaltyDaysPerDay = parseFloat(configMap.get('penalty_days_per_day') || '2')

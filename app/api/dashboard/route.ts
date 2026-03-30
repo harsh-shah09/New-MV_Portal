@@ -74,7 +74,7 @@ export async function GET(req: NextRequest) {
                 pendingApprovalsQuery = await conn.query(`
                     SELECT Id, Name, Employee__c, Employee__r.Employee_Name__c, 
                            Leave_Type__c, Leave_Category__c, Start_Date__c, 
-                           End_Date__c, Total_Days__c, TL_Approval__c, Rule_Calculation_Details__c
+                           End_Date__c, Total_Days__c, TL_Approval__c, Sandwich_Rule__c, OnePlusTwo_Rule__c
                     FROM Leave__c
                     WHERE Status__c = 'Applied'
                     ORDER BY Start_Date__c ASC
@@ -83,7 +83,7 @@ export async function GET(req: NextRequest) {
                 pendingApprovalsQuery = await conn.query(`
                     SELECT Id, Name, Employee__c, Employee__r.Employee_Name__c, 
                            Leave_Type__c, Leave_Category__c, Start_Date__c, 
-                           End_Date__c, Total_Days__c, TL_Approval__c, Rule_Calculation_Details__c
+                           End_Date__c, Total_Days__c, TL_Approval__c, Sandwich_Rule__c, OnePlusTwo_Rule__c
                     FROM Leave__c
                     WHERE Status__c = 'Applied' ${hrDashboardLeaveFilter}
                     ORDER BY Start_Date__c ASC
@@ -92,7 +92,7 @@ export async function GET(req: NextRequest) {
                 pendingApprovalsQuery = await conn.query(`
                     SELECT Id,Name, Employee__c, Employee__r.Employee_Name__c, 
                            Leave_Type__c, Leave_Category__c, Start_Date__c, 
-                           End_Date__c, Total_Days__c, TL_Approval__c, Rule_Calculation_Details__c
+                           End_Date__c, Total_Days__c, TL_Approval__c, Sandwich_Rule__c, OnePlusTwo_Rule__c
                     FROM Leave__c
                     WHERE Status__c = 'Applied' AND Employee__r.Role__c != 'HR'
                     ORDER BY Start_Date__c ASC
@@ -100,19 +100,8 @@ export async function GET(req: NextRequest) {
             }
 
             const pendingApprovals = pendingApprovalsQuery.records.map((record: any) => {
-                let parsedDetails: any = null
-                try {
-                    parsedDetails = record.Rule_Calculation_Details__c ? JSON.parse(record.Rule_Calculation_Details__c) : null
-                } catch (error) {
-                    console.error('Failed to parse Rule_Calculation_Details__c in dashboard pending approvals:', error)
-                }
-
-                const sandwichRuleApplicable =
-                    parsedDetails?.sameRequestSandwich?.applied === true ||
-                    (parsedDetails?.sameRequestSandwich?.totalDays || 0) > 0
-                const onePlusTwoRuleApplicable =
-                    parsedDetails?.onePlusTwoRule?.applied === true ||
-                    (parsedDetails?.onePlusTwoRule?.extraDays || 0) > 0
+                const sandwichRuleApplicable = record.Sandwich_Rule__c === true
+                const onePlusTwoRuleApplicable = record.OnePlusTwo_Rule__c === true
 
                 return {
                     id: record.Id,

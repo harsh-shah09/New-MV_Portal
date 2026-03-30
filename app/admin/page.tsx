@@ -47,6 +47,7 @@ function hashToTab(hash: string): AdminTab {
 export default function AdminConsole() {
     const [activeTab, setActiveTab] = useState<AdminTab>("admin");
     const [configs, setConfigs] = useState<any>(null);
+    const [roleOptions, setRoleOptions] = useState<string[]>([]);
     const [users, setUsers] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [loadingUsers, setLoadingUsers] = useState(false);
@@ -178,7 +179,9 @@ export default function AdminConsole() {
             }
             if (!res.ok) throw new Error("Failed to fetch configurations");
             const data = await res.json();
-            setConfigs(data);
+            setRoleOptions(data.roleOptions || []);
+            const { roleOptions: _roleOptions, ...configData } = data;
+            setConfigs(configData);
         } catch (error) {
             console.error(error);
             message.error("Failed to load configurations");
@@ -531,12 +534,22 @@ export default function AdminConsole() {
                                                         {['One_plus_two_rule', 'Sandwich_Rule'].includes(record.DeveloperName) ? (
                                                             <Select
                                                                 value={record.Value__c || 'false'}
-                                                                onChange={(e) => handleInputChange('Leave_Configurations__mdt', record, e)}
+                                                                onChange={(value) => handleInputChange('Leave_Configurations__mdt', record, value)}
                                                                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
                                                                 options={[
                                                                     { value: 'true', label: 'Enabled' },
                                                                     { value: 'false', label: 'Disabled' }
                                                                 ]}
+                                                            />
+                                                        ) : ['Sandwich_Rule_Applies_to', 'One_Two_Applies_to'].includes(record.DeveloperName) ? (
+                                                            <Select
+                                                                mode="multiple"
+                                                                allowClear
+                                                                value={(record.Value__c || '').split(',').map((role: string) => role.trim()).filter(Boolean)}
+                                                                onChange={(values) => handleInputChange('Leave_Configurations__mdt', record, values.join(','))}
+                                                                options={roleOptions.map((role) => ({ value: role, label: role }))}
+                                                                placeholder="Select roles"
+                                                                className="w-full bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
                                                             />
                                                         ) : (
                                                             <input

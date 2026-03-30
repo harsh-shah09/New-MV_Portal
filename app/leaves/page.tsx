@@ -8,7 +8,7 @@ import { useLeaveStore } from "@/store/leaveStore"
 import type { LeaveRequest } from "@/types"
 import { useQuery } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { Modal, Select, Input, Card, Row, Col, Spin, DatePicker, Button, Form } from "antd"
+import { Modal, Select, Input, Card, Row, Col, Spin, DatePicker, Button, Form, Checkbox } from "antd"
 import { SearchOutlined } from "@ant-design/icons"
 import { PageContainer } from "@/components/page-container"
 import { PageHeader } from "@/components/page-header"
@@ -41,7 +41,9 @@ export default function LeavesPage() {
   const [rejectingLeaveId, setRejectingLeaveId] = useState<string | null>(null)
   const [rejectReason, setRejectReason] = useState("")
   const [ruleChoiceModalVisible, setRuleChoiceModalVisible] = useState(false)
-  const [ruleChoiceLeaveId, setRuleChoiceLeaveId] = useState<string | null>(null)
+  const [ruleChoiceLeave, setRuleChoiceLeave] = useState<LeaveRequest | null>(null)
+  const [applySandwichSelection, setApplySandwichSelection] = useState(false)
+  const [applyOnePlusTwoSelection, setApplyOnePlusTwoSelection] = useState(false)
   const [allLeaves, setAllLeaves] = useState<LeaveRequest[]>([])
   const [filteredLeaves, setFilteredLeaves] = useState<LeaveRequest[]>([])
   const [filteredMyLeaves, setFilteredMyLeaves] = useState<LeaveRequest[]>([])
@@ -619,7 +621,10 @@ export default function LeavesPage() {
     })
   }
 
-  const approveLeaveRequest = async (targetLeaveId: string, applyLeaveRules: boolean) => {
+  const approveLeaveRequest = async (
+    targetLeaveId: string,
+    ruleOptions: { applySandwichRule: boolean; applyOnePlusTwoRule: boolean }
+  ) => {
     const toastId = toast.loading("Approving leave request...")
     const isHrOrAdmin = currentUser?.role === 'HR' || currentUser?.role === 'Admin'
     try {
@@ -631,7 +636,8 @@ export default function LeavesPage() {
         body: JSON.stringify({
           leaveId: targetLeaveId,
           action: "approve",
-          applyLeaveRules,
+          applySandwichRule: ruleOptions.applySandwichRule,
+          applyOnePlusTwoRule: ruleOptions.applyOnePlusTwoRule,
         }),
       })
 
@@ -684,24 +690,34 @@ export default function LeavesPage() {
       okButtonProps: { style: { backgroundColor: '#10b981' } },
       onOk: async () => {
         if (shouldShowRulesPopup) {
-          setRuleChoiceLeaveId(leaveId)
+          setRuleChoiceLeave(leave || null)
+          setApplySandwichSelection(leave?.sandwichRuleApplicable === true)
+          setApplyOnePlusTwoSelection(leave?.onePlusTwoRuleApplicable === true)
           setRuleChoiceModalVisible(true)
           return
         }
 
-        await approveLeaveRequest(leaveId, false)
+        await approveLeaveRequest(leaveId, {
+          applySandwichRule: false,
+          applyOnePlusTwoRule: false,
+        })
       },
     })
   }
 
   const closeRuleChoiceModal = () => {
     setRuleChoiceModalVisible(false)
-    setRuleChoiceLeaveId(null)
+    setRuleChoiceLeave(null)
+    setApplySandwichSelection(false)
+    setApplyOnePlusTwoSelection(false)
   }
 
-  const handleApproveFromRuleChoice = async (applyLeaveRules: boolean) => {
-    if (!ruleChoiceLeaveId) return
-    await approveLeaveRequest(ruleChoiceLeaveId, applyLeaveRules)
+  const handleApproveFromRuleChoice = async () => {
+    if (!ruleChoiceLeave?.id) return
+    await approveLeaveRequest(ruleChoiceLeave.id, {
+      applySandwichRule: ruleChoiceLeave.sandwichRuleApplicable === true ? applySandwichSelection : false,
+      applyOnePlusTwoRule: ruleChoiceLeave.onePlusTwoRuleApplicable === true ? applyOnePlusTwoSelection : false,
+    })
     closeRuleChoiceModal()
   }
 
@@ -1426,22 +1442,29 @@ export default function LeavesPage() {
             <Button key="cancel" onClick={closeRuleChoiceModal}>
               Cancel
             </Button>,
-            <Button key="without-rules" onClick={() => handleApproveFromRuleChoice(false)}>
-              Approve Without Rules
-            </Button>,
             <Button
-              key="apply-rules"
+              key="approve"
               type="primary"
               style={{ backgroundColor: '#10b981' }}
-              onClick={() => handleApproveFromRuleChoice(true)}
+              onClick={handleApproveFromRuleChoice}
             >
-              Apply Rules & Approve
+              Approve
             </Button>,
           ]}
         >
-          <div>
-            <p className="mb-2">Do you want to apply Sandwich and One+Two rules on this leave before approval?</p>
-            <p className="text-sm text-gray-600">You can also approve without applying rules, or cancel.</p>
+          <div className="space-y-3">
+            <p className="mb-1">Select which rules to apply before approval.</p>
+            {ruleChoiceLeave?.sandwichRuleApplicable === true && (
+              <Checkbox checked={applySandwichSelection} onChange={(e) => setApplySandwichSelection(e.target.checked)}>
+                Apply Sandwich Rule
+              </Checkbox>
+            )}
+            {ruleChoiceLeave?.onePlusTwoRuleApplicable === true && (
+              <Checkbox checked={applyOnePlusTwoSelection} onChange={(e) => setApplyOnePlusTwoSelection(e.target.checked)}>
+                Apply 1+2 Rule
+              </Checkbox>
+            )}
+            <p className="text-sm text-gray-600">Only applicable rules are shown.</p>
           </div>
         </Modal>
 

@@ -1,6 +1,6 @@
 "use client"
 
-import { Card, Button, Table, Badge, message, Tooltip, Modal, Input } from "antd"
+import { Card, Button, Table, Badge, message, Tooltip, Modal, Input, Checkbox } from "antd"
 import { 
   CheckCircleOutlined, 
   CloseCircleOutlined,
@@ -27,6 +27,8 @@ export function PendingApprovalsQueue({ initialPendingApprovals = [], dashboardV
   const [rejectReason, setRejectReason] = useState("")
   const [ruleChoiceModalVisible, setRuleChoiceModalVisible] = useState(false)
   const [ruleChoiceLeave, setRuleChoiceLeave] = useState<any | null>(null)
+  const [applySandwichSelection, setApplySandwichSelection] = useState(false)
+  const [applyOnePlusTwoSelection, setApplyOnePlusTwoSelection] = useState(false)
 
   const fetchPendingApprovals = async () => {
     try {
@@ -49,7 +51,10 @@ export function PendingApprovalsQueue({ initialPendingApprovals = [], dashboardV
     setIsLoading(false)
   }, [initialPendingApprovals])
 
-  const handleApprove = async (leaveId: string, applyLeaveRules = false) => {
+  const handleApprove = async (
+    leaveId: string,
+    ruleOptions: { applySandwichRule: boolean; applyOnePlusTwoRule: boolean }
+  ) => {
     setLoading(leaveId)
     try {
       const response = await fetch('/api/leave-management', {
@@ -60,7 +65,8 @@ export function PendingApprovalsQueue({ initialPendingApprovals = [], dashboardV
         body: JSON.stringify({
           leaveId,
           action: 'approve',
-          applyLeaveRules,
+          applySandwichRule: ruleOptions.applySandwichRule,
+          applyOnePlusTwoRule: ruleOptions.applyOnePlusTwoRule,
         })
       })
 
@@ -69,7 +75,7 @@ export function PendingApprovalsQueue({ initialPendingApprovals = [], dashboardV
       if (response.ok) {
         message.success(
           dashboardView === 'hr'
-            ? `Leave approved successfully${applyLeaveRules ? ' with Sandwich and One+Two rules.' : ' without Sandwich and One+Two rules.'}`
+            ? `Leave approved successfully${ruleOptions.applySandwichRule || ruleOptions.applyOnePlusTwoRule ? ' with selected rules.' : ' without rules.'}`
             : 'Leave approved successfully'
         )
         // Refresh only this component's data
@@ -88,18 +94,24 @@ export function PendingApprovalsQueue({ initialPendingApprovals = [], dashboardV
   const closeRuleChoiceModal = () => {
     setRuleChoiceModalVisible(false)
     setRuleChoiceLeave(null)
+    setApplySandwichSelection(false)
+    setApplyOnePlusTwoSelection(false)
   }
 
-  const handleApproveFromRuleChoice = async (applyLeaveRules: boolean) => {
+  const handleApproveFromRuleChoice = async () => {
     if (!ruleChoiceLeave?.id) return
-    await handleApprove(ruleChoiceLeave.id, applyLeaveRules)
+    await handleApprove(ruleChoiceLeave.id, {
+      applySandwichRule: ruleChoiceLeave.sandwichRuleApplicable === true ? applySandwichSelection : false,
+      applyOnePlusTwoRule: ruleChoiceLeave.onePlusTwoRuleApplicable === true ? applyOnePlusTwoSelection : false,
+    })
     closeRuleChoiceModal()
   }
 
   const shouldShowRulesPopup = (record: any): boolean => {
     return (
       dashboardView === 'hr' &&
-      record?.leaveType === 'Planned Leave'
+      record?.leaveType === 'Planned Leave' &&
+      (record?.sandwichRuleApplicable === true || record?.onePlusTwoRuleApplicable === true)
     )
   }
 
@@ -219,11 +231,16 @@ export function PendingApprovalsQueue({ initialPendingApprovals = [], dashboardV
             onClick={() => {
               if (shouldShowRulesPopup(record)) {
                 setRuleChoiceLeave(record)
+                setApplySandwichSelection(record?.sandwichRuleApplicable === true)
+                setApplyOnePlusTwoSelection(record?.onePlusTwoRuleApplicable === true)
                 setRuleChoiceModalVisible(true)
                 return
               }
 
-              handleApprove(record.id, false)
+              handleApprove(record.id, {
+                applySandwichRule: false,
+                applyOnePlusTwoRule: false,
+              })
             }}
           >
             Approve
@@ -295,22 +312,29 @@ export function PendingApprovalsQueue({ initialPendingApprovals = [], dashboardV
           <Button key="cancel" onClick={closeRuleChoiceModal}>
             Cancel
           </Button>,
-          <Button key="without-rules" onClick={() => handleApproveFromRuleChoice(false)}>
-            Approve Without Rules
-          </Button>,
           <Button
-            key="apply-rules"
+            key="approve"
             type="primary"
             style={{ backgroundColor: '#10b981' }}
-            onClick={() => handleApproveFromRuleChoice(true)}
+            onClick={handleApproveFromRuleChoice}
           >
-            Apply Rules & Approve
+            Approve
           </Button>,
         ]}
       >
-        <div>
-          <p className="mb-2">Do you want to apply Sandwich and One+Two rules on this leave before approval?</p>
-          <p className="text-sm text-gray-600">You can also approve without applying rules, or cancel.</p>
+        <div className="space-y-3">
+          <p className="mb-1">Select which rules to apply before approval.</p>
+          {ruleChoiceLeave?.sandwichRuleApplicable === true && (
+            <Checkbox checked={applySandwichSelection} onChange={(e) => setApplySandwichSelection(e.target.checked)}>
+              Apply Sandwich Rule
+            </Checkbox>
+          )}
+          {ruleChoiceLeave?.onePlusTwoRuleApplicable === true && (
+            <Checkbox checked={applyOnePlusTwoSelection} onChange={(e) => setApplyOnePlusTwoSelection(e.target.checked)}>
+              Apply 1+2 Rule
+            </Checkbox>
+          )}
+          <p className="text-sm text-gray-600">Only applicable rules are shown.</p>
         </div>
       </Modal>
 

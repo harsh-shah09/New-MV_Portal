@@ -58,7 +58,7 @@ async function fetchLeaveConfigurations(conn: any): Promise<LeaveConfig> {
     const SandwichRule = configMap.get('Sandwich_Rule')?.toLowerCase() === 'true';
     const sandwichRuleAppliesTo = (configMap.get('Sandwich_Rule_Applies_to') || '')
       .split(',').map(role => role.trim()).filter(Boolean);
-    const penaltyAppliesTo = (configMap.get('penalty_applies_to') || '')
+    const penaltyAppliesTo = (configMap.get('One_Two_Applies_to') || '')
       .split(',').map(role => role.trim()).filter(Boolean);
     const minWorkingDayNoticePeriod = parseInt(configMap.get('minimum_working_working_day_notice_perio') || '5');
     const penaltyDaysPerDay = parseFloat(configMap.get('penalty_days_per_day') || '2');
@@ -205,7 +205,7 @@ function createRuleCalculationDetails(
   holidaySet: Set<string>,
   createdReferenceDate: dayjs.Dayjs,
   mergeInfo?: RuleCalculationDetails["mergeInfo"],
-  applyPolicyRules: boolean = true
+  ruleSelection?: boolean | { applySandwichRule?: boolean; applyOnePlusTwoRule?: boolean }
 ): RecalculatedLeaveMetrics {
   const isWeekend = (d: dayjs.Dayjs) => {
     const day = d.day();
@@ -221,13 +221,28 @@ function createRuleCalculationDetails(
   const requestedEndDate = endDate.format("YYYY-MM-DD");
   const baseCalendarDays = endDate.diff(startDate, "day") + 1;
   const isHalfDay = sessionValue === "Session-1" || sessionValue === "Session-2";
+  const applyPolicyRules = typeof ruleSelection === "boolean" ? ruleSelection : true;
+  const selectedSandwichRule =
+    typeof ruleSelection === "object" && ruleSelection !== null
+      ? ruleSelection.applySandwichRule === true
+      : true;
+  const selectedOnePlusTwoRule =
+    typeof ruleSelection === "object" && ruleSelection !== null
+      ? ruleSelection.applyOnePlusTwoRule === true
+      : true;
+
   const applyRules =
     applyPolicyRules &&
     effectiveLeaveCategory === "Loss of Pay" &&
     (leaveType || "") === "Planned Leave";
   const sandwichRuleAppliesToUser = leaveConfig.sandwichRuleAppliesTo.includes(role || "");
   const penaltyAppliesToUser = leaveConfig.penaltyAppliesTo.includes(role || "");
-  const applySandwichRule = applyRules && !isHalfDay && leaveConfig.SandwichRule && sandwichRuleAppliesToUser;
+  const applySandwichRule =
+    applyRules &&
+    selectedSandwichRule &&
+    !isHalfDay &&
+    leaveConfig.SandwichRule &&
+    sandwichRuleAppliesToUser;
 
   let workingDaysInRange = 0;
   let nonWorkingDaysInRange = 0;
@@ -297,7 +312,7 @@ function createRuleCalculationDetails(
   const sandwichExtra = sandwichApplied ? sandwichDates.length : 0;
 
   let onePlusTwoExtra = 0;
-  if (applyRules && !isHalfDay && leaveConfig.OnePlusTwoRule && penaltyAppliesToUser) {
+  if (applyRules && selectedOnePlusTwoRule && !isHalfDay && leaveConfig.OnePlusTwoRule && penaltyAppliesToUser) {
     const countWorkingDaysBetween = (fromDate: dayjs.Dayjs, toDate: dayjs.Dayjs): number => {
       let workingDays = 0;
       let current = fromDate.clone();
@@ -487,6 +502,8 @@ export async function GET(request: NextRequest) {
           Approved_Date__c,
           TL_Approval__c,
           HR_Approval__c,
+          Sandwich_Rule__c,
+          OnePlusTwo_Rule__c,
           Reason__c,
           Rule_Calculation_Details__c
         FROM Leave__c
@@ -499,12 +516,8 @@ export async function GET(request: NextRequest) {
       pendingApprovals = pendingLeaveRecords.records.map((record: any) => {
         const parsedDetails = parseRuleCalculationDetails(record.Rule_Calculation_Details__c);
         const partialRequest = (parsedDetails as any)?.partialWithdrawalRequest;
-        const sandwichRuleApplicable =
-          parsedDetails?.sameRequestSandwich?.applied === true ||
-          (parsedDetails?.sameRequestSandwich?.totalDays || 0) > 0;
-        const onePlusTwoRuleApplicable =
-          parsedDetails?.onePlusTwoRule?.applied === true ||
-          (parsedDetails?.onePlusTwoRule?.extraDays || 0) > 0;
+        const sandwichRuleApplicable = record.Sandwich_Rule__c === true;
+        const onePlusTwoRuleApplicable = record.OnePlusTwo_Rule__c === true;
 
         return {
           id: record.Id,
@@ -551,6 +564,8 @@ export async function GET(request: NextRequest) {
           Approved_Date__c,
           TL_Approval__c,
           HR_Approval__c,
+          Sandwich_Rule__c,
+          OnePlusTwo_Rule__c,
           Reason__c,
           Rule_Calculation_Details__c
         FROM Leave__c
@@ -563,12 +578,8 @@ export async function GET(request: NextRequest) {
       pendingApprovals = pendingLeaveRecords.records.map((record: any) => {
         const parsedDetails = parseRuleCalculationDetails(record.Rule_Calculation_Details__c);
         const partialRequest = (parsedDetails as any)?.partialWithdrawalRequest;
-        const sandwichRuleApplicable =
-          parsedDetails?.sameRequestSandwich?.applied === true ||
-          (parsedDetails?.sameRequestSandwich?.totalDays || 0) > 0;
-        const onePlusTwoRuleApplicable =
-          parsedDetails?.onePlusTwoRule?.applied === true ||
-          (parsedDetails?.onePlusTwoRule?.extraDays || 0) > 0;
+        const sandwichRuleApplicable = record.Sandwich_Rule__c === true;
+        const onePlusTwoRuleApplicable = record.OnePlusTwo_Rule__c === true;
 
         return {
           id: record.Id,
@@ -612,6 +623,8 @@ export async function GET(request: NextRequest) {
           Approved_Date__c,
           TL_Approval__c,
           HR_Approval__c,
+          Sandwich_Rule__c,
+          OnePlusTwo_Rule__c,
           Reason__c,
           Rule_Calculation_Details__c
         FROM Leave__c
@@ -625,12 +638,8 @@ export async function GET(request: NextRequest) {
       pendingApprovals = pendingLeaveRecords.records.map((record: any) => {
         const parsedDetails = parseRuleCalculationDetails(record.Rule_Calculation_Details__c);
         const partialRequest = (parsedDetails as any)?.partialWithdrawalRequest;
-        const sandwichRuleApplicable =
-          parsedDetails?.sameRequestSandwich?.applied === true ||
-          (parsedDetails?.sameRequestSandwich?.totalDays || 0) > 0;
-        const onePlusTwoRuleApplicable =
-          parsedDetails?.onePlusTwoRule?.applied === true ||
-          (parsedDetails?.onePlusTwoRule?.extraDays || 0) > 0;
+        const sandwichRuleApplicable = record.Sandwich_Rule__c === true;
+        const onePlusTwoRuleApplicable = record.OnePlusTwo_Rule__c === true;
 
         return {
           id: record.Id,
@@ -2558,6 +2567,14 @@ export async function PATCH(request: NextRequest) {
     if (action === "approve") {
       const { role, title, name: approverName } = payload;
       const applyLeaveRules = body?.applyLeaveRules === true;
+      const applySandwichRule =
+        typeof body?.applySandwichRule === 'boolean'
+          ? body.applySandwichRule
+          : applyLeaveRules;
+      const applyOnePlusTwoRule =
+        typeof body?.applyOnePlusTwoRule === 'boolean'
+          ? body.applyOnePlusTwoRule
+          : applyLeaveRules;
 
       // Check if user can approve leaves
       const isHR = role === 'HR';
@@ -2603,7 +2620,10 @@ export async function PATCH(request: NextRequest) {
           holidaySet,
           dayjs(oldLeave.CreatedDate || new Date().toISOString()).startOf("day"),
           undefined,
-          applyLeaveRules
+          {
+            applySandwichRule,
+            applyOnePlusTwoRule,
+          }
         );
 
         updateData.HR_Approval__c = 'Approved';
@@ -2804,7 +2824,9 @@ export async function PATCH(request: NextRequest) {
         success: true,
         message: "Leave approved successfully",
         ruleSettings: {
-          applyLeaveRules: isHR || isAdmin ? applyLeaveRules : null,
+          applyLeaveRules: isHR || isAdmin ? (applySandwichRule || applyOnePlusTwoRule) : null,
+          applySandwichRule: isHR || isAdmin ? applySandwichRule : null,
+          applyOnePlusTwoRule: isHR || isAdmin ? applyOnePlusTwoRule : null,
         },
       });
     }
