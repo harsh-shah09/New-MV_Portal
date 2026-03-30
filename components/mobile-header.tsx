@@ -98,7 +98,8 @@ export function MobileHeader({ onMenuClick }: { onMenuClick: () => void }) {
                     </button>
 
                     {/* Profile Dropdown */}
-                    <div className="relative" ref={profileRef}>
+                    <div className="relative" ref={profileRef}
+                        data-tour="profile-card">
                         <button
                             onClick={() => setIsProfileOpen(!isProfileOpen)}
                             className="flex items-center gap-2 p-1 pl-2 rounded-full hover:bg-slate-100 transition-all border border-transparent hover:border-slate-200"

@@ -329,7 +329,7 @@ export default function AdminConsole() {
                     : "text-slate-600 hover:bg-slate-100"
                 }`}
         >
-            <Icon className={`w-5 h-5 lg:w-5 lg:h-5 ${activeTab === id ? "text-white" : "text-slate-400"}`} />
+            <Icon className={`w-5 h-5 lg:w-5 lg:h-5 shrink-0 ${activeTab === id ? "text-white" : "text-slate-400"}`} />
             <span className="text-xs sm:text-sm">{label}</span>
         </button>
     );
@@ -361,7 +361,7 @@ export default function AdminConsole() {
                     <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 lg:gap-8">
                         {/* Sidebar */}
                         <div className="lg:col-span-1 space-y-4">
-                            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-2 grid grid-cols-2 sm:grid-cols-3 lg:flex lg:flex-col gap-2">
+                            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-2 grid grid-cols-3 md:grid-cols-2 lg:grid-cols-1 gap-2">
                                 <TabButton id="admin" label="General Settings" icon={Settings} />
                                 <TabButton id="documents" label="Documents Config" icon={FileText} />
                                 <TabButton id="leave" label="Leave Rules" icon={Calendar} />
