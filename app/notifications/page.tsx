@@ -8,6 +8,8 @@ import { formatDistanceToNow } from 'date-fns'
 import { useState } from "react"
 import { toast } from "sonner"
 import { RefreshButton } from "@/components/refresh-button"
+import { PageContainer } from "@/components/page-container"
+import { PageHeader } from "@/components/page-header"
 
 export default function NotificationsPage() {
     const [showAll, setShowAll] = useState(false)
@@ -100,40 +102,32 @@ export default function NotificationsPage() {
     }
 
     return (
-        <div className="min-h-screen bg-slate-50 p-6 lg:p-10">
-            <div className="max-w-4xl mx-auto space-y-6">
-                 <div className="flex justify-between items-start">
-                    <div>
-                        <h1 className="text-3xl font-extrabold text-slate-900">Notifications</h1>
-                        <p className="text-slate-500">
-                            {showAll ? 'All notifications' : `${unreadNotifications?.length || 0} unread notification${unreadNotifications?.length !== 1 ? 's' : ''}`}
-                        </p>
-                    </div>
-                    <div className="flex gap-2">
-                        <Button 
-                            onClick={() => setShowAll(!showAll)}
-                            className="mt-1"
-                        >
-                            {showAll ? 'Show Unread Only' : 'Show All'}
-                        </Button>
-                        <Button 
-                            icon={<CheckCheckIcon className="w-4 h-4" />} 
-                            onClick={handleClearAll}
-                            loading={clearing}
-                            disabled={!unreadNotifications || unreadNotifications.length === 0}
-                            className="mt-1"
-                            danger
-                        >
-                            Read All
-                        </Button>
-                        <RefreshButton
-                            onClick={refetch}
-                            loading={isFetching}
-                            label=""
-                            className="mt-1"
-                        />
-                    </div>
-                </div>
+        <PageContainer className="bg-slate-50">
+            <div className="w-full mx-auto space-y-6">
+                <PageHeader 
+                    title="Notifications"
+                    subtitle={showAll ? 'All notifications' : `${unreadNotifications?.length || 0} unread notification${unreadNotifications?.length !== 1 ? 's' : ''}`}
+                >
+                    <Button 
+                        onClick={() => setShowAll(!showAll)}
+                    >
+                        {showAll ? 'Show Unread Only' : 'Show All'}
+                    </Button>
+                    <Button 
+                        icon={<CheckCheckIcon className="w-4 h-4" />} 
+                        onClick={handleClearAll}
+                        loading={clearing}
+                        disabled={!unreadNotifications || unreadNotifications.length === 0}
+                        danger
+                    >
+                        Read All
+                    </Button>
+                    <RefreshButton
+                        onClick={refetch}
+                        loading={isFetching}
+                        label=""
+                    />
+                </PageHeader>
 
                 <Card className="shadow-sm border-slate-100 rounded-2xl bg-white/80 backdrop-blur-sm">
                     {isLoading || isFetching ? (
@@ -158,7 +152,7 @@ export default function NotificationsPage() {
                                                 e.stopPropagation()
                                                 handleMarkAsRead(item.Id)
                                             }}
-                                            className="absolute right-4 top-4 opacity-0 transition-opacity hover:bg-red-50 group-hover:opacity-100 rounded-lg p-1.5 text-red-500"
+                                            className="absolute right-4 top-4 opacity-100 sm:opacity-0 transition-opacity hover:bg-red-50 sm:group-hover:opacity-100 rounded-lg p-1.5 text-red-500"
                                             title="Clear notification"
                                         >
                                             <X className="w-4 h-4" />
@@ -201,6 +195,6 @@ export default function NotificationsPage() {
                     )}
                 </Card>
             </div>
-        </div>
+        </PageContainer>
     )
 }

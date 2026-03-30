@@ -641,8 +641,7 @@ export default function AdminConsole() {
                                                                                 <td className="px-6 py-4">
                                                                                     <Select
                                                                                         size="small"
-                                                                                        dropdownMatchSelectWidth={false}
-                                                                                        dropdownStyle={{ width: 'max-content', minWidth: '100%' }}
+                                                                                        dropdownStyle={{ width: 'max-content'}}
                                                                                         value={user.Role || 'Employee'}
                                                                                         onChange={(e) => updateUser(user.Id, { Role__c: e.target.value })}
                                                                                         className="bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs font-medium focus:ring-2 focus:ring-indigo-500 outline-none"
@@ -720,21 +719,21 @@ export default function AdminConsole() {
                                                                     <div className="text-sm text-slate-500 text-center sm:text-left">
                                                                         Showing {start} to {end} of {filteredUsers.length} entries
                                                                     </div>
-                                                                    <div className="flex items-center">
+                                                                    <div className="flex items-center gap-2">
                                                                         <button
                                                                             disabled={currentPageUsers === 1}
                                                                             onClick={() => setCurrentPageUsers(prev => prev - 1)}
-                                                                            className="px-3 py-1.5 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                                                            className="px-1 py-1.5 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                                                         >
                                                                             <ChevronLeft size={16}/>
                                                                         </button>
-                                                                        <span className="text-sm text-cyan-500 border border-border rounded-lg border-cyan-500 px-2 py-1 font-bold text-slate-400">
+                                                                        <span className="text-sm px-3 text-cyan-500 border border-border rounded-lg border-cyan-500 px-2 py-1 font-bold">
                                                                             {currentPageUsers}
                                                                         </span>
                                                                         <button
                                                                             disabled={currentPageUsers >= totalPages}
                                                                             onClick={() => setCurrentPageUsers(prev => prev + 1)}
-                                                                            className="px-3 py-1.5 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                                                            className="px-1 py-1.5 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                                                         >
                                                                             <ChevronRight size={16}/>
                                                                         </button>
@@ -902,17 +901,17 @@ export default function AdminConsole() {
                                                                             <button
                                                                                 disabled={currentPageIntegrations === 1}
                                                                                 onClick={() => setCurrentPageIntegrations(prev => prev - 1)}
-                                                                                className="rounded-lg font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                                                                className="px-1 py-1.5 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                                                             >
                                                                                 <ChevronLeft size={16}/>
                                                                             </button>
-                                                                            <span className="text-xs text-slate-400 border border-border border-cyan-100 rounded-lg p-3 text-cyan-500 font-bold">
+                                                                            <span className="px-3 text-cyan-500 border border-border rounded-lg border-cyan-500 px-2 py-1 font-bold">
                                                                                 {currentPageIntegrations}
                                                                             </span>
                                                                             <button
                                                                                 disabled={currentPageIntegrations >= totalPages}
                                                                                 onClick={() => setCurrentPageIntegrations(prev => prev + 1)}
-                                                                                className="rounded-lg font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                                                                className="px-1 py-1.5 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                                                             >
                                                                                 <ChevronRight size={16}/>
                                                                             </button>
