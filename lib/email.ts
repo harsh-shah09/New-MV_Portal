@@ -1,8 +1,3 @@
-/**
- * Email utility for sending notifications
- * Replace GoogleGmailApi.sendEmailFuture from Apex
- */
-
 import nodemailer from 'nodemailer';
 import { google } from 'googleapis';
 import { GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';

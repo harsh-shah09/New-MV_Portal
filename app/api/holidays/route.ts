@@ -91,8 +91,8 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "No holidays provided" }, { status: 400 });
       }
 
-      // Validate all holidays have required fields
-      const invalidHolidays = holidays.filter(h => !h.name || !h.date || !h.day || !h.year);
+      // Validate all holidays have required fields (year can be auto-derived from date)
+      const invalidHolidays = holidays.filter(h => !h.name || !h.date || !h.day);
       if (invalidHolidays.length > 0) {
         return NextResponse.json({ error: "Some holidays are missing required fields" }, { status: 400 });
       }
@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
         Name: h.name,
         Date__c: h.date,
         Day__c: h.day,
-        Year__c: h.year,
+        Year__c: h.year || new Date(h.date).getFullYear().toString(),
       }));
 
       // Bulk create all holidays at once
@@ -130,8 +130,8 @@ export async function POST(request: NextRequest) {
       // Single insert (legacy support)
       const { name, date, day, year } = body;
 
-      // Validate required fields
-      if (!name || !date || !day || !year) {
+      // Validate required fields (year can be auto-derived from date)
+      if (!name || !date || !day) {
         return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
       }
 
@@ -142,7 +142,7 @@ export async function POST(request: NextRequest) {
         Name: name,
         Date__c: date,
         Day__c: day,
-        Year__c: year,
+        Year__c: year || new Date(date).getFullYear().toString(),
       }) as any;
 
       if (!result.success) {
@@ -206,7 +206,11 @@ export async function PATCH(request: NextRequest) {
     if (name) updateData.Name = name;
     if (date) updateData.Date__c = date;
     if (day) updateData.Day__c = day;
-    if (year) updateData.Year__c = year;
+    if (year) {
+      updateData.Year__c = year;
+    } else if (date) {
+      updateData.Year__c = new Date(date).getFullYear().toString();
+    }
 
     await conn.sobject('Holidays_List__c').update(updateData);
 

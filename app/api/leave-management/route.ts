@@ -55,10 +55,10 @@ async function fetchLeaveConfigurations(conn: any): Promise<LeaveConfig> {
     // Parse configurations with defaults
     const annualLeaveBalance = parseFloat(configMap.get('Annual_Leave_Balance') || '18');
     const OnePlusTwoRule = configMap.get('One_plus_two_rule')?.toLowerCase() === 'true';
-    const SandwichRule = configMap.get('Sandwitch_Rule')?.toLowerCase() === 'true';
-    const sandwichRuleAppliesTo = (configMap.get('Sandwitch_Rule_Applies_to') || '')
+    const SandwichRule = configMap.get('Sandwich_Rule')?.toLowerCase() === 'true';
+    const sandwichRuleAppliesTo = (configMap.get('Sandwich_Rule_Applies_to') || '')
       .split(',').map(role => role.trim()).filter(Boolean);
-    const penaltyAppliesTo = (configMap.get('penalty_applies_to') || '')
+    const penaltyAppliesTo = (configMap.get('One_Two_Applies_to') || '')
       .split(',').map(role => role.trim()).filter(Boolean);
     const minWorkingDayNoticePeriod = parseInt(configMap.get('minimum_working_working_day_notice_perio') || '5');
     const penaltyDaysPerDay = parseFloat(configMap.get('penalty_days_per_day') || '2');
@@ -204,7 +204,8 @@ function createRuleCalculationDetails(
   leaveConfig: LeaveConfig,
   holidaySet: Set<string>,
   createdReferenceDate: dayjs.Dayjs,
-  mergeInfo?: RuleCalculationDetails["mergeInfo"]
+  mergeInfo?: RuleCalculationDetails["mergeInfo"],
+  ruleSelection?: boolean | { applySandwichRule?: boolean; applyOnePlusTwoRule?: boolean }
 ): RecalculatedLeaveMetrics {
   const isWeekend = (d: dayjs.Dayjs) => {
     const day = d.day();
@@ -220,10 +221,28 @@ function createRuleCalculationDetails(
   const requestedEndDate = endDate.format("YYYY-MM-DD");
   const baseCalendarDays = endDate.diff(startDate, "day") + 1;
   const isHalfDay = sessionValue === "Session-1" || sessionValue === "Session-2";
-  const applyRules = effectiveLeaveCategory === "Loss of Pay" && (leaveType || "") === "Planned Leave";
+  const applyPolicyRules = typeof ruleSelection === "boolean" ? ruleSelection : true;
+  const selectedSandwichRule =
+    typeof ruleSelection === "object" && ruleSelection !== null
+      ? ruleSelection.applySandwichRule === true
+      : true;
+  const selectedOnePlusTwoRule =
+    typeof ruleSelection === "object" && ruleSelection !== null
+      ? ruleSelection.applyOnePlusTwoRule === true
+      : true;
+
+  const applyRules =
+    applyPolicyRules &&
+    effectiveLeaveCategory === "Loss of Pay" &&
+    (leaveType || "") === "Planned Leave";
   const sandwichRuleAppliesToUser = leaveConfig.sandwichRuleAppliesTo.includes(role || "");
   const penaltyAppliesToUser = leaveConfig.penaltyAppliesTo.includes(role || "");
-  const applySandwichRule = applyRules && !isHalfDay && leaveConfig.SandwichRule && sandwichRuleAppliesToUser;
+  const applySandwichRule =
+    applyRules &&
+    selectedSandwichRule &&
+    !isHalfDay &&
+    leaveConfig.SandwichRule &&
+    sandwichRuleAppliesToUser;
 
   let workingDaysInRange = 0;
   let nonWorkingDaysInRange = 0;
@@ -293,7 +312,7 @@ function createRuleCalculationDetails(
   const sandwichExtra = sandwichApplied ? sandwichDates.length : 0;
 
   let onePlusTwoExtra = 0;
-  if (applyRules && !isHalfDay && leaveConfig.OnePlusTwoRule && penaltyAppliesToUser) {
+  if (applyRules && selectedOnePlusTwoRule && !isHalfDay && leaveConfig.OnePlusTwoRule && penaltyAppliesToUser) {
     const countWorkingDaysBetween = (fromDate: dayjs.Dayjs, toDate: dayjs.Dayjs): number => {
       let workingDays = 0;
       let current = fromDate.clone();
@@ -483,11 +502,12 @@ export async function GET(request: NextRequest) {
           Approved_Date__c,
           TL_Approval__c,
           HR_Approval__c,
+          Sandwich_Rule__c,
+          OnePlusTwo_Rule__c,
           Reason__c,
           Rule_Calculation_Details__c
         FROM Leave__c
         WHERE Status__c IN ('Applied', 'Withdrawal Pending')
-        AND Employee__r.Role__c = 'HR'
         ORDER BY Start_Date__c ASC
       `);
 
@@ -496,6 +516,8 @@ export async function GET(request: NextRequest) {
       pendingApprovals = pendingLeaveRecords.records.map((record: any) => {
         const parsedDetails = parseRuleCalculationDetails(record.Rule_Calculation_Details__c);
         const partialRequest = (parsedDetails as any)?.partialWithdrawalRequest;
+        const sandwichRuleApplicable = record.Sandwich_Rule__c === true;
+        const onePlusTwoRuleApplicable = record.OnePlusTwo_Rule__c === true;
 
         return {
           id: record.Id,
@@ -515,6 +537,8 @@ export async function GET(request: NextRequest) {
           reason: record.Reason__c || '',
           tlApproved: record.TL_Approval__c,
           hrApproval: record.HR_Approval__c,
+          sandwichRuleApplicable,
+          onePlusTwoRuleApplicable,
           withdrawalStartDate: partialRequest?.requested ? partialRequest.withdrawalStartDate : undefined,
           withdrawalEndDate: partialRequest?.requested ? partialRequest.withdrawalEndDate : undefined,
         };
@@ -540,6 +564,8 @@ export async function GET(request: NextRequest) {
           Approved_Date__c,
           TL_Approval__c,
           HR_Approval__c,
+          Sandwich_Rule__c,
+          OnePlusTwo_Rule__c,
           Reason__c,
           Rule_Calculation_Details__c
         FROM Leave__c
@@ -552,6 +578,8 @@ export async function GET(request: NextRequest) {
       pendingApprovals = pendingLeaveRecords.records.map((record: any) => {
         const parsedDetails = parseRuleCalculationDetails(record.Rule_Calculation_Details__c);
         const partialRequest = (parsedDetails as any)?.partialWithdrawalRequest;
+        const sandwichRuleApplicable = record.Sandwich_Rule__c === true;
+        const onePlusTwoRuleApplicable = record.OnePlusTwo_Rule__c === true;
 
         return {
           id: record.Id,
@@ -571,6 +599,8 @@ export async function GET(request: NextRequest) {
           reason: record.Reason__c || '',
           tlApproved: record.TL_Approval__c,
           hrApproval: record.HR_Approval__c,
+          sandwichRuleApplicable,
+          onePlusTwoRuleApplicable,
           withdrawalStartDate: partialRequest?.requested ? partialRequest.withdrawalStartDate : undefined,
           withdrawalEndDate: partialRequest?.requested ? partialRequest.withdrawalEndDate : undefined,
         };
@@ -593,6 +623,8 @@ export async function GET(request: NextRequest) {
           Approved_Date__c,
           TL_Approval__c,
           HR_Approval__c,
+          Sandwich_Rule__c,
+          OnePlusTwo_Rule__c,
           Reason__c,
           Rule_Calculation_Details__c
         FROM Leave__c
@@ -606,6 +638,8 @@ export async function GET(request: NextRequest) {
       pendingApprovals = pendingLeaveRecords.records.map((record: any) => {
         const parsedDetails = parseRuleCalculationDetails(record.Rule_Calculation_Details__c);
         const partialRequest = (parsedDetails as any)?.partialWithdrawalRequest;
+        const sandwichRuleApplicable = record.Sandwich_Rule__c === true;
+        const onePlusTwoRuleApplicable = record.OnePlusTwo_Rule__c === true;
 
         return {
           id: record.Id,
@@ -624,6 +658,8 @@ export async function GET(request: NextRequest) {
           reason: record.Reason__c || '',
           tlApproved: record.TL_Approval__c,
           hrApproval: record.HR_Approval__c,
+          sandwichRuleApplicable,
+          onePlusTwoRuleApplicable,
           withdrawalStartDate: partialRequest?.requested ? partialRequest.withdrawalStartDate : undefined,
           withdrawalEndDate: partialRequest?.requested ? partialRequest.withdrawalEndDate : undefined,
         };
@@ -688,6 +724,7 @@ export async function POST(request: NextRequest) {
       mergeExistingLeaveId
     } = body;
     const targetEmployeeId = body?.employeeId;
+    const isAdminAutoApprove = role === 'Admin';
     const reason = rawReason?.trim() || '';
     const rulesAlreadyConfirmed = confirmedRules === true;
     const confirmMergeWithExisting = confirmMerge === true;
@@ -1412,6 +1449,17 @@ export async function POST(request: NextRequest) {
     // Prepare leave record based on category
     const saveStartDate = start.format('YYYY-MM-DD');
     const saveEndDate = end.format('YYYY-MM-DD');
+    let requesterBaseSalary = 0;
+    if (isAdminAutoApprove) {
+      const requesterSalaryQuery = await conn.query<any>(`
+        SELECT Id, Base_Salary__c
+        FROM Employee__c
+        WHERE Id = '${employeeId}'
+        LIMIT 1
+      `);
+      requesterBaseSalary = requesterSalaryQuery.records?.[0]?.Base_Salary__c || 0;
+    }
+
     const leaveRecord: any = {
       Employee__c: employeeId,
       Start_Date__c: saveStartDate,
@@ -1419,11 +1467,29 @@ export async function POST(request: NextRequest) {
       Total_Days__c: rangeLeaveDays,
       Total_Days_After_Rule__c: finalTotalAfterRules,
       Session__c: sessionValue,
-      Status__c: 'Applied',
+      Status__c: isAdminAutoApprove ? 'Approved' : 'Applied',
       OnePlusTwo_Rule__c: onePlusTwoRuleApplied,
       Sandwich_Rule__c: anySandwichApplied,
       Rule_Calculation_Details__c: JSON.stringify(ruleCalculationDetails),
     };
+
+    if (isAdminAutoApprove) {
+      leaveRecord.HR_Approval__c = 'Approved';
+      leaveRecord.TL_Approval__c = 'Approved';
+      leaveRecord.Approved_Date__c = new Date().toISOString();
+      leaveRecord.Actual_Deduction__c = calculateLeaveDeduction(
+        leaveCategory === 'loss-of-pay' ? 'Loss of Pay' : 'Extra Day Pay',
+        saveStartDate,
+        rangeLeaveDays,
+        requesterBaseSalary
+      );
+      leaveRecord.After_Rule_Deduction__c = calculateLeaveDeduction(
+        leaveCategory === 'loss-of-pay' ? 'Loss of Pay' : 'Extra Day Pay',
+        saveStartDate,
+        finalTotalAfterRules,
+        requesterBaseSalary
+      );
+    }
 
     console.log("Prepared leave record:", leaveRecord);
     console.log('[Critical] Total_Days__c value being stored:', leaveRecord.Total_Days__c, 'Type:', typeof leaveRecord.Total_Days__c);
@@ -1451,15 +1517,35 @@ export async function POST(request: NextRequest) {
     // Create or merge the leave record in Salesforce
     let result: any = { success: false };
     let mergedExistingLeave = false;
+    let mergedExistingLeavePreviousStatus: string | null = null;
+    let mergedExistingLeavePreviousEventId: string | null = null;
+    let mergedExistingLeavePreviousTotals: { totalDays: number; totalDaysAfterRule: number } | null = null;
 
     if (mergeContext) {
+      const existingMergeLeaveQuery = await conn.query<any>(`
+        SELECT Id, Status__c, Event_ID__c, Total_Days__c, Total_Days_After_Rule__c
+        FROM Leave__c
+        WHERE Id = '${mergeContext.existingLeaveId}'
+        LIMIT 1
+      `);
+
+      if (existingMergeLeaveQuery.records?.length > 0) {
+        const existingMergeLeave = existingMergeLeaveQuery.records[0];
+        mergedExistingLeavePreviousStatus = existingMergeLeave.Status__c || null;
+        mergedExistingLeavePreviousEventId = existingMergeLeave.Event_ID__c || null;
+        mergedExistingLeavePreviousTotals = {
+          totalDays: existingMergeLeave.Total_Days__c || 0,
+          totalDaysAfterRule: existingMergeLeave.Total_Days_After_Rule__c || 0,
+        };
+      }
+
       const updatePayload = {
         ...leaveRecord,
         Id: mergeContext.existingLeaveId,
-        Status__c: 'Applied', // Re-apply for approval
-        TL_Approval__c: null,
-        HR_Approval__c: null,
-        Approved_Date__c: null,
+        Status__c: isAdminAutoApprove ? 'Approved' : 'Applied',
+        TL_Approval__c: isAdminAutoApprove ? 'Approved' : null,
+        HR_Approval__c: isAdminAutoApprove ? 'Approved' : null,
+        Approved_Date__c: isAdminAutoApprove ? new Date().toISOString() : null,
       };
 
       result = await conn.sobject('Leave__c').update(updatePayload) as any;
@@ -1473,6 +1559,41 @@ export async function POST(request: NextRequest) {
     if (!result.success) {
       console.error("Failed to save leave record:", result);
       return NextResponse.json({ error: "Failed to create leave request" }, { status: 500 });
+    }
+
+    const savedLeaveId = mergeContext ? mergeContext.existingLeaveId : result.id;
+
+    if (isAdminAutoApprove) {
+      if (mergedExistingLeave && mergedExistingLeavePreviousStatus === 'Approved' && mergedExistingLeavePreviousTotals) {
+        await updateLeaveBalance(conn, {
+          Employee__c: employeeId,
+          Leave_Category__c: leaveRecord.Leave_Category__c,
+          Leave_Type__c: leaveRecord.Leave_Type__c,
+          Total_Days__c: mergedExistingLeavePreviousTotals.totalDays,
+          Total_Days_After_Rule__c: mergedExistingLeavePreviousTotals.totalDaysAfterRule,
+        }, 'revert');
+      }
+
+      await updateLeaveBalance(conn, leaveRecord, 'approve');
+
+      if (mergedExistingLeavePreviousEventId) {
+        await deleteLeaveCalendarEventForEmployee({
+          employeeId,
+          eventId: mergedExistingLeavePreviousEventId,
+        });
+      }
+
+      const createdEventId = await createLeaveCalendarEventForEmployee({
+        employeeId,
+        leaveType: leaveRecord.Leave_Type__c || leaveRecord.Leave_Category__c || 'Leave',
+        leaveCategory: leaveRecord.Leave_Category__c,
+        startDate: saveStartDate,
+        endDate: saveEndDate,
+        reason: leaveRecord.Reason__c,
+        approvedBy: 'Admin',
+      });
+
+      await persistLeaveEventId(conn, savedLeaveId, createdEventId || null, 'admin-auto-approval');
     }
 
     // After Insert: Send email notification based on employee role/title
@@ -1496,8 +1617,16 @@ export async function POST(request: NextRequest) {
         // Prepare notification recipients
         const notificationRecipients: string[] = [];
 
+        if (isAdminAutoApprove) {
+          await sendInAppNotifications(
+            [employeeId],
+            `Your leave request from ${start.format('DD MMM YYYY')} to ${end.format('DD MMM YYYY')} has been auto-approved by Admin.`,
+            'Leave',
+            false
+          );
+        }
         // Case 1: If employee is HR, send notification to Admin
-        if (employeeRole === 'HR') {
+        else if (employeeRole === 'HR') {
           // Find Admin employee
           const adminQuery = await conn.query<any>(`
             SELECT Id, Employee_Name__c, Employee_Email__c
@@ -1624,11 +1753,11 @@ export async function POST(request: NextRequest) {
       // Don't fail the request if email fails
     }
 
-    const savedLeaveId = mergeContext ? mergeContext.existingLeaveId : result.id;
-
     return NextResponse.json({
       success: true,
-      message: mergeContext ? "Existing leave updated and resubmitted for approval" : "Leave request submitted successfully",
+      message: isAdminAutoApprove
+        ? (mergeContext ? "Existing leave merged and auto-approved successfully" : "Leave request auto-approved successfully")
+        : (mergeContext ? "Existing leave updated and resubmitted for approval" : "Leave request submitted successfully"),
       leaveId: savedLeaveId,
       mergedExistingLeave,
       totals: {
@@ -1806,6 +1935,11 @@ export async function PATCH(request: NextRequest) {
       const leaveStart = dayjs(leave.Start_Date__c).startOf("day");
       const leaveEnd = dayjs(leave.End_Date__c).startOf("day");
       const isHalfDayLeave = leave.Session__c === "Session-1" || leave.Session__c === "Session-2";
+      const today = dayjs().startOf("day");
+
+      if (today.isAfter(leaveEnd, "day")) {
+        return NextResponse.json({ error: "Withdrawal is allowed only on or before the leave end date" }, { status: 400 });
+      }
 
       let requestedWithdrawalStart = leaveStart;
       let requestedWithdrawalEnd = leaveEnd;
@@ -2432,6 +2566,15 @@ export async function PATCH(request: NextRequest) {
     // Handle approve action (HR, Team Lead, or Admin)
     if (action === "approve") {
       const { role, title, name: approverName } = payload;
+      const applyLeaveRules = body?.applyLeaveRules === true;
+      const applySandwichRule =
+        typeof body?.applySandwichRule === 'boolean'
+          ? body.applySandwichRule
+          : applyLeaveRules;
+      const applyOnePlusTwoRule =
+        typeof body?.applyOnePlusTwoRule === 'boolean'
+          ? body.applyOnePlusTwoRule
+          : applyLeaveRules;
 
       // Check if user can approve leaves
       const isHR = role === 'HR';
@@ -2445,7 +2588,7 @@ export async function PATCH(request: NextRequest) {
       }
 
       const leaveRecordQuery = await conn.query<any>(`
-        SELECT Id, Status__c, Employee__c, Employee__r.Role__c,Employee__r.Base_Salary__c, Leave_Category__c, Leave_Type__c, Total_Days__c, Total_Days_After_Rule__c, HR_Approval__c, TL_Approval__c, Start_Date__c, End_Date__c, Actual_Deduction__c, After_Rule_Deduction__c, Event_ID__c
+        SELECT Id, Status__c, Employee__c, Employee__r.Role__c,Employee__r.Base_Salary__c, Leave_Category__c, Leave_Type__c, Total_Days__c, Total_Days_After_Rule__c, HR_Approval__c, TL_Approval__c, Start_Date__c, End_Date__c, Session__c, CreatedDate, Rule_Calculation_Details__c, Actual_Deduction__c, After_Rule_Deduction__c, Event_ID__c
         FROM Leave__c
         WHERE Id = '${leaveId}'
         LIMIT 1
@@ -2458,31 +2601,50 @@ export async function PATCH(request: NextRequest) {
       const oldLeave = leaveRecordQuery.records[0];
       const employeeRole = oldLeave.Employee__r?.Role__c;
 
-      // Admin can only approve HR leaves
-      if (isAdmin && employeeRole !== 'HR') {
-        return NextResponse.json({ error: "Admin can only approve HR leaves" }, { status: 403 });
-      }
-
       // Update approval based on role
       const updateData: any = {
         Id: leaveId,
       };
 
       if (isHR || isAdmin) {
+        const leaveConfig = await fetchLeaveConfigurations(conn);
+        const holidaySet = await getHolidaySet(conn);
+        const recalculated = createRuleCalculationDetails(
+          dayjs(oldLeave.Start_Date__c).startOf("day"),
+          dayjs(oldLeave.End_Date__c).startOf("day"),
+          employeeRole,
+          oldLeave.Leave_Type__c,
+          oldLeave.Leave_Category__c,
+          oldLeave.Session__c,
+          leaveConfig,
+          holidaySet,
+          dayjs(oldLeave.CreatedDate || new Date().toISOString()).startOf("day"),
+          undefined,
+          {
+            applySandwichRule,
+            applyOnePlusTwoRule,
+          }
+        );
+
         updateData.HR_Approval__c = 'Approved';
         updateData.Approved_Date__c = new Date().toISOString();
         // beforeUpdate: Sync Status__c with HR_Approval__c
         updateData.Status__c = 'Approved';
+        updateData.Total_Days__c = recalculated.totalDays;
+        updateData.Total_Days_After_Rule__c = recalculated.totalDaysAfterRule;
+        updateData.OnePlusTwo_Rule__c = recalculated.onePlusTwoRuleApplied;
+        updateData.Sandwich_Rule__c = recalculated.sandwichApplied;
+        updateData.Rule_Calculation_Details__c = JSON.stringify(recalculated.details);
         updateData.Actual_Deduction__c = calculateLeaveDeduction(
           oldLeave.Leave_Category__c,
           oldLeave.Start_Date__c,
-          oldLeave.Total_Days__c,
+          recalculated.totalDays,
           oldLeave.Employee__r?.Base_Salary__c
         );
         updateData.After_Rule_Deduction__c = calculateLeaveDeduction(
           oldLeave.Leave_Category__c,
           oldLeave.Start_Date__c,
-          oldLeave.Total_Days_After_Rule__c,
+          recalculated.totalDaysAfterRule,
           oldLeave.Employee__r?.Base_Salary__c
         );
 
@@ -2647,14 +2809,26 @@ export async function PATCH(request: NextRequest) {
             }
 
             // Update Leave Balance when HR/Admin approves (Status becomes Approved)
-            await updateLeaveBalance(conn, oldLeave, 'approve');
+            await updateLeaveBalance(conn, {
+              ...oldLeave,
+              Total_Days__c: updateData.Total_Days__c ?? oldLeave.Total_Days__c,
+              Total_Days_After_Rule__c: updateData.Total_Days_After_Rule__c ?? oldLeave.Total_Days_After_Rule__c,
+            }, 'approve');
           }
         }
       } catch (emailError) {
         console.error('Error sending approval notification:', emailError);
       }
 
-      return NextResponse.json({ success: true, message: "Leave approved successfully" });
+      return NextResponse.json({
+        success: true,
+        message: "Leave approved successfully",
+        ruleSettings: {
+          applyLeaveRules: isHR || isAdmin ? (applySandwichRule || applyOnePlusTwoRule) : null,
+          applySandwichRule: isHR || isAdmin ? applySandwichRule : null,
+          applyOnePlusTwoRule: isHR || isAdmin ? applyOnePlusTwoRule : null,
+        },
+      });
     }
 
     // Handle reject action (HR, Team Lead, or Admin)

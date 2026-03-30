@@ -137,7 +137,7 @@ function generatePayslipHTML(payslip: PayslipData): string {
   // Read and encode logo as base64
   let logoBase64 = ''
   try {
-    const logoPath = path.join(process.cwd(), 'public', 'mv_logo.png')
+    const logoPath = path.join(process.cwd(), 'public', 'mv_logo1.png')
     const logoBuffer = fs.readFileSync(logoPath)
     logoBase64 = `data:image/png;base64,${logoBuffer.toString('base64')}`
   } catch (error) {

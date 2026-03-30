@@ -25,7 +25,7 @@ import {
     ChevronRight
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { message, Modal, Spin } from "antd";
+import { message, Modal, Select, Spin } from "antd";
 import EmailEditor from "@/components/admin/email-editor";
 import SafeHTMLPreview from "@/components/safe-html-preview";
 import { RoleGuard } from "@/components/role-guard";
@@ -47,6 +47,7 @@ function hashToTab(hash: string): AdminTab {
 export default function AdminConsole() {
     const [activeTab, setActiveTab] = useState<AdminTab>("admin");
     const [configs, setConfigs] = useState<any>(null);
+    const [roleOptions, setRoleOptions] = useState<string[]>([]);
     const [users, setUsers] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [loadingUsers, setLoadingUsers] = useState(false);
@@ -178,7 +179,9 @@ export default function AdminConsole() {
             }
             if (!res.ok) throw new Error("Failed to fetch configurations");
             const data = await res.json();
-            setConfigs(data);
+            setRoleOptions(data.roleOptions || []);
+            const { roleOptions: _roleOptions, ...configData } = data;
+            setConfigs(configData);
         } catch (error) {
             console.error(error);
             message.error("Failed to load configurations");
@@ -329,7 +332,7 @@ export default function AdminConsole() {
                     : "text-slate-600 hover:bg-slate-100"
                 }`}
         >
-            <Icon className={`w-5 h-5 lg:w-5 lg:h-5 ${activeTab === id ? "text-white" : "text-slate-400"}`} />
+            <Icon className={`w-5 h-5 lg:w-5 lg:h-5 shrink-0 ${activeTab === id ? "text-white" : "text-slate-400"}`} />
             <span className="text-xs sm:text-sm">{label}</span>
         </button>
     );
@@ -361,7 +364,7 @@ export default function AdminConsole() {
                     <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 lg:gap-8">
                         {/* Sidebar */}
                         <div className="lg:col-span-1 space-y-4">
-                            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-2 grid grid-cols-2 sm:grid-cols-3 lg:flex lg:flex-col gap-2">
+                            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-2 grid grid-cols-3 md:grid-cols-2 lg:grid-cols-1 gap-2">
                                 <TabButton id="admin" label="General Settings" icon={Settings} />
                                 <TabButton id="documents" label="Documents Config" icon={FileText} />
                                 <TabButton id="leave" label="Leave Rules" icon={Calendar} />
@@ -528,15 +531,26 @@ export default function AdminConsole() {
                                                         <label className="block text-sm font-semibold text-slate-700 mb-2">
                                                             {record.MasterLabel}
                                                         </label>
-                                                        {['One_plus_two_rule', 'Sandwitch_Rule'].includes(record.DeveloperName) ? (
-                                                            <select
+                                                        {['One_plus_two_rule', 'Sandwich_Rule'].includes(record.DeveloperName) ? (
+                                                            <Select
                                                                 value={record.Value__c || 'false'}
-                                                                onChange={(e) => handleInputChange('Leave_Configurations__mdt', record, e.target.value)}
+                                                                onChange={(value) => handleInputChange('Leave_Configurations__mdt', record, value)}
                                                                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-                                                            >
-                                                                <option value="true">Enabled</option>
-                                                                <option value="false">Disabled</option>
-                                                            </select>
+                                                                options={[
+                                                                    { value: 'true', label: 'Enabled' },
+                                                                    { value: 'false', label: 'Disabled' }
+                                                                ]}
+                                                            />
+                                                        ) : ['Sandwich_Rule_Applies_to', 'One_Two_Applies_to'].includes(record.DeveloperName) ? (
+                                                            <Select
+                                                                mode="multiple"
+                                                                allowClear
+                                                                value={(record.Value__c || '').split(',').map((role: string) => role.trim()).filter(Boolean)}
+                                                                onChange={(values) => handleInputChange('Leave_Configurations__mdt', record, values.join(','))}
+                                                                options={roleOptions.map((role) => ({ value: role, label: role }))}
+                                                                placeholder="Select roles"
+                                                                className="w-full bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                                                            />
                                                         ) : (
                                                             <input
                                                                 type="text"
@@ -558,14 +572,15 @@ export default function AdminConsole() {
                                                             {formatLabel(record.MasterLabel)}
                                                         </label>
                                                         {['Auto_Apply_Anniversary_Bonus'].includes(record.DeveloperName) ? (
-                                                            <select
+                                                            <Select
                                                                 value={record.Value__c || 'false'}
                                                                 onChange={(e) => handleInputChange('Payroll_Configurations__mdt', record, e.target.value)}
                                                                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-                                                            >
-                                                                <option value="true">Enabled</option>
-                                                                <option value="false">Disabled</option>
-                                                            </select>
+                                                                options={[
+                                                                    { value: 'true', label: 'Enabled' },
+                                                                    { value: 'false', label: 'Disabled' }
+                                                                ]}
+                                                            />
                                                         ) : (
                                                             <input
                                                                 type="text"
@@ -581,7 +596,7 @@ export default function AdminConsole() {
 
                                         {activeTab === "users" && (
                                             <div className="space-y-6">
-                                                <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+                                                <div className="flex flex-col md:flex-row justify-between gap-4">
                                                     <div>
                                                         <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
                                                             <Users className="w-5 h-5 text-indigo-500" /> User Access
@@ -637,15 +652,18 @@ export default function AdminConsole() {
                                                                                     </div>
                                                                                 </td>
                                                                                 <td className="px-6 py-4">
-                                                                                    <select
+                                                                                    <Select
+                                                                                        size="small"
+                                                                                        dropdownStyle={{ width: 'max-content'}}
                                                                                         value={user.Role || 'Employee'}
                                                                                         onChange={(e) => updateUser(user.Id, { Role__c: e.target.value })}
                                                                                         className="bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs font-medium focus:ring-2 focus:ring-indigo-500 outline-none"
-                                                                                    >
-                                                                                        <option value="Employee">Employee (Standard)</option>
-                                                                                        <option value="HR">HR (Manager)</option>
-                                                                                        <option value="Admin">Admin (Full Access)</option>
-                                                                                    </select>
+                                                                                        options={[
+                                                                                            { value: 'Employee', label: 'Employee (Standard)' },
+                                                                                            { value: 'HR', label: 'HR (Manager)' },
+                                                                                            { value: 'Admin', label: 'Admin (Full Access)' }
+                                                                                        ]}
+                                                                                    />
                                                                                 </td>
                                                                                 <td className="px-6 py-4">
                                                                                     {user.Role === 'Admin' ? (
@@ -710,7 +728,7 @@ export default function AdminConsole() {
                                                             }
 
                                                             return (
-                                                                <div className="p-4 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between bg-slate-50 gap-4 sm:gap-0">
+                                                                <div className="p-4 border-t border-slate-200 flex flex-row sm:flex-row items-center justify-between bg-slate-50 gap-4 sm:gap-0">
                                                                     <div className="text-sm text-slate-500 text-center sm:text-left">
                                                                         Showing {start} to {end} of {filteredUsers.length} entries
                                                                     </div>
@@ -718,19 +736,19 @@ export default function AdminConsole() {
                                                                         <button
                                                                             disabled={currentPageUsers === 1}
                                                                             onClick={() => setCurrentPageUsers(prev => prev - 1)}
-                                                                            className="px-3 py-1.5 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                                                            className="px-1 py-1.5 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                                                         >
-                                                                            Previous
+                                                                            <ChevronLeft size={16}/>
                                                                         </button>
-                                                                        <span className="text-xs text-slate-400 px-1">
-                                                                            {currentPageUsers} / {totalPages}
+                                                                        <span className="text-sm px-3 text-cyan-500 border border-border rounded-lg border-cyan-500 px-2 py-1 font-bold">
+                                                                            {currentPageUsers}
                                                                         </span>
                                                                         <button
                                                                             disabled={currentPageUsers >= totalPages}
                                                                             onClick={() => setCurrentPageUsers(prev => prev + 1)}
-                                                                            className="px-3 py-1.5 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                                                            className="px-1 py-1.5 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                                                         >
-                                                                            Next
+                                                                            <ChevronRight size={16}/>
                                                                         </button>
                                                                     </div>
                                                                 </div>
@@ -747,11 +765,11 @@ export default function AdminConsole() {
 
                                         {activeTab === "integration" && (
                                             <div className="space-y-6">
-                                                <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
+                                                <div className="flex flex-col md:flex-row justify-between gap-4 mb-6">
                                                     <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-                                                        <Workflow className="w-5 h-5 text-orange-500" /> Google Connected Users
+                                                        <Workflow className="text-orange-500" /> Google Connected Users
                                                     </h2>
-                                                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto">
+                                                    <div className="flex sm:flex-row items-center sm:items-center gap-3 w-full md:w-auto">
                                                         <div className="flex justify-center sm:block">
                                                             <RefreshButton onClick={fetchConnectedUsers} label="" loading={loadingIntegrations} />
                                                         </div>
@@ -888,7 +906,7 @@ export default function AdminConsole() {
                                                                 }
 
                                                                 return (
-                                                                    <div className="p-4 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between bg-slate-50 gap-4 sm:gap-0">
+                                                                    <div className="p-4 border-t border-slate-200 flex flex-row sm:flex-row items-center justify-between bg-slate-50 gap-4 sm:gap-0">
                                                                         <div className="text-sm text-slate-500 text-center sm:text-left">
                                                                             Showing {start} to {end} of {filteredIntegrations.length} entries
                                                                         </div>
@@ -896,17 +914,17 @@ export default function AdminConsole() {
                                                                             <button
                                                                                 disabled={currentPageIntegrations === 1}
                                                                                 onClick={() => setCurrentPageIntegrations(prev => prev - 1)}
-                                                                                className="rounded-lg font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                                                                className="px-1 py-1.5 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                                                             >
                                                                                 <ChevronLeft size={16}/>
                                                                             </button>
-                                                                            <span className="text-xs text-slate-400 border border-border border-cyan-100 rounded-lg p-3 text-cyan-500 font-bold">
+                                                                            <span className="px-3 text-cyan-500 border border-border rounded-lg border-cyan-500 px-2 py-1 font-bold">
                                                                                 {currentPageIntegrations}
                                                                             </span>
                                                                             <button
                                                                                 disabled={currentPageIntegrations >= totalPages}
                                                                                 onClick={() => setCurrentPageIntegrations(prev => prev + 1)}
-                                                                                className="rounded-lg font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                                                                className="px-1 py-1.5 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                                                             >
                                                                                 <ChevronRight size={16}/>
                                                                             </button>

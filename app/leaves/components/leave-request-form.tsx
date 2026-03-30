@@ -298,8 +298,8 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
             leaveCategory: '',
           leaveType: undefined,
           session: undefined,
-            startDate: dayjs(),
-            endDate: dayjs()
+            startDate: undefined,
+            endDate: undefined
         }}
         className="mt-4"
       >

@@ -4,12 +4,8 @@ import { Sidebar } from "@/components/sidebar"
 import { MobileHeader } from "@/components/mobile-header"
 import { usePathname } from "next/navigation"
 import { useState, useEffect } from "react"
-import { Menu } from "lucide-react"
-
-
 import { OnboardingWizard } from "@/components/onboarding-wizard";
 import { AppTour } from "@/components/app-tour";
-import { AnimatedBackground } from "@/components/animated-background";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
@@ -30,7 +26,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen relative">
-      {/* <AnimatedBackground /> */}
       <OnboardingWizard />
       <AppTour />
       <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} />

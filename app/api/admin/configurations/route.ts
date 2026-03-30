@@ -1,8 +1,28 @@
 
 import { NextResponse } from 'next/server';
 import { verifySession } from '@/lib/auth';
-import { getEmployeeById } from '@/lib/salesforce';
+import { getEmployeeById, getSalesforceConnection } from '@/lib/salesforce';
 import { getAllConfigurations, getSpecificConfigurations, updateConfiguration, ConfigKey } from '@/lib/admin-config';
+
+async function getRolePicklistOptions() {
+  try {
+    const conn = await getSalesforceConnection();
+    if (!conn) return [];
+
+    const description = await conn.sobject('Employee__c').describe();
+    const roleField = description.fields?.find((field: any) => field.name === 'Role__c');
+
+    if (!roleField?.picklistValues) return [];
+
+    return roleField.picklistValues
+      .filter((picklistValue: any) => picklistValue.active)
+      .map((picklistValue: any) => picklistValue.value)
+      .filter((value: string) => Boolean(value));
+  } catch (error) {
+    console.error('Error fetching Role__c picklist options:', error);
+    return [];
+  }
+}
 
 export async function GET(req: Request) {
   try {
@@ -20,8 +40,11 @@ export async function GET(req: Request) {
       return NextResponse.json(configs);
     }
 
-    const configs = await getAllConfigurations();
-    return NextResponse.json(configs);
+    const [configs, roleOptions] = await Promise.all([
+      getAllConfigurations(),
+      getRolePicklistOptions()
+    ]);
+    return NextResponse.json({ ...configs, roleOptions });
 
   } catch (error) {
     console.error('Error fetching admin configurations:', error);

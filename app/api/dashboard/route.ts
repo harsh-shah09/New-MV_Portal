@@ -74,7 +74,7 @@ export async function GET(req: NextRequest) {
                 pendingApprovalsQuery = await conn.query(`
                     SELECT Id, Name, Employee__c, Employee__r.Employee_Name__c, 
                            Leave_Type__c, Leave_Category__c, Start_Date__c, 
-                           End_Date__c, Total_Days__c, TL_Approval__c
+                           End_Date__c, Total_Days__c, TL_Approval__c, Sandwich_Rule__c, OnePlusTwo_Rule__c
                     FROM Leave__c
                     WHERE Status__c = 'Applied'
                     ORDER BY Start_Date__c ASC
@@ -83,7 +83,7 @@ export async function GET(req: NextRequest) {
                 pendingApprovalsQuery = await conn.query(`
                     SELECT Id, Name, Employee__c, Employee__r.Employee_Name__c, 
                            Leave_Type__c, Leave_Category__c, Start_Date__c, 
-                           End_Date__c, Total_Days__c, TL_Approval__c
+                           End_Date__c, Total_Days__c, TL_Approval__c, Sandwich_Rule__c, OnePlusTwo_Rule__c
                     FROM Leave__c
                     WHERE Status__c = 'Applied' ${hrDashboardLeaveFilter}
                     ORDER BY Start_Date__c ASC
@@ -92,24 +92,31 @@ export async function GET(req: NextRequest) {
                 pendingApprovalsQuery = await conn.query(`
                     SELECT Id,Name, Employee__c, Employee__r.Employee_Name__c, 
                            Leave_Type__c, Leave_Category__c, Start_Date__c, 
-                           End_Date__c, Total_Days__c, TL_Approval__c
+                           End_Date__c, Total_Days__c, TL_Approval__c, Sandwich_Rule__c, OnePlusTwo_Rule__c
                     FROM Leave__c
                     WHERE Status__c = 'Applied' AND Employee__r.Role__c != 'HR'
                     ORDER BY Start_Date__c ASC
                 `);
             }
 
-            const pendingApprovals = pendingApprovalsQuery.records.map((record: any) => ({
-                id: record.Id,
-                employeeId: record.Name,
-                employeeName: record.Employee__r?.Employee_Name__c || "Unknown",
-                leaveType: record.Leave_Category__c === 'Extra Day Pay' ? 'Extra Day Pay' : record.Leave_Type__c,
-                leaveCategory: record.Leave_Category__c,
-                startDate: record.Start_Date__c,
-                endDate: record.End_Date__c,
-                duration: record.Total_Days__c,
-                tlApproved: record.TL_Approval__c
-            }));
+            const pendingApprovals = pendingApprovalsQuery.records.map((record: any) => {
+                const sandwichRuleApplicable = record.Sandwich_Rule__c === true
+                const onePlusTwoRuleApplicable = record.OnePlusTwo_Rule__c === true
+
+                return {
+                    id: record.Id,
+                    employeeId: record.Name,
+                    employeeName: record.Employee__r?.Employee_Name__c || "Unknown",
+                    leaveType: record.Leave_Category__c === 'Extra Day Pay' ? 'Extra Day Pay' : record.Leave_Type__c,
+                    leaveCategory: record.Leave_Category__c,
+                    startDate: record.Start_Date__c,
+                    endDate: record.End_Date__c,
+                    duration: record.Total_Days__c,
+                    tlApproved: record.TL_Approval__c,
+                    sandwichRuleApplicable,
+                    onePlusTwoRuleApplicable,
+                }
+            });
 
             // Get approved today count
             const approvedTodayQuery = await conn.query(`

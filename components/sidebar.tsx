@@ -161,7 +161,7 @@ export function Sidebar({
           <div className="absolute -inset-1 bg-gradient-to-r from-cyan-400 to-blue-600 rounded-lg blur opacity-20 group-hover:opacity-40 transition duration-1000 group-hover:duration-200"></div>
           <div className="relative bg-white rounded-lg p-1.5 ring-1 ring-slate-100 shadow-sm">
             <Image
-              src="/mv_logo.png"
+              src="/mv_logo1.png"
               alt="MV Portal"
               width={40}
               height={40}
@@ -250,6 +250,7 @@ export function Sidebar({
 
         {/* Profile Card */}
         <div
+          data-tour="profile-card"
           onClick={handleProfileClick}
           className="flex items-center gap-3 p-3 rounded-xl bg-white border border-slate-100 shadow-sm hover:shadow-md transition-all group cursor-pointer relative"
         >

@@ -25,6 +25,9 @@ function buildSteps(role: string): Step[] {
 
   const steps: Step[] = [WELCOME];
 
+  // View Profile step
+  steps.push(s("[data-tour='profile-card']", "Your Profile", "Click here anytime to view and edit your personal information, employment details, and manage your account settings."));
+
   // Always visible
   steps.push(s("[data-tour='dashboard']",  "Dashboard",          "Your command centre. Get a real-time snapshot of leave balances, upcoming holidays, and key HR metrics."));
   steps.push(s("[data-tour='leaves']",     "Leaves",              "Apply for leaves, track your balance, and view your history — all in one place."));

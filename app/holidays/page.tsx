@@ -24,6 +24,12 @@ interface BulkHolidayRow {
   day: string
 }
 
+interface BulkHolidayRowError {
+  name?: string
+  date?: string
+  row?: string
+}
+
 export default function HolidaysPage() {
   const router = useRouter()
   const [isMounted, setIsMounted] = useState(false)
@@ -39,6 +45,7 @@ export default function HolidaysPage() {
   const [bulkRows, setBulkRows] = useState<BulkHolidayRow[]>([
     { name: "", date: "", day: "" }
   ])
+  const [bulkRowErrors, setBulkRowErrors] = useState<BulkHolidayRowError[]>([])
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString())
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deletingHolidayId, setDeletingHolidayId] = useState<string | null>(null)
@@ -96,6 +103,16 @@ export default function HolidaysPage() {
       const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
       newRows[index].day = days[dateObj.getDay()]
     }
+
+    if (bulkRowErrors[index]?.date || bulkRowErrors[index]?.row) {
+      const newErrors = [...bulkRowErrors]
+      newErrors[index] = {
+        ...newErrors[index],
+        date: undefined,
+        row: undefined,
+      }
+      setBulkRowErrors(newErrors)
+    }
     
     setBulkRows(newRows)
   }
@@ -103,13 +120,16 @@ export default function HolidaysPage() {
   // Add a new row
   const addNewRow = () => {
     setBulkRows([...bulkRows, { name: "", date: "", day: "" }])
+    setBulkRowErrors([...bulkRowErrors, {}])
   }
 
   // Remove a row
   const removeRow = (index: number) => {
     if (bulkRows.length > 1) {
       const newRows = bulkRows.filter((_, i) => i !== index)
+      const newErrors = bulkRowErrors.filter((_, i) => i !== index)
       setBulkRows(newRows)
+      setBulkRowErrors(newErrors)
     }
   }
 
@@ -123,28 +143,78 @@ export default function HolidaysPage() {
     if (editFormData.date) {
       const date = new Date(editFormData.date)
       const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-      setEditFormData(prev => ({ ...prev, day: days[date.getDay()] }))
+      setEditFormData(prev => ({
+        ...prev,
+        day: days[date.getDay()],
+        year: date.getFullYear().toString(),
+      }))
     }
   }, [editFormData.date])
 
   const handleBulkSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    // Filter out empty rows
-    const validRows = bulkRows.filter(row => row.name.trim() && row.date)
+    const rowErrors: BulkHolidayRowError[] = bulkRows.map(() => ({}))
+    let hasAnyFilledRow = false
+    let hasAnyEmptyRow = false
+    let hasAnyPartialRow = false
 
-    if (validRows.length === 0) {
+    bulkRows.forEach((row, index) => {
+      const hasName = row.name.trim().length > 0
+      const hasDate = Boolean(row.date)
+
+      if (!hasName && !hasDate) {
+        hasAnyEmptyRow = true
+        return
+      }
+
+      hasAnyFilledRow = true
+
+      if (!hasName) {
+        rowErrors[index].name = "Holiday name is required when date is selected"
+        hasAnyPartialRow = true
+      }
+
+      if (!hasDate) {
+        rowErrors[index].date = "Date is required when holiday name is entered"
+        hasAnyPartialRow = true
+      }
+    })
+
+    if (!hasAnyFilledRow) {
+      setBulkRowErrors(rowErrors)
       toast.error("Please add at least one holiday")
       return
     }
 
+    if (hasAnyPartialRow) {
+      setBulkRowErrors(rowErrors)
+      toast.error("Please complete all required fields in highlighted rows")
+      return
+    }
+
+    if (hasAnyEmptyRow) {
+      const updatedErrors = rowErrors.map((error, index) => {
+        const row = bulkRows[index]
+        if (!row.name.trim() && !row.date) {
+          return { ...error, row: "Fill this row or delete it" }
+        }
+        return error
+      })
+      setBulkRowErrors(updatedErrors)
+      toast.error("Please fill all rows or delete extra rows")
+      return
+    }
+
+    setBulkRowErrors([])
+
     try {
       // Prepare holidays data
-      const holidays = validRows.map(row => ({
+      const holidays = bulkRows.map(row => ({
         name: row.name,
         date: row.date,
         day: row.day,
-        year: selectedYear,
+        year: new Date(row.date).getFullYear().toString(),
       }))
 
       // Send bulk insert request
@@ -166,7 +236,8 @@ export default function HolidaysPage() {
       refetch()
       setShowBulkModal(false)
       setBulkRows([{ name: "", date: "", day: "" }])
-      toast.success(result.message || `Successfully created ${validRows.length} holiday(s)!`)
+      setBulkRowErrors([])
+      toast.success(result.message || `Successfully created ${bulkRows.length} holiday(s)!`)
     } catch (error) {
       console.error("Error creating holidays:", error)
       toast.error("Failed to create holidays")
@@ -197,6 +268,7 @@ export default function HolidaysPage() {
         body: JSON.stringify({
           holidayId: editingHoliday.id,
           ...editFormData,
+          year: editFormData.date ? new Date(editFormData.date).getFullYear().toString() : editFormData.year,
         }),
       })
 
@@ -441,12 +513,13 @@ export default function HolidaysPage() {
             <div className="p-6 bg-gradient-to-r from-blue-600 to-blue-700 flex-shrink-0">
               <div className="flex items-center justify-between text-white">
                 <h3 className="text-xl font-bold">
-                  Add Holidays for {selectedYear}
+                  Add Holidays
                 </h3>
                 <button
                   onClick={() => {
                     setShowBulkModal(false)
                     setBulkRows([{ name: "", date: "", day: "" }])
+                    setBulkRowErrors([])
                   }}
                   className="p-1 hover:bg-white/20 rounded-lg transition-colors"
                 >
@@ -463,7 +536,7 @@ export default function HolidaysPage() {
                 
                 <div className="space-y-4">
                   {bulkRows.map((row, index) => (
-                    <div key={index} className="bg-gray-50 p-4 rounded-xl border-2 border-gray-200 hover:border-blue-300 transition-colors">
+                    <div key={index} className={`bg-gray-50 p-4 rounded-xl border-2 transition-colors ${bulkRowErrors[index]?.name || bulkRowErrors[index]?.date || bulkRowErrors[index]?.row ? "border-red-300" : "border-gray-200 hover:border-blue-300"}`}>
                       <div className="flex items-start gap-3">
                         <div className="flex-shrink-0 w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold text-sm">
                           {index + 1}
@@ -480,10 +553,23 @@ export default function HolidaysPage() {
                                 const newRows = [...bulkRows]
                                 newRows[index] = { ...newRows[index], name: e.target.value }
                                 setBulkRows(newRows)
+
+                                if (bulkRowErrors[index]?.name || bulkRowErrors[index]?.row) {
+                                  const newErrors = [...bulkRowErrors]
+                                  newErrors[index] = {
+                                    ...newErrors[index],
+                                    name: undefined,
+                                    row: undefined,
+                                  }
+                                  setBulkRowErrors(newErrors)
+                                }
                               }}
                               placeholder="e.g., New Year's Day"
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm"
+                              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm ${bulkRowErrors[index]?.name ? "border-red-400" : "border-gray-300"}`}
                             />
+                            {bulkRowErrors[index]?.name && (
+                              <p className="mt-1 text-xs text-red-600">{bulkRowErrors[index].name}</p>
+                            )}
                           </div>
                           <div>
                             <label className="block text-xs font-semibold text-gray-700 mb-1.5">
@@ -493,8 +579,11 @@ export default function HolidaysPage() {
                               type="date"
                               value={row.date}
                               onChange={(e) => updateBulkRowDate(index, e.target.value)}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm"
+                              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm ${bulkRowErrors[index]?.date ? "border-red-400" : "border-gray-300"}`}
                             />
+                            {bulkRowErrors[index]?.date && (
+                              <p className="mt-1 text-xs text-red-600">{bulkRowErrors[index].date}</p>
+                            )}
                           </div>
                           <div>
                             <label className="block text-xs font-semibold text-gray-700 mb-1.5">
@@ -513,13 +602,16 @@ export default function HolidaysPage() {
                           <button
                             type="button"
                             onClick={() => removeRow(index)}
-                            className="flex-shrink-0 p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            className="flex-shrink-0 self-center p-2 mt-4 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                             title="Remove"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-6 h-5" />
                           </button>
                         )}
                       </div>
+                      {bulkRowErrors[index]?.row && (
+                        <p className="mt-2 text-xs text-red-600">{bulkRowErrors[index].row}</p>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -540,6 +632,7 @@ export default function HolidaysPage() {
                   onClick={() => {
                     setShowBulkModal(false)
                     setBulkRows([{ name: "", date: "", day: "" }])
+                    setBulkRowErrors([])
                   }}
                   className="flex-1 px-4 py-3 bg-white hover:bg-gray-100 text-gray-700 rounded-xl font-semibold transition-colors border-2 border-gray-300"
                 >
@@ -561,10 +654,10 @@ export default function HolidaysPage() {
       {/* Edit Modal */}
       {showEditModal && editingHoliday && isMounted && createPortal(
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden transform transition-all border border-gray-100">
-            <div className="p-6 border-b border-gray-100">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden transform transition-all ">
+            <div className="p-6 bg-gradient-to-r from-blue-600 to-blue-700 flex-shrink-0">
               <div className="flex items-center justify-between">
-                <h3 className="text-xl font-bold text-gray-900">Edit Holiday</h3>
+                <h3 className="text-xl font-bold text-white">Edit Holiday</h3>
                 <button
                   onClick={() => {
                     setShowEditModal(false)
@@ -618,20 +711,6 @@ export default function HolidaysPage() {
                   />
                 </div>
 
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Year *
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    value={editFormData.year}
-                    onChange={(e) => setEditFormData({ ...editFormData, year: e.target.value })}
-                    min="2020"
-                    max="2100"
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-gray-900 transition-colors"
-                  />
-                </div>
               </div>
 
               <div className="flex gap-3 pt-4 border-t border-gray-100">

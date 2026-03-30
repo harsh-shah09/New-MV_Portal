@@ -46,7 +46,7 @@ export default function LandingPage() {
       <nav className="fixed top-0 left-0 right-0 z-50 glass border-b border-white/10 bg-white/5 backdrop-blur-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
             <Link href="/" className="flex items-center gap-2">
-                 <Image src="/mv_logo.png" alt="Logo" width={50} height={50} className="w-10 h-10 object-contain drop-shadow-sm" />
+                 <Image src="/mv_logo1.png" alt="Logo" width={50} height={50} className="w-10 h-10 object-contain drop-shadow-sm" />
                  <span className="text-xl font-bold bg-gradient-to-r from-cyan-600 to-blue-600 bg-clip-text text-transparent">Portal</span>
             </Link>
             <div className="hidden md:flex gap-8">
@@ -421,7 +421,7 @@ export default function LandingPage() {
           <div className="max-w-7xl mx-auto px-4 grid grid-cols-2 md:grid-cols-4 gap-12 text-sm">
               <div>
                   <div className="flex items-center gap-2 mb-6">
-                      <Image src="/mv_logo.png" width={40} height={40} alt="Logo" className="grayscale opacity-70" />
+                      <Image src="/mv_logo1.png" width={40} height={40} alt="Logo" className="grayscale opacity-70" />
                       <span className="text-white font-bold text-lg">Portal</span>
                   </div>
                   <p>Modern HR for modern teams.</p>

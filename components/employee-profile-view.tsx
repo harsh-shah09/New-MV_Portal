@@ -286,6 +286,11 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                 Birthdate__c: employee.Birthdate__c,
                 Gender__c: employee.Gender__c,
                 Employee_Address__c: employee.Employee_Current_Address__c || {},
+                Employee_Address__Street__s: employee.Employee_Current_Address__c?.street || '',
+                Employee_Address__City__s: employee.Employee_Current_Address__c?.city || '',
+                Employee_Address__StateCode__s: employee.Employee_Current_Address__c?.state || '',
+                Employee_Address__PostalCode__s: employee.Employee_Current_Address__c?.postalCode || '',
+                Employee_Address__CountryCode__s: employee.Employee_Current_Address__c?.country || '',
                 Emergency_Contact_Name__c: employee.Emergency_Contact_Name__c,
                 Emergency_Contact_Number__c: employee.Emergency_Contact_Number__c,
                 exp_years: expParsed.years,
@@ -299,6 +304,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                 Onboarding_Date__c: employee.Onboarding_Date__c,
                 Base_Salary__c: employee.Base_Salary__c,
                 Salary_CTC__c: employee.Salary_CTC__c,
+                Company_Security_Deduction__c: employee.Company_Security_Deduction__c,
                 Status__c: employee.Status__c
             })
             setIsEditing(true)
@@ -918,10 +924,10 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                         </div>
                         <button
                             onClick={() => fileInputRef.current?.click()}
-                            className="absolute bottom-0.5 right-0.5 p-1.5 rounded-full bg-black/60 text-white shadow-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black"
+                            className="absolute bottom-0.5 right-0.5 p-2 sm:p-1.5 rounded-full bg-black/70 backdrop-blur-sm text-white shadow-md opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity hover:bg-black active:scale-95"
                             title="Change Photo"
                         >
-                            <Camera className="w-3.5 h-3.5" />
+                            <Camera className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
                         </button>
                         <input type="file" hidden ref={fileInputRef} accept="image/*" onChange={handleFileChange} />
                     </div>
@@ -1008,7 +1014,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
 
                 {/* Sidebar Nav */}
                 <div className="lg:col-span-1">
-                    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-2 grid grid-cols-2 md:grid-cols-3 lg:flex lg:flex-col gap-2">
+                    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-2 grid gap-2 grid-cols-3 md:grid-cols-2 lg:grid-cols-1">
                         {[
                             { id: "personal", label: "Personal Details", icon: User },
                             { id: "employment", label: "Employment Details", icon: Building2 },
@@ -1022,13 +1028,13 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                 key={tab.id}
                                 onClick={() => handleTabChange(tab.id as TabId)}
                                 className={cn(
-                                    "w-full flex flex-col lg:flex-row items-center justify-center lg:justify-start gap-1 lg:gap-3 px-2 lg:px-4 py-3 rounded-xl font-medium transition-all duration-200 text-center lg:text-left",
+                                    "w-full min-w-0 flex flex-col lg:flex-row items-center justify-center lg:justify-start gap-1 lg:gap-3 px-2 lg:px-4 py-3 rounded-xl font-medium transition-all duration-200 text-center lg:text-left",
                                     activeTab === tab.id
                                         ? "bg-blue-50 text-blue-700 shadow-sm"
                                         : "text-slate-600 hover:bg-slate-50"
                                 )}
                             >
-                                <tab.icon className={cn("w-5 h-5", activeTab === tab.id ? "text-blue-600" : "text-slate-400")} />
+                                <tab.icon className={cn("w-5 h-5 shrink-0 flex-none", activeTab === tab.id ? "text-blue-600" : "text-slate-400")} />
                                 <span className="text-sm">{tab.label}</span>
                             </button>
                         ))}
@@ -1318,7 +1324,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                                                 placeholder="Select Manager"
                                                                 value={formData.Team_Lead__c !== undefined ? formData.Team_Lead__c : employee.Team_Lead__c}
                                                                 onChange={(val: any) => setFormData({ ...formData, Team_Lead__c: val })}
-                                                                options={employeesList?.filter((e: any) => e.Id !== employeeId).map((e: any) => ({
+                                                                options={employeesList?.filter((e: any) => e.Id !== employeeId && e.Status__c === 'Active' && e.Title__c === 'Team Lead').map((e: any) => ({
                                                                     value: e.Id,
                                                                     label: `${e.Employee_Name__c || ''}`.trim()
                                                                 }))}
@@ -1339,6 +1345,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                                                 <Field label="Base Salary" value={employee.Base_Salary__c} fieldKey="Base_Salary__c" type="number" isEditing={isEditing && ['HR', 'Admin'].includes(currentUserRole)} formData={formData} setFormData={setFormData} />
                                                 <Field label="CTC" value={employee.Salary_CTC__c} fieldKey="Salary_CTC__c" type="number" isEditing={isEditing && ['HR', 'Admin'].includes(currentUserRole)} formData={formData} setFormData={setFormData} />
+                                                <Field label="Security Deduction" value={employee.Company_Security_Deduction__c} fieldKey="Company_Security_Deduction__c" type="number" isEditing={isEditing && ['HR', 'Admin'].includes(currentUserRole)} formData={formData} setFormData={setFormData} />
                                             </div>
                                         </div>
                                     </div>
