@@ -272,6 +272,8 @@ export async function POST(request: NextRequest) {
           End_Date__c,
           Session__c,
           Status__c,
+          Sandwich_Rule__c,
+          OnePlusTwo_Rule__c,
           CreatedDate
         FROM Leave__c
         WHERE 
@@ -423,17 +425,17 @@ export async function POST(request: NextRequest) {
       // Determine if rules apply
       // Handle both 'Loss of Pay' and 'loss-of-pay' formats (case-insensitive)
       const applyRules = normalizedCategory === 'loss-of-pay' && normalizedType === 'planned leave'
-      const sandwichRuleAppliesToUser = leaveConfig.sandwichRuleAppliesTo.includes(employeeRole)
-      const penaltyAppliesToUser = leaveConfig.penaltyAppliesTo.includes(employeeRole)
+      const sandwichRuleApprovedOnLeave = leave.Sandwich_Rule__c === true
+      const onePlusTwoRuleApprovedOnLeave = leave.OnePlusTwo_Rule__c === true
       
-      const applySandwichRule = applyRules && !isHalfDay && leaveConfig.SandwichRule && sandwichRuleAppliesToUser
-      const applyOnePlusTwoRule = applyRules && !isHalfDay && leaveConfig.OnePlusTwoRule && penaltyAppliesToUser
+      const applySandwichRule = applyRules && !isHalfDay && sandwichRuleApprovedOnLeave
+      const applyOnePlusTwoRule = applyRules && !isHalfDay && onePlusTwoRuleApprovedOnLeave
       
       console.log(`   Rules Evaluation:`)
       console.log(`     • applyRules: ${applyRules} (category: '${leaveCategory}' → '${normalizedCategory}', type: '${leaveType}' → '${normalizedType}')`)
       console.log(`     • isHalfDay: ${isHalfDay}`)
-      console.log(`     • sandwichRuleAppliesToUser: ${sandwichRuleAppliesToUser}`)
-      console.log(`     • penaltyAppliesToUser: ${penaltyAppliesToUser}`)
+      console.log(`     • Sandwich approved on leave: ${sandwichRuleApprovedOnLeave}`)
+      console.log(`     • One+Two approved on leave: ${onePlusTwoRuleApprovedOnLeave}`)
       console.log(`     • Sandwich Rule: ${applySandwichRule ? '✓ APPLIES' : '✗ Not Applicable'}`)
       console.log(`     • 1+2 Rule: ${applyOnePlusTwoRule ? '✓ APPLIES' : '✗ Not Applicable'}`)
       

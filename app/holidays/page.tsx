@@ -123,7 +123,11 @@ export default function HolidaysPage() {
     if (editFormData.date) {
       const date = new Date(editFormData.date)
       const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-      setEditFormData(prev => ({ ...prev, day: days[date.getDay()] }))
+      setEditFormData(prev => ({
+        ...prev,
+        day: days[date.getDay()],
+        year: date.getFullYear().toString(),
+      }))
     }
   }, [editFormData.date])
 
@@ -144,7 +148,7 @@ export default function HolidaysPage() {
         name: row.name,
         date: row.date,
         day: row.day,
-        year: selectedYear,
+        year: new Date(row.date).getFullYear().toString(),
       }))
 
       // Send bulk insert request
@@ -197,6 +201,7 @@ export default function HolidaysPage() {
         body: JSON.stringify({
           holidayId: editingHoliday.id,
           ...editFormData,
+          year: editFormData.date ? new Date(editFormData.date).getFullYear().toString() : editFormData.year,
         }),
       })
 
@@ -441,7 +446,7 @@ export default function HolidaysPage() {
             <div className="p-6 bg-gradient-to-r from-blue-600 to-blue-700 flex-shrink-0">
               <div className="flex items-center justify-between text-white">
                 <h3 className="text-xl font-bold">
-                  Add Holidays for {selectedYear}
+                  Add Holidays
                 </h3>
                 <button
                   onClick={() => {
@@ -618,20 +623,6 @@ export default function HolidaysPage() {
                   />
                 </div>
 
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Year *
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    value={editFormData.year}
-                    onChange={(e) => setEditFormData({ ...editFormData, year: e.target.value })}
-                    min="2020"
-                    max="2100"
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-gray-900 transition-colors"
-                  />
-                </div>
               </div>
 
               <div className="flex gap-3 pt-4 border-t border-gray-100">

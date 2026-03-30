@@ -715,6 +715,7 @@ export async function POST(request: NextRequest) {
       mergeExistingLeaveId
     } = body;
     const targetEmployeeId = body?.employeeId;
+    const isAdminAutoApprove = role === 'Admin';
     const reason = rawReason?.trim() || '';
     const rulesAlreadyConfirmed = confirmedRules === true;
     const confirmMergeWithExisting = confirmMerge === true;
@@ -1439,6 +1440,17 @@ export async function POST(request: NextRequest) {
     // Prepare leave record based on category
     const saveStartDate = start.format('YYYY-MM-DD');
     const saveEndDate = end.format('YYYY-MM-DD');
+    let requesterBaseSalary = 0;
+    if (isAdminAutoApprove) {
+      const requesterSalaryQuery = await conn.query<any>(`
+        SELECT Id, Base_Salary__c
+        FROM Employee__c
+        WHERE Id = '${employeeId}'
+        LIMIT 1
+      `);
+      requesterBaseSalary = requesterSalaryQuery.records?.[0]?.Base_Salary__c || 0;
+    }
+
     const leaveRecord: any = {
       Employee__c: employeeId,
       Start_Date__c: saveStartDate,
@@ -1446,11 +1458,29 @@ export async function POST(request: NextRequest) {
       Total_Days__c: rangeLeaveDays,
       Total_Days_After_Rule__c: finalTotalAfterRules,
       Session__c: sessionValue,
-      Status__c: 'Applied',
+      Status__c: isAdminAutoApprove ? 'Approved' : 'Applied',
       OnePlusTwo_Rule__c: onePlusTwoRuleApplied,
       Sandwich_Rule__c: anySandwichApplied,
       Rule_Calculation_Details__c: JSON.stringify(ruleCalculationDetails),
     };
+
+    if (isAdminAutoApprove) {
+      leaveRecord.HR_Approval__c = 'Approved';
+      leaveRecord.TL_Approval__c = 'Approved';
+      leaveRecord.Approved_Date__c = new Date().toISOString();
+      leaveRecord.Actual_Deduction__c = calculateLeaveDeduction(
+        leaveCategory === 'loss-of-pay' ? 'Loss of Pay' : 'Extra Day Pay',
+        saveStartDate,
+        rangeLeaveDays,
+        requesterBaseSalary
+      );
+      leaveRecord.After_Rule_Deduction__c = calculateLeaveDeduction(
+        leaveCategory === 'loss-of-pay' ? 'Loss of Pay' : 'Extra Day Pay',
+        saveStartDate,
+        finalTotalAfterRules,
+        requesterBaseSalary
+      );
+    }
 
     console.log("Prepared leave record:", leaveRecord);
     console.log('[Critical] Total_Days__c value being stored:', leaveRecord.Total_Days__c, 'Type:', typeof leaveRecord.Total_Days__c);
@@ -1478,15 +1508,35 @@ export async function POST(request: NextRequest) {
     // Create or merge the leave record in Salesforce
     let result: any = { success: false };
     let mergedExistingLeave = false;
+    let mergedExistingLeavePreviousStatus: string | null = null;
+    let mergedExistingLeavePreviousEventId: string | null = null;
+    let mergedExistingLeavePreviousTotals: { totalDays: number; totalDaysAfterRule: number } | null = null;
 
     if (mergeContext) {
+      const existingMergeLeaveQuery = await conn.query<any>(`
+        SELECT Id, Status__c, Event_ID__c, Total_Days__c, Total_Days_After_Rule__c
+        FROM Leave__c
+        WHERE Id = '${mergeContext.existingLeaveId}'
+        LIMIT 1
+      `);
+
+      if (existingMergeLeaveQuery.records?.length > 0) {
+        const existingMergeLeave = existingMergeLeaveQuery.records[0];
+        mergedExistingLeavePreviousStatus = existingMergeLeave.Status__c || null;
+        mergedExistingLeavePreviousEventId = existingMergeLeave.Event_ID__c || null;
+        mergedExistingLeavePreviousTotals = {
+          totalDays: existingMergeLeave.Total_Days__c || 0,
+          totalDaysAfterRule: existingMergeLeave.Total_Days_After_Rule__c || 0,
+        };
+      }
+
       const updatePayload = {
         ...leaveRecord,
         Id: mergeContext.existingLeaveId,
-        Status__c: 'Applied', // Re-apply for approval
-        TL_Approval__c: null,
-        HR_Approval__c: null,
-        Approved_Date__c: null,
+        Status__c: isAdminAutoApprove ? 'Approved' : 'Applied',
+        TL_Approval__c: isAdminAutoApprove ? 'Approved' : null,
+        HR_Approval__c: isAdminAutoApprove ? 'Approved' : null,
+        Approved_Date__c: isAdminAutoApprove ? new Date().toISOString() : null,
       };
 
       result = await conn.sobject('Leave__c').update(updatePayload) as any;
@@ -1500,6 +1550,41 @@ export async function POST(request: NextRequest) {
     if (!result.success) {
       console.error("Failed to save leave record:", result);
       return NextResponse.json({ error: "Failed to create leave request" }, { status: 500 });
+    }
+
+    const savedLeaveId = mergeContext ? mergeContext.existingLeaveId : result.id;
+
+    if (isAdminAutoApprove) {
+      if (mergedExistingLeave && mergedExistingLeavePreviousStatus === 'Approved' && mergedExistingLeavePreviousTotals) {
+        await updateLeaveBalance(conn, {
+          Employee__c: employeeId,
+          Leave_Category__c: leaveRecord.Leave_Category__c,
+          Leave_Type__c: leaveRecord.Leave_Type__c,
+          Total_Days__c: mergedExistingLeavePreviousTotals.totalDays,
+          Total_Days_After_Rule__c: mergedExistingLeavePreviousTotals.totalDaysAfterRule,
+        }, 'revert');
+      }
+
+      await updateLeaveBalance(conn, leaveRecord, 'approve');
+
+      if (mergedExistingLeavePreviousEventId) {
+        await deleteLeaveCalendarEventForEmployee({
+          employeeId,
+          eventId: mergedExistingLeavePreviousEventId,
+        });
+      }
+
+      const createdEventId = await createLeaveCalendarEventForEmployee({
+        employeeId,
+        leaveType: leaveRecord.Leave_Type__c || leaveRecord.Leave_Category__c || 'Leave',
+        leaveCategory: leaveRecord.Leave_Category__c,
+        startDate: saveStartDate,
+        endDate: saveEndDate,
+        reason: leaveRecord.Reason__c,
+        approvedBy: 'Admin',
+      });
+
+      await persistLeaveEventId(conn, savedLeaveId, createdEventId || null, 'admin-auto-approval');
     }
 
     // After Insert: Send email notification based on employee role/title
@@ -1523,8 +1608,16 @@ export async function POST(request: NextRequest) {
         // Prepare notification recipients
         const notificationRecipients: string[] = [];
 
+        if (isAdminAutoApprove) {
+          await sendInAppNotifications(
+            [employeeId],
+            `Your leave request from ${start.format('DD MMM YYYY')} to ${end.format('DD MMM YYYY')} has been auto-approved by Admin.`,
+            'Leave',
+            false
+          );
+        }
         // Case 1: If employee is HR, send notification to Admin
-        if (employeeRole === 'HR') {
+        else if (employeeRole === 'HR') {
           // Find Admin employee
           const adminQuery = await conn.query<any>(`
             SELECT Id, Employee_Name__c, Employee_Email__c
@@ -1651,11 +1744,11 @@ export async function POST(request: NextRequest) {
       // Don't fail the request if email fails
     }
 
-    const savedLeaveId = mergeContext ? mergeContext.existingLeaveId : result.id;
-
     return NextResponse.json({
       success: true,
-      message: mergeContext ? "Existing leave updated and resubmitted for approval" : "Leave request submitted successfully",
+      message: isAdminAutoApprove
+        ? (mergeContext ? "Existing leave merged and auto-approved successfully" : "Leave request auto-approved successfully")
+        : (mergeContext ? "Existing leave updated and resubmitted for approval" : "Leave request submitted successfully"),
       leaveId: savedLeaveId,
       mergedExistingLeave,
       totals: {
@@ -1833,6 +1926,11 @@ export async function PATCH(request: NextRequest) {
       const leaveStart = dayjs(leave.Start_Date__c).startOf("day");
       const leaveEnd = dayjs(leave.End_Date__c).startOf("day");
       const isHalfDayLeave = leave.Session__c === "Session-1" || leave.Session__c === "Session-2";
+      const today = dayjs().startOf("day");
+
+      if (today.isAfter(leaveEnd, "day")) {
+        return NextResponse.json({ error: "Withdrawal is allowed only on or before the leave end date" }, { status: 400 });
+      }
 
       let requestedWithdrawalStart = leaveStart;
       let requestedWithdrawalEnd = leaveEnd;

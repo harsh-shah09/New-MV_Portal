@@ -5,6 +5,7 @@ import type { ColumnsType } from 'antd/es/table';
 import { CloseOutlined } from '@ant-design/icons';
 import type { LeaveRequest } from "@/types"
 import { formatDate } from "@/lib/utils"
+import dayjs from 'dayjs';
 
 interface LeaveTableProps {
   leaves: LeaveRequest[]
@@ -16,6 +17,13 @@ export function LeaveTable({ leaves, onWithdraw, showActions = true }: LeaveTabl
   const { useBreakpoint } = Grid;
   const screens = useBreakpoint();
   const isMobile = !screens.md;   // true on xs and sm screens
+  const canWithdraw = (record: LeaveRequest) => {
+    if (record.status !== 'approved') return false;
+    const leaveEnd = dayjs(record.endDate).startOf('day');
+    if (!leaveEnd.isValid()) return false;
+    const today = dayjs().startOf('day');
+    return !today.isAfter(leaveEnd, 'day');
+  };
 
   // ==================== DESKTOP / TABLET TABLE ====================
   const columns: ColumnsType<LeaveRequest> = [
@@ -79,7 +87,7 @@ export function LeaveTable({ leaves, onWithdraw, showActions = true }: LeaveTabl
       align: 'center',
       render: (_, record) => (
         <Space size="small">
-          {record.status === 'approved' && onWithdraw && (
+          {canWithdraw(record) && onWithdraw && (
             <Tooltip title="Withdraw Request">
               <Button
                 type="text"
@@ -141,7 +149,7 @@ export function LeaveTable({ leaves, onWithdraw, showActions = true }: LeaveTabl
           </Col>
         </Row>
 
-        {showActions && record.status === 'approved' && onWithdraw && (
+        {showActions && canWithdraw(record) && onWithdraw && (
           <div className="mt-4 pt-3 border-t">
             <Button 
               type="primary" 

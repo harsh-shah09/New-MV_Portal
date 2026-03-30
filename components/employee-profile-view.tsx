@@ -299,6 +299,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                 Onboarding_Date__c: employee.Onboarding_Date__c,
                 Base_Salary__c: employee.Base_Salary__c,
                 Salary_CTC__c: employee.Salary_CTC__c,
+                Company_Security_Deduction__c: employee.Company_Security_Deduction__c,
                 Status__c: employee.Status__c
             })
             setIsEditing(true)
@@ -1339,6 +1340,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                                                 <Field label="Base Salary" value={employee.Base_Salary__c} fieldKey="Base_Salary__c" type="number" isEditing={isEditing && ['HR', 'Admin'].includes(currentUserRole)} formData={formData} setFormData={setFormData} />
                                                 <Field label="CTC" value={employee.Salary_CTC__c} fieldKey="Salary_CTC__c" type="number" isEditing={isEditing && ['HR', 'Admin'].includes(currentUserRole)} formData={formData} setFormData={setFormData} />
+                                                <Field label="Security Deduction" value={employee.Company_Security_Deduction__c} fieldKey="Company_Security_Deduction__c" type="number" isEditing={isEditing && ['HR', 'Admin'].includes(currentUserRole)} formData={formData} setFormData={setFormData} />
                                             </div>
                                         </div>
                                     </div>
