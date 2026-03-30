@@ -250,6 +250,7 @@ export function Sidebar({
 
         {/* Profile Card */}
         <div
+          data-tour="profile-card"
           onClick={handleProfileClick}
           className="flex items-center gap-3 p-3 rounded-xl bg-white border border-slate-100 shadow-sm hover:shadow-md transition-all group cursor-pointer relative"
         >

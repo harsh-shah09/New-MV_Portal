@@ -8,12 +8,15 @@ import { useQueryClient } from "@tanstack/react-query"
 import Confetti from "react-confetti"
 import { motion, AnimatePresence } from "framer-motion"
 import { Check, AlertCircle, Loader2, Trash2 } from "lucide-react"
+import ImgCrop from "antd-img-crop"
 
 export function OnboardingWizard() {
     const [open, setOpen] = useState(false)
     const [currentStep, setCurrentStep] = useState(0)
     const [loading, setLoading] = useState(false)
     const [form] = Form.useForm()
+    const phonePattern = /^(\+91|91)?[6-9]\d{9}$|^[6-9]\d{9}$/
+    const [formErrors, setFormErrors] = useState<Record<string, string>>({})
     console.log(form.getFieldsValue())
     const queryClient = useQueryClient()
     const [showConfetti, setShowConfetti] = useState(false)
@@ -101,6 +104,12 @@ export function OnboardingWizard() {
         { title: 'Documents', icon: <FileTextOutlined /> },
     ]
 
+    const validateEmergencyPhone = (value: string) => {
+        if (!value) return true
+        const normalized = value.replace(/[\s-]/g, "")
+        return phonePattern.test(normalized)
+    }
+
     const handlePassbookUpload = async (file: File) => {        
         if (!file) return
         if (file.size > 10 * 1024 * 1024) {
@@ -132,6 +141,7 @@ export function OnboardingWizard() {
     const handleNext = async () => {
         try {
             setLoading(true)
+            setFormErrors({}) // Clear previous errors
             
             if (currentStep === 1) {
                  // Profile Photo Upload (Step 1 in API)
@@ -159,6 +169,26 @@ export function OnboardingWizard() {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ step: 4, data: {} })
                 })
+            } else if (currentStep === 2) {
+                // Validate emergency phone for personal info step
+                const values = await form.validateFields()
+                const emergencyPhone = values.emergencyPhone?.trim()
+                
+                if (emergencyPhone && !validateEmergencyPhone(emergencyPhone)) {
+                    setFormErrors({ emergencyPhone: 'Emergency contact must be 10 digits or +91 followed by 10 digits' })
+                    setLoading(false)
+                    return
+                }
+                
+                const res = await fetch('/api/auth/onboarding-status', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        step: currentStep, 
+                        data: values 
+                    })
+                })
+                if (!res.ok) throw new Error('Failed')
             } else {
                 // Standard JSON steps
                 const values = await form.validateFields()
@@ -171,7 +201,6 @@ export function OnboardingWizard() {
                     })
                 })
                 if (!res.ok) throw new Error('Failed')
-                if (currentStep === 2) form.resetFields()
             }
             
             setCurrentStep(prev => prev + 1)
@@ -180,6 +209,11 @@ export function OnboardingWizard() {
             console.error("Validation Failed:", error)
             setLoading(false)
         }
+    }
+
+    const handlePrevious = () => {
+        setFormErrors({})
+        setCurrentStep(prev => (prev > 1 ? prev - 1 : 1))
     }
 
     const handleDocumentUpload = async (options: any , doc : any) => {
@@ -235,28 +269,36 @@ export function OnboardingWizard() {
 
     const renderStepContent = (step: number) => {
         switch (step) {
-            case 1:
+             case 1:
                 return (
                      <div className="py-8 text-center flex flex-col items-center">
                         <p className="mb-6 text-gray-500">Upload a professional profile picture.</p>
-                        <Upload 
-                            listType="picture-card"
-                            showUploadList={false}
-                            beforeUpload={(file) => {
-                                setProfileFile(file)
-                                return false
-                            }}
-                            className="avatar-uploader"
-                        >
-                            {profileFile ? (
-                                <img src={URL.createObjectURL(profileFile)} alt="avatar" style={{ width: '100%', borderRadius: '50%' }} />
-                            ) : (
-                                <div>
-                                    <CameraOutlined />
-                                    <div style={{ marginTop: 8 }}>Upload</div>
-                                </div>
-                            )}
-                        </Upload>
+                        <ImgCrop rotationSlider cropShape="round" showGrid aspect={1}>
+                            <Upload 
+                                listType="picture-circle"
+                                showUploadList={false}
+                                beforeUpload={(file) => {
+                                    setProfileFile(file)
+                                    return false
+                                }}
+                                className="avatar-uploader group border-dashed"
+                            >
+                                {profileFile ? (
+                                    <div className="w-full h-full relative group rounded-full overflow-hidden flex items-center justify-center p-1">
+                                        <img src={URL.createObjectURL(profileFile)} alt="avatar" className="w-full h-full object-cover rounded-full" />
+                                        <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-full">
+                                            <CameraOutlined className="text-white text-xl" />
+                                            <span className="text-white text-xs mt-1">Change</span>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col items-center justify-center text-gray-400 group-hover:text-blue-500 transition-colors w-full h-full mt-5">
+                                        <CameraOutlined className="text-2xl mb-2" />
+                                        <div className="font-medium text-sm">Upload</div>
+                                    </div>
+                                )}
+                            </Upload>
+                        </ImgCrop>
                      </div>
                 )
             case 2: 
@@ -333,8 +375,17 @@ export function OnboardingWizard() {
                             <Input />
                             </Form.Item>
                             <Form.Item name="emergencyPhone" label="Emergency Contact Phone" rules={[{ required: true }]}>
-                            <Input />
+                            <Input 
+                                status={formErrors.emergencyPhone ? 'error' : ''}
+                                className={formErrors.emergencyPhone ? 'border-red-500' : ''}
+                            />
                             </Form.Item>
+                            {formErrors.emergencyPhone && (
+                                <div className='text-red-500 text-sm mb-4 flex items-center gap-1'>
+                                    <AlertCircle className='w-4 h-4' />
+                                    {formErrors.emergencyPhone}
+                                </div>
+                            )}
                     </div>
                 )
             case 3:
@@ -580,7 +631,14 @@ export function OnboardingWizard() {
                 </div>
 
                 <div className="flex justify-between pt-6 border-t border-gray-100 mt-6">
-                    <Button onClick={() => setOpen(false)}>Skip for Now</Button>
+                    <div className="flex gap-3">
+                        <Button onClick={() => setOpen(false)}>Skip for Now</Button>
+                        {currentStep > 1 && currentStep <= stepItems.length && (
+                            <Button onClick={handlePrevious}>
+                                ← Previous
+                            </Button>
+                        )}
+                    </div>
                     
                     {currentStep <= stepItems.length && (
                         <Button type="primary" size="large" onClick={handleNext} loading={loading}>

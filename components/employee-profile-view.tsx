@@ -286,6 +286,11 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                 Birthdate__c: employee.Birthdate__c,
                 Gender__c: employee.Gender__c,
                 Employee_Address__c: employee.Employee_Current_Address__c || {},
+                Employee_Address__Street__s: employee.Employee_Current_Address__c?.street || '',
+                Employee_Address__City__s: employee.Employee_Current_Address__c?.city || '',
+                Employee_Address__StateCode__s: employee.Employee_Current_Address__c?.state || '',
+                Employee_Address__PostalCode__s: employee.Employee_Current_Address__c?.postalCode || '',
+                Employee_Address__CountryCode__s: employee.Employee_Current_Address__c?.country || '',
                 Emergency_Contact_Name__c: employee.Emergency_Contact_Name__c,
                 Emergency_Contact_Number__c: employee.Emergency_Contact_Number__c,
                 exp_years: expParsed.years,
@@ -1009,7 +1014,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
 
                 {/* Sidebar Nav */}
                 <div className="lg:col-span-1">
-                    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-2 grid grid-cols-2 md:grid-cols-3 lg:flex lg:flex-col gap-2">
+                    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-2 grid gap-2 grid-cols-3 md:grid-cols-2 lg:grid-cols-1">
                         {[
                             { id: "personal", label: "Personal Details", icon: User },
                             { id: "employment", label: "Employment Details", icon: Building2 },
@@ -1023,13 +1028,13 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                 key={tab.id}
                                 onClick={() => handleTabChange(tab.id as TabId)}
                                 className={cn(
-                                    "w-full flex flex-col lg:flex-row items-center justify-center lg:justify-start gap-1 lg:gap-3 px-2 lg:px-4 py-3 rounded-xl font-medium transition-all duration-200 text-center lg:text-left",
+                                    "w-full min-w-0 flex flex-col lg:flex-row items-center justify-center lg:justify-start gap-1 lg:gap-3 px-2 lg:px-4 py-3 rounded-xl font-medium transition-all duration-200 text-center lg:text-left",
                                     activeTab === tab.id
                                         ? "bg-blue-50 text-blue-700 shadow-sm"
                                         : "text-slate-600 hover:bg-slate-50"
                                 )}
                             >
-                                <tab.icon className={cn("w-5 h-5", activeTab === tab.id ? "text-blue-600" : "text-slate-400")} />
+                                <tab.icon className={cn("w-5 h-5 shrink-0 flex-none", activeTab === tab.id ? "text-blue-600" : "text-slate-400")} />
                                 <span className="text-sm">{tab.label}</span>
                             </button>
                         ))}
