@@ -24,30 +24,30 @@ interface EmailEditorProps {
   onBack: () => void;
 }
 
-const MERGE_FIELDS = {
-  Employee: [
-    { label: "Full Name", value: "{{Employee_Name__c}}" },
-    { label: "Email", value: "{{Employee_Email__c}}" },
-    { label: "Role", value: "{{Role__c}}" },
-    { label: "Department", value: "{{Department__c}}" },
-    { label: "Employee ID", value: "{{Employee_ID__c}}" },
-    { label: "Reporting Manager", value: "{{Team_Lead__r.Name}}" },
-  ],
-  Leave: [
-    { label: "Leave Type", value: "{{Leave_Type__c}}" },
-    { label: "Start Date", value: "{{From_Date__c}}" },
-    { label: "End Date", value: "{{To_Date__c}}" },
-    { label: "Reason", value: "{{Reason__c}}" },
-    { label: "Status", value: "{{Status__c}}" },
-    { label: "Duration", value: "{{Days_Count__c}}" },
-  ],
-  General: [
-    { label: "Recipient Name", value: "{{recipientName}}" },
-    { label: "Current Date", value: "{{Current_Date}}" },
-    { label: "Company Name", value: "{{Company_Name}}" },
-    { label: "Login URL", value: "{{Login_URL}}" },
-  ]
-};
+// const MERGE_FIELDS = {
+//   Employee: [
+//     { label: "Full Name", value: "{{Employee_Name__c}}" },
+//     { label: "Email", value: "{{Employee_Email__c}}" },
+//     { label: "Role", value: "{{Role__c}}" },
+//     { label: "Department", value: "{{Department__c}}" },
+//     { label: "Employee ID", value: "{{Employee_ID__c}}" },
+//     { label: "Reporting Manager", value: "{{Team_Lead__r.Name}}" },
+//   ],
+//   Leave: [
+//     { label: "Leave Type", value: "{{Leave_Type__c}}" },
+//     { label: "Start Date", value: "{{From_Date__c}}" },
+//     { label: "End Date", value: "{{To_Date__c}}" },
+//     { label: "Reason", value: "{{Reason__c}}" },
+//     { label: "Status", value: "{{Status__c}}" },
+//     { label: "Duration", value: "{{Days_Count__c}}" },
+//   ],
+//   General: [
+//     { label: "Recipient Name", value: "{{recipientName}}" },
+//     { label: "Current Date", value: "{{Current_Date}}" },
+//     { label: "Company Name", value: "{{Company_Name}}" },
+//     { label: "Login URL", value: "{{Login_URL}}" },
+//   ]
+// };
 
 export default function EmailEditor({ template, onSave, onBack }: EmailEditorProps) {
   const [content, setContent] = useState(template.Value__c || `<!DOCTYPE html>
@@ -306,7 +306,7 @@ export default function EmailEditor({ template, onSave, onBack }: EmailEditorPro
         </div>
 
         {/* Sidebar: Merge Fields */}
-        <div className="bg-white border-l border-slate-200 flex flex-col z-10 shadow-lg">
+        {/* <div className="bg-white border-l border-slate-200 flex flex-col z-10 shadow-lg">
             <div className="p-4 border-b border-slate-100 bg-slate-50/50">
                 <h3 className="font-bold text-slate-800 flex items-center gap-2">
                     <Braces className="w-4 h-4 text-purple-500" /> Merge Fields
@@ -333,7 +333,7 @@ export default function EmailEditor({ template, onSave, onBack }: EmailEditorPro
                      </div>
                  ))}
             </div>
-        </div>
+        </div> */}
       </div>
     </div>
   );
