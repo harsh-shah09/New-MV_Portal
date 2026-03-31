@@ -104,7 +104,7 @@ function isAuthError(error: unknown): boolean {
 
 async function sendWithCurrentCredentials(oauth2Client: any, params: EmailParams): Promise<void> {
   const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
-  const raw = encodeGmailMessage(params.to, params.subject, params.body);
+  const raw = encodeGmailMessage(params.to, params.cc, params.subject, params.body);
 
   await gmail.users.messages.send({
     userId: 'me',
@@ -112,15 +112,19 @@ async function sendWithCurrentCredentials(oauth2Client: any, params: EmailParams
   });
 }
 
-function encodeGmailMessage(to: string, subject: string, html: string): string {
-  const mimeMessage = [
+function encodeGmailMessage(to: string, cc: string | string[] | undefined, subject: string, html: string): string {
+  const ccString = Array.isArray(cc) ? cc.filter(Boolean).join(', ') : cc || '';
+  
+  const headers = [
     `To: ${to}`,
+    ...(ccString ? [`Cc: ${ccString}`] : []),
     `Subject: ${subject}`,
     'MIME-Version: 1.0',
     'Content-Type: text/html; charset=UTF-8',
     '',
-    html,
-  ].join('\r\n');
+  ];
+
+  const mimeMessage = headers.join('\r\n') + '\r\n' + html;
 
   return Buffer.from(mimeMessage)
     .toString('base64')
@@ -196,9 +200,9 @@ export async function hasGoogleWorkspaceIntegration(employeeId: string): Promise
 /**
  * Send email notification using Gmail
  */
-export async function sendEmail({ to, subject, body, contentType = 'text/plain', senderEmployeeId, isInfo = false }: EmailParams): Promise<void> {
+export async function sendEmail({ to, cc, subject, body, contentType = 'text/plain', senderEmployeeId, isInfo = false }: EmailParams): Promise<void> {
   try {
-    console.log('📧 Sending email:', { to, subject, contentType, isInfo });
+    console.log('📧 Sending email:', { to, cc, subject, contentType, isInfo });
 
     // If isInfo is true, use nodemailer with Gmail app password
     if (isInfo) {
@@ -211,14 +215,18 @@ export async function sendEmail({ to, subject, body, contentType = 'text/plain',
         html: body,
       };
 
+      if (cc) {
+        mailOptions.cc = cc;
+      }
+
       await transporter.sendMail(mailOptions);
-      console.log('✅ Email sent via nodemailer (Gmail app password) to:', to);
+      console.log('✅ Email sent via nodemailer (Gmail app password) to:', to, cc ? `with CC: ${JSON.stringify(cc)}` : '');
       return;
     }
 
-    const wasSentViaGoogle = await sendViaUserGoogleAccount({ to, subject, body, contentType, senderEmployeeId });
+    const wasSentViaGoogle = await sendViaUserGoogleAccount({ to, cc, subject, body, contentType, senderEmployeeId });
     if (wasSentViaGoogle) {
-      console.log('✅ Email sent via user Google account to:', to);
+      console.log('✅ Email sent via user Google account to:', to, cc ? `with CC: ${JSON.stringify(cc)}` : '');
       return;
     }
 
