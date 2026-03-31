@@ -31,11 +31,37 @@ interface EmployeeLeaveKpi {
   plannedLeaveCount: number
 }
 
+type LeaveTab = "my-requests" | "approvals" | "all-leaves"
+
+const LEAVE_TAB_HASH_MAP: Record<LeaveTab, string> = {
+  "my-requests": "my-requests",
+  approvals: "approvals",
+  "all-leaves": "all-leaves",
+}
+
+function getTabFromHash(hash: string): LeaveTab | null {
+  const normalized = hash.replace(/^#/, "").trim().toLowerCase()
+
+  if (normalized === "approvals") {
+    return "approvals"
+  }
+
+  if (normalized === "my-requests" || normalized === "myrequests") {
+    return "my-requests"
+  }
+
+  if (normalized === "all-leaves" || normalized === "allleaves") {
+    return "all-leaves"
+  }
+
+  return null
+}
+
 export default function LeavesPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [showForm, setShowForm] = useState(false)
-  const [selectedTab, setSelectedTab] = useState<"my-requests" | "approvals" | "all-leaves">("my-requests")
+  const [selectedTab, setSelectedTab] = useState<LeaveTab>("my-requests")
   const [currentUser, setCurrentUser] = useState<{ employeeId: string; email?: string; recordId: string; role?: string; title?: string } | null>(null)
   const [rejectModalVisible, setRejectModalVisible] = useState(false)
   const [rejectingLeaveId, setRejectingLeaveId] = useState<string | null>(null)
@@ -93,14 +119,37 @@ export default function LeavesPage() {
     })
   }
 
+  const updateUrlHashForTab = (tab: LeaveTab) => {
+    if (typeof window === "undefined") {
+      return
+    }
+
+    const targetHash = `#${LEAVE_TAB_HASH_MAP[tab]}`
+    const { pathname, search, hash } = window.location
+
+    if (hash === targetHash) {
+      return
+    }
+
+    window.history.replaceState(null, "", `${pathname}${search}${targetHash}`)
+  }
+
+  const handleTabChange = (tab: LeaveTab) => {
+    setSelectedTab(tab)
+    updateUrlHashForTab(tab)
+  }
+
   // Handle URL parameters for filtering
   useEffect(() => {
     const typeParam = searchParams.get('type')
     const statusParam = searchParams.get('status')
     const tabParam = searchParams.get('tab')
     const openRequestParam = searchParams.get('openRequest')
+    const hashTab = typeof window !== 'undefined' ? getTabFromHash(window.location.hash) : null
 
-    if (tabParam === 'approvals') {
+    if (hashTab) {
+      setSelectedTab(hashTab)
+    } else if (tabParam === 'approvals') {
       setSelectedTab('approvals')
     } else if (typeParam || statusParam) {
       setSelectedTab('my-requests')
@@ -120,9 +169,29 @@ export default function LeavesPage() {
       const nextParams = new URLSearchParams(searchParams.toString())
       nextParams.delete('openRequest')
       const nextQuery = nextParams.toString()
-      router.replace(nextQuery ? `/leaves?${nextQuery}` : '/leaves')
+      const currentHash = typeof window !== 'undefined' ? window.location.hash : ''
+      const nextUrl = nextQuery ? `/leaves?${nextQuery}` : '/leaves'
+      router.replace(`${nextUrl}${currentHash}`)
     }
   }, [searchParams, router])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return
+    }
+
+    const onHashChange = () => {
+      const tabFromHash = getTabFromHash(window.location.hash)
+      if (tabFromHash) {
+        setSelectedTab(tabFromHash)
+      }
+    }
+
+    window.addEventListener('hashchange', onHashChange)
+    return () => {
+      window.removeEventListener('hashchange', onHashChange)
+    }
+  }, [])
 
   // Apply filters to my leaves
   useEffect(() => {
@@ -912,7 +981,7 @@ export default function LeavesPage() {
           <div className="flex border-b border-border">
             {(currentUser?.role === 'HR' || currentUser?.role === 'Admin' || currentUser?.title === 'Team Lead') && (
               <button
-                onClick={() => setSelectedTab("my-requests")}
+                onClick={() => handleTabChange("my-requests")}
                 className={`flex-1 px-6 py-4 text-center font-medium transition ${selectedTab === "my-requests"
                   ? "text-primary border-b-2 border-primary bg-primary/5"
                   : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
@@ -923,7 +992,7 @@ export default function LeavesPage() {
             )}
             {(currentUser?.role === 'HR' || currentUser?.role === 'Admin' || currentUser?.title === 'Team Lead') && (
               <button
-                onClick={() => setSelectedTab("approvals")}
+                onClick={() => handleTabChange("approvals")}
                 className={`flex-1 px-6 py-4 text-center font-medium transition ${selectedTab === "approvals"
                   ? "text-primary border-b-2 border-primary bg-primary/5"
                   : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
@@ -934,7 +1003,7 @@ export default function LeavesPage() {
             )}
             {(currentUser?.role === 'HR' || currentUser?.role === 'Admin') && (
               <button
-                onClick={() => setSelectedTab("all-leaves")}
+                onClick={() => handleTabChange("all-leaves")}
                 className={`flex-1 px-6 py-4 text-center font-medium transition ${selectedTab === "all-leaves"
                   ? "text-primary border-b-2 border-primary bg-primary/5"
                   : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
