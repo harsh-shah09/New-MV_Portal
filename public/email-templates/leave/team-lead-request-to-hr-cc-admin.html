@@ -3,23 +3,24 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>HR Leave Request</title>
+  <title>Team Lead Leave Request</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; line-height: 1.6; color: #1f2937; background-color: #f3f4f6; padding: 20px; }
-    .email-wrapper { max-width: 600px; margin: 0 auto; background: #fff; border: 2px solid #67e8f9; border-radius: 12px; overflow: hidden; outline: 1px solid #cffafe; box-shadow: 0 4px 6px rgba(0,0,0,.1); }
-    .header { background: linear-gradient(135deg, #06b6d4 0%, #0e7490 100%); color: #fff; padding: 30px 20px; text-align: center; }
+    .email-wrapper { max-width: 600px; margin: 0 auto; background: #fff; border: 2px solid #a5b4fc; border-radius: 12px; overflow: hidden; outline: 1px solid #e0e7ff; box-shadow: 0 4px 6px rgba(0,0,0,.1); }
+    .header { background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); color: #fff; padding: 30px 20px; text-align: center; }
     .header .icon { font-size: 48px; margin-bottom: 10px; }
     .header h1 { font-size: 27px; margin-bottom: 8px; }
     .content { padding: 25px 20px; }
     .greeting { margin-bottom: 14px; }
     .message { font-size: 15px; color: #4b5563; margin-bottom: 18px; }
-    .info-card { background: linear-gradient(to right, #ecfeff, #fff); border: 1px solid #cffafe; border-left: 4px solid #06b6d4; border-radius: 8px; padding: 18px; }
-    .info-card h3 { color: #0e7490; margin-bottom: 12px; }
+    .info-card { background: linear-gradient(to right, #eef2ff, #fff); border: 1px solid #e0e7ff; border-left: 4px solid #6366f1; border-radius: 8px; padding: 18px; }
+    .info-card h3 { color: #4338ca; margin-bottom: 12px; }
     .info-row { display: table; width: 100%; padding: 9px 0; border-bottom: 1px solid #f3f4f6; }
     .info-row:last-child { border-bottom: none; }
     .info-label { display: table-cell; width: 45%; font-weight: 600; color: #6b7280; font-size: 14px; }
     .info-value { display: table-cell; width: 55%; text-align: right; font-weight: 500; font-size: 14px; }
+    .alert { background: #e0e7ff; border-left: 4px solid #6366f1; color: #3730a3; border-radius: 8px; padding: 14px 16px; margin-top: 18px; font-size: 14px; }
     .footer { background: #1f2937; color: #9ca3af; padding: 20px; text-align: center; font-size: 12px; line-height: 1.5; }
     .footer p { margin: 5px 0; }
   </style>
@@ -27,23 +28,25 @@
 <body>
   <div class="email-wrapper">
     <div class="header">
-      <div class="icon">🏢</div>
-      <h1>HR Leave Request</h1>
-      <p>Approval required from Admin</p>
+      <div class="icon">👨‍💼</div>
+      <h1>Team Lead Leave Request</h1>
+      <p>Request submitted for HR approval</p>
     </div>
 
     <div class="content">
       <div class="greeting">Dear <strong>{{recipientName}}</strong>,</div>
-      <div class="message"><strong>{{employeeName}}</strong> (HR) has submitted a leave request requiring your review.</div>
+      <div class="message"><strong>{{employeeName}}</strong> (Team Lead) has submitted a leave request for your approval.</div>
 
       <div class="info-card">
         <h3>📋 Request Details</h3>
-        <div class="info-row"><span class="info-label">HR Employee</span><span class="info-value">{{employeeName}}</span></div>
+        <div class="info-row"><span class="info-label">Team Lead</span><span class="info-value">{{employeeName}}</span></div>
         <div class="info-row"><span class="info-label">Leave Type</span><span class="info-value">{{leaveType}}</span></div>
         <div class="info-row"><span class="info-label">Start Date</span><span class="info-value">{{startDate}}</span></div>
         <div class="info-row"><span class="info-label">End Date</span><span class="info-value">{{endDate}}</span></div>
         <div class="info-row"><span class="info-label">Duration</span><span class="info-value"><strong>{{duration}} day(s)</strong></span></div>
       </div>
+
+      <div class="alert"><strong>CC Information:</strong> Admin should be included in this request email.</div>
     </div>
 
     <div class="footer">

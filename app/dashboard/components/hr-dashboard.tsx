@@ -78,24 +78,24 @@ export function HRDashboard({ data, dashboardRole = "HR" }: HRDashboardProps) {
 
       {/* Recent Activities and Quick Actions */}
       <Row gutter={[16, 16]}>
-        <Col xs={12} lg={12}>
+        <Col xs={24} sm={12} lg={12}>
           <HRQuickActions />
         </Col>
-        <Col xs={12} lg={12}>
+        <Col xs={24} sm={12} lg={12}>
           <RecentActivities recentActivities={recentActivities} />
         </Col>
-        <Col xs={12} lg={12}>
+        <Col xs={24} sm={12} lg={12}>
           <EmployeeBirthday data={birthdayToday} />
         </Col>
-        <Col xs={12} lg={12}>
+        <Col xs={24} sm={12} lg={12}>
           {/* Anniversary Here */}
           <EmployeeAnniversary data={anniversaryToday} />
         </Col>
-        <Col xs={12} lg={12} id="on-leave-today-widget">
+        <Col xs={24} sm={12} lg={12} id="on-leave-today-widget">
         {/* Employees On Leave Today */}
         <EmployeesOnLeave employeesOnLeave={employeesOnLeave} />
         </Col>
-        <Col xs={12} lg={12} id="approved-today-widget">
+        <Col xs={24} sm={12} lg={12} id="approved-today-widget">
         {/* Leaves Approved Today */}
         <LeavesApprovedToday approvedTodayLeaves={approvedTodayLeaves} />
         </Col>

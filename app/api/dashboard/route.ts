@@ -38,40 +38,41 @@ export async function GET(req: NextRequest) {
         const requestedViewMode = searchParams.get('view') === 'hr' ? 'hr' : 'default';
         const viewMode = canAccessHRView ? requestedViewMode : 'default';
         const today = dayjs().format('YYYY-MM-DD');
-        const birthdayquery =  await conn.query(`
-            SELECT Id , Name , Employee_Name__c,Role__c , Title__c ,Profile_Photo__c,Department__c
-            FROM Employee__c
-            WHERE Birthdate__c = ${today} AND Status__c = 'Active' AND Active__c = true`);
+        const todayMonth = dayjs().month() + 1;
+        const todayDay = dayjs().date();
+
+        const [birthdayquery, anniversaryQuery] = await Promise.all([
+            conn.query(`
+                SELECT Id, Name, Employee_Name__c, Role__c, Title__c, Profile_Photo__c, Department__c
+                FROM Employee__c
+                WHERE Birthdate__c != null
+                AND CALENDAR_MONTH(Birthdate__c) = ${todayMonth}
+                AND DAY_IN_MONTH(Birthdate__c) = ${todayDay}
+                AND Status__c = 'Active'
+                AND Active__c = true
+            `),
+            conn.query(`
+                SELECT Id, Name, Employee_Name__c, Role__c, Title__c, Profile_Photo__c, Department__c, Onboarding_Date__c
+                FROM Employee__c
+                WHERE Onboarding_Date__c != null
+                AND CALENDAR_MONTH(Onboarding_Date__c) = ${todayMonth}
+                AND DAY_IN_MONTH(Onboarding_Date__c) = ${todayDay}
+                AND Status__c = 'Active'
+                AND Active__c = true
+            `)
+        ]);
+
         const birthdayToday = birthdayquery.records;
-        const anniversaryQuery = await conn.query(`
-            SELECT Id, Name, Employee_Name__c, Role__c, Title__c, Profile_Photo__c, Department__c, Onboarding_Date__c
-            FROM Employee__c
-            WHERE Onboarding_Date__c != null
-            AND Status__c = 'Active'
-            AND Active__c = true
-        `)
-        const todayMonthDay = dayjs().format('MM-DD')
-        const anniversaryToday = anniversaryQuery.records.filter((record: any) =>
-            dayjs(record.Onboarding_Date__c).format('MM-DD') === todayMonthDay
-        );
+        const anniversaryToday = anniversaryQuery.records;
         // HR/Admin Dashboard Data
         if (viewMode === 'hr' && canAccessHRView) {
             const hrDashboardLeaveFilter = isAdmin
                 ? ""
                 : "AND Employee__r.Role__c NOT IN ('HR', 'Admin')";
 
-            // Get total employees
-            const employeeQuery = await conn.query(`
-                SELECT COUNT(Id) totalEmployees
-                FROM Employee__c
-                WHERE Status__c = 'Active'
-            `);
-            const totalEmployees = employeeQuery.records[0]?.totalEmployees || 0;
-
-            // Get pending approvals count
-            let pendingApprovalsQuery;
+            let pendingApprovalsQueryPromise;
             if (isAdmin) {
-                pendingApprovalsQuery = await conn.query(`
+                pendingApprovalsQueryPromise = conn.query(`
                     SELECT Id, Name, Employee__c, Employee__r.Employee_Name__c, 
                            Leave_Type__c, Leave_Category__c, Start_Date__c, 
                            End_Date__c, Total_Days__c, TL_Approval__c, Sandwich_Rule__c, OnePlusTwo_Rule__c
@@ -80,7 +81,7 @@ export async function GET(req: NextRequest) {
                     ORDER BY Start_Date__c ASC
                 `);
             } else if (isHR) {
-                pendingApprovalsQuery = await conn.query(`
+                pendingApprovalsQueryPromise = conn.query(`
                     SELECT Id, Name, Employee__c, Employee__r.Employee_Name__c, 
                            Leave_Type__c, Leave_Category__c, Start_Date__c, 
                            End_Date__c, Total_Days__c, TL_Approval__c, Sandwich_Rule__c, OnePlusTwo_Rule__c
@@ -89,7 +90,7 @@ export async function GET(req: NextRequest) {
                     ORDER BY Start_Date__c ASC
                 `);
             } else {
-                pendingApprovalsQuery = await conn.query(`
+                pendingApprovalsQueryPromise = conn.query(`
                     SELECT Id,Name, Employee__c, Employee__r.Employee_Name__c, 
                            Leave_Type__c, Leave_Category__c, Start_Date__c, 
                            End_Date__c, Total_Days__c, TL_Approval__c, Sandwich_Rule__c, OnePlusTwo_Rule__c
@@ -98,6 +99,81 @@ export async function GET(req: NextRequest) {
                     ORDER BY Start_Date__c ASC
                 `);
             }
+
+            const [
+                employeeQuery,
+                pendingApprovalsQuery,
+                approvedTodayQuery,
+                approvedTodayLeavesQuery,
+                onLeaveTodayQuery,
+                employeesOnLeaveQuery,
+                leaveAnalyticsQuery,
+                recentActivitiesQuery,
+            ] = await Promise.all([
+                conn.query(`
+                    SELECT COUNT(Id) totalEmployees
+                    FROM Employee__c
+                    WHERE Status__c = 'Active'
+                `),
+                pendingApprovalsQueryPromise,
+                conn.query(`
+                    SELECT COUNT(Id) approvedCount
+                    FROM Leave__c
+                    WHERE Approved_Date__c = ${today}
+                    AND Status__c = 'Approved'
+                    ${hrDashboardLeaveFilter}
+                `),
+                conn.query(`
+                    SELECT Id, Employee__c, Employee__r.Employee_Name__c,
+                           Employee__r.Employee_Email__c, Leave_Type__c,
+                           Leave_Category__c, Start_Date__c, End_Date__c,
+                           Total_Days__c, Approved_Date__c
+                    FROM Leave__c
+                    WHERE Approved_Date__c = ${today}
+                    AND Status__c = 'Approved'
+                    ${hrDashboardLeaveFilter}
+                    ORDER BY Start_Date__c ASC
+                `),
+                conn.query(`
+                    SELECT COUNT(Id) onLeaveCount
+                    FROM Leave__c
+                    WHERE Start_Date__c <= ${today}
+                    AND End_Date__c >= ${today}
+                    AND Status__c = 'Approved'
+                    ${hrDashboardLeaveFilter}
+                `),
+                conn.query(`
+                    SELECT Id, Employee__c, Employee__r.Employee_Name__c,
+                           Employee__r.Employee_Email__c, Leave_Type__c,
+                           Leave_Category__c, Start_Date__c, End_Date__c,
+                           Total_Days__c
+                    FROM Leave__c
+                    WHERE Start_Date__c <= ${today}
+                    AND End_Date__c >= ${today}
+                    AND Status__c = 'Approved'
+                    ${hrDashboardLeaveFilter}
+                    ORDER BY Start_Date__c ASC
+                `),
+                conn.query(`
+                    SELECT Leave_Type__c, COUNT(Id) leaveCount
+                    FROM Leave__c
+                    WHERE Status__c = 'Approved'
+                    AND CALENDAR_YEAR(Start_Date__c) = ${new Date().getFullYear()}
+                    ${hrDashboardLeaveFilter}
+                    GROUP BY Leave_Type__c
+                `),
+                conn.query(`
+                    SELECT Id, Employee__r.Employee_Name__c, Status__c,
+                           Leave_Type__c, CreatedDate
+                    FROM Leave__c
+                    WHERE CreatedDate >= LAST_N_DAYS:7
+                    ${hrDashboardLeaveFilter}
+                    ORDER BY CreatedDate DESC
+                    LIMIT 20
+                `),
+            ]);
+
+            const totalEmployees = employeeQuery.records[0]?.totalEmployees || 0;
 
             const pendingApprovals = pendingApprovalsQuery.records.map((record: any) => {
                 const sandwichRuleApplicable = record.Sandwich_Rule__c === true
@@ -118,27 +194,7 @@ export async function GET(req: NextRequest) {
                 }
             });
 
-            // Get approved today count
-            const approvedTodayQuery = await conn.query(`
-                SELECT COUNT(Id) approvedCount
-                FROM Leave__c
-                WHERE Approved_Date__c = ${today}
-                AND Status__c = 'Approved'
-                ${hrDashboardLeaveFilter}
-            `);
             const approvedToday = approvedTodayQuery.records[0]?.approvedCount || 0;
-
-            const approvedTodayLeavesQuery = await conn.query(`
-                SELECT Id, Employee__c, Employee__r.Employee_Name__c,
-                       Employee__r.Employee_Email__c, Leave_Type__c,
-                       Leave_Category__c, Start_Date__c, End_Date__c,
-                       Total_Days__c, Approved_Date__c
-                FROM Leave__c
-                WHERE Approved_Date__c = ${today}
-                AND Status__c = 'Approved'
-                ${hrDashboardLeaveFilter}
-                ORDER BY Start_Date__c ASC
-            `);
 
             const approvedTodayLeaves = approvedTodayLeavesQuery.records.map((record: any) => ({
                 id: record.Id,
@@ -153,31 +209,7 @@ export async function GET(req: NextRequest) {
                 approvedDate: record.Approved_Date__c,
             }));
 
-            
-            // Get on leave today count
-            const onLeaveTodayQuery = await conn.query(`
-                SELECT COUNT(Id) onLeaveCount
-                FROM Leave__c
-                WHERE Start_Date__c <= ${today} 
-                AND End_Date__c >= ${today}
-                AND Status__c = 'Approved'
-                ${hrDashboardLeaveFilter}
-            `);
             const onLeaveToday = onLeaveTodayQuery.records[0]?.onLeaveCount || 0;
-
-            // Get employees on leave today (with details)
-            const employeesOnLeaveQuery = await conn.query(`
-                SELECT Id, Employee__c, Employee__r.Employee_Name__c, 
-                       Employee__r.Employee_Email__c, Leave_Type__c, 
-                       Leave_Category__c, Start_Date__c, End_Date__c, 
-                       Total_Days__c
-                FROM Leave__c
-                WHERE Start_Date__c <= ${today} 
-                AND End_Date__c >= ${today}
-                AND Status__c = 'Approved'
-                ${hrDashboardLeaveFilter}
-                ORDER BY Start_Date__c ASC
-            `);
 
             const employeesOnLeave = employeesOnLeaveQuery.records.map((record: any) => ({
                 id: record.Id,
@@ -190,16 +222,6 @@ export async function GET(req: NextRequest) {
                 endDate: record.End_Date__c,
                 duration: record.Total_Days__c
             }));
-
-            // Get leave analytics
-            const leaveAnalyticsQuery = await conn.query(`
-                SELECT Leave_Type__c, COUNT(Id) leaveCount
-                FROM Leave__c
-                WHERE Status__c = 'Approved'
-                AND CALENDAR_YEAR(Start_Date__c) = ${new Date().getFullYear()}
-                ${hrDashboardLeaveFilter}
-                GROUP BY Leave_Type__c
-            `);
 
             const totalLeaves = leaveAnalyticsQuery.records.reduce((sum: number, record: any) => sum + (record.leaveCount || 0), 0);
             const leaveAnalytics: any = {
@@ -228,17 +250,6 @@ export async function GET(req: NextRequest) {
                     leaveAnalytics.emergencyLeavePercentage = percentage;
                 }
             });
-
-            // Get recent activities
-            const recentActivitiesQuery = await conn.query(`
-                SELECT Id, Employee__r.Employee_Name__c, Status__c, 
-                       Leave_Type__c, CreatedDate
-                FROM Leave__c
-                WHERE CreatedDate >= LAST_N_DAYS:7
-                ${hrDashboardLeaveFilter}
-                ORDER BY CreatedDate DESC
-                LIMIT 20
-            `);
 
             const recentActivities = recentActivitiesQuery.records.map((record: any, index: number) => ({
                 id: `activity-${index}`,
@@ -271,14 +282,67 @@ export async function GET(req: NextRequest) {
         // Employee Dashboard Data
         const currentYear = new Date().getFullYear();
         
-        // Get leave balance
-        const leaveBalanceQuery = await conn.query(`
-            SELECT Annual_Leave_Remaining__c, Earned_Leave_Balance__c,
-                   Sick_Leave_Count__c, Emergency_Leave_Count__c, Planned_Leave_Count__c
-            FROM Leave_Balance__c
-            WHERE Employee__c = '${currentEmployeeId}' AND Year__c = ${currentYear}
-            LIMIT 1
-        `);
+        const teamLeadApprovalsPromise = isTeamLead
+            ? conn.query(`
+                SELECT Id, Name, Employee__c, Employee__r.Employee_Name__c,
+                       Leave_Type__c, Leave_Category__c, Start_Date__c,
+                       End_Date__c, Total_Days__c, TL_Approval__c
+                FROM Leave__c
+                WHERE Status__c = 'Applied'
+                AND Employee__r.Team_Lead__c = '${currentEmployeeId}'
+                AND (TL_Approval__c = null OR TL_Approval__c = '')
+                ORDER BY Start_Date__c ASC
+            `)
+            : Promise.resolve({ records: [] as any[] });
+
+        const [
+            leaveBalanceQuery,
+            upcomingLeavesQuery,
+            pendingRequestsQuery,
+            holidaysQuery,
+            currentEmployeeQuery,
+            teamLeadApprovalsQuery,
+        ] = await Promise.all([
+            conn.query(`
+                SELECT Annual_Leave_Remaining__c, Earned_Leave_Balance__c,
+                       Sick_Leave_Count__c, Emergency_Leave_Count__c, Planned_Leave_Count__c
+                FROM Leave_Balance__c
+                WHERE Employee__c = '${currentEmployeeId}' AND Year__c = ${currentYear}
+                LIMIT 1
+            `),
+            conn.query(`
+                SELECT Id, Leave_Type__c, Leave_Category__c, Start_Date__c,
+                       End_Date__c, Total_Days__c
+                FROM Leave__c
+                WHERE Employee__c = '${currentEmployeeId}'
+                AND Start_Date__c >= TODAY
+                AND Status__c = 'Approved'
+                ORDER BY Start_Date__c ASC
+                LIMIT 5
+            `),
+            conn.query(`
+                SELECT Id, Leave_Type__c, Leave_Category__c, Start_Date__c,
+                       End_Date__c, Total_Days__c, Status__c
+                FROM Leave__c
+                WHERE Employee__c = '${currentEmployeeId}'
+                AND Status__c = 'Applied'
+                ORDER BY Start_Date__c ASC
+            `),
+            conn.query(`
+                SELECT Name, Date__c, Day__c
+                FROM Holidays_List__c
+                WHERE Date__c >= TODAY
+                ORDER BY Date__c ASC
+                LIMIT 5
+            `),
+            conn.query(`
+                SELECT Id, Employee_Name__c, Employee_Email__c, Title__c, Team_Lead__c
+                FROM Employee__c
+                WHERE Id = '${currentEmployeeId}'
+                LIMIT 1
+            `),
+            teamLeadApprovalsPromise,
+        ]);
 
         const leaveBalance = leaveBalanceQuery.records.length > 0 ? {
             annualLeaveRemaining: leaveBalanceQuery.records[0].Annual_Leave_Remaining__c || 0,
@@ -294,18 +358,6 @@ export async function GET(req: NextRequest) {
             plannedLeaveCount: 0
         };
 
-        // Get upcoming approved leaves
-        const upcomingLeavesQuery = await conn.query(`
-            SELECT Id, Leave_Type__c, Leave_Category__c, Start_Date__c, 
-                   End_Date__c, Total_Days__c
-            FROM Leave__c
-            WHERE Employee__c = '${currentEmployeeId}'
-            AND Start_Date__c >= TODAY
-            AND Status__c = 'Approved'
-            ORDER BY Start_Date__c ASC
-            LIMIT 5
-        `);
-
         const upcomingLeaves = upcomingLeavesQuery.records.map((record: any) => ({
             id: record.Id,
             leaveType: record.Leave_Category__c === 'Extra Day Pay' ? 'Extra Day Pay' : record.Leave_Type__c,
@@ -314,16 +366,6 @@ export async function GET(req: NextRequest) {
             endDate: record.End_Date__c,
             duration: record.Total_Days__c
         }));
-
-        // Get pending requests
-        const pendingRequestsQuery = await conn.query(`
-            SELECT Id, Leave_Type__c, Leave_Category__c, Start_Date__c, 
-                   End_Date__c, Total_Days__c, Status__c
-            FROM Leave__c
-            WHERE Employee__c = '${currentEmployeeId}'
-            AND Status__c = 'Applied'
-            ORDER BY Start_Date__c ASC
-        `);
 
         const pendingRequests = pendingRequestsQuery.records.map((record: any) => ({
             id: record.Id,
@@ -337,17 +379,6 @@ export async function GET(req: NextRequest) {
 
         let teamLeadPendingApprovals: any[] = [];
         if (isTeamLead) {
-            const teamLeadApprovalsQuery = await conn.query(`
-                SELECT Id, Name, Employee__c, Employee__r.Employee_Name__c,
-                       Leave_Type__c, Leave_Category__c, Start_Date__c,
-                       End_Date__c, Total_Days__c, TL_Approval__c
-                FROM Leave__c
-                WHERE Status__c = 'Applied'
-                AND Employee__r.Team_Lead__c = '${currentEmployeeId}'
-                AND (TL_Approval__c = null OR TL_Approval__c = '')
-                ORDER BY Start_Date__c ASC
-            `);
-
             teamLeadPendingApprovals = teamLeadApprovalsQuery.records.map((record: any) => ({
                 id: record.Id,
                 employeeId: record.Name,
@@ -361,32 +392,15 @@ export async function GET(req: NextRequest) {
             }));
         }
 
-        // Get upcoming holidays
-        const holidaysQuery = await conn.query(`
-            SELECT Name, Date__c, Day__c
-            FROM Holidays_List__c
-            WHERE Date__c >= TODAY
-            ORDER BY Date__c ASC
-            LIMIT 5
-        `);
-
         const holidays = holidaysQuery.records.map((record: any) => ({
             name: record.Name,
             date: record.Date__c,
             day: record.Day__c
         }));
 
-        // Get team members (employees with the same team lead)
-        const teamMembersQuery = await conn.query(`
-            SELECT Id, Employee_Name__c, Employee_Email__c, Title__c, Team_Lead__c
-            FROM Employee__c
-            WHERE Id = '${currentEmployeeId}'
-            LIMIT 1
-        `);
-
         let teamMembers: any[] = [];
-        if (teamMembersQuery.records.length > 0) {
-            const currentEmployee = teamMembersQuery.records[0];
+        if (currentEmployeeQuery.records.length > 0) {
+            const currentEmployee = currentEmployeeQuery.records[0];
             const teamLeadId = currentEmployee.Team_Lead__c;
 
             if (teamLeadId) {
@@ -408,15 +422,7 @@ export async function GET(req: NextRequest) {
                 }));
             }
         }
-
-        // Get employee name
-        const empQuery = await conn.query(`
-            SELECT Employee_Name__c
-            FROM Employee__c
-            WHERE Id = '${currentEmployeeId}'
-            LIMIT 1
-        `);
-        const employeeName = empQuery.records[0]?.Employee_Name__c || email || name;
+        const employeeName = currentEmployeeQuery.records[0]?.Employee_Name__c || email || name;
 
         return NextResponse.json({
             employeeName,
