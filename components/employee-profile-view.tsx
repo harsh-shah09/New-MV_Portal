@@ -1660,6 +1660,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                                 <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
                                                     <Download className="w-4 h-4 text-slate-500" /> All Uploaded Documents
                                                 </h3>
+                                                {['HR', 'Admin'].includes(currentUserRole) && (
                                                 <Button
                                                     type="primary"
                                                     onClick={() => setShowCustomDocModal(true)}
@@ -1667,6 +1668,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                                 >
                                                     <Upload className="w-4 h-4" /> Upload Document
                                                 </Button>
+                                                )}
                                             </div>
                                             {(() => {
                                                 const nonPayslipDocs = (employee.documents || []).filter(
