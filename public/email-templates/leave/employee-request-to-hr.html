@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Leave Request Rejected</title>
+  <title>Employee Leave Request</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -17,48 +17,46 @@
       max-width: 600px;
       margin: 0 auto;
       background-color: #ffffff;
-      border: 2px solid #fca5a5;
+      border: 2px solid #93c5fd;
       border-radius: 12px;
       overflow: hidden;
-      outline: 1px solid #fee2e2;
+      outline: 1px solid #dbeafe;
       box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     }
     .header {
-      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+      background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
       color: #ffffff;
       padding: 30px 20px;
       text-align: center;
     }
     .header .icon { font-size: 48px; margin-bottom: 10px; }
-    .header h1 { font-size: 28px; font-weight: 700; margin-bottom: 8px; }
+    .header h1 { font-size: 27px; font-weight: 700; margin-bottom: 8px; }
     .header p { font-size: 16px; opacity: 0.95; }
     .content { padding: 25px 20px; }
-    .greeting { font-size: 16px; margin-bottom: 15px; color: #374151; }
-    .message { font-size: 15px; color: #4b5563; margin-bottom: 20px; line-height: 1.6; }
+    .greeting { font-size: 16px; margin-bottom: 14px; color: #374151; }
+    .message { font-size: 15px; color: #4b5563; margin-bottom: 18px; }
     .info-card {
-      background: linear-gradient(to right, #fef2f2, #ffffff);
-      border: 1px solid #fee2e2;
-      border-left: 4px solid #ef4444;
+      background: linear-gradient(to right, #eff6ff, #ffffff);
+      border: 1px solid #dbeafe;
+      border-left: 4px solid #3b82f6;
       border-radius: 8px;
-      padding: 20px;
-      margin: 18px 0;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+      padding: 18px;
+      margin: 16px 0;
     }
-    .info-card h3 { color: #dc2626; font-size: 17px; margin-bottom: 12px; }
-    .info-row { display: table; width: 100%; padding: 10px 0; border-bottom: 1px solid #f3f4f6; }
+    .info-card h3 { color: #1d4ed8; font-size: 17px; margin-bottom: 12px; }
+    .info-row { display: table; width: 100%; padding: 9px 0; border-bottom: 1px solid #f3f4f6; }
     .info-row:last-child { border-bottom: none; }
     .info-label { display: table-cell; width: 45%; font-weight: 600; color: #6b7280; font-size: 14px; }
     .info-value { display: table-cell; width: 55%; text-align: right; color: #111827; font-weight: 500; font-size: 14px; }
-    .reason-box {
-      background-color: #fffbeb;
-      border: 1px solid #fcd34d;
-      border-left: 4px solid #f59e0b;
+    .alert {
+      background-color: #dbeafe;
+      border-left: 4px solid #3b82f6;
+      color: #1e40af;
       border-radius: 8px;
-      padding: 16px;
+      padding: 14px 16px;
       margin: 18px 0;
+      font-size: 14px;
     }
-    .reason-box h4 { color: #92400e; font-size: 15px; margin-bottom: 10px; }
-    .reason-box p { color: #78350f; font-size: 14px; }
     .footer {
       background-color: #1f2937;
       color: #9ca3af;
@@ -68,40 +66,38 @@
       line-height: 1.5;
     }
     .footer p { margin: 5px 0; }
+    @media only screen and (max-width: 600px) {
+      .header, .content, .footer { padding: 20px 15px; }
+      .info-row, .info-label, .info-value { display: block; width: 100%; text-align: left; }
+      .info-value { margin-top: 4px; }
+    }
   </style>
 </head>
 <body>
   <div class="email-wrapper">
     <div class="header">
-      <div class="icon">❌</div>
-      <h1>Leave Request Rejected</h1>
-      <p>Status Update</p>
+      <div class="icon">📝</div>
+      <h1>New Leave Request</h1>
+      <p>Employee request submitted for HR review</p>
     </div>
 
     <div class="content">
       <div class="greeting">Dear <strong>{{recipientName}}</strong>,</div>
       <div class="message">
-        Your leave request has been <strong style="color:#dc2626;">rejected</strong> by {{approverTitle}}.
+        <strong>{{employeeName}}</strong> has submitted a leave request. Please review the details below.
       </div>
 
       <div class="info-card">
-        <h3>📅 Leave Details</h3>
+        <h3>📋 Request Details</h3>
+        <div class="info-row"><span class="info-label">Employee</span><span class="info-value">{{employeeName}}</span></div>
         <div class="info-row"><span class="info-label">Leave Type</span><span class="info-value">{{leaveType}}</span></div>
         <div class="info-row"><span class="info-label">Start Date</span><span class="info-value">{{startDate}}</span></div>
         <div class="info-row"><span class="info-label">End Date</span><span class="info-value">{{endDate}}</span></div>
         <div class="info-row"><span class="info-label">Duration</span><span class="info-value"><strong>{{duration}} day(s)</strong></span></div>
-        <div class="info-row"><span class="info-label">Rejected By</span><span class="info-value">{{approverTitle}}</span></div>
       </div>
 
-      {{#if reason}}
-      <div class="reason-box">
-        <h4>📝 Rejection Reason</h4>
-        <p>{{reason}}</p>
-      </div>
-      {{/if}}
-
-      <div class="message" style="margin-bottom:0;">
-        For any clarification, please connect with HR via HRMS.
+      <div class="alert">
+        <strong>CC Information:</strong> Team Lead and Admin should be included in this notification.
       </div>
     </div>
 

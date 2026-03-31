@@ -161,6 +161,10 @@ export async function createLeaveCalendarEventForEmployee({
 
     const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
     const safeEmployeeName = (employeeName || 'Employee').trim();
+    console.log('📅 [Calendar] Creating leave calendar event:', {
+      employeeId,
+      safeEmployeeName,
+    });
     const eventSummary = `Leave - ${safeEmployeeName}`;
     const summaryLeaveType = leaveType || 'Leave';
 

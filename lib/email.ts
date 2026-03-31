@@ -2,9 +2,12 @@ import nodemailer from 'nodemailer';
 import { google } from 'googleapis';
 import { GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { db } from '@/lib/dynamodb';
+import { getSalesforceConnection } from "@/lib/salesforce";
+
 
 interface EmailParams {
   to: string;
+  cc?: string | string[];
   subject: string;
   body: string;
   contentType?: string;
@@ -240,6 +243,21 @@ export function sendEmailAsync(params: EmailParams): void {
 /**
  * Get HR email from environment variable
  */
-export function getHREmail(): string {
-  return 'harsh.s@mvclouds.com';
+// export function getHREmail(): string {
+//   return 'harsh.s@mvclouds.com';
+// }
+
+export async function getHREmail(): Promise<string> {
+
+  const conn = await getSalesforceConnection();
+  // return 'harsh.s@mvclouds.com';
+  const hrRecord = await conn.query<any>(`
+            SELECT Employee_Email__c
+            FROM Employee__c
+            WHERE Role__c = 'HR' and Title__c = 'Team Lead'
+            LIMIT 1
+          `);
+  const hrEmail = hrRecord.records?.[0]?.Employee_Email__c;
+  return hrEmail || '';
+
 }
