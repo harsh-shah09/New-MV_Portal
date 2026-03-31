@@ -33,16 +33,20 @@ interface EmployeeLeaveKpi {
 
 type LeaveTab = "my-requests" | "approvals" | "all-leaves"
 
-const LEAVE_TAB_HASH_MAP: Record<LeaveTab, string> = {
+const LEAVE_TAB_QUERY_MAP: Record<LeaveTab, string> = {
   "my-requests": "my-requests",
-  approvals: "approvals",
+  approvals: "approval",
   "all-leaves": "all-leaves",
 }
 
-function getTabFromHash(hash: string): LeaveTab | null {
-  const normalized = hash.replace(/^#/, "").trim().toLowerCase()
+function getTabFromParam(tab: string | null): LeaveTab | null {
+  const normalized = tab?.trim().toLowerCase()
 
-  if (normalized === "approvals") {
+  if (!normalized) {
+    return null
+  }
+
+  if (normalized === "approval" || normalized === "approvals") {
     return "approvals"
   }
 
@@ -119,24 +123,22 @@ export default function LeavesPage() {
     })
   }
 
-  const updateUrlHashForTab = (tab: LeaveTab) => {
-    if (typeof window === "undefined") {
+  const updateUrlQueryForTab = (tab: LeaveTab) => {
+    const tabParamValue = LEAVE_TAB_QUERY_MAP[tab]
+    const nextParams = new URLSearchParams(searchParams.toString())
+
+    if (nextParams.get('tab') === tabParamValue) {
       return
     }
 
-    const targetHash = `#${LEAVE_TAB_HASH_MAP[tab]}`
-    const { pathname, search, hash } = window.location
-
-    if (hash === targetHash) {
-      return
-    }
-
-    window.history.replaceState(null, "", `${pathname}${search}${targetHash}`)
+    nextParams.set('tab', tabParamValue)
+    const nextQuery = nextParams.toString()
+    router.replace(nextQuery ? `/leaves?${nextQuery}` : '/leaves')
   }
 
   const handleTabChange = (tab: LeaveTab) => {
     setSelectedTab(tab)
-    updateUrlHashForTab(tab)
+    updateUrlQueryForTab(tab)
   }
 
   // Handle URL parameters for filtering
@@ -145,12 +147,10 @@ export default function LeavesPage() {
     const statusParam = searchParams.get('status')
     const tabParam = searchParams.get('tab')
     const openRequestParam = searchParams.get('openRequest')
-    const hashTab = typeof window !== 'undefined' ? getTabFromHash(window.location.hash) : null
+    const queryTab = getTabFromParam(tabParam)
 
-    if (hashTab) {
-      setSelectedTab(hashTab)
-    } else if (tabParam === 'approvals') {
-      setSelectedTab('approvals')
+    if (queryTab) {
+      setSelectedTab(queryTab)
     } else if (typeParam || statusParam) {
       setSelectedTab('my-requests')
     }
@@ -169,29 +169,9 @@ export default function LeavesPage() {
       const nextParams = new URLSearchParams(searchParams.toString())
       nextParams.delete('openRequest')
       const nextQuery = nextParams.toString()
-      const currentHash = typeof window !== 'undefined' ? window.location.hash : ''
-      const nextUrl = nextQuery ? `/leaves?${nextQuery}` : '/leaves'
-      router.replace(`${nextUrl}${currentHash}`)
+      router.replace(nextQuery ? `/leaves?${nextQuery}` : '/leaves')
     }
   }, [searchParams, router])
-
-  useEffect(() => {
-    if (typeof window === 'undefined') {
-      return
-    }
-
-    const onHashChange = () => {
-      const tabFromHash = getTabFromHash(window.location.hash)
-      if (tabFromHash) {
-        setSelectedTab(tabFromHash)
-      }
-    }
-
-    window.addEventListener('hashchange', onHashChange)
-    return () => {
-      window.removeEventListener('hashchange', onHashChange)
-    }
-  }, [])
 
   // Apply filters to my leaves
   useEffect(() => {
