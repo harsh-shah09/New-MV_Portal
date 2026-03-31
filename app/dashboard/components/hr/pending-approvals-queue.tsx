@@ -316,7 +316,7 @@ export function PendingApprovalsQueue({ initialPendingApprovals = [], dashboardV
         open={ruleChoiceModalVisible}
         onCancel={closeRuleChoiceModal}
         footer={[
-          <Button key="cancel" onClick={closeRuleChoiceModal}>
+          <Button key="cancel" onClick={closeRuleChoiceModal} disabled={loading !== null}>
             Cancel
           </Button>,
           <Button
@@ -324,6 +324,8 @@ export function PendingApprovalsQueue({ initialPendingApprovals = [], dashboardV
             type="primary"
             style={{ backgroundColor: '#10b981' }}
             onClick={handleApproveFromRuleChoice}
+            loading={ruleChoiceLeave?.id ? loading === ruleChoiceLeave.id : false}
+            disabled={loading !== null}
           >
             Approve
           </Button>,
