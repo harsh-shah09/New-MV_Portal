@@ -14,11 +14,15 @@ export async function proxy(request: NextRequest) {
     if (request.nextUrl.pathname.startsWith('/_next') || request.nextUrl.pathname.includes('.')) {
       return NextResponse.next();
     }
-    return NextResponse.redirect(new URL('/auth/login', request.url));
-  }
+    const loginUrl = new URL('/auth/login', request.url);
+    loginUrl.searchParams.set('redirect', request.nextUrl.pathname + request.nextUrl.search);
+
+    return NextResponse.redirect(loginUrl);
+    }
 
   if (session && request.nextUrl.pathname === '/auth/login') {
-    return NextResponse.redirect(new URL('/dashboard', request.url));
+    const redirectTo = request.nextUrl.searchParams.get('redirect') || '/dashboard';
+    return NextResponse.redirect(new URL(redirectTo, request.url));
   }
 
   return NextResponse.next()

@@ -46,28 +46,18 @@ interface ViewProps {
 }
 
 export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }: ViewProps) {
-    // --- Hash <-> Tab mapping ---
+    // --- Query Parameter <-> Tab mapping ---
     type TabId = "personal" | "employment" | "bank" | "documents" | "security" | "assets" | "leaves"
-    const TAB_HASH_MAP: Record<TabId, string> = {
-        personal: "PersonalDetails",
-        employment: "EmploymentInfo",
-        assets: "Assets",
-        bank: "BankDetails",
-        documents: "Documents",
-        leaves: "Leaves",
-        security: "Security",
-    }
-    const HASH_TAB_MAP: Record<string, TabId> = Object.fromEntries(
-        Object.entries(TAB_HASH_MAP).map(([k, v]) => [v.toLowerCase(), k as TabId])
-    )
-
-    const getTabFromHash = (): TabId => {
+    
+    const getTabFromQuery = (): TabId => {
         if (typeof window === "undefined") return "personal"
-        const raw = window.location.hash.replace("#", "").toLowerCase()
-        return HASH_TAB_MAP[raw] ?? "personal"
+        const params = new URLSearchParams(window.location.search)
+        const tab = params.get("tab")?.toLowerCase()
+        const validTabs: TabId[] = ["personal", "employment", "bank", "documents", "security", "assets", "leaves"]
+        return validTabs.includes(tab as TabId) ? (tab as TabId) : "personal"
     }
 
-    const [activeTab, setActiveTab] = useState<TabId>(getTabFromHash)
+    const [activeTab, setActiveTab] = useState<TabId>(getTabFromQuery)
     const [showAssetHistory, setShowAssetHistory] = useState(false)
     const [isEditing, setIsEditing] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
@@ -79,18 +69,23 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
         getEmployeeTitles().then(setTitles).catch(console.error)
     }, [])
 
-    // --- Sync hash → tab on browser back/forward ---
+    // --- Sync query param → tab on browser back/forward ---
     useEffect(() => {
-        const onHashChange = () => setActiveTab(getTabFromHash())
-        window.addEventListener("hashchange", onHashChange)
-        return () => window.removeEventListener("hashchange", onHashChange)
+        const onPopState = () => setActiveTab(getTabFromQuery())
+        window.addEventListener("popstate", onPopState)
+        return () => window.removeEventListener("popstate", onPopState)
     }, [])
 
-    // --- Sync tab → hash whenever activeTab changes ---
+    // --- Sync tab → query param whenever activeTab changes ---
     useEffect(() => {
-        const hash = TAB_HASH_MAP[activeTab]
-        if (typeof window !== "undefined" && window.location.hash !== `#${hash}`) {
-            window.history.replaceState(null, "", `#${hash}`)
+        if (typeof window !== "undefined") {
+            const params = new URLSearchParams(window.location.search)
+            const currentTab = params.get("tab")
+            if (currentTab !== activeTab) {
+                const newParams = new URLSearchParams(window.location.search)
+                newParams.set("tab", activeTab)
+                window.history.replaceState(null, "", `?${newParams.toString()}`)
+            }
         }
     }, [activeTab])
 
@@ -1660,6 +1655,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                                 <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
                                                     <Download className="w-4 h-4 text-slate-500" /> All Uploaded Documents
                                                 </h3>
+                                                {['HR', 'Admin'].includes(currentUserRole) && (
                                                 <Button
                                                     type="primary"
                                                     onClick={() => setShowCustomDocModal(true)}
@@ -1667,6 +1663,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                                 >
                                                     <Upload className="w-4 h-4" /> Upload Document
                                                 </Button>
+                                                )}
                                             </div>
                                             {(() => {
                                                 const nonPayslipDocs = (employee.documents || []).filter(

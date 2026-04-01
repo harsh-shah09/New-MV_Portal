@@ -41,6 +41,7 @@ function applyTemplateData(template: string, data: LeaveEmailData): string {
   html = html.replace(/{{startDate}}/g, data.startDate || 'N/A');
   html = html.replace(/{{endDate}}/g, data.endDate || 'N/A');
   html = html.replace(/{{duration}}/g, String(data.duration || 0));
+  html = html.replace(/{{Reason}}/g, String(data.reason || 'N/A'));
   html = html.replace(/{{approverTitle}}/g, data.approverTitle || 'Approver');
   html = html.replace(/{{teamLeadName}}/g, data.teamLeadName || 'Team Lead');
   html = html.replace(/{{decisionStatus}}/g, data.decisionStatus || 'Pending');

@@ -2,8 +2,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Modal, Steps, Form, Input, Button, Upload, message, Collapse ,Checkbox , Divider , Card} from "antd"
-import { UploadOutlined, BankOutlined, UserOutlined, FileTextOutlined, CheckCircleOutlined, CameraOutlined, GoogleOutlined } from "@ant-design/icons"
+import { Modal, Steps, Form,Grid, Input, Button, Upload, message, Collapse ,Checkbox , Divider , Card} from "antd"
+import { UploadOutlined, BankOutlined, UserOutlined, FileTextOutlined, CheckCircleOutlined, CameraOutlined, GoogleOutlined, CheckCircleFilled } from "@ant-design/icons"
 import { useQueryClient } from "@tanstack/react-query"
 import Confetti from "react-confetti"
 import { motion, AnimatePresence } from "framer-motion"
@@ -25,15 +25,14 @@ export function OnboardingWizard() {
     const [passbookUploading, setPassbookUploading] = useState(false)
     const [passbookUploaded, setPassbookUploaded] = useState(false)
     const [userRole, setUserRole] = useState('')
-
     // Google integration state (for step 4)
     const [googleConnected, setGoogleConnected] = useState(false)
     const [googleLoading, setGoogleLoading] = useState(false)
     const [googleChecking, setGoogleChecking] = useState(false)
     const [googleNotification, setGoogleNotification] = useState<{ type: 'success' | 'error', message: string } | null>(null)
-
-    const documents = ['Aadhar Card', 'PAN Card', 'Degree Certificate'];
-
+    const [documents, setDocuments] = useState<string[]>([])
+    const [documentsLoading, setDocumentsLoading] = useState(true)
+    const {useBreakpoint} = Grid;
     useEffect(() => {
         // Check status on mount
         fetch('/api/auth/onboarding-status')
@@ -45,6 +44,25 @@ export function OnboardingWizard() {
                 }
             })
             .catch(err => console.error(err))
+    }, [])
+
+    useEffect(() => {
+        // Fetch documents configuration
+        setDocumentsLoading(true)
+        fetch('/api/admin/configurations?types=documents')
+            .then(res => res.json())
+            .then(data => {
+                if (data.documents && Array.isArray(data.documents)) {
+                    const docNames = data.documents.map((doc: any) => ({
+                        value: doc.Value__c,
+                        label: doc.MasterLabel
+                    }));                    
+                    const common = docNames[0].value?.split(',');
+                    setDocuments(common)
+                }
+            })
+            .catch(err => console.error('Failed to fetch documents:', err))
+            .finally(() => setDocumentsLoading(false))
     }, [])
 
     useEffect(() => {
@@ -230,10 +248,10 @@ export function OnboardingWizard() {
             })
             if (!res.ok) throw new Error('Upload Failed')
             onSuccess("Ok")
-            message.success(`${file.name} uploaded successfully`)
+            message.success('Uploaded successfully')
         } catch (err) {
             onError({ err })
-            message.error(`${file.name} upload failed`)
+            message.error('Upload failed')
         }
     }
 
@@ -530,8 +548,14 @@ export function OnboardingWizard() {
                 return (
                      <div className="py-4 text-center">
                         <p className="mb-6 text-gray-500">Please upload your ID proof and other relevant documents (Optional).</p>
+                        {documentsLoading ? (
+                            <div className="flex flex-col items-center justify-center py-12">
+                                <Loader2 className="w-8 h-8 animate-spin text-blue-500 mb-3" />
+                                <p className="text-gray-500">Loading documents...</p>
+                            </div>
+                        ) : (
                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                        {documents.map((doc) => (
+                        {documents && documents.length > 0 ? documents.map((doc) => (
                         <Card
                             key={doc}
                             className="rounded-xl shadow-sm hover:shadow-md transition"
@@ -558,9 +582,13 @@ export function OnboardingWizard() {
                             </p>
                             </Upload.Dragger>
                         </Card>
-                        ))}
+                        )) : (
+                            <div className="col-span-full text-center py-8">
+                                <p className="text-gray-400">No documents configured</p>
+                            </div>
+                        )}
                     </div>
-                        
+                        )}
                      </div>
                 )
             default:
@@ -586,18 +614,74 @@ export function OnboardingWizard() {
                 centered
                 width='90vw'
                 height='calc(100vh - 40px)'
-                bodyStyle={{ padding: '24px' ,
+                styles={ { body :{ padding: '24px' ,
                     maxHeight: '86vh',
                     overflow: 'hidden',
                     display: 'flex',
-                    flexDirection: 'column',
+                    flexDirection: 'column',},
+                    mask:{ backdropFilter: 'blur(8px)', backgroundColor: 'rgba(0,0,0,0.6)' }
                  }}
                 className="onboarding-modal"
-                maskStyle={{ backdropFilter: 'blur(8px)', backgroundColor: 'rgba(0,0,0,0.6)' }}
             >
-                <div className="mb-8">
-                     <Steps current={currentStep - 1} items={stepItems} />
-                </div>
+                {!useBreakpoint().md ? (
+                    <div className="mb-6 md:mb-8">
+                        <div className="flex items-center justify-center gap-3 py-4 px-2">
+                            {stepItems.map((item, index) => {
+                            const isActive = index + 1 === currentStep;
+                            const isCompleted = index + 1 < currentStep;
+
+                            return (
+                                <motion.div
+                                key={index}
+                                initial={{ scale: 0.8, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                transition={{ delay: index * 0.1 }}
+                                className="flex flex-col items-center gap-1.5 group"
+                                >
+                                    <div
+                                    className={`w-12 h-12 rounded-full flex items-center justify-center font-semibold transition-all duration-300 flex-shrink-0 shadow-md
+                                        ${isCompleted ? 'bg-gradient-to-br from-cyan-400 to-blue-600' : 
+                                        isActive ? 'bg-gradient-to-br from-blue-500 to-blue-700' : 
+                                        'bg-gradient-to-br from-gray-100 to-gray-200 border-2 border-gray-300 group-hover:border-blue-300 group-hover:shadow-blue-100'}`}
+                                    title={item.title}
+                                    >
+                                        {isCompleted ? (
+                                            <motion.div
+                                            initial={{ rotate: -180, scale: 0 }}
+                                            animate={{ rotate: 0, scale: 1 }}
+                                            transition={{ duration: 0.4, type: 'spring' }}
+                                            className="flex items-center justify-center"
+                                            >
+                                                <CheckCircleFilled className="text-white text-xl" />
+                                            </motion.div>
+                                        ) : (
+                                            <motion.div
+                                            className={`text-lg flex items-center justify-center ${isActive ? 'text-white' : 'text-gray-600 group-hover:text-blue-600'}`}
+                                            animate={isActive ? { scale: [1, 1.1, 1] } : {}}
+                                            transition={isActive ? { repeat: Infinity, duration: 2 } : {}}
+                                            >
+                                                {item.icon}
+                                            </motion.div>
+                                        )}
+                                    </div>
+                                    {isActive && (
+                                        <motion.div
+                                        initial={{ width: 0 }}
+                                        animate={{ width: 24 }}
+                                        className="h-1 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full shadow-sm"
+                                        />
+                                    )}
+                                   
+                                </motion.div>
+                            );
+                            })}
+                        </div>
+                    </div>
+                    ) : (
+                    <div className="mb-6 md:mb-8">
+                        <Steps current={currentStep - 1} items={stepItems} />
+                    </div>
+                    )}
 
                 <div className="min-h-[300px]" style={{    height: '100%',
     flex: 1,
@@ -630,25 +714,27 @@ export function OnboardingWizard() {
                     </Form>
                 </div>
 
-                <div className="flex justify-between pt-6 border-t border-gray-100 mt-6">
-                    <div className="flex gap-3">
-                        <Button onClick={() => setOpen(false)}>Skip for Now</Button>
+                <div className="flex flex-col sm:flex-row justify-between pt-6 border-t border-gray-100 mt-6 gap-3">
+                    <div className="flex gap-2 sm:gap-3 order-2 sm:order-1">
+                        <Button onClick={() => setOpen(false)} className="flex-1 sm:flex-initial">
+                            Skip for Now
+                        </Button>
                     </div>
                     
                     {currentStep <= stepItems.length && (
-                        <div className="flex gap-3">
+                        <div className="flex gap-2 sm:gap-3 order-1 sm:order-2 w-full sm:w-auto">
                         {currentStep > 1 && currentStep <= stepItems.length && (
-                            <Button type="primary" size="large" onClick={handlePrevious}>
+                            <Button type="primary" size="large" onClick={handlePrevious} className="flex-1 sm:flex-initial">
                                 ← Previous
                             </Button>
                         )}
-                        <Button type="primary" size="large" onClick={handleNext} loading={loading}>
+                        <Button type="primary" size="large" onClick={handleNext} loading={loading} className="flex-1 sm:flex-initial">
                             Next Step
                         </Button>
                         </div>
                     )}
                      {currentStep > stepItems.length && (
-                         <Button type="primary" size="large" onClick={handleFinish} loading={loading} className="bg-green-600 hover:bg-green-700">
+                         <Button type="primary" size="large" onClick={handleFinish} loading={loading} className="bg-green-600 hover:bg-green-700 w-full sm:w-auto order-1 sm:order-2">
                             Get Started
                         </Button>
                     )}

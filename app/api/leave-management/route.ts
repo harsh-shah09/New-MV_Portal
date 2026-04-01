@@ -1758,7 +1758,8 @@ export async function POST(request: NextRequest) {
               leaveType: leaveType || 'N/A',
               startDate: start.format('YYYY-MM-DD'),
               endDate: end.format('YYYY-MM-DD'),
-              duration: duration
+              duration: duration,
+              reason: reason || 'N/A'
             });
 
             const ccRecipients = [teamLeadEmail, adminEmail].filter(Boolean) as string[];

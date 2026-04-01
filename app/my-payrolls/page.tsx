@@ -1,8 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import { Card, Table, Button, Spin, message, Empty, Space } from "antd"
-import { EyeOutlined, FileTextOutlined, DownloadOutlined } from "@ant-design/icons"
+import { Card, Table, Button, Spin, message, Empty } from "antd"
+import { EyeOutlined, EyeInvisibleOutlined, FileTextOutlined } from "@ant-design/icons"
 import { useQuery } from "@tanstack/react-query"
 import type { ColumnsType } from "antd/es/table"
 import { PayslipView } from "@/components/payslip-view"
@@ -28,6 +28,40 @@ interface EmployeePayroll {
 
 export default function MyPayrollsPage() {
   const [selectedPayroll, setSelectedPayroll] = useState<EmployeePayroll | null>(null)
+  const [visibleCellKey, setVisibleCellKey] = useState<string | null>(null)
+
+  const getCellKey = (recordId: string, field: string) => `${recordId}-${field}`
+
+  const maskDigits = (value: string) => value.replace(/[\d,]+(?:\.\d+)?/g, "X,XXX")
+
+  const renderSensitiveValue = (
+    record: EmployeePayroll,
+    field: string,
+    value: string,
+    className?: string,
+  ) => {
+    if (!/\d/.test(value)) {
+      return <span className={className}>{value}</span>
+    }
+
+    const cellKey = getCellKey(record.id, field)
+    const isVisible = visibleCellKey === cellKey
+
+    return (
+      <div className="inline-flex items-center gap-1">
+        <span className={className}>
+          {isVisible ? value : maskDigits(value)}
+        </span>
+        <Button
+          type="text"
+          size="small"
+          icon={isVisible ? <EyeInvisibleOutlined /> : <EyeOutlined />}
+          onClick={() => setVisibleCellKey(isVisible ? null : cellKey)}
+          aria-label={isVisible ? "Hide value" : "Show value"}
+        />
+      </div>
+    )
+  }
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["my-payrolls"],
@@ -91,37 +125,44 @@ export default function MyPayrollsPage() {
       title: "Basic Salary",
       dataIndex: "basicSalary",
       key: "basicSalary",
-      render: (amount: number) => `₹${amount.toLocaleString()}`,
+      render: (amount: number, record) =>
+        renderSensitiveValue(record, "basicSalary", `₹${amount.toLocaleString()}`),
     },
     {
       title: "Bonus",
       dataIndex: "bonus",
       key: "bonus",
-      render: (amount: number) => (
-        <span className={amount > 0 ? "text-green-600 font-semibold" : ""}>
-          {amount > 0 ? `+₹${amount.toLocaleString()}` : "-"}
-        </span>
-      ),
+      render: (amount: number, record) =>
+        renderSensitiveValue(
+          record,
+          "bonus",
+          amount > 0 ? `+₹${amount.toLocaleString()}` : "₹0",
+          amount > 0 ? "text-green-600 font-semibold" : undefined,
+        ),
     },
     {
       title: "Deductions",
       dataIndex: "totalDeductions",
       key: "totalDeductions",
-      render: (amount: number) => (
-        <span className={amount > 0 ? "text-red-600" : ""}>
-          {amount > 0 ? `-₹${amount.toLocaleString()}` : "-"}
-        </span>
-      ),
+      render: (amount: number, record) =>
+        renderSensitiveValue(
+          record,
+          "totalDeductions",
+          amount > 0 ? `-₹${amount.toLocaleString()}` : "-",
+          amount > 0 ? "text-red-600" : undefined,
+        ),
     },
     {
       title: "Net Salary",
       dataIndex: "netSalary",
       key: "netSalary",
-      render: (amount: number) => (
-        <span className="text-lg font-bold text-green-600">
-          ₹{amount.toLocaleString()}
-        </span>
-      ),
+      render: (amount: number, record) =>
+        renderSensitiveValue(
+          record,
+          "netSalary",
+          `₹${amount.toLocaleString()}`,
+          "text-lg font-bold text-green-600",
+        ),
     },
     {
       title: "Action",

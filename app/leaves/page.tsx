@@ -31,11 +31,41 @@ interface EmployeeLeaveKpi {
   plannedLeaveCount: number
 }
 
+type LeaveTab = "my-requests" | "approvals" | "all-leaves"
+
+const LEAVE_TAB_QUERY_MAP: Record<LeaveTab, string> = {
+  "my-requests": "my-requests",
+  approvals: "approval",
+  "all-leaves": "all-leaves",
+}
+
+function getTabFromParam(tab: string | null): LeaveTab | null {
+  const normalized = tab?.trim().toLowerCase()
+
+  if (!normalized) {
+    return null
+  }
+
+  if (normalized === "approval" || normalized === "approvals") {
+    return "approvals"
+  }
+
+  if (normalized === "my-requests" || normalized === "myrequests") {
+    return "my-requests"
+  }
+
+  if (normalized === "all-leaves" || normalized === "allleaves") {
+    return "all-leaves"
+  }
+
+  return null
+}
+
 export default function LeavesPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [showForm, setShowForm] = useState(false)
-  const [selectedTab, setSelectedTab] = useState<"my-requests" | "approvals" | "all-leaves">("my-requests")
+  const [selectedTab, setSelectedTab] = useState<LeaveTab>("my-requests")
   const [currentUser, setCurrentUser] = useState<{ employeeId: string; email?: string; recordId: string; role?: string; title?: string } | null>(null)
   const [rejectModalVisible, setRejectModalVisible] = useState(false)
   const [rejectingLeaveId, setRejectingLeaveId] = useState<string | null>(null)
@@ -93,15 +123,34 @@ export default function LeavesPage() {
     })
   }
 
+  const updateUrlQueryForTab = (tab: LeaveTab) => {
+    const tabParamValue = LEAVE_TAB_QUERY_MAP[tab]
+    const nextParams = new URLSearchParams(searchParams.toString())
+
+    if (nextParams.get('tab') === tabParamValue) {
+      return
+    }
+
+    nextParams.set('tab', tabParamValue)
+    const nextQuery = nextParams.toString()
+    router.replace(nextQuery ? `/leaves?${nextQuery}` : '/leaves')
+  }
+
+  const handleTabChange = (tab: LeaveTab) => {
+    setSelectedTab(tab)
+    updateUrlQueryForTab(tab)
+  }
+
   // Handle URL parameters for filtering
   useEffect(() => {
     const typeParam = searchParams.get('type')
     const statusParam = searchParams.get('status')
     const tabParam = searchParams.get('tab')
     const openRequestParam = searchParams.get('openRequest')
+    const queryTab = getTabFromParam(tabParam)
 
-    if (tabParam === 'approvals') {
-      setSelectedTab('approvals')
+    if (queryTab) {
+      setSelectedTab(queryTab)
     } else if (typeParam || statusParam) {
       setSelectedTab('my-requests')
     }
@@ -912,7 +961,7 @@ export default function LeavesPage() {
           <div className="flex border-b border-border">
             {(currentUser?.role === 'HR' || currentUser?.role === 'Admin' || currentUser?.title === 'Team Lead') && (
               <button
-                onClick={() => setSelectedTab("my-requests")}
+                onClick={() => handleTabChange("my-requests")}
                 className={`flex-1 px-6 py-4 text-center font-medium transition ${selectedTab === "my-requests"
                   ? "text-primary border-b-2 border-primary bg-primary/5"
                   : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
@@ -923,7 +972,7 @@ export default function LeavesPage() {
             )}
             {(currentUser?.role === 'HR' || currentUser?.role === 'Admin' || currentUser?.title === 'Team Lead') && (
               <button
-                onClick={() => setSelectedTab("approvals")}
+                onClick={() => handleTabChange("approvals")}
                 className={`flex-1 px-6 py-4 text-center font-medium transition ${selectedTab === "approvals"
                   ? "text-primary border-b-2 border-primary bg-primary/5"
                   : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
@@ -934,7 +983,7 @@ export default function LeavesPage() {
             )}
             {(currentUser?.role === 'HR' || currentUser?.role === 'Admin') && (
               <button
-                onClick={() => setSelectedTab("all-leaves")}
+                onClick={() => handleTabChange("all-leaves")}
                 className={`flex-1 px-6 py-4 text-center font-medium transition ${selectedTab === "all-leaves"
                   ? "text-primary border-b-2 border-primary bg-primary/5"
                   : "text-muted-foreground hover:text-foreground hover:bg-muted/50"

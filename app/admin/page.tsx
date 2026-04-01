@@ -39,9 +39,11 @@ type AdminTab = "admin" | "documents" | "email" | "leave" | "payroll" | "users" 
 
 const VALID_TABS: AdminTab[] = ["admin", "documents", "leave", "payroll", "users", "integration", "email", "assets"];
 
-function hashToTab(hash: string): AdminTab {
-    const stripped = hash.replace(/^#/, '') as AdminTab;
-    return VALID_TABS.includes(stripped) ? stripped : "admin";
+function getTabFromQuery(): AdminTab {
+    if (typeof window === "undefined") return "admin";
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get("tab") as AdminTab;
+    return VALID_TABS.includes(tab) ? tab : "admin";
 }
 
 export default function AdminConsole() {
@@ -76,12 +78,12 @@ export default function AdminConsole() {
     // Email Editor State
     const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
 
-    // Read + sync hash on mount and hash changes
+    // Read + sync query params on mount and navigation
     useEffect(() => {
-        const syncTab = () => setActiveTab(hashToTab(window.location.hash));
+        const syncTab = () => setActiveTab(getTabFromQuery());
         syncTab(); // initial
-        window.addEventListener("hashchange", syncTab);
-        return () => window.removeEventListener("hashchange", syncTab);
+        window.addEventListener("popstate", syncTab);
+        return () => window.removeEventListener("popstate", syncTab);
     }, []);
 
     useEffect(() => {
@@ -325,7 +327,10 @@ export default function AdminConsole() {
     const TabButton = ({ id, label, icon: Icon }: { id: AdminTab; label: string; icon: React.ElementType }) => (
         <button
             onClick={() => {
-                window.location.hash = id;
+                const params = new URLSearchParams(window.location.search);
+                params.set("tab", id);
+                window.history.replaceState(null, "", `?${params.toString()}`);
+                setActiveTab(id);
             }}
             className={`w-full flex flex-col lg:flex-row items-center justify-center lg:justify-start gap-1 lg:gap-3 px-2 lg:px-4 py-3 rounded-xl font-medium transition-all duration-200 text-center lg:text-left ${activeTab === id
                     ? "bg-blue-600 text-white shadow-lg shadow-blue-500/30"

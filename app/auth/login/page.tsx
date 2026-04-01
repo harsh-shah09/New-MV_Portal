@@ -2,7 +2,7 @@
 
 import { loginAction, forgotPasswordAction, verify2FAAndLogin } from "./actions"
 import { useEffect, useState, useActionState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import Image from "next/image"
 import { motion } from "framer-motion"
 import { Mail, Lock, ArrowRight, Loader2, CheckCircle2, Ban } from "lucide-react"
@@ -16,10 +16,11 @@ export default function LoginPage() {
   const [otp, setOtp] = useState("")
   const [resetStatus, setResetStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null)
   const [isResetting, setIsResetting] = useState(false)
-
+  const searchParams = useSearchParams()
   useEffect(() => {
     if (state.success || verifyState.success) {
-      router.push("/dashboard")
+        const redirectUrl = searchParams.get('redirect') || '/dashboard';
+        router.push(redirectUrl);
     }
   }, [state.success, verifyState.success, router])
 
