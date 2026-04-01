@@ -14,7 +14,6 @@ import {
   hrDecisionToTeamLead,
   adminDecisionToHR,
   hrLeaveRequestToAdmin,
-  leaveApprovedFinal,
   leaveAutoApproved,
   withdrawalRequestSubmitted,
   withdrawalRequestToHR,
@@ -915,30 +914,46 @@ export async function POST(request: NextRequest) {
         const employeeName = targetEmployee.Employee_Name__c || 'Employee';
         const employeeEmail = targetEmployee.Employee_Email__c;
         const teamLeadEmail = targetEmployee.Team_Lead__r?.Employee_Email__c;
-        const teamLeadName = targetEmployee.Team_Lead__r?.Employee_Name__c || 'Team Lead';
+        const adminQuery = await conn.query<any>(`
+          SELECT Id, Employee_Name__c, Employee_Email__c
+          FROM Employee__c
+          WHERE Role__c = 'Admin' AND Active__c = true
+        `);
+
+        const adminRecipients = (adminQuery.records || [])
+          .map((admin: any) => ({
+            id: admin.Id,
+            name: admin.Employee_Name__c || 'Admin',
+            email: admin.Employee_Email__c,
+          }))
+          .filter((admin: { id: string; name: string; email?: string }) => Boolean(admin.email));
 
         if (employeeEmail) {
-          const employeeEmailTemplate = await leaveApprovedFinal({
+          const ccCandidates = isAdmin
+            ? [teamLeadEmail, hrEmail]
+            : [
+                teamLeadEmail,
+                ...adminRecipients.map((admin: { id: string; name: string; email: string }) => admin.email),
+              ];
+
+          const seenCcEmails = new Set<string>();
+          const normalizedEmployeeEmail = employeeEmail.trim().toLowerCase();
+          const ccRecipients = ccCandidates.filter((ccEmail): ccEmail is string => {
+            if (!ccEmail) {
+              return false;
+            }
+
+            const normalizedCcEmail = ccEmail.trim().toLowerCase();
+            if (!normalizedCcEmail || normalizedCcEmail === normalizedEmployeeEmail || seenCcEmails.has(normalizedCcEmail)) {
+              return false;
+            }
+
+            seenCcEmails.add(normalizedCcEmail);
+            return true;
+          });
+
+          const autoApprovedTemplate = await leaveAutoApproved({
             recipientName: employeeName,
-            approverTitle,
-            leaveType,
-            startDate: parsedStart.format('YYYY-MM-DD'),
-            endDate: parsedEnd.format('YYYY-MM-DD'),
-            duration: fullDayDuration,
-          });
-
-          logLeaveEmailDispatch('apply-for-others-final-approval-to-employee', employeeEmail, undefined, employeeEmailTemplate.subject);
-          sendEmailAsync({
-            to: employeeEmail,
-            subject: employeeEmailTemplate.subject,
-            body: employeeEmailTemplate.html,
-            senderEmployeeId: employeeId,
-          });
-        }
-
-        if (teamLeadEmail) {
-          const teamLeadEmailTemplate = await leaveAutoApproved({
-            recipientName: teamLeadName,
             employeeName,
             approverTitle,
             leaveType,
@@ -947,11 +962,12 @@ export async function POST(request: NextRequest) {
             duration: fullDayDuration,
           });
 
-          logLeaveEmailDispatch('apply-for-others-auto-approval-to-team-lead', teamLeadEmail, undefined, teamLeadEmailTemplate.subject);
+          logLeaveEmailDispatch('apply-for-others-auto-approval-to-employee', employeeEmail, ccRecipients, autoApprovedTemplate.subject);
           sendEmailAsync({
-            to: teamLeadEmail,
-            subject: teamLeadEmailTemplate.subject,
-            body: teamLeadEmailTemplate.html,
+            to: employeeEmail,
+            cc: ccRecipients,
+            subject: autoApprovedTemplate.subject,
+            body: autoApprovedTemplate.html,
             senderEmployeeId: employeeId,
           });
         }
