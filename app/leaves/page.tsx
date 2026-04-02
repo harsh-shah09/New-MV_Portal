@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { LeaveRequestForm } from "./components/leave-request-form"
 import { LeaveTable } from "./components/leave-table"
+import { LeaveDetailsModal } from "./components/leave-details-modal"
 import { useLeaveStore } from "@/store/leaveStore"
 import type { LeaveRequest } from "@/types"
 import { useQuery } from "@tanstack/react-query"
@@ -74,6 +75,7 @@ export default function LeavesPage() {
   const [ruleChoiceLeave, setRuleChoiceLeave] = useState<LeaveRequest | null>(null)
   const [applySandwichSelection, setApplySandwichSelection] = useState(false)
   const [applyOnePlusTwoSelection, setApplyOnePlusTwoSelection] = useState(false)
+  const [isApprovingRuleChoice, setIsApprovingRuleChoice] = useState(false)
   const [allLeaves, setAllLeaves] = useState<LeaveRequest[]>([])
   const [filteredLeaves, setFilteredLeaves] = useState<LeaveRequest[]>([])
   const [filteredMyLeaves, setFilteredMyLeaves] = useState<LeaveRequest[]>([])
@@ -84,6 +86,9 @@ export default function LeavesPage() {
   const [isLoadingEmployees, setIsLoadingEmployees] = useState(false)
   const [isSubmittingApplyForOthers, setIsSubmittingApplyForOthers] = useState(false)
   const [applyForOthersForm] = Form.useForm()
+  const [selectedLeaveForDetails, setSelectedLeaveForDetails] = useState<LeaveRequest | null>(null)
+  const [detailsModalVisible, setDetailsModalVisible] = useState(false)
+  const [isLoadingLeaveDetails, setIsLoadingLeaveDetails] = useState(false)
   const [filters, setFilters] = useState({
     status: "",
     leaveType: "",
@@ -121,6 +126,31 @@ export default function LeavesPage() {
         router.push('/dashboard?tab=integration')
       },
     })
+  }
+
+  const handleViewLeaveDetails = async (leave: LeaveRequest) => {
+    setSelectedLeaveForDetails(leave)
+    setDetailsModalVisible(true)
+    setIsLoadingLeaveDetails(true)
+
+    try {
+      const response = await fetch(`/api/leave-management/details?leaveId=${encodeURIComponent(leave.id)}`)
+      const result = await response.json()
+
+      if (!response.ok) {
+        toast.error(result?.error || 'Failed to fetch leave details')
+        return
+      }
+
+      if (result?.leave) {
+        setSelectedLeaveForDetails(result.leave)
+      }
+    } catch (error) {
+      console.error('Error fetching leave details:', error)
+      toast.error('Failed to fetch leave details')
+    } finally {
+      setIsLoadingLeaveDetails(false)
+    }
   }
 
   const updateUrlQueryForTab = (tab: LeaveTab) => {
@@ -755,6 +785,7 @@ export default function LeavesPage() {
   }
 
   const closeRuleChoiceModal = () => {
+    if (isApprovingRuleChoice) return
     setRuleChoiceModalVisible(false)
     setRuleChoiceLeave(null)
     setApplySandwichSelection(false)
@@ -762,12 +793,21 @@ export default function LeavesPage() {
   }
 
   const handleApproveFromRuleChoice = async () => {
-    if (!ruleChoiceLeave?.id) return
-    await approveLeaveRequest(ruleChoiceLeave.id, {
-      applySandwichRule: ruleChoiceLeave.sandwichRuleApplicable === true ? applySandwichSelection : false,
-      applyOnePlusTwoRule: ruleChoiceLeave.onePlusTwoRuleApplicable === true ? applyOnePlusTwoSelection : false,
-    })
-    closeRuleChoiceModal()
+    if (!ruleChoiceLeave?.id || isApprovingRuleChoice) return
+
+    setIsApprovingRuleChoice(true)
+    try {
+      await approveLeaveRequest(ruleChoiceLeave.id, {
+        applySandwichRule: ruleChoiceLeave.sandwichRuleApplicable === true ? applySandwichSelection : false,
+        applyOnePlusTwoRule: ruleChoiceLeave.onePlusTwoRuleApplicable === true ? applyOnePlusTwoSelection : false,
+      })
+      setRuleChoiceModalVisible(false)
+      setRuleChoiceLeave(null)
+      setApplySandwichSelection(false)
+      setApplyOnePlusTwoSelection(false)
+    } finally {
+      setIsApprovingRuleChoice(false)
+    }
   }
 
   const handleReject = async (leaveId: string, reason: string) => {
@@ -811,7 +851,6 @@ export default function LeavesPage() {
           <div className="p-3 bg-amber-50 border border-amber-200 rounded">
             <div className="text-sm space-y-1">
               <div><strong>Employee:</strong> {leave.employeeName}</div>
-              <div><strong>Type:</strong> {leave.leaveType || leave.leaveCategory}</div>
               <div><strong>Dates:</strong> {leave.startDate} to {leave.endDate}</div>
               {leave.withdrawalStartDate && leave.withdrawalEndDate && (
                 <div><strong>Requested Withdrawal:</strong> {leave.withdrawalStartDate} to {leave.withdrawalEndDate}</div>
@@ -1052,6 +1091,7 @@ export default function LeavesPage() {
                 <LeaveTable
                   leaves={filteredMyLeaves}
                   onWithdraw={handleWithdraw}
+                  onViewDetails={handleViewLeaveDetails}
                 />
               </div>
             )}
@@ -1373,7 +1413,12 @@ export default function LeavesPage() {
                 {/* Leave Table */}
                 <div className="mt-4">
                   {filteredLeaves.length > 0 ? (
-                    <LeaveTable leaves={filteredLeaves} onWithdraw={handleWithdraw} showActions={false} />
+                    <LeaveTable 
+                      leaves={filteredLeaves} 
+                      onWithdraw={handleWithdraw} 
+                      showActions={false}
+                      onViewDetails={handleViewLeaveDetails}
+                    />
                   ) : (
                     <div className="text-center py-8 text-gray-500">
                       {allLeaves.length === 0 ? 'No leave records found' : 'No leaves match the selected filters'}
@@ -1488,7 +1533,7 @@ export default function LeavesPage() {
           open={ruleChoiceModalVisible}
           onCancel={closeRuleChoiceModal}
           footer={[
-            <Button key="cancel" onClick={closeRuleChoiceModal}>
+            <Button key="cancel" onClick={closeRuleChoiceModal} disabled={isApprovingRuleChoice}>
               Cancel
             </Button>,
             <Button
@@ -1496,6 +1541,8 @@ export default function LeavesPage() {
               type="primary"
               style={{ backgroundColor: '#10b981' }}
               onClick={handleApproveFromRuleChoice}
+              loading={isApprovingRuleChoice}
+              disabled={isApprovingRuleChoice}
             >
               Approve
             </Button>,
@@ -1580,6 +1627,18 @@ export default function LeavesPage() {
             </div>
           </div>
         </Modal>
+
+        {/* Leave Details Modal */}
+        <LeaveDetailsModal
+          leave={selectedLeaveForDetails}
+          visible={detailsModalVisible}
+          loading={isLoadingLeaveDetails}
+          onClose={() => {
+            setDetailsModalVisible(false)
+            setSelectedLeaveForDetails(null)
+            setIsLoadingLeaveDetails(false)
+          }}
+        />
       </div>
     </PageContainer>
   )

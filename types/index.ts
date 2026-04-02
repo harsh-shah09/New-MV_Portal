@@ -61,6 +61,7 @@ export interface PersonalDetails {
 export interface LeaveRequest {
   id: string
   employeeId: string
+  employeeRecordName?: string
   employeeName: string
   teamLeadName?: string
   leaveType: string
@@ -69,6 +70,7 @@ export interface LeaveRequest {
   startDate: string
   endDate: string
   duration: number
+  totalDaysAfterRule?: number
   reason?: string
   status: "pending" | "approved" | "rejected" | "cancelled" | "applied" | "withdrawn" | "withdrawal pending"
   isWithdrawalRequest?: boolean
@@ -76,6 +78,8 @@ export interface LeaveRequest {
   approvalDate?: string
   tlApproved?: string
   hrApproval?: string
+  tlRejectionReason?: string
+  hrRejectionReason?: string
   confirmMerge ?: boolean
   mergeExistingLeaveId ?: string
   withdrawalStartDate?: string

@@ -2,7 +2,7 @@
 import { NextResponse } from 'next/server';
 import { verifySession } from '@/lib/auth';
 import { getIsFirstTimeLogin, getOnboardingStep, setOnboardingStep, clearOnboardingData } from '@/lib/dynamodb';
-import { updateEmployee, createBankDetail, createDocumentRecord } from '@/lib/salesforce';
+import { updateEmployee, createBankDetail, createDocumentRecord, getEmployeeById } from '@/lib/salesforce';
 import { uploadFileToS3 } from '@/lib/s3';
 
 export async function GET() {
@@ -13,7 +13,9 @@ export async function GET() {
    if (!isFirstTime) return NextResponse.json({ showOnboarding: false });
    
    const currentStep = await getOnboardingStep(session.employeeId);
-   return NextResponse.json({ showOnboarding: true, currentStep });
+   const employeeData = await getEmployeeById(session.employeeId);
+   
+   return NextResponse.json({ showOnboarding: true, currentStep, employeeData });
 }
 
 export async function POST(req: Request) {

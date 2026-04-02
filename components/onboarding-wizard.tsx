@@ -14,6 +14,7 @@ export function OnboardingWizard() {
     const [open, setOpen] = useState(false)
     const [currentStep, setCurrentStep] = useState(0)
     const [loading, setLoading] = useState(false)
+    const [pageLoading, setPageLoading] = useState(true)
     const [form] = Form.useForm()
     const phonePattern = /^(\+91|91)?[6-9]\d{9}$|^[6-9]\d{9}$/
     const [formErrors, setFormErrors] = useState<Record<string, string>>({})
@@ -32,19 +33,88 @@ export function OnboardingWizard() {
     const [googleNotification, setGoogleNotification] = useState<{ type: 'success' | 'error', message: string } | null>(null)
     const [documents, setDocuments] = useState<string[]>([])
     const [documentsLoading, setDocumentsLoading] = useState(true)
+    const [existingProfilePhoto, setExistingProfilePhoto] = useState<string | null>(null)
+    const [existingDocuments, setExistingDocuments] = useState<any[]>([])
     const {useBreakpoint} = Grid;
     const screens = useBreakpoint();
     useEffect(() => {
         // Check status on mount
+        setPageLoading(true);
         fetch('/api/auth/onboarding-status')
             .then(res => res.json())
             .then(data => {
                 if (data.showOnboarding) {
                     setOpen(true)
                     setCurrentStep(data.currentStep || 1)
+                    if (data.employeeData) {
+                        const emp = data.employeeData || {};
+                        
+                        if (emp.Profile_Photo__c) {
+                            setExistingProfilePhoto(emp.Profile_Photo__c);
+                        }
+
+                        // Parse addresses
+                        let currentAddrStr = emp.Employee_Current_Address__c;
+                        let permanentAddrStr = emp.Employee_Address__c;
+                        let currentAddr: any = null;
+                        let permanentAddr: any = null;
+                        try {
+                            if (currentAddrStr) currentAddr = JSON.parse(currentAddrStr);
+                            if (permanentAddrStr) permanentAddr = JSON.parse(permanentAddrStr);
+                        } catch (e) {}
+
+                        let isSameAsCurrent = false;
+                        if (currentAddr && permanentAddr && 
+                            currentAddr.street === permanentAddr.street && 
+                            currentAddr.city === permanentAddr.city && 
+                            currentAddr.state === permanentAddr.state && 
+                            currentAddr.postalCode === permanentAddr.postalCode && 
+                            currentAddr.country === permanentAddr.country) {
+                                isSameAsCurrent = true;
+                        } else if (currentAddrStr && !permanentAddrStr) {
+                             isSameAsCurrent = true;
+                        }
+
+                        form.setFieldsValue({
+                            street: currentAddr?.street || '',
+                            city: currentAddr?.city || '',
+                            state: currentAddr?.state || '',
+                            postalCode: currentAddr?.postalCode || '',
+                            country: currentAddr?.country || '',
+                            
+                            sameAsCurrent: isSameAsCurrent,
+
+                            permanentstreet: permanentAddr?.street || '',
+                            permanentcity: permanentAddr?.city || '',
+                            permanentstate: permanentAddr?.state || '',
+                            permanentpostalCode: permanentAddr?.postalCode || '',
+                            permanentcountry: permanentAddr?.country || '',
+
+                            emergencyContact: emp.Emergency_Contact_Name__c || '',
+                            emergencyPhone: emp.Emergency_Contact_Number__c || '',
+                        });
+
+                        if (emp.bankDetails && emp.bankDetails.length > 0) {
+                            const bank = emp.bankDetails[0];
+                            form.setFieldsValue({
+                                bankName: bank.Name || '',
+                                bankbranch: bank.Bank_Branch_Name__c || '',
+                                accountNumber: bank.Bank_Account_Number__c || '',
+                                accountHolder: emp.Employee_Name__c || '',
+                                ifscCode: bank.IFSC__c || '',
+                            });
+                        }
+
+                        if (emp.documents && emp.documents.length > 0) {
+                             const passbook = emp.documents.find((d: any) => d.Document_Type__c === 'Passbook');
+                             if (passbook) setPassbookUploaded(true);
+                             setExistingDocuments(emp.documents);
+                        }
+                    }
                 }
             })
             .catch(err => console.error(err))
+            .finally(() => setPageLoading(false))
     }, [])
 
     useEffect(() => {
@@ -310,6 +380,14 @@ export function OnboardingWizard() {
                                             <span className="text-white text-xs mt-1">Change</span>
                                         </div>
                                     </div>
+                                ) : existingProfilePhoto ? (
+                                    <div className="w-full h-full relative group rounded-full overflow-hidden flex items-center justify-center p-1">
+                                        <img src={existingProfilePhoto} alt="avatar" className="w-full h-full object-cover rounded-full" />
+                                        <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-full">
+                                            <CameraOutlined className="text-white text-xl" />
+                                            <span className="text-white text-xs mt-1">Change</span>
+                                        </div>
+                                    </div>
                                 ) : (
                                     <div className="flex flex-col items-center justify-center text-gray-400 group-hover:text-blue-500 transition-colors w-full h-full mt-5">
                                         <CameraOutlined className="text-2xl mb-2" />
@@ -418,7 +496,7 @@ export function OnboardingWizard() {
                             <Input />
                         </Form.Item>
                         <Form.Item name="accountNumber" label="Account Number" rules={[{ required: true }]}>
-                            <Input />
+                            <Input type='number' />
                         </Form.Item>
                         <Form.Item name="accountHolder" label="Account Holder Name" rules={[{ required: true }]}>
                             <Input />
@@ -556,7 +634,9 @@ export function OnboardingWizard() {
                             </div>
                         ) : (
                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                        {documents && documents.length > 0 ? documents.map((doc) => (
+                        {documents && documents.length > 0 ? documents.map((doc) => {
+                            const isUploaded = existingDocuments.some(d => d.Document_Type__c === doc);
+                            return (
                         <Card
                             key={doc}
                             className="rounded-xl shadow-sm hover:shadow-md transition"
@@ -572,18 +652,20 @@ export function OnboardingWizard() {
                             name={doc}
                             customRequest={(opts) => handleDocumentUpload(opts, doc)}
                             multiple={false}
-                            showUploadList={true}
+                            showUploadList={!isUploaded}
                             className="!bg-gray-50 hover:!bg-blue-50 transition rounded-lg"
+                            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
                             >
                             <p className="ant-upload-drag-icon">
-                                <UploadOutlined className="text-xl text-blue-500" />
+                                {isUploaded ? <CheckCircleFilled className="text-xl text-green-500" /> : <UploadOutlined className="text-xl text-blue-500" />}
                             </p>
                             <p className="text-xs text-gray-500">
-                                Click or drag file
+                                {isUploaded ? 'Document Uploaded' : 'Click or drag file'}
                             </p>
                             </Upload.Dragger>
                         </Card>
-                        )) : (
+                        )
+                        }) : (
                             <div className="col-span-full text-center py-8">
                                 <p className="text-gray-400">No documents configured</p>
                             </div>
@@ -687,6 +769,12 @@ export function OnboardingWizard() {
                 <div className="min-h-[300px]" style={{    height: '100%',
     flex: 1,
     overflowY: 'auto'}}>
+                    {pageLoading ? (
+                        <div className="flex flex-col items-center justify-center h-full min-h-[300px]">
+                            <Loader2 className="w-10 h-10 animate-spin text-blue-500 mb-4" />
+                            <p className="text-gray-500 font-medium">Loading your details...</p>
+                        </div>
+                    ) : (
                     <Form form={form} layout="vertical">
                         <AnimatePresence mode="wait">
                             {currentStep <= stepItems.length ? (
@@ -713,11 +801,12 @@ export function OnboardingWizard() {
                             )}
                         </AnimatePresence>
                     </Form>
+                    )}
                 </div>
 
                 <div className="flex flex-col sm:flex-row justify-between pt-6 border-t border-gray-100 mt-6 gap-3">
                     <div className="flex gap-2 sm:gap-3 order-2 sm:order-1">
-                        <Button onClick={() => setOpen(false)} className="flex-1 sm:flex-initial">
+                        <Button disabled={pageLoading} onClick={() => setOpen(false)} className="flex-1 sm:flex-initial">
                             Skip for Now
                         </Button>
                     </div>
@@ -725,17 +814,17 @@ export function OnboardingWizard() {
                     {currentStep <= stepItems.length && (
                         <div className="flex gap-2 sm:gap-3 order-1 sm:order-2 w-full sm:w-auto">
                         {currentStep > 1 && currentStep <= stepItems.length && (
-                            <Button type="primary" size="large" onClick={handlePrevious} className="flex-1 sm:flex-initial">
+                            <Button disabled={pageLoading} type="primary" size="large" onClick={handlePrevious} className="flex-1 sm:flex-initial">
                                 ← Previous
                             </Button>
                         )}
-                        <Button type="primary" size="large" onClick={handleNext} loading={loading} className="flex-1 sm:flex-initial">
+                        <Button disabled={pageLoading} type="primary" size="large" onClick={handleNext} loading={loading} className="flex-1 sm:flex-initial">
                             Next Step
                         </Button>
                         </div>
                     )}
                      {currentStep > stepItems.length && (
-                         <Button type="primary" size="large" onClick={handleFinish} loading={loading} className="bg-green-600 hover:bg-green-700 w-full sm:w-auto order-1 sm:order-2">
+                         <Button disabled={pageLoading} type="primary" size="large" onClick={handleFinish} loading={loading} className="bg-green-600 hover:bg-green-700 w-full sm:w-auto order-1 sm:order-2">
                             Get Started
                         </Button>
                     )}
