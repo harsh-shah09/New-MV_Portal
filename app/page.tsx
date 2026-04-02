@@ -105,11 +105,11 @@ export default function LandingPage() {
               </div>
             </FadeIn>
             
-             <FadeIn delay={0.5} className="mt-16 relative">
-                 <motion.div style={{ y: heroY }} className="relative z-10 glass-card rounded-2xl p-1 border border-white/40 shadow-2xl mx-auto max-w-5xl overflow-hidden aspect-video bg-slate-100">
-                     <div className="absolute inset-0 bg-slate-50 flex font-sans text-left">
+             <FadeIn delay={0.5} className="mt-16 relative px-2 sm:px-0">
+                 <motion.div style={{ y: heroY }} className="relative z-10 glass-card rounded-2xl p-1 border border-white/40 shadow-2xl mx-auto max-w-5xl overflow-hidden aspect-[4/3] sm:aspect-video bg-slate-100">
+                     <div className="absolute inset-0 bg-slate-50 flex font-sans text-left overflow-hidden">
                         {/* Mock Sidebar */}
-                        <div className="hidden md:flex flex-col w-56 bg-slate-900 text-slate-400 p-4 gap-4 border-r border-slate-800">
+                        <div className="hidden md:flex flex-col w-56 bg-slate-900 text-slate-400 p-4 gap-4 border-r border-slate-800 shrink-0">
                              <div className="flex items-center gap-2 text-white font-bold mb-4">
                                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center">
                                      <Zap className="w-5 h-5 text-white" />
@@ -135,52 +135,52 @@ export default function LandingPage() {
                         {/* Mock Main Content */}
                         <div className="flex-1 flex flex-col min-w-0 bg-slate-50/50">
                             {/* Mock Header */}
-                            <div className="h-16 border-b border-slate-200 bg-white flex items-center justify-between px-6">
-                                <span className="font-bold text-slate-700">Dashboard Overview</span>
-                                <div className="flex items-center gap-4">
-                                    <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center">
+                            <div className="h-12 sm:h-16 border-b border-slate-200 bg-white flex items-center justify-between px-4 sm:px-6 shrink-0">
+                                <span className="font-bold text-slate-700 text-sm sm:text-base">Dashboard Overview</span>
+                                <div className="flex items-center gap-3 sm:gap-4">
+                                    <div className="hidden sm:flex w-8 h-8 rounded-full bg-slate-100 items-center justify-center">
                                         <Bell className="w-4 h-4 text-slate-500" />
                                     </div>
-                                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-cyan-500 to-blue-500"></div>
+                                    <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-gradient-to-r from-cyan-500 to-blue-500"></div>
                                 </div>
                             </div>
 
                             {/* Mock Dashboard Grid */}
-                            <div className="p-6 gap-6 flex flex-col h-full overflow-hidden">
+                            <div className="p-3 sm:p-6 gap-3 sm:gap-6 flex flex-col h-full overflow-hidden">
                                 {/* KPIs */}
-                                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                                <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 shrink-0">
                                      {[
                                          { label: "Total Staff", val: "245", color: "bg-blue-50 text-blue-600", icon: Users },
                                          { label: "On Leave", val: "12", color: "bg-amber-50 text-amber-600", icon: Calendar },
                                          { label: "Pending", val: "8", color: "bg-red-50 text-red-600", icon: Bell },
                                          { label: "Training", val: "94%", color: "bg-green-50 text-green-600", icon: CheckCircle2 }
                                      ].map((k, i) => (
-                                         <div key={i} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex flex-col justify-between">
-                                             <div className="flex justify-between items-start mb-2">
-                                                 <span className="text-xs font-medium text-slate-500">{k.label}</span>
-                                                 <div className={`p-1.5 rounded-md ${k.color}`}>
-                                                     <k.icon className="w-3.5 h-3.5" />
+                                         <div key={i} className={`bg-white p-2 sm:p-4 rounded-xl border border-slate-100 shadow-sm flex flex-col justify-between ${i > 1 ? 'hidden sm:flex' : ''}`}>
+                                             <div className="flex justify-between items-start mb-1 sm:mb-2">
+                                                 <span className="text-[10px] sm:text-xs font-medium text-slate-500">{k.label}</span>
+                                                 <div className={`p-1 sm:p-1.5 rounded-md ${k.color}`}>
+                                                     <k.icon className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                                                  </div>
                                              </div>
-                                             <span className="text-2xl font-bold text-slate-800">{k.val}</span>
+                                             <span className="text-lg sm:text-2xl font-bold text-slate-800">{k.val}</span>
                                          </div>
                                      ))}
                                 </div>
 
                                 {/* Charts Area */}
-                                <div className="flex-1 grid grid-cols-3 gap-4 min-h-0">
+                                <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 min-h-0">
                                      {/* Main Graph Mock */}
-                                     <div className="col-span-2 bg-white rounded-xl border border-slate-100 shadow-sm p-4 flex flex-col">
-                                         <div className="flex justify-between items-center mb-4">
-                                             <span className="font-bold text-slate-700 text-sm">Employee Growth</span>
+                                     <div className="col-span-1 sm:col-span-2 bg-white rounded-xl border border-slate-100 shadow-sm p-3 sm:p-4 flex flex-col min-h-0">
+                                         <div className="flex justify-between items-center mb-2 sm:mb-4">
+                                             <span className="font-bold text-slate-700 text-xs sm:text-sm">Employee Growth</span>
                                              <div className="flex gap-2">
-                                                 <div className="h-2 w-2 rounded-full bg-cyan-500"></div>
-                                                 <div className="h-2 w-2 rounded-full bg-blue-500"></div>
+                                                 <div className="h-1.5 w-1.5 sm:h-2 sm:w-2 rounded-full bg-cyan-500"></div>
+                                                 <div className="h-1.5 w-1.5 sm:h-2 sm:w-2 rounded-full bg-blue-500"></div>
                                              </div>
                                          </div>
-                                         <div className="flex-1 flex items-end justify-between gap-2 px-2 pb-2">
+                                         <div className="flex-1 flex items-end justify-between gap-1 sm:gap-2 px-1 sm:px-2 pb-1 sm:pb-2">
                                              {[30, 45, 35, 60, 55, 75, 60, 80, 70, 90].map((h, i) => (
-                                                 <div key={i} className="w-full bg-gradient-to-t from-cyan-100 to-blue-100 rounded-t-sm relative group">
+                                                 <div key={i} className={`w-full bg-gradient-to-t from-cyan-100 to-blue-100 rounded-t-sm relative group ${i > 6 ? 'hidden sm:block' : ''}`}>
                                                      <div 
                                                          style={{ height: `${h}%` }} 
                                                          className="absolute bottom-0 w-full bg-gradient-to-t from-cyan-500 to-blue-600 rounded-t-sm transition-all duration-1000 group-hover:opacity-90"
@@ -191,10 +191,10 @@ export default function LandingPage() {
                                      </div>
                                      
                                      {/* Side Stats Mock */}
-                                     <div className="col-span-1 bg-white rounded-xl border border-slate-100 shadow-sm p-4 flex flex-col gap-3">
-                                          <span className="font-bold text-slate-700 text-sm">Activity</span>
+                                     <div className="hidden sm:flex col-span-1 bg-white rounded-xl border border-slate-100 shadow-sm p-4 flex-col gap-3 min-h-0 overflow-hidden">
+                                          <span className="font-bold text-slate-700 text-sm shrink-0">Activity</span>
                                           {[1, 2, 3].map((_, i) => (
-                                              <div key={i} className="flex gap-3 items-start">
+                                              <div key={i} className="flex gap-3 items-start shrink-0">
                                                   <div className="mt-1 h-2 w-2 rounded-full bg-slate-300 shrink-0" />
                                                   <div className="space-y-1">
                                                       <div className="h-2 w-20 bg-slate-200 rounded"></div>
@@ -297,17 +297,16 @@ export default function LandingPage() {
                         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-bold mb-4 uppercase tracking-wider">
                             <item.icon className="w-3 h-3"/> Feature Focus
                         </div>
-                        <h2 className="text-4xl md:text-5xl font-bold mb-6">{item.title}</h2>
-                        <p className="text-xl text-slate-600 mb-8">{item.desc}</p>
-                        <button className="text-cyan-600 font-bold hover:underline underline-offset-4 decoration-2">Learn more &rarr;</button>
+                        <h2 className="text-3xl md:text-5xl font-bold mb-4 md:mb-6 leading-tight">{item.title}</h2>
+                        <p className="text-lg md:text-xl text-slate-600 mb-8">{item.desc}</p>
                      </FadeIn>
                  </div>
-                 <div className={`flex-1 ${item.reverse ? 'md:order-1' : ''}`}>
+                 <div className={`flex-1 w-full max-w-full ${item.reverse ? 'md:order-1' : ''}`}>
                      <FadeIn delay={0.2}>
-                         <div className="glass-card p-6 rounded-2xl aspect-[4/3] flex items-center justify-center bg-gradient-to-tr from-cyan-50 to-blue-50 relative overflow-hidden">
+                         <div className="glass-card p-6 rounded-2xl aspect-video md:aspect-[4/3] w-full flex items-center justify-center bg-gradient-to-tr from-cyan-50 to-blue-50 relative overflow-hidden">
                              <div className="absolute inset-0 bg-grid-slate-200/50 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.6))]"></div>
                              {/* Abstract UI Representation */}
-                             <div className="w-3/4 h-3/4 bg-white rounded-xl shadow-2xl border border-slate-100 p-4 space-y-3 z-10">
+                             <div className="w-[90%] md:w-3/4 h-3/4 bg-white rounded-xl shadow-2xl border border-slate-100 p-4 space-y-3 z-10 overflow-hidden">
                                  <div className="h-4 w-1/3 bg-slate-200 rounded animate-pulse"/>
                                  <div className="h-32 bg-slate-100 rounded-lg"/>
                                  <div className="flex gap-2">
@@ -346,34 +345,55 @@ export default function LandingPage() {
       </section>
 
       {/* Pricing */}
-      <section id="pricing" className="py-24 max-w-7xl mx-auto px-4">
-          <h2 className="text-4xl font-bold text-center mb-4">Simple, Transparent Pricing.</h2>
-          <p className="text-slate-600 text-center mb-16">Choose the plan that fits your team size.</p>
+      <section id="pricing" className="py-24 max-w-5xl mx-auto px-4">
+          <h2 className="text-4xl font-bold text-center mb-4">Experience the Future of HR</h2>
+          <p className="text-slate-600 text-center mb-16 text-lg">Start your free trial today. No credit card required.</p>
           
-          <div className="grid md:grid-cols-3 gap-8">
-              {[
-                  { name: "Starter", price: "$0", desc: "For small teams just getting started.", features: ["Up to 10 Employees", "Basic Leave Management", "Document Storage"] },
-                  { name: "Growth", price: "$49", desc: "For scaling companies.", features: ["Up to 50 Employees", "Advanced Payroll", "Full Asset Management", "Priority Support"], featured: true },
-                  { name: "Enterprise", price: "Custom", desc: "For large organizations.", features: ["Unlimited Employees", "Custom Integrations", "Dedicated Account Manager", "SLA Support"] }
-              ].map((plan, i) => (
-                  <div key={i} className={`relative p-8 rounded-3xl border ${plan.featured ? 'border-cyan-500 shadow-2xl scale-105 z-10 bg-white' : 'border-slate-200 bg-slate-50'} flex flex-col`}>
-                      {plan.featured && <div className="absolute top-0 right-0 bg-cyan-500 text-white text-xs font-bold px-3 py-1 rounded-bl-xl rounded-tr-2xl">POPULAR</div>}
-                      <h3 className="text-xl font-bold mb-2">{plan.name}</h3>
-                      <div className="text-4xl font-extrabold mb-4">{plan.price}<span className="text-lg font-normal text-slate-500">/mo</span></div>
-                      <p className="text-slate-500 mb-8">{plan.desc}</p>
-                      <ul className="space-y-4 mb-8 flex-1">
-                          {plan.features.map((f, j) => (
-                              <li key={j} className="flex items-center gap-2">
-                                  <CheckCircle2 className="w-5 h-5 text-green-500" />
-                                  <span className="text-sm font-medium">{f}</span>
-                              </li>
-                          ))}
-                      </ul>
-                      <button className={`w-full py-3 rounded-xl font-bold transition ${plan.featured ? 'btn-gradient' : 'bg-white border border-slate-300 hover:bg-slate-50'}`}>
-                          {plan.price === 'Custom' ? 'Talk to Sales' : 'Start Free Trial'}
-                      </button>
-                  </div>
-              ))}
+          <div className="relative p-8 md:p-12 rounded-3xl border border-cyan-200 shadow-2xl shadow-cyan-500/10 bg-white flex flex-col md:flex-row gap-12 items-center">
+              <div className="absolute top-0 right-8 bg-gradient-to-r from-cyan-500 to-blue-500 text-white text-sm font-bold px-6 py-1.5 rounded-b-xl shadow-md">
+                  14-DAY FREE TRIAL
+              </div>
+              
+              <div className="flex-1 md:pr-8">
+                  <h3 className="text-3xl font-bold mb-4 text-slate-900">All-Access Pass</h3>
+                  <div className="text-6xl font-extrabold mb-6 text-slate-900">$0<span className="text-2xl font-normal text-slate-500"> / trial</span></div>
+                  <p className="text-slate-600 mb-8 text-lg leading-relaxed">
+                      Test drive the complete MV Portal experience with your entire team. Access all premium features at absolutely no cost.
+                  </p>
+                  
+                  <Link 
+                      href="https://login.salesforce.com/packaging/installPackage.apexp?p0=04tdM000000QE5l" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="block w-full text-center py-4 rounded-xl text-lg font-bold transition btn-gradient hover:shadow-xl hover:shadow-cyan-500/20 transform hover:-translate-y-1"
+                  >
+                      Start Free Trial
+                  </Link>
+              </div>
+
+              <div className="flex-1 w-full bg-slate-50 p-8 rounded-2xl border border-slate-100">
+                  <h4 className="font-bold text-slate-800 mb-6 uppercase tracking-wider text-sm flex items-center gap-2">
+                      <Zap className="w-4 h-4 text-cyan-500" />
+                      What's Included:
+                  </h4>
+                  <ul className="space-y-5">
+                      {[
+                          "Unlimited Employees", 
+                          "Advanced Payroll Engine", 
+                          "Automated Leave Management",
+                          "Full Asset Tracking",
+                          "Document Storage & Handbooks",
+                          "Email and Portal Notifications"
+                      ].map((f, j) => (
+                          <li key={j} className="flex items-center gap-3">
+                              <div className="bg-white p-1 rounded-full shadow-sm">
+                                  <CheckCircle2 className="w-5 h-5 text-cyan-500 shrink-0" />
+                              </div>
+                              <span className="font-medium text-slate-700">{f}</span>
+                          </li>
+                      ))}
+                  </ul>
+              </div>
           </div>
       </section>
       
@@ -401,15 +421,15 @@ export default function LandingPage() {
       </section>
 
       {/* Final CTA */}
-      <section className="py-32 text-center px-4">
+      <section className="py-20 md:py-32 text-center px-4">
           <FadeIn>
-              <h2 className="text-5xl font-extrabold mb-6">Start Transforming Your HR Today.</h2>
-              <p className="text-xl text-slate-600 mb-10 max-w-2xl mx-auto">Automate HR workflows and focus on what really matters—your people.</p>
-              <div className="flex gap-4 justify-center">
-                  <Link href="/auth/signup" className="px-8 py-4 rounded-full text-lg font-bold btn-gradient shadow-xl hover:shadow-cyan-500/40 hover:-translate-y-1 transition">
+              <h2 className="text-3xl md:text-5xl font-extrabold mb-4 md:mb-6 leading-tight">Start Transforming Your HR Today.</h2>
+              <p className="text-lg md:text-xl text-slate-600 mb-8 md:mb-10 max-w-2xl mx-auto">Automate HR workflows and focus on what really matters—your people.</p>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                  <Link href="/auth/signup" className="px-6 py-3.5 md:px-8 md:py-4 rounded-full text-base md:text-lg font-bold btn-gradient shadow-xl hover:shadow-cyan-500/40 hover:-translate-y-1 transition w-full sm:w-auto text-center">
                       Get Started Free
                   </Link>
-                  <Link href="/contact" className="px-8 py-4 rounded-full text-lg font-bold bg-white border border-slate-200 shadow-sm hover:shadow-md hover:bg-slate-50 transition">
+                  <Link href="/contact" className="px-6 py-3.5 md:px-8 md:py-4 rounded-full text-base md:text-lg font-bold bg-white border border-slate-200 shadow-sm hover:shadow-md hover:bg-slate-50 transition w-full sm:w-auto text-center text-slate-700">
                       Talk to Sales
                   </Link>
               </div>

@@ -148,7 +148,7 @@ export default function MyPayrollsPage() {
         renderSensitiveValue(
           record,
           "totalDeductions",
-          amount > 0 ? `-₹${amount.toLocaleString()}` : "-",
+          amount > 0 ? `-₹${amount.toLocaleString()}` : "₹0",
           amount > 0 ? "text-red-600" : undefined,
         ),
     },

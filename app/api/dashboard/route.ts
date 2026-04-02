@@ -59,6 +59,7 @@ export async function GET(req: NextRequest) {
                 AND DAY_IN_MONTH(Onboarding_Date__c) = ${todayDay}
                 AND Status__c = 'Active'
                 AND Active__c = true
+                AND Onboarding_Date__c != ${today}
             `)
         ]);
 
