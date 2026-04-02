@@ -1,28 +1,43 @@
 "use client"
 
+import { useState } from 'react';
 import { Table, Button, Tag, Space, Tooltip, Card, Row, Col, Divider , Grid } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { CloseOutlined } from '@ant-design/icons';
 import type { LeaveRequest } from "@/types"
 import { formatDate } from "@/lib/utils"
 import dayjs from 'dayjs';
+import { LeaveDetailsModal } from './leave-details-modal';
 
 interface LeaveTableProps {
   leaves: LeaveRequest[]
   onWithdraw?: (id: string) => void
   showActions?: boolean
+  onViewDetails?: (leave: LeaveRequest) => void
 }
 
-export function LeaveTable({ leaves, onWithdraw, showActions = true }: LeaveTableProps) {
+export function LeaveTable({ leaves, onWithdraw, showActions = true, onViewDetails }: LeaveTableProps) {
   const { useBreakpoint } = Grid;
   const screens = useBreakpoint();
   const isMobile = !screens.md;   // true on xs and sm screens
+  const [selectedLeave, setSelectedLeave] = useState<LeaveRequest | null>(null);
+  const [detailsModalVisible, setDetailsModalVisible] = useState(false);
+
   const canWithdraw = (record: LeaveRequest) => {
     if (record.status !== 'approved') return false;
     const leaveEnd = dayjs(record.endDate).startOf('day');
     if (!leaveEnd.isValid()) return false;
     const today = dayjs().startOf('day');
     return !today.isAfter(leaveEnd, 'day');
+  };
+
+  const handleViewDetails = (leave: LeaveRequest) => {
+    if (onViewDetails) {
+      onViewDetails(leave);
+    } else {
+      setSelectedLeave(leave);
+      setDetailsModalVisible(true);
+    }
   };
 
   // ==================== DESKTOP / TABLET TABLE ====================
@@ -93,7 +108,10 @@ export function LeaveTable({ leaves, onWithdraw, showActions = true }: LeaveTabl
                 type="text"
                 danger
                 icon={<CloseOutlined />}
-                onClick={() => onWithdraw(record.id)}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  onWithdraw(record.id)
+                }}
               >
                 Withdraw
               </Button>
@@ -113,10 +131,11 @@ export function LeaveTable({ leaves, onWithdraw, showActions = true }: LeaveTabl
     return (
       <Card 
         key={record.id}
-        className="mb-4 shadow-sm"
+        className="mb-4 shadow-sm cursor-pointer"
         bordered
         styles={{ body: { padding: 16 } }}
         style={{ marginBottom :  16 }}
+        onClick={() => handleViewDetails(record)}
       >
         <div className="flex justify-between items-start">
           <div>
@@ -149,17 +168,21 @@ export function LeaveTable({ leaves, onWithdraw, showActions = true }: LeaveTabl
           </Col>
         </Row>
 
-        {showActions && canWithdraw(record) && onWithdraw && (
-          <div className="mt-4 pt-3 border-t">
-            <Button 
-              type="primary" 
-              danger 
-              block
-              icon={<CloseOutlined />}
-              onClick={() => onWithdraw(record.id)}
-            >
-              Withdraw Request
-            </Button>
+        {showActions && (
+          <div className="mt-4 pt-3 border-t flex gap-2">
+            {canWithdraw(record) && onWithdraw && (
+              <Button 
+                type="primary" 
+                danger 
+                icon={<CloseOutlined />}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  onWithdraw(record.id)
+                }}
+              >
+                Withdraw
+              </Button>
+            )}
           </div>
         )}
       </Card>
@@ -188,6 +211,22 @@ export function LeaveTable({ leaves, onWithdraw, showActions = true }: LeaveTabl
           pagination={{ pageSize: 10}}
           scroll={{ x: 900 }}
           className="ant-table-responsive"
+          rowClassName={() => 'cursor-pointer'}
+          onRow={(record) => ({
+            onClick: () => handleViewDetails(record),
+          })}
+        />
+      )}
+      
+      {/* Leave Details Modal - Only show if onViewDetails callback not provided */}
+      {!onViewDetails && (
+        <LeaveDetailsModal
+          leave={selectedLeave}
+          visible={detailsModalVisible}
+          onClose={() => {
+            setDetailsModalVisible(false);
+            setSelectedLeave(null);
+          }}
         />
       )}
     </div>
