@@ -1319,7 +1319,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                                                 placeholder="Select Manager"
                                                                 value={formData.Team_Lead__c !== undefined ? formData.Team_Lead__c : employee.Team_Lead__c}
                                                                 onChange={(val: any) => setFormData({ ...formData, Team_Lead__c: val })}
-                                                                options={employeesList?.filter((e: any) => e.Id !== employeeId && e.Status__c === 'Active' && e.Title__c === 'Team Lead').map((e: any) => ({
+                                                                options={employeesList?.filter((e: any) => e.Id !== employeeId && e.Status__c === 'Active' && e.Title__c === 'Team Lead' && e.Role__c === currentUserRole).map((e: any) => ({
                                                                     value: e.Id,
                                                                     label: `${e.Employee_Name__c || ''}`.trim()
                                                                 }))}

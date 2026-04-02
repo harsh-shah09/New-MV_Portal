@@ -39,7 +39,9 @@ export const Field = ({
   required
 }: FieldProps) => {
   const [showPassword, setShowPassword] = useState(false)
+  const [showNumber, setShowNumber] = useState(false)
   const isPasswordType = type === "password" || type === "confidential"
+  const isNumberType = type === "number"
   const inputType = isPasswordType ? (showPassword ? "text" : "password") : type
 
   const currentValue = formData[fieldKey] !== undefined ? formData[fieldKey] : (value || "")
@@ -105,10 +107,24 @@ export const Field = ({
           </div>
         )
       ) : (
-         <p className="font-medium text-slate-800 text-sm break-words py-1">
+         <p className="font-medium text-slate-800 text-sm break-words py-1 relative inline-block">
              {/* Mask confidential data if not editing */
                (isPasswordType && value) 
-                 ? "•".repeat(8) 
+                 ? "•".repeat(8)
+                 : isNumberType && value
+                 ? (
+                   <span className="flex items-center gap-2">
+                     <span>{showNumber ? value : "****"}</span>
+                     <button
+                       type="button"
+                       onClick={() => setShowNumber(!showNumber)}
+                       className="text-slate-400 hover:text-slate-600 focus:outline-none"
+                       title={showNumber ? "Hide value" : "Show value"}
+                     >
+                       {showNumber ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                     </button>
+                   </span>
+                 )
                  : (value || <span className="text-slate-400 italic">Not set</span>)
              }
          </p>

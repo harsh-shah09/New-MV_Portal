@@ -33,6 +33,7 @@ export function OnboardingWizard() {
     const [documents, setDocuments] = useState<string[]>([])
     const [documentsLoading, setDocumentsLoading] = useState(true)
     const {useBreakpoint} = Grid;
+    const screens = useBreakpoint();
     useEffect(() => {
         // Check status on mount
         fetch('/api/auth/onboarding-status')
@@ -623,7 +624,7 @@ export function OnboardingWizard() {
                  }}
                 className="onboarding-modal"
             >
-                {!useBreakpoint().md ? (
+                {!screens.md ? (
                     <div className="mb-6 md:mb-8">
                         <div className="flex items-center justify-center gap-3 py-4 px-2">
                             {stepItems.map((item, index) => {
