@@ -337,11 +337,11 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
                 </Form.Item>
                 
                 <Form.Item name="startDate" label="Start Date" rules={[{ required: true }]}>
-                     <DatePicker className="w-full" placeholder="YYYY-MM-DD" format="YYYY-MM-DD" dateRender={dateFullCellRender} disabledDate={disabledDate} />
+                     <DatePicker className="w-full" placeholder="DD-MM-YYYY" format="DD-MM-YYYY" dateRender={dateFullCellRender} disabledDate={disabledDate} />
                 </Form.Item>
                 
                 <Form.Item name="endDate" label="End Date" rules={[{ required: true }]}>
-                     <DatePicker className="w-full" placeholder="YYYY-MM-DD" format="YYYY-MM-DD" dateRender={dateFullCellRender} disabledDate={disabledDate} />
+                     <DatePicker className="w-full" placeholder="DD-MM-YYYY" format="DD-MM-YYYY" dateRender={dateFullCellRender} disabledDate={disabledDate} />
                 </Form.Item>
                 
                 <Form.Item name="session" label="Session" rules={[{ required: true }]}>
@@ -385,11 +385,11 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Form.Item name="startDate" label="Start Date" rules={[{ required: true }]}>
-                   <DatePicker className="w-full" placeholder="YYYY-MM-DD" format="YYYY-MM-DD" dateRender={dateFullCellRender} disabledDate={disabledDateForExtraDayPay} />
+                   <DatePicker className="w-full" placeholder="DD-MM-YYYY" format="DD-MM-YYYY" dateRender={dateFullCellRender} disabledDate={disabledDateForExtraDayPay} />
                 </Form.Item>
                 
                 <Form.Item name="endDate" label="End Date" rules={[{ required: true }]}>
-                   <DatePicker className="w-full" placeholder="YYYY-MM-DD" format="YYYY-MM-DD" dateRender={dateFullCellRender} disabledDate={disabledDateForExtraDayPay} />
+                   <DatePicker className="w-full" placeholder="DD-MM-YYYY" format="DD-MM-YYYY" dateRender={dateFullCellRender} disabledDate={disabledDateForExtraDayPay} />
                 </Form.Item>
                 
                 <Form.Item label="Duration">

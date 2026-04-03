@@ -1492,14 +1492,14 @@ export default function LeavesPage() {
                 label="Start Date"
                 rules={[{ required: true, message: 'Please select start date' }]}
               >
-                <DatePicker className="w-full" placeholder="YYYY-MM-DD" format="YYYY-MM-DD" disabledDate={disabledApplyForOthersDate} />
+                <DatePicker className="w-full" placeholder="DD-MM-YYYY" format="DD-MM-YYYY" disabledDate={disabledApplyForOthersDate} />
               </Form.Item>
               <Form.Item
                 name="endDate"
                 label="End Date"
                 rules={[{ required: true, message: 'Please select end date' }]}
               >
-                <DatePicker className="w-full" placeholder="YYYY-MM-DD" format="YYYY-MM-DD" disabledDate={disabledApplyForOthersDate} />
+                <DatePicker className="w-full" placeholder="DD-MM-YYYY" format="DD-MM-YYYY" disabledDate={disabledApplyForOthersDate} />
               </Form.Item>
             </div>
 
