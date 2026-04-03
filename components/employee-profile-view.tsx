@@ -39,6 +39,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import dayjs from "dayjs"
 import { cn } from "@/lib/utils"
 import { Field } from "./field-component"
+import { EmployeeSalaryHistoryTab } from "./employee-salary-history-tab"
 
 interface ViewProps {
     employeeId: string;
@@ -47,13 +48,13 @@ interface ViewProps {
 
 export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }: ViewProps) {
     // --- Query Parameter <-> Tab mapping ---
-    type TabId = "personal" | "employment" | "bank" | "documents" | "security" | "assets" | "leaves"
+    type TabId = "personal" | "employment" | "salary-history" | "bank" | "documents" | "security" | "assets" | "leaves"
     
     const getTabFromQuery = (): TabId => {
         if (typeof window === "undefined") return "personal"
         const params = new URLSearchParams(window.location.search)
         const tab = params.get("tab")?.toLowerCase()
-        const validTabs: TabId[] = ["personal", "employment", "bank", "documents", "security", "assets", "leaves"]
+        const validTabs: TabId[] = ["personal", "employment", "salary-history", "bank", "documents", "security", "assets", "leaves"]
         return validTabs.includes(tab as TabId) ? (tab as TabId) : "personal"
     }
 
@@ -1013,6 +1014,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                         {[
                             { id: "personal", label: "Personal Details", icon: User },
                             { id: "employment", label: "Employment Details", icon: Building2 },
+                            { id: "salary-history", label: "Salary History", icon: History },
                             { id: "assets", label: "Assets", icon: Laptop },
                             { id: "bank", label: "Bank Details", icon: CreditCard },
                             { id: "documents", label: "Documents", icon: FileText },
@@ -1968,6 +1970,13 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                             </div>
                                         )}
                                     </div>
+                                )}
+
+                                {activeTab === "salary-history" && (
+                                    <EmployeeSalaryHistoryTab
+                                        employeeId={employeeId}
+                                        currentUserRole={currentUserRole}
+                                    />
                                 )}
 
                                 {activeTab === "assets" && (

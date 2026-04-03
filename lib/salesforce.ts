@@ -628,3 +628,60 @@ export const isTrustedDevice = async (employeeId: string, deviceId: string) => {
     const result = await db.send(getCmd);
     return !!result.Item;
 };
+
+export interface SalaryHistoryRecord {
+  Id?: string;
+  Employee__c: string;
+  Current_Salary__c: number;
+  Previous_Salary__c: number;
+  Security_Deposite__c?: number;
+  Increment_Amount__c: number;
+  Increment_Percent__c: number;
+  Effective_Date__c: string;
+  End_Date__c?: string | null;
+  Is_Current__c?: boolean;
+  Change_Type__c?: string;
+  Description__c?: string;
+  CreatedDate?: string;
+}
+
+export const getSalaryHistoryByEmployee = async (employeeId: string): Promise<SalaryHistoryRecord[]> => {
+    const conn = await getSalesforceConnection();
+    if (!conn) throw new Error("No Salesforce connection");
+
+    const query = `
+      SELECT Id, Employee__c, Current_Salary__c, Previous_Salary__c, Security_Deposite__c, Increment_Amount__c, Increment_Percent__c,
+             Effective_Date__c, End_Date__c, Is_Current__c, Change_Type__c, Description__c, CreatedDate
+      FROM Salary_History_Tracking__c
+      WHERE Employee__c = '${employeeId}'
+      ORDER BY Effective_Date__c DESC
+    `;
+
+    const result = await conn.query<SalaryHistoryRecord>(query);
+    return result.records;
+}
+
+export const createSalaryHistoryRecord = async (record: SalaryHistoryRecord) => {
+    const conn = await getSalesforceConnection();
+    if (!conn) throw new Error("No Salesforce connection");
+    return await conn.sobject("Salary_History_Tracking__c").create(record);
+}
+
+export async function getSalaryHistoryChangeTypeOptions(): Promise<Array<{ label: string; value: string }>> {
+    const conn = await getSalesforceConnection();
+    if (!conn) throw new Error("No Salesforce connection");
+
+    const describe = await conn.sobject('Salary_History_Tracking__c').describe() as {
+      fields?: Array<{ name: string; picklistValues?: Array<{ active: boolean; value: string; label: string }> }>;
+    };
+
+    const changeTypeField = describe.fields?.find((field) => field.name === 'Change_Type__c');
+    if (!changeTypeField?.picklistValues) return [];
+
+    return changeTypeField.picklistValues
+      .filter((option) => option.active)
+      .map((option) => ({
+        label: option.label,
+        value: option.value
+      }));
+}
