@@ -171,10 +171,10 @@ export function EmployeeSalaryHistoryTab({ employeeId, currentUserRole }: Employ
             <tbody className="divide-y divide-slate-200">
               {data.records.map((record) => (
                 <tr key={record.Id} className="hover:bg-slate-50 transition">
-                  <td className="px-4 py-3 text-slate-700">
+                  <td className="px-4 py-3 text-slate-700 whitespace-nowrap">
                     {record.Effective_Date__c ? dayjs(record.Effective_Date__c).format("DD MMM YYYY") : "-"}
                   </td>
-                  <td className="px-4 py-3 text-slate-700">
+                  <td className="px-4 py-3 text-slate-700 whitespace-nowrap">
                     {record.End_Date__c ? dayjs(record.End_Date__c).format("DD MMM YYYY") : "-"}
                   </td>
                   <td className="px-4 py-3 text-slate-700">{record.Change_Type__c || "-"}</td>

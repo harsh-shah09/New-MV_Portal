@@ -24,7 +24,7 @@ export default function PayrollPage() {
     },
   })
 
-  // State for HR/Admin view
+  // State for Admin view
   const [view, setView] = useState<"summary" | "employees" | "detail">("summary")
   const [selectedSummary, setSelectedSummary] = useState<PayrollSummary | null>(null)
   const [employeePayrolls, setEmployeePayrolls] = useState<PayrollEmployeeDetail[]>([])
@@ -40,12 +40,12 @@ export default function PayrollPage() {
       if (!res.ok) throw new Error("Failed to fetch payroll summaries")
       return res.json()
     },
-    enabled: user?.role === "Admin" || user?.role === "HR",
+    enabled: user?.role === "Admin",
   })
 
   const payrollSummaries = summariesData?.summaries || []
 
-  const isHROrAdmin = user?.role === "Admin" || user?.role === "HR"
+  const isAdmin = user?.role === "Admin"
 
   const handleSelectSummary = async (summary: PayrollSummary) => {
     setSelectedSummary(summary)
@@ -123,14 +123,14 @@ export default function PayrollPage() {
     }
   }
 
-  // Show appropriate message if not HR/Admin
-  if (!isHROrAdmin) {
+  // Show appropriate message if not Admin
+  if (!isAdmin) {
     return (
       <RoleGuard>
         <PageContainer>
           <div className="text-center py-12">
             <h1 className="text-4xl font-bold text-foreground mb-4">Payroll Management</h1>
-            <p className="text-muted-foreground">Access restricted to HR and Admin users only.</p>
+            <p className="text-muted-foreground">Access restricted to Admin users only.</p>
           </div>
         </PageContainer>
       </RoleGuard>

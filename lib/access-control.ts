@@ -49,7 +49,7 @@ export const PAGE_ACCESS: PageAccess[] = [
     {
         path: '/payroll',
         label: 'Payroll',
-        roles: ['HR', 'Admin']
+        roles: ['Admin']
     },
     {
         path: '/nda',

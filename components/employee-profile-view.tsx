@@ -44,9 +44,10 @@ import { EmployeeSalaryHistoryTab } from "./employee-salary-history-tab"
 interface ViewProps {
     employeeId: string;
     currentUserRole?: string;
+    currentUserEmployeeId?: string;
 }
 
-export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }: ViewProps) {
+export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", currentUserEmployeeId }: ViewProps) {
     // --- Query Parameter <-> Tab mapping ---
     type TabId = "personal" | "employment" | "salary-history" | "bank" | "documents" | "security" | "assets" | "leaves"
     
@@ -876,6 +877,15 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
     if (!employee) return <div className="flex h-screen items-center justify-center text-red-500">Employee not found</div>
 
     const viewedEmployeeRole = (employee.Role__c || "").trim()
+    const normalizedCurrentRole = (currentUserRole || "").trim().toLowerCase()
+    const isAdminUser = normalizedCurrentRole === 'admin'
+    const isHrUser = normalizedCurrentRole === 'hr'
+    const normalizeSfId = (id?: string) => (id || '').trim().toLowerCase().slice(0, 15)
+    const isOwnProfile =
+        normalizeSfId(currentUserEmployeeId) !== '' &&
+        normalizeSfId(currentUserEmployeeId) === normalizeSfId(employee?.Id || employeeId)
+    const canViewCompensation = isAdminUser || (!isHrUser && isOwnProfile) || (isHrUser && isOwnProfile)
+    const canViewSalaryHistory = isAdminUser || (!isHrUser && isOwnProfile) || (isHrUser && isOwnProfile)
     const canToggleUserActive =
         currentUserRole === 'Admin'
             ? true
@@ -1014,7 +1024,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                         {[
                             { id: "personal", label: "Personal Details", icon: User },
                             { id: "employment", label: "Employment Details", icon: Building2 },
-                            { id: "salary-history", label: "Salary History", icon: History },
+                            ...(canViewSalaryHistory ? [{ id: "salary-history", label: "Salary History", icon: History }] : []),
                             { id: "assets", label: "Assets", icon: Laptop },
                             { id: "bank", label: "Bank Details", icon: CreditCard },
                             { id: "documents", label: "Documents", icon: FileText },
@@ -1335,16 +1345,18 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                             </div>
                                         </div>
 
-                                        <div className="border-t border-slate-100 pt-8">
-                                            <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
-                                                <CreditCard className="w-5 h-5 text-green-500" /> Compensation
-                                            </h2>
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-                                                <Field label="Base Salary" value={employee.Base_Salary__c} fieldKey="Base_Salary__c" type="number" isEditing={isEditing && ['HR', 'Admin'].includes(currentUserRole)} formData={formData} setFormData={setFormData} />
-                                                <Field label="CTC" value={employee.Salary_CTC__c} fieldKey="Salary_CTC__c" type="number" isEditing={isEditing && ['HR', 'Admin'].includes(currentUserRole)} formData={formData} setFormData={setFormData} />
-                                                <Field label="Security Deduction" value={employee.Company_Security_Deduction__c} fieldKey="Company_Security_Deduction__c" type="number" isEditing={isEditing && ['HR', 'Admin'].includes(currentUserRole)} formData={formData} setFormData={setFormData} />
+                                        {canViewCompensation && (
+                                            <div className="border-t border-slate-100 pt-8">
+                                                <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+                                                    <CreditCard className="w-5 h-5 text-green-500" /> Compensation
+                                                </h2>
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                                                    <Field label="Base Salary" value={employee.Base_Salary__c} fieldKey="Base_Salary__c" type="number" isEditing={isEditing && currentUserRole === 'Admin'} formData={formData} setFormData={setFormData} />
+                                                    <Field label="CTC" value={employee.Salary_CTC__c} fieldKey="Salary_CTC__c" type="number" isEditing={isEditing && currentUserRole === 'Admin'} formData={formData} setFormData={setFormData} />
+                                                    <Field label="Security Deduction" value={employee.Company_Security_Deduction__c} fieldKey="Company_Security_Deduction__c" type="number" isEditing={isEditing && currentUserRole === 'Admin'} formData={formData} setFormData={setFormData} />
+                                                </div>
                                             </div>
-                                        </div>
+                                        )}
                                     </div>
                                 )}
 
@@ -1972,7 +1984,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                     </div>
                                 )}
 
-                                {activeTab === "salary-history" && (
+                                {activeTab === "salary-history" && canViewSalaryHistory && (
                                     <EmployeeSalaryHistoryTab
                                         employeeId={employeeId}
                                         currentUserRole={currentUserRole}
