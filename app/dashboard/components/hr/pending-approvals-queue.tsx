@@ -15,9 +15,14 @@ import { useState, useEffect } from "react"
 interface PendingApprovalsQueueProps {
   initialPendingApprovals?: any[]
   dashboardView?: "default" | "hr"
+  canUseLeaveRulesPopup?: boolean
 }
 
-export function PendingApprovalsQueue({ initialPendingApprovals = [], dashboardView = "default" }: PendingApprovalsQueueProps) {
+export function PendingApprovalsQueue({
+  initialPendingApprovals = [],
+  dashboardView = "default",
+  canUseLeaveRulesPopup = false,
+}: PendingApprovalsQueueProps) {
   const router = useRouter()
   const [loading, setLoading] = useState<string | null>(null)
   const [pendingApprovals, setPendingApprovals] = useState<any[]>(initialPendingApprovals)
@@ -91,6 +96,39 @@ export function PendingApprovalsQueue({ initialPendingApprovals = [], dashboardV
     }
   }
 
+  const markLeaveAsDoubtful = async (leaveId: string): Promise<boolean> => {
+    setLoading(leaveId)
+    try {
+      const response = await fetch('/api/leave-management', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          leaveId,
+          action: 'mark_doubtful_case',
+        })
+      })
+
+      const result = await response.json()
+
+      if (response.ok) {
+        message.success('Leave marked as doubtful case.')
+        await fetchPendingApprovals()
+        return true
+      }
+
+      message.error(result.error || 'Failed to mark doubtful case')
+      return false
+    } catch (error) {
+      console.error('Error marking doubtful case:', error)
+      message.error('Failed to mark doubtful case')
+      return false
+    } finally {
+      setLoading(null)
+    }
+  }
+
   const closeRuleChoiceModal = () => {
     setRuleChoiceModalVisible(false)
     setRuleChoiceLeave(null)
@@ -109,10 +147,73 @@ export function PendingApprovalsQueue({ initialPendingApprovals = [], dashboardV
 
   const shouldShowRulesPopup = (record: any): boolean => {
     return (
-      dashboardView === 'hr' &&
+      canUseLeaveRulesPopup &&
       record?.leaveType === 'Planned Leave' &&
       (record?.sandwichRuleApplicable === true || record?.onePlusTwoRuleApplicable === true)
     )
+  }
+
+  const openApproveConfirmation = (record: any) => {
+    const isHRUser = dashboardView === 'hr' && canUseLeaveRulesPopup === false
+    let confirmModalRef: { destroy: () => void } | null = null
+
+    const handleMarkDoubtfulCaseClick = async () => {
+      if (!record?.id) return
+      const success = await markLeaveAsDoubtful(record.id)
+      if (success) {
+        confirmModalRef?.destroy()
+      }
+    }
+
+    confirmModalRef = Modal.confirm({
+      title: 'Approve Leave Request',
+      content: record ? (
+        <div>
+          <p className="mb-3">Are you sure you want to approve this leave request?</p>
+          <div className="p-3 bg-green-50 border border-green-200 rounded">
+            <div className="text-sm space-y-1">
+              <div><strong>Employee:</strong> {record.employeeName}</div>
+              <div><strong>Type:</strong> {record.leaveType || record.leaveCategory}</div>
+              <div><strong>Dates:</strong> {record.startDate} to {record.endDate}</div>
+              <div><strong>Duration:</strong> {record.duration} day(s)</div>
+              {record.reason && (
+                <div className="mt-2 pt-2 border-t border-green-300">
+                  <strong>Reason:</strong>
+                  <p className="mt-1 text-gray-700">{record.reason}</p>
+                </div>
+              )}
+            </div>
+          </div>
+          <p className="mt-3 text-sm text-green-700">✓ Email notification will be sent to the employee</p>
+          {isHRUser && (
+            <div className="mt-4 pt-3 border-t border-amber-200">
+              <Button danger type="default" onClick={handleMarkDoubtfulCaseClick}>
+                Mark as Doubtful Case
+              </Button>
+            </div>
+          )}
+        </div>
+      ) : 'Are you sure you want to approve this leave request?',
+      okText: 'Approve',
+      cancelText: 'Cancel',
+      okButtonProps: { style: { backgroundColor: '#10b981' } },
+      onOk: async () => {
+        if (shouldShowRulesPopup(record)) {
+          setRuleChoiceLeave(record)
+          setApplySandwichSelection(record?.sandwichRuleApplicable === true)
+          setApplyOnePlusTwoSelection(record?.onePlusTwoRuleApplicable === true)
+          setRuleChoiceModalVisible(true)
+          return
+        }
+
+        const shouldAutoApplyRulesForHr = dashboardView === 'hr' && canUseLeaveRulesPopup === false
+
+        await handleApprove(record.id, {
+          applySandwichRule: shouldAutoApplyRulesForHr ? record?.sandwichRuleApplicable === true : false,
+          applyOnePlusTwoRule: shouldAutoApplyRulesForHr ? record?.onePlusTwoRuleApplicable === true : false,
+        })
+      },
+    })
   }
 
   const handleReject = async (leaveId: string, reason: string): Promise<boolean> => {
@@ -185,6 +286,9 @@ export function PendingApprovalsQueue({ initialPendingApprovals = [], dashboardV
       render: (text, record) => (
         <div>
           <div className="font-medium">{text}</div>
+          {canUseLeaveRulesPopup && record?.doubtfullCase === true && (
+            <div className="text-xs text-red-600 font-medium">Doubtful Case</div>
+          )}
           {/* <div className="text-xs text-gray-500">{record.employeeId}</div> */}
         </div>
       )
@@ -234,20 +338,7 @@ export function PendingApprovalsQueue({ initialPendingApprovals = [], dashboardV
             icon={<CheckCircleOutlined />}
             loading={loading === record.id}
             disabled={loading !== null}
-            onClick={() => {
-              if (shouldShowRulesPopup(record)) {
-                setRuleChoiceLeave(record)
-                setApplySandwichSelection(record?.sandwichRuleApplicable === true)
-                setApplyOnePlusTwoSelection(record?.onePlusTwoRuleApplicable === true)
-                setRuleChoiceModalVisible(true)
-                return
-              }
-
-              handleApprove(record.id, {
-                applySandwichRule: false,
-                applyOnePlusTwoRule: false,
-              })
-            }}
+            onClick={() => openApproveConfirmation(record)}
           >
             Approve
           </Button>
@@ -294,6 +385,11 @@ export function PendingApprovalsQueue({ initialPendingApprovals = [], dashboardV
               rowKey="id"
               size="small"
               scroll={{ x: 980 }}
+              rowClassName={(record) =>
+                canUseLeaveRulesPopup && record?.doubtfullCase === true
+                  ? 'bg-red-50/70'
+                  : ''
+              }
             />
             {pendingApprovals.length > 5 && (
               <div className="text-center mt-4">

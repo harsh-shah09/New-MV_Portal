@@ -86,6 +86,7 @@ export interface LeaveRequest {
   withdrawalEndDate?: string
   sandwichRuleApplicable?: boolean
   onePlusTwoRuleApplicable?: boolean
+  doubtfullCase?: boolean
 }
 
 export interface LeavePolicy {

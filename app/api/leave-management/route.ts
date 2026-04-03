@@ -513,6 +513,7 @@ export async function GET(request: NextRequest) {
           HR_Approval__c,
           Sandwich_Rule__c,
           OnePlusTwo_Rule__c,
+          Doubtfull_Case__c,
           Reason__c,
           Rule_Calculation_Details__c
         FROM Leave__c
@@ -548,6 +549,7 @@ export async function GET(request: NextRequest) {
           hrApproval: record.HR_Approval__c,
           sandwichRuleApplicable,
           onePlusTwoRuleApplicable,
+          doubtfullCase: record.Doubtfull_Case__c === true,
           withdrawalStartDate: partialRequest?.requested ? partialRequest.withdrawalStartDate : undefined,
           withdrawalEndDate: partialRequest?.requested ? partialRequest.withdrawalEndDate : undefined,
         };
@@ -575,6 +577,7 @@ export async function GET(request: NextRequest) {
           HR_Approval__c,
           Sandwich_Rule__c,
           OnePlusTwo_Rule__c,
+          Doubtfull_Case__c,
           Reason__c,
           Rule_Calculation_Details__c
         FROM Leave__c
@@ -610,6 +613,7 @@ export async function GET(request: NextRequest) {
           hrApproval: record.HR_Approval__c,
           sandwichRuleApplicable,
           onePlusTwoRuleApplicable,
+          doubtfullCase: record.Doubtfull_Case__c === true,
           withdrawalStartDate: partialRequest?.requested ? partialRequest.withdrawalStartDate : undefined,
           withdrawalEndDate: partialRequest?.requested ? partialRequest.withdrawalEndDate : undefined,
         };
@@ -634,6 +638,7 @@ export async function GET(request: NextRequest) {
           HR_Approval__c,
           Sandwich_Rule__c,
           OnePlusTwo_Rule__c,
+          Doubtfull_Case__c,
           Reason__c,
           Rule_Calculation_Details__c
         FROM Leave__c
@@ -669,6 +674,7 @@ export async function GET(request: NextRequest) {
           hrApproval: record.HR_Approval__c,
           sandwichRuleApplicable,
           onePlusTwoRuleApplicable,
+          doubtfullCase: record.Doubtfull_Case__c === true,
           withdrawalStartDate: partialRequest?.requested ? partialRequest.withdrawalStartDate : undefined,
           withdrawalEndDate: partialRequest?.requested ? partialRequest.withdrawalEndDate : undefined,
         };
@@ -2524,6 +2530,41 @@ export async function PATCH(request: NextRequest) {
       }
 
       return NextResponse.json({ success: true, message: "Withdrawal request rejected successfully" });
+    }
+
+    // Handle mark doubtful case action (HR or Admin)
+    if (action === "mark_doubtful_case") {
+      const { role } = payload;
+      const isHR = role === 'HR';
+      const isAdmin = role === 'Admin';
+
+      if (!isHR && !isAdmin) {
+        return NextResponse.json({ error: "Only HR or Admin can mark doubtful cases" }, { status: 403 });
+      }
+
+      const updateResult = await conn.sobject('Leave__c').update({
+        Id: leaveId,
+        Doubtfull_Case__c: true,
+      });
+
+      const resultList = Array.isArray(updateResult) ? updateResult : [updateResult];
+      const firstResult = resultList[0];
+
+      if (!firstResult?.success) {
+        const firstError = firstResult?.errors?.[0];
+        if (firstError?.statusCode === 'NOT_FOUND') {
+          return NextResponse.json({ error: "Leave not found" }, { status: 404 });
+        }
+
+        return NextResponse.json({
+          error: firstError?.message || "Failed to mark leave as doubtful case",
+        }, { status: 400 });
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: "Leave marked as doubtful case",
+      });
     }
 
     // Handle approve action (HR, Team Lead, or Admin)

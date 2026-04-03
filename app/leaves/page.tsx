@@ -734,15 +734,57 @@ export default function LeavesPage() {
     }
   }
 
+  const markLeaveAsDoubtful = async (targetLeaveId: string) => {
+    const toastId = toast.loading("Marking leave as doubtful case...")
+
+    try {
+      const response = await fetch("/api/leave-management", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          leaveId: targetLeaveId,
+          action: "mark_doubtful_case",
+        }),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        toast.error(error.error || "Failed to mark doubtful case", { id: toastId })
+        return false
+      }
+
+      refetch()
+      toast.success("Leave marked as doubtful case.", { id: toastId, duration: 4000 })
+      return true
+    } catch (error) {
+      console.error("Error marking doubtful case:", error)
+      toast.error("Failed to mark doubtful case. Please try again.", { id: toastId })
+      return false
+    }
+  }
+
   const handleApprove = async (leaveId: string) => {
     const leave = pendingApprovals.find((l) => l.id === leaveId)
-    const isHrOrAdmin = currentUser?.role === 'HR' || currentUser?.role === 'Admin'
+    const isAdmin = currentUser?.role === 'Admin'
+    const isHR = currentUser?.role === 'HR'
     const shouldShowRulesPopup =
-      isHrOrAdmin &&
+      isAdmin &&
       leave?.leaveType === 'Planned Leave' &&
       (leave?.sandwichRuleApplicable === true || leave?.onePlusTwoRuleApplicable === true)
 
-    Modal.confirm({
+    let confirmModalRef: { destroy: () => void } | null = null
+
+    const handleMarkDoubtfulCaseClick = async () => {
+      if (!leave?.id) return
+      const success = await markLeaveAsDoubtful(leave.id)
+      if (success) {
+        confirmModalRef?.destroy()
+      }
+    }
+
+    confirmModalRef = Modal.confirm({
       title: 'Approve Leave Request',
       content: leave ? (
         <div>
@@ -762,6 +804,17 @@ export default function LeavesPage() {
             </div>
           </div>
           <p className="mt-3 text-sm text-green-700">✓ Email notification will be sent to the employee</p>
+          {isHR && (
+            <div className="mt-4 pt-3 border-t border-amber-200">
+              <Button
+                danger
+                type="default"
+                onClick={handleMarkDoubtfulCaseClick}
+              >
+                Mark as Doubtful Case
+              </Button>
+            </div>
+          )}
         </div>
       ) : 'Are you sure you want to approve this leave request?',
       okText: 'Approve',
@@ -776,9 +829,11 @@ export default function LeavesPage() {
           return
         }
 
+        const shouldAutoApplyRulesForHr = currentUser?.role === 'HR'
+
         await approveLeaveRequest(leaveId, {
-          applySandwichRule: false,
-          applyOnePlusTwoRule: false,
+          applySandwichRule: shouldAutoApplyRulesForHr ? leave?.sandwichRuleApplicable === true : false,
+          applyOnePlusTwoRule: shouldAutoApplyRulesForHr ? leave?.onePlusTwoRuleApplicable === true : false,
         })
       },
     })
@@ -1110,6 +1165,7 @@ export default function LeavesPage() {
                         const isTeamLead = currentUser?.role === 'Developer' && currentUser?.title === 'Team Lead'
                         const isHR = currentUser?.role === 'HR'
                         const isAdmin = currentUser?.role === 'Admin'
+                        const isDoubtfulCase = leave.doubtfullCase === true
                         const tlApproved = leave.tlApproved === 'Approved'
                         const tlRejected = leave.tlApproved === 'Rejected'
                         const hrApproved = leave.hrApproval === 'Approved'
@@ -1128,7 +1184,14 @@ export default function LeavesPage() {
                         const alreadyActioned = leave.isWithdrawalRequest ? false : (isTeamLead ? (tlApproved || tlRejected) : (hrApproved || hrRejected))
 
                         return (
-                          <div key={leave.id} className="bg-gradient-to-r from-slate-50 to-blue-50 border border-gray-200 rounded-lg hover:border-blue-300 hover:shadow-md transition-all">
+                          <div
+                            key={leave.id}
+                            className={`bg-gradient-to-r border rounded-lg hover:shadow-md transition-all ${
+                              isAdmin && isDoubtfulCase
+                                ? 'from-red-50 to-orange-50 border-red-300 hover:border-red-400'
+                                : 'from-slate-50 to-blue-50 border-gray-200 hover:border-blue-300'
+                            }`}
+                          >
                             <div className="p-5">
                               {/* Header */}
                               <div className="flex flex-col md:flex-row sm:flex-row gap-2 items-center justify-between mb-4">
@@ -1146,6 +1209,11 @@ export default function LeavesPage() {
                                     }`}>
                                     {leave.isWithdrawalRequest ? 'Withdrawal Pending' : leave.status.charAt(0).toUpperCase() + leave.status.slice(1)}
                                   </span>
+                                  {isAdmin && isDoubtfulCase && (
+                                    <span className="px-4 py-2 rounded-full text-xs font-semibold border bg-red-100 text-red-700 border-red-200">
+                                      Doubtful Case
+                                    </span>
+                                  )}
                                 </div>
 
                                 {/* Action Buttons */}
