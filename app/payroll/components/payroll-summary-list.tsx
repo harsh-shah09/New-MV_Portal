@@ -1,6 +1,6 @@
 "use client"
 
-import { Table, Tag, Button, Popconfirm, message } from "antd"
+import { Table, Tag, Button, Popconfirm, Select } from "antd"
 import { DeleteOutlined } from "@ant-design/icons"
 import type { ColumnsType } from "antd/es/table"
 import type { PayrollSummary } from "@/types"
@@ -9,9 +9,11 @@ interface PayrollSummaryListProps {
   summaries: PayrollSummary[]
   onSelectSummary: (summary: PayrollSummary) => void
   onDeleteSummary?: (summaryId: string) => Promise<void>
+  isAdmin?: boolean
+  onStatusChange?: (summaryId: string, status: "draft" | "paid") => Promise<void>
 }
 
-export function PayrollSummaryList({ summaries, onSelectSummary, onDeleteSummary }: PayrollSummaryListProps) {
+export function PayrollSummaryList({ summaries, onSelectSummary, onDeleteSummary, isAdmin = false, onStatusChange }: PayrollSummaryListProps) {
   const handleDelete = async (summaryId: string, event: React.MouseEvent) => {
     event.stopPropagation() // Prevent row click
     
@@ -51,7 +53,25 @@ export function PayrollSummaryList({ summaries, onSelectSummary, onDeleteSummary
       title: "Status",
       dataIndex: "status",
       key: "status",
-      render: (status: string) => {
+      render: (status: string, record: PayrollSummary) => {
+        if (isAdmin && onStatusChange) {
+          const safeValue = status === "paid" ? "paid" : "draft"
+          return (
+            <div onClick={(event) => event.stopPropagation()}>
+              <Select
+                value={safeValue}
+                size="small"
+                style={{ minWidth: 110 }}
+                options={[
+                  { value: "draft", label: "Draft" },
+                  { value: "paid", label: "Paid" },
+                ]}
+                onChange={(value) => onStatusChange(record.id, value as "draft" | "paid")}
+              />
+            </div>
+          )
+        }
+
         let color = "default"
         if (status === "paid") color = "green"
         else if (status === "processed") color = "blue"

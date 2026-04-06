@@ -4,6 +4,75 @@ import { verifyToken } from "@/lib/auth-utils"
 import { getSalesforceConnection } from "@/lib/salesforce"
 import { deletePayslipFromS3 } from "@/lib/s3"
 
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const cookieStore = await cookies()
+    const session = cookieStore.get("session")?.value
+
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const payload = await verifyToken(session)
+    if (!payload) {
+      return NextResponse.json({ error: "Invalid session" }, { status: 401 })
+    }
+
+    const { role } = payload
+    if (role !== "Admin") {
+      return NextResponse.json({ error: "Forbidden - Only Admin can update payroll summary status" }, { status: 403 })
+    }
+
+    const { id } = await params
+    if (!id) {
+      return NextResponse.json({ error: "Payroll Summary ID is required" }, { status: 400 })
+    }
+
+    const body = await request.json()
+    const requestedStatus = String(body?.status || "").toLowerCase()
+    const allowedStatuses = ["draft", "paid"]
+
+    if (!allowedStatuses.includes(requestedStatus)) {
+      return NextResponse.json({ error: "Invalid status. Allowed values: Draft, Paid" }, { status: 400 })
+    }
+
+    const statusValue = requestedStatus === "paid" ? "Paid" : "Draft"
+
+    const conn = await getSalesforceConnection()
+    if (!conn) {
+      return NextResponse.json({ error: "Failed to connect to Salesforce" }, { status: 500 })
+    }
+
+    const updateResult = await conn.sobject("Payroll_Summary__c").update({
+      Id: id,
+      Status__c: statusValue,
+    })
+
+    const normalizedResult = Array.isArray(updateResult) ? updateResult[0] : updateResult
+    if (!normalizedResult?.success) {
+      return NextResponse.json(
+        { error: "Failed to update payroll summary status", details: normalizedResult?.errors || [] },
+        { status: 500 }
+      )
+    }
+
+    return NextResponse.json({
+      message: "Payroll summary status updated successfully",
+      summaryId: id,
+      status: requestedStatus,
+    })
+  } catch (error: any) {
+    console.error("Error updating payroll summary status:", error)
+    return NextResponse.json(
+      { error: "Failed to update payroll summary status", details: error.message },
+      { status: 500 }
+    )
+  }
+}
+
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }

@@ -42,6 +42,7 @@ function applyTemplateData(template: string, data: LeaveEmailData): string {
   html = html.replace(/{{endDate}}/g, data.endDate || 'N/A');
   html = html.replace(/{{duration}}/g, String(data.duration || 0));
   html = html.replace(/{{Reason}}/g, String(data.reason || 'N/A'));
+  html = html.replace(/{{approverName}}/g, data.approverName || 'HR Team');
   html = html.replace(/{{approverTitle}}/g, data.approverTitle || 'Approver');
   html = html.replace(/{{teamLeadName}}/g, data.teamLeadName || 'Team Lead');
   html = html.replace(/{{decisionStatus}}/g, data.decisionStatus || 'Pending');
@@ -279,6 +280,17 @@ export async function withdrawalRejected(data: LeaveEmailData): Promise<{ subjec
   const html = await loadTemplate('withdrawal-rejected', data);
   const text = `Dear ${data.recipientName},\n\nYour withdrawal request has been rejected by ${data.approverTitle}. Your leave remains approved and active.\n\n${data.reason ? `Reason: ${data.reason}\n\n` : ''}Leave Details:\n- Leave Type: ${data.leaveType}\n- Start Date: ${data.startDate}\n- End Date: ${data.endDate}\n- Duration: ${data.duration} day(s)\n\nRegards,\nHRMS System`;
   
+  return { subject, html, text };
+}
+
+/**
+ * Template: Doubtful Leave Marked by HR to Admin
+ */
+export async function doubtfulLeaveMarkedToAdmin(data: LeaveEmailData): Promise<{ subject: string; html: string; text: string }> {
+  const subject = `Doubtful Leave Review Required - ${data.employeeName}`;
+  const html = await loadTemplate('doubtful-leave-to-admin', data);
+  const text = `Dear ${data.recipientName},\n\n${data.approverTitle || 'HR'} ${data.approverName || ''} has marked a leave request as doubtful and it requires Admin review.\n\nLeave Details:\n- Employee: ${data.employeeName}\n- Leave Type: ${data.leaveType}\n- Start Date: ${data.startDate}\n- End Date: ${data.endDate}\n- Duration: ${data.duration} day(s)${data.reason ? `\n- Reason: ${data.reason}` : ''}\n\nPlease review this request in the HRMS portal.\n\nRegards,\nHRMS System`;
+
   return { subject, html, text };
 }
 

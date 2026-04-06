@@ -123,6 +123,27 @@ export default function PayrollPage() {
     }
   }
 
+  const handleSummaryStatusChange = async (summaryId: string, status: "draft" | "paid") => {
+    try {
+      const res = await fetch(`/api/payroll/summaries/${summaryId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      })
+
+      if (!res.ok) {
+        const error = await res.json()
+        throw new Error(error.error || "Failed to update payroll summary status")
+      }
+
+      message.success("Payroll summary status updated")
+      await refetchSummaries()
+    } catch (error: any) {
+      console.error("Error updating payroll summary status:", error)
+      message.error(error.message || "Failed to update payroll summary status")
+    }
+  }
+
   // Show appropriate message if not Admin
   if (!isAdmin) {
     return (
@@ -172,6 +193,8 @@ export default function PayrollPage() {
                     summaries={payrollSummaries}
                     onSelectSummary={handleSelectSummary}
                     onDeleteSummary={handleDeleteSummary}
+                    isAdmin={isAdmin}
+                    onStatusChange={handleSummaryStatusChange}
                   />
                   {/* </div> */}
                 </div>
