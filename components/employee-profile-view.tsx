@@ -204,6 +204,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
             const employeeName = formData.Employee_Name__c?.trim()
             const email = formData.Employee_Email__c?.trim()
             const phone = formData.Employee_Phone__c?.trim()
+            const companyEmail = formData.Company_Email__c?.trim()
             const normalizedPhone = phone?.replace(/[\s-]/g, "")
             const emergencyPhone = formData.Emergency_Contact_Number__c?.trim()
             const normalizedEmergencyPhone = emergencyPhone?.replace(/[\s-]/g, "")
@@ -218,6 +219,10 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                 newErrors.Employee_Email__c = "Email address is required"
             } else if (!emailPattern.test(email)) {
                 newErrors.Employee_Email__c = "Please enter a valid email address"
+            }
+
+            if (companyEmail && !emailPattern.test(companyEmail)) {
+                newErrors.Company_Email__c = "Please enter a valid company email address"
             }
 
             if (!phone) {
@@ -279,6 +284,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
             setFormData({
                 Employee_Name__c: employee.Employee_Name__c,
                 Employee_Email__c: employee.Employee_Email__c,
+                Company_Email__c: employee.Company_Email__c,
                 Employee_Phone__c: employee.Employee_Phone__c,
                 Birthdate__c: employee.Birthdate__c,
                 Gender__c: employee.Gender__c,
@@ -290,6 +296,8 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                 Employee_Address__CountryCode__s: employee.Employee_Current_Address__c?.country || '',
                 Emergency_Contact_Name__c: employee.Emergency_Contact_Name__c,
                 Emergency_Contact_Number__c: employee.Emergency_Contact_Number__c,
+                Technology__c: employee.Technology__c,
+                Enrollment_Number__c: employee.Enrollment_Number__c,
                 exp_years: expParsed.years,
                 exp_months: expParsed.months,
                 Experience__c: employee.Experience__c,
@@ -316,6 +324,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
             const payload = { ...formData };
             payload.Employee_Name__c = payload.Employee_Name__c?.trim();
             payload.Employee_Email__c = payload.Employee_Email__c?.trim();
+            payload.Company_Email__c = payload.Company_Email__c?.trim();
             payload.Employee_Phone__c = payload.Employee_Phone__c?.trim()?.replace(/[\s-]/g, '');
             payload.Emergency_Contact_Number__c = payload.Emergency_Contact_Number__c?.trim()?.replace(/[\s-]/g, '');
             payload.Employee_Current_Address__c = JSON.stringify(
@@ -1113,7 +1122,8 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                             </div>
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                                                 <Field label="Employee Name" value={employee.Employee_Name__c} fieldKey="Employee_Name__c" isEditing={isEditing} formData={formData} setFormData={setFormData} error={errors.Employee_Name__c} placeholder="e.g. John Doe" required />
-                                                <Field label="Email Address" value={employee.Employee_Email__c} fieldKey="Employee_Email__c" type="email" isEditing={isEditing} formData={formData} setFormData={setFormData} error={errors.Employee_Email__c} placeholder="e.g. john@example.com" required />
+                                                <Field label="Personal Email" value={employee.Employee_Email__c} fieldKey="Employee_Email__c" type="email" isEditing={isEditing} formData={formData} setFormData={setFormData} error={errors.Employee_Email__c} placeholder="e.g. john@example.com" required />
+                                                <Field label="Company Email" value={employee.Company_Email__c} fieldKey="Company_Email__c" type="email" isEditing={isEditing} formData={formData} setFormData={setFormData} error={errors.Company_Email__c} placeholder="e.g. john@company.com" />
                                                 <Field label="Phone Number" value={employee.Employee_Phone__c} fieldKey="Employee_Phone__c" type="tel" isEditing={isEditing} formData={formData} setFormData={setFormData} error={errors.Employee_Phone__c} placeholder="+919876543210 or 9876543210" required />
                                                 <Field label="Date of Birth" value={employee.Birthdate__c} fieldKey="Birthdate__c" type="date" isEditing={isEditing} formData={formData} setFormData={setFormData} error={errors.Birthdate__c} required />
                                                 <Field label="Gender" value={employee.Gender__c} fieldKey="Gender__c" isEditing={isEditing} formData={formData} setFormData={setFormData} options={[{ label: 'Male', value: 'Male' }, { label: 'Female', value: 'Female' }]} type="select" error={errors.Gender__c} required />
@@ -1150,6 +1160,15 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                                                 <Field label="Contact Name" value={employee.Emergency_Contact_Name__c} fieldKey="Emergency_Contact_Name__c" isEditing={isEditing} formData={formData} setFormData={setFormData} error={errors.Emergency_Contact_Name__c} />
                                                 <Field label="Contact Number" value={employee.Emergency_Contact_Number__c} fieldKey="Emergency_Contact_Number__c" isEditing={isEditing} formData={formData} setFormData={setFormData} pattern="^(?:\\+91\\d{10}|\\d{10})$" type="tel" error={errors.Emergency_Contact_Number__c} placeholder="+919876543210 or 9876543210" />
+                                            </div>
+                                        </div>
+                                        <div className="border-t border-slate-100 pt-8 mt-8">
+                                            <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+                                                <FileText className="w-5 h-5 text-purple-500" /> Academic & Other Details
+                                            </h2>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                                                <Field label="Technology" value={employee.Technology__c} fieldKey="Technology__c" isEditing={isEditing} formData={formData} setFormData={setFormData} placeholder="e.g. React" />
+                                                <Field label="Enrollment Number" value={employee.Enrollment_Number__c} fieldKey="Enrollment_Number__c" isEditing={isEditing} formData={formData} setFormData={setFormData} placeholder="e.g. EN12345" />
                                             </div>
                                         </div>
                                     </div>
@@ -1581,7 +1600,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                         {/* ── Required Documents Tiles ── */}
                                         <div>
                                             <h2 className="text-xl font-bold text-slate-800 mb-1 flex items-center gap-2">
-                                                <FileText className="w-5 h-5 text-orange-500" /> Required Documents
+                                                <FileText className="w-5 h-5 text-orange-500" /> Documents
                                             </h2>
                                             <p className="text-sm text-slate-500 mb-5">Click on a tile to upload the corresponding document.</p>
 
@@ -1667,7 +1686,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                         <div className="border-t border-slate-100 pt-6">
                                             <div className="flex justify-between items-center mb-4">
                                                 <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                                                    <Download className="w-4 h-4 text-slate-500" /> All Uploaded Documents
+                                                    <Download className="w-4 h-4 text-slate-500" /> Uploaded Documents
                                                 </h3>
                                                 {['HR', 'Admin'].includes(currentUserRole) && (
                                                 <Button

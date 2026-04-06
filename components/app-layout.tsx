@@ -4,7 +4,7 @@ import { Sidebar } from "@/components/sidebar"
 import { MobileHeader } from "@/components/mobile-header"
 import { usePathname } from "next/navigation"
 import { useState, useEffect } from "react"
-import { OnboardingWizard } from "@/components/onboarding-wizard";
+// import { OnboardingWizard } from "@/components/onboarding-wizard";
 import { AppTour } from "@/components/app-tour";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
@@ -15,7 +15,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     setIsClient(true)
   }, [])
 
-  const isPublic = pathname === "/" || pathname.startsWith("/auth")
+  const isPublic = pathname === "/" || pathname.startsWith("/auth") || pathname.startsWith("/welcome")
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   if (!isClient) return null
@@ -26,7 +26,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen relative">
-      <OnboardingWizard />
+      {/* <OnboardingWizard /> */}
       <AppTour />
       <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} />
       <div className="flex-1 flex flex-col min-w-0 min-h-screen transition-all duration-300 ease-in-out relative z-10"> 

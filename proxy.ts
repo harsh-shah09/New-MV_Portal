@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server'
 import { verifyToken } from '@/lib/auth-utils'
 
 export async function proxy(request: NextRequest) {
-  const publicPaths = ['/auth/login', '/' , '/auth/change-password' , '/auth/welcome' , '/auth/reset-password'];
+  const publicPaths = ['/auth/login', '/' , '/auth/change-password' , '/auth/welcome' , '/auth/reset-password' , '/welcome'];
   const isPublic = publicPaths.includes(request.nextUrl.pathname);
 
   // Check for session

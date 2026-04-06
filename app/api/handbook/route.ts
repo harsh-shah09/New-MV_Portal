@@ -48,3 +48,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
+
+export async function DELETE(request: NextRequest) {
+  const session = await verifySession();
+  if (!session || (!session.role?.includes('HR') && !session.role?.includes('Admin'))) { 
+     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+    if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
+
+    const { getSalesforceConnection } = await import('@/lib/salesforce');
+    const conn = await getSalesforceConnection();
+    await conn.sobject('Document__c').destroy(id);
+
+    return NextResponse.json({ success: true });
+  } catch (err: any) {
+      console.error(err);
+      return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+}

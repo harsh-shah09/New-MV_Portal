@@ -166,7 +166,7 @@ export const getAllEmployees = async (): Promise<any[]> => {
            Employee_Name__c, Employee_Email__c, Employee_Phone__c, Birthdate__c, Gender__c, 
            Employee_Address__c , Employee_Current_Address__c,
            Emergency_Contact_Name__c, Emergency_Contact_Number__c, Emergency_Contact_Relation__c, 
-           Experience__c, Department__c, Role__c, Title__c, Employee_ID__c
+           Experience__c, Department__c, Role__c, Title__c, Employee_ID__c, Company_Email__c, Technology__c, Enrollment_Number__c
     FROM Employee__c
   `;
 
@@ -298,7 +298,7 @@ export const getEmployeeById = async (id: string): Promise<any | null> => {
       SELECT Id, Name,Employee_Id__c , Employee_Name__c, Employee_Email__c, Joining_Date__c, Onboarding_Date__c, Base_Salary__c, Company_Security_Deduction__c, Salary_CTC__c, Status__c, Active__c, Profile_Photo__c, Team_Lead__c, Password__c, Is2FAEnabled__c,
              Employee_Phone__c, Birthdate__c, Gender__c, Employee_Address__c, Employee_Current_Address__c,
              Emergency_Contact_Name__c, Emergency_Contact_Number__c, Emergency_Contact_Relation__c, 
-             Experience__c, Department__c, Role__c, Title__c
+             Experience__c, Department__c, Role__c, Title__c, Company_Email__c, Technology__c, Enrollment_Number__c
       FROM Employee__c 
       WHERE Id = '${id}'
       LIMIT 1
