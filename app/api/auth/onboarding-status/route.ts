@@ -20,11 +20,8 @@ export async function GET() {
 
 export async function POST(req: Request) {
     const formData = await req.formData();
-    console.log(formData.get('id'))
     const id = formData.get('id') as string || '';
    const session = await verifySession() || {employeeId : id};
-   console.log(session);
-   console.log(req.url);
    
    
    try {
@@ -33,7 +30,6 @@ export async function POST(req: Request) {
        
        if (contentType.includes('multipart/form-data')) {
             // const formData = await req.formData();
-            console.log(formData)
             const step = parseInt(formData.get('step') as string);
             if (step === 1) {
                 // Profile Photo
@@ -52,7 +48,6 @@ export async function POST(req: Request) {
                  if(file) {
                      const buffer = Buffer.from(await file.arrayBuffer());
                      const url = await uploadFileToS3(buffer, `documents/${session.employeeId}-${file.name}`, file.type);
-                     console.log('url' , url)
                      await createDocumentRecord({
                          Name: file.name,
                          Document_Type__c: type || 'Passbook',
@@ -60,7 +55,6 @@ export async function POST(req: Request) {
                          Status__c: 'Uploaded',
                          Employee__c: session.employeeId
                      });
-                     console.log('here')
                  }
             }
             else if (step === 5) {
@@ -91,7 +85,6 @@ export async function POST(req: Request) {
            }
 
            if (step === 2) {
-            console.log(data , 'in address') 
                // Personal Details
                const payload = {
                    Employee_Current_Address__c : JSON.stringify({
@@ -124,7 +117,6 @@ export async function POST(req: Request) {
                 }
                await updateEmployee(session.employeeId, payload );
            } else if (step === 3) {
-            console.log(data , 'inn bank')
                // Bank Details
                await createBankDetail({
                    Name: data.bankName,

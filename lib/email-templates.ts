@@ -307,3 +307,13 @@ export async function welcomeEmail(data: { recipientName: string; setupLink: str
     const text = `Dear ${data.recipientName},\n\nWelcome to MV Clouds! Please set up your account here: ${data.setupLink}`;
     return { subject, html, text };
 }
+export async function onboardingMail(data: { recipientName: string; setupLink: string }): Promise<{ subject: string; html: string; text: string }> {
+  const subject = `Welcome to MV Clouds Team!`;
+  const html = await loadTemplate('onboarding-mail', {
+    recipientName: data.recipientName,
+    setupLink: data.setupLink,
+  });
+  
+  const text = `...`;
+  return { subject, html, text };
+}

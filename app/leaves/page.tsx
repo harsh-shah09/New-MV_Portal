@@ -298,7 +298,7 @@ export default function LeavesPage() {
         .map((emp: any) => ({
           id: emp.Id,
           name: emp.Employee_Name__c || emp.Name || 'Unknown',
-          email: emp.Employee_Email__c || '',
+          email: emp.Company_Email__c || '',
           role: emp.Role__c || '',
           active: emp.Active__c,
         }))

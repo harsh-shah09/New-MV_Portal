@@ -64,8 +64,6 @@ export async function POST(req: Request) {
         if (updates.Status__c) allowedUpdates.Status__c = updates.Status__c;
         allowedUpdates.Active__c = updates.Active__c ?? true;
         // Add other allowed fields here
-        console.log('Updates',updates.Active__c)
-        console.log('allowedUpdates', allowedUpdates);
         await updateEmployee(employeeId, allowedUpdates);
 
         return NextResponse.json({ success: true });

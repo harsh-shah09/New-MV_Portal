@@ -209,7 +209,7 @@ export async function sendEmail({ to, cc, subject, body, contentType = 'text/pla
       const transporter = createInfoTransporter();
 
       const mailOptions: any = {
-        from: process.env.INFO_USER,
+        from: `"MV Clouds" <${process.env.INFO_USER}>`,
         to,
         subject,
         html: body,
@@ -260,12 +260,12 @@ export async function getHREmail(): Promise<string> {
   const conn = await getSalesforceConnection();
   // return 'harsh.s@mvclouds.com';
   const hrRecord = await conn.query<any>(`
-            SELECT Employee_Email__c
+            SELECT Employee_Email__c ,Company_Email__c
             FROM Employee__c
             WHERE Role__c = 'HR' and Title__c = 'Team Lead'
             LIMIT 1
           `);
-  const hrEmail = hrRecord.records?.[0]?.Employee_Email__c;
+  const hrEmail = hrRecord.records?.[0]?.Company_Email__c;
   return hrEmail || '';
 
 }

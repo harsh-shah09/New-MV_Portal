@@ -33,8 +33,8 @@ import {
     ChevronUp,
     Leaf
 } from "lucide-react"
-import { generate2FASecretAction, verifyAndEnable2FAAction, disable2FAAction, getEmployeeTitles } from "@/app/employees/[id]/actions"
-import { message, Spin, Select, Modal, Form, DatePicker, Space, Button } from "antd"
+import { generate2FASecretAction, verifyAndEnable2FAAction, disable2FAAction, getEmployeeTitles, sendWelcomeEmailAction } from "@/app/employees/[id]/actions"
+import { message, Spin, Select, Modal, Form, DatePicker, Space, Button, Pagination } from "antd"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import dayjs from "dayjs"
 import { cn } from "@/lib/utils"
@@ -66,7 +66,9 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
     const queryClient = useQueryClient()
     const [titles, setTitles] = useState<{ label: string, value: string }[]>([])
     const [leaveFilters, setLeaveFilters] = useState({ status: '', type: '', dateRange: [null, null] as [any, any] })
-
+    const [currentPage, setCurrentPage] = useState(1);
+    const [sendingEmail, setSendingEmail] = useState(false);
+    const itemsPerPage = 6;
     useEffect(() => {
         getEmployeeTitles().then(setTitles).catch(console.error)
     }, [])
@@ -280,7 +282,6 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
             setWarningMsg(null)
         } else {
             const expParsed = decimalToYearsMonths(employee.Experience__c)
-            console.log(employee)
             setFormData({
                 Employee_Name__c: employee.Employee_Name__c,
                 Employee_Email__c: employee.Employee_Email__c,
@@ -336,7 +337,6 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                     country: formData.Employee_Address__CountryCode__s
                 }
             );
-            console.log(payload);
 
             // Remove flattened address fields from payload
             delete payload.Employee_Address__Street__s;
@@ -912,7 +912,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
         )
     }
     return (
-        <div className="w-full mx-auto p-6 lg:p-10 space-y-8 animate-in fade-in duration-500">
+        <div className="w-full mx-auto px-8 max-h-[85vh] overflow-y-auto space-y-8 animate-in fade-in duration-500">
             {/* {isScreenActionLoading && (
                 <div className="fixed z-[999] h-[80vh] overflow-hidden inset-0 backdrop-blur-sm flex items-center justify-center">
                     <div className="bg-white rounded-xl shadow-xl px-6 py-5 flex items-center gap-3 border border-slate-100">
@@ -967,7 +967,30 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
 
                     {/* Action Button */}
                     {canToggleUserActive && (
-                        <div className="shrink-0">
+                        <div className="shrink-0 flex items-center gap-3">
+                            <button
+                                onClick={async () => {
+                                    if (!employee.Employee_Email__c) {
+                                        message.error("Employee Email is required to send welcome email.");
+                                        return;
+                                    }
+                                    setSendingEmail(true);
+                                    try {
+                                        const res = await sendWelcomeEmailAction(employeeId, employee.Employee_Email__c, employee.Employee_Name__c);
+                                        if (res.error) throw new Error(res.error);
+                                        message.success("Welcome Email sent successfully.");
+                                    } catch (e) {
+                                        message.error("Failed to send Welcome Email.");
+                                    } finally {
+                                        setSendingEmail(false);
+                                    }
+                                }}
+                                disabled={sendingEmail || !employee.Employee_Email__c}
+                                className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all border shadow-lg bg-white border-gray-200 text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <Mail className="w-4 h-4" />
+                                {sendingEmail ? 'Sending...' : 'Send Welcome Email'}
+                            </button>
                             <button
                                 onClick={() => {
                                     const isActivating = !employee.Active__c;
@@ -995,8 +1018,10 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                         }
                                     });
                                 }}
+                                disabled={!employee.Active__c && !employee.Company_Email__c}
                                 className={cn(
                                     'flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all border shadow-lg',
+                                    (!employee.Active__c && !employee.Company_Email__c) && 'opacity-50 cursor-not-allowed',
                                     employee.Active__c
                                         ? 'bg-red-600/90 text-white border-red-500/50 hover:bg-red-700'
                                         : 'bg-green-600/90 text-white border-green-500/50 hover:bg-green-700'
@@ -1662,7 +1687,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                                 {!uploaded && !isUploading && (
                                                                     <span className="text-[10px] text-slate-400">Click to upload</span>
                                                                 )}
-                                                                {/* View link for uploaded docs */}
+                                                                {/* View link for uploaded docs
                                                                 {uploaded && uploaded.File_URL__c && (
                                                                     <button
                                                                         type="button"
@@ -1674,7 +1699,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                                     >
                                                                         <Eye className="w-3 h-3" /> View
                                                                     </button>
-                                                                )}
+                                                                )} */}
                                                             </label>
                                                         )
                                                     })}
@@ -1702,9 +1727,13 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                 const nonPayslipDocs = (employee.documents || []).filter(
                                                     (doc: any) => doc.Document_Type__c?.trim().toLowerCase() !== 'payslip'
                                                 )
-                                                return nonPayslipDocs.length > 0 ? (
+                                                const totalDocs = nonPayslipDocs.length;
+                                                const startIndex = (currentPage - 1) * itemsPerPage;
+                                                const paginatedDocs = nonPayslipDocs.slice(startIndex, startIndex + itemsPerPage);
+                                                return totalDocs > 0 ? (
+                                                    <>
                                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                                        {nonPayslipDocs.map((doc: any) => (
+                                                        {paginatedDocs.map((doc: any) => (
                                                             <div key={doc.Id} className="group p-4 border border-slate-200 rounded-xl hover:border-blue-300 hover:bg-blue-50/10 transition relative">
                                                                 {/* Top row: icon + name + approve/reject */}
                                                                 <div className="flex items-start gap-3">
@@ -1779,6 +1808,21 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                             </div>
                                                         ))}
                                                     </div>
+                                                    {/* Pagination */}
+                                                    {totalDocs > itemsPerPage && (
+                                                        <div className="flex justify-end mt-6">
+                                                            <Pagination
+                                                                current={currentPage}
+                                                                total={totalDocs}
+                                                                pageSize={itemsPerPage}
+                                                                onChange={(page) => setCurrentPage(page)}
+                                                                showSizeChanger={false}
+                                                                className="ant-pagination-custom"
+                                                                
+                                                            />
+                                                        </div>
+                                                    )}
+                                                </>
                                                 ) : (
                                                     <div className="text-center py-10 bg-slate-50 rounded-xl border-dashed border-2 border-slate-200">
                                                         <FileText className="w-10 h-10 text-slate-300 mx-auto mb-2" />
@@ -1786,6 +1830,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                     </div>
                                                 )
                                             })()}
+                                            
                                         </div>
 
                                         {/* Custom Document Upload Modal */}

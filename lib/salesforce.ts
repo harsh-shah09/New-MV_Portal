@@ -104,7 +104,7 @@ export interface Employee {
   Employee_Email__c?: string;
   Password__c?: string; // Stored hash
   Employee_Name__c: string; // Replaces Name/FirstName/LastName
-  
+  Company_Email__c?: string;
   // New fields directly on Employee__c
   Department__c?: string;
   Role__c?: string;
@@ -141,9 +141,9 @@ export const findEmployee = async (identifier: string): Promise<Employee | null>
   const escapedIdentifier = identifier.replace(/'/g, "\\'");
   // Updated query to fetch fields from Employee__c directly
   const query = `
-    SELECT Id , Employee_Name__c, Employee_Email__c, Password__c, Role__c, Title__c, Is2FAEnabled__c, Name, Active__c
+    SELECT Id , Employee_Name__c, Employee_Email__c,Company_Email__c, Password__c, Role__c, Title__c, Is2FAEnabled__c, Name, Active__c
     FROM Employee__c 
-    WHERE ${isEmail ? 'Employee_Email__c' : 'Name'} = '${escapedIdentifier}' 
+    WHERE ${isEmail ? 'Company_Email__c' : 'Name'} = '${escapedIdentifier}' 
     LIMIT 1
   `;
   console.log(query)

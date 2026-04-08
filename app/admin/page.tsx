@@ -142,7 +142,6 @@ export default function AdminConsole() {
             const res = await fetch('/api/admin/users');
             if (!res.ok) throw new Error("Failed to fetch users");
             const data = await res.json();
-            console.log('users', data)
             setUsers(data);
         } catch (e) {
             message.error("Failed to load users");
@@ -352,7 +351,7 @@ export default function AdminConsole() {
 
     return (
         <RoleGuard>
-            <div className="min-h-screen bg-slate-50 p-6 lg:p-10">
+            <div className="min-h-screen bg-slate-50 p-6">
                 <div className="w-full mx-auto space-y-4 lg:space-y-8">
 
                     {/* Header */}
@@ -400,7 +399,7 @@ export default function AdminConsole() {
 
                         {/* Content */}
                         <div className="lg:col-span-3">
-                            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 sm:p-6 lg:p-8 min-h-[600px]">
+                            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 sm:p-6 lg:p-8 max-h-[70vh] overflow-y-auto">
                                 <AnimatePresence mode="wait">
                                     <motion.div
                                         key={activeTab}
@@ -727,8 +726,7 @@ export default function AdminConsole() {
                                                                                                 const data = {
                                                                                                     Active__c: user.Active__c ? false : true
                                                                                                 }
-                                                                                                console.log(data)
-                                                                                                updateUser(user.Id, data)
+                                                                                                                                                                                     updateUser(user.Id, data)
                                                                                             }}
                                                                                             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${user.Active__c
                                                                                                 ? "bg-green-100 text-green-700 hover:bg-green-200"

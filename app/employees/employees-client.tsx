@@ -124,8 +124,6 @@ export default function EmployeesClient({ role }: EmployeesClientProps) {
   })
 
   const handleAddEmployee = (data: Employee) => {
-    console.log("Add not implemented fully via API yet", data);
-    message.info("Add Employee feature coming soon via API");
     setShowForm(false)
   }
 

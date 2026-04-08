@@ -199,7 +199,7 @@ export default function NDAPage() {
             replace('Seperation_Date__c', formatToDDMMYYYY(emp.Seperation_Date__c || new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })));
             replace('Employee_Title__c' , emp.Title__c + ' ' + emp.Role__c);
             replace('Employee_ID__c' , emp.Name);
-            replace('Email' , emp.Employee_Email__c);
+            replace('Email' , emp.Company_Email__c);
             replace('Phone' , emp.Employee_Phone__c);
             replace('Employment_Duration__c' , formatToDDMMYYYY(emp.Joining_Date__c) + ' - ' + formatToDDMMYYYY(emp.Seperation_Date__c))
             replace('Enrollment_Number__c' , emp.Enrollment_Number__c);
@@ -465,7 +465,7 @@ export default function NDAPage() {
                                                             </div>
                                                             <div className="flex-1 min-w-0">
                                                                 <h3 className="font-bold text-card-foreground truncate text-base">{selectedEmployee.Employee_Name__c}</h3>
-                                                                <p className="text-xs text-muted-foreground truncate mb-2">{selectedEmployee.Employee_Email__c}</p>
+                                                                <p className="text-xs text-muted-foreground truncate mb-2">{selectedEmployee.Company_Email__c}</p>
 
                                                                 <div className="flex flex-col gap-1.5 mt-2 pt-2 border-t border-primary/20">
                                                                     <div className="flex justify-between items-center text-xs group">

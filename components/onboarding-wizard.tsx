@@ -24,7 +24,6 @@ export function OnboardingWizard({ publicMode = false, publicEmpId , firsttime =
     const [form] = Form.useForm()
     const phonePattern = /^(\+91|91)?[6-9]\d{9}$|^[6-9]\d{9}$/
     const [formErrors, setFormErrors] = useState<Record<string, string>>({})
-    console.log(form.getFieldsValue())
     const queryClient = useQueryClient()
     const [showConfetti, setShowConfetti] = useState(false)
     const [profileFile, setProfileFile] = useState<File | null>(null)
@@ -120,7 +119,6 @@ export function OnboardingWizard({ publicMode = false, publicEmpId , firsttime =
                                 ifscCode: bank.IFSC__c || '',
                             });
                         }
-
                         if (emp.documents && emp.documents.length > 0) {
                              const passbook = emp.documents.find((d: any) => d.Document_Type__c === 'Passbook');
                              if (passbook) setPassbookUploaded(true);
@@ -144,13 +142,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId , firsttime =
             setDocuments([
                 'Aadhaar Card',
                 'PAN Card',
-                'Passport',
                 'Driving License',
-                'Voter ID',
-                'Bank Passbook',
-                'Resume',
-                'Passport Size Photo',
-                'Other',
             ])
             return;
         }
@@ -246,13 +238,11 @@ export function OnboardingWizard({ publicMode = false, publicEmpId , firsttime =
         formData.append('type', 'Passbook')
         formData.append('step', '3_passbook')
         if (publicMode && publicEmpId) formData.append('id', publicEmpId)
-        console.log(formData)
         try {
             const res = await fetch('/api/auth/onboarding-status', {
                 method: 'POST',
                 body: formData
             })
-            console.log(res)
             if (!res.ok) throw new Error('Upload Failed')
             setPassbookUploaded(true)
             message.success(`${file.name} uploaded successfully`)
@@ -344,6 +334,16 @@ export function OnboardingWizard({ publicMode = false, publicEmpId , firsttime =
                           message.error("Please upload your Passbook or Bank Statement to proceed.");
                           setLoading(false);
                           return;
+                     }
+                }
+                if (currentStep === 4) {
+                     if (documents && documents.length > 0) {
+                          const missingDocs = documents.filter(docName => !existingDocuments.some(d => d.Document_Type__c === docName));
+                          if (missingDocs.length > 0) {
+                               message.error("Please upload all required documents to proceed.");
+                               setLoading(false);
+                               return;
+                          }
                      }
                 }
                 const values = await form.validateFields()
@@ -648,7 +648,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId , firsttime =
                         >
                             {/* Title */}
                             <p className="text-sm font-medium text-gray-700 mb-3">
-                            {doc}
+                            {doc} <span className="text-red-500">*</span>
                             </p>
 
                             {/* Upload Box */}

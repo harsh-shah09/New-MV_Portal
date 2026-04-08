@@ -35,7 +35,6 @@ export function EmployeeDashboard({ data, hideTeamMembersWidget = false }: Emplo
 
   const totalLeavesTaken = leaveBalanceData.sickLeaveCount + leaveBalanceData.emergencyLeaveCount + leaveBalanceData.plannedLeaveCount
   const totalAllowance = 18
-console.log(data)
   return (
     <div className="space-y-6">
       {/* Header Section */}

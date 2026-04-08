@@ -21,7 +21,7 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
             </Link>
             )}
         </div>
-        <div className="-mt-4">
+        <div className="mt-1">
                         <EmployeeProfileView employeeId={id} currentUserRole={role} currentUserEmployeeId={currentUserEmployeeId} />
         </div>
     </div>

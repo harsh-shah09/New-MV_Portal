@@ -13,7 +13,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
         const { active } = await req.json(); // expected boolean
-console.log(id , active)
         // 1. Update Salesforce
         await updateEmployee(id, { 
             Active__c: active,
@@ -36,7 +35,7 @@ console.log(id , active)
                 });
 
                 await sendEmail({
-                    to: employee.Employee_Email__c,
+                    to: employee.Company_Email__c,
                     subject,
                     body: html,
                     contentType: 'text/html',
