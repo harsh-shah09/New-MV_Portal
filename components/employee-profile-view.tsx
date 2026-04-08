@@ -2051,6 +2051,8 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                 {activeTab === "salary-history" && canViewSalaryHistory && (
                                     <EmployeeSalaryHistoryTab
                                         employeeId={employeeId}
+                                        employeeName={employee?.Employee_Name__c}
+                                        employeeCode={employee?.Enrollment_Number__c}
                                         currentUserRole={currentUserRole}
                                     />
                                 )}

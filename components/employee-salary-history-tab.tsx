@@ -8,6 +8,8 @@ import { DollarSign, History } from "lucide-react"
 
 interface EmployeeSalaryHistoryTabProps {
   employeeId: string
+  employeeName?: string
+  employeeCode?: string
   currentUserRole: string
 }
 
@@ -54,10 +56,11 @@ const formatCurrency = (amount?: number | null) => {
   }).format(amount)
 }
 
-export function EmployeeSalaryHistoryTab({ employeeId, currentUserRole }: EmployeeSalaryHistoryTabProps) {
+export function EmployeeSalaryHistoryTab({ employeeId, employeeName, employeeCode, currentUserRole }: EmployeeSalaryHistoryTabProps) {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [form] = Form.useForm<SalaryHistoryFormValues>()
   const queryClient = useQueryClient()
+  const selectedEmployeeDisplay = employeeName?.trim() || employeeCode?.trim() || employeeId
 
   const previousSalary = Form.useWatch("Previous_Salary__c", form)
   const currentSalary = Form.useWatch("Current_Salary__c", form)
@@ -215,13 +218,14 @@ export function EmployeeSalaryHistoryTab({ employeeId, currentUserRole }: Employ
         title="Add Salary History Record"
         open={isModalOpen}
         width={820}
-        // styles={{
-        //   body: {
-        //     maxHeight: "70vh",
-        //     overflowY: "auto",
-        //     paddingRight: 8
-        //   }
-        // }}
+        styles={{
+          body: {
+            maxHeight: "70vh",
+            overflowY: "auto",
+            overscrollBehavior: "contain",
+            paddingRight: 8
+          }
+        }}
         onCancel={() => {
           setIsModalOpen(false)
           form.resetFields()
@@ -240,8 +244,8 @@ export function EmployeeSalaryHistoryTab({ employeeId, currentUserRole }: Employ
         >
           <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Selected Employee</p>
-            <Form.Item label="Employee Record Id" tooltip="Selected employee will be used automatically." className="!mb-0">
-              <Input value={employeeId} disabled className="!font-mono" />
+            <Form.Item label="Employee" tooltip="Selected employee is picked automatically from this profile." className="!mb-0">
+              <Input value={selectedEmployeeDisplay} disabled className="!font-medium" />
             </Form.Item>
           </div>
 
@@ -287,10 +291,10 @@ export function EmployeeSalaryHistoryTab({ employeeId, currentUserRole }: Employ
           </div>
 
           <div className="rounded-xl border border-slate-200 bg-white px-4 py-4">
-            <h4 className="text-sm font-semibold text-slate-700 mb-3">Change Details</h4>
+            <h4 className="text-sm font-semibold text-slate-700 mb-3">Salary Change Information</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <Form.Item
-                label="Effective Date"
+                label="Salary Effective From"
                 name="Effective_Date__c"
                 rules={[{ required: true, message: "Effective date is required" }]}
                 className="!mb-2"
@@ -298,11 +302,21 @@ export function EmployeeSalaryHistoryTab({ employeeId, currentUserRole }: Employ
                 <DatePicker className="!w-full" format="DD/MM/YYYY" />
               </Form.Item>
 
-              <Form.Item label="End Date" name="End_Date__c" className="!mb-2">
-                <DatePicker className="!w-full" format="DD/MM/YYYY" />
+              <Form.Item
+                label="Salary Effective Until"
+                name="End_Date__c"
+                tooltip="This date is auto-calculated when a new increment record is added."
+                className="!mb-2"
+              >
+                <DatePicker
+                  className="!w-full"
+                  format="DD/MM/YYYY"
+                  disabled
+                  placeholder="Auto-calculated"
+                />
               </Form.Item>
 
-              <Form.Item label="Change Type" name="Change_Type__c" className="!mb-2">
+              <Form.Item label="Reason for Salary Change" name="Change_Type__c" className="!mb-2">
                 <Select
                   placeholder="Select change type"
                   options={data?.changeTypeOptions || []}
@@ -317,10 +331,10 @@ export function EmployeeSalaryHistoryTab({ employeeId, currentUserRole }: Employ
               >
                 <Select
                   options={[
-                    { label: "True", value: true },
-                    { label: "False", value: false }
+                    { label: "Yes, this is the current salary", value: true },
+                    { label: "No, this is a past salary", value: false }
                   ]}
-                  placeholder="Select true/false"
+                  placeholder="Select current salary status"
                 />
               </Form.Item>
             </div>
