@@ -669,6 +669,26 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
         onError: () => message.error("Failed to add bank account")
     })
 
+    const verifyBankMutation = useMutation({
+        mutationFn: async ({ bankId, action }: { bankId: string, action: 'approve' | 'reject' }) => {
+            const res = await fetch(`/api/employees/${employeeId}/bank/verify`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ bankId, action })
+            })
+            const data = await res.json()
+            if (!res.ok) throw new Error(data.error || 'Failed to verify bank account')
+            return data
+        },
+        onSuccess: (_data, variables) => {
+            message.success(`Bank account ${variables.action === 'approve' ? 'verified' : 'rejected'} successfully`)
+            queryClient.invalidateQueries({ queryKey: ["employee", employeeId] })
+        },
+        onError: (error: any) => {
+            message.error(error?.message || 'Failed to verify bank account')
+        }
+    })
+
     // --- Delete Bank Mutation ---
     const deleteBankMutation = useMutation({
         mutationFn: async (bankId: string) => {
@@ -710,10 +730,10 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
     const canManageBankAccounts = ['HR', 'Admin'].includes(currentUserRole)
 
     const handleAddBank = () => {
-        if (!canManageBankAccounts) {
-            message.error("Only HR or Admin can add bank accounts")
-            return
-        }
+        // if (!canManageBankAccounts) {
+        //     message.error("Only HR or Admin can add bank accounts")
+        //     return
+        // }
 
         const newErrors: Record<string, string> = {}
 
@@ -887,6 +907,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
         updateMutation.isPending ||
         uploadMutation.isPending ||
         addBankMutation.isPending ||
+        verifyBankMutation.isPending ||
         setPrimaryBankMutation.isPending ||
         deleteBankMutation.isPending ||
         customDocMutation.isPending ||
@@ -1536,8 +1557,35 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                                 <p className="text-sm text-slate-500">{bank.Bank_Branch_Name__c}</p>
                                                             </div>
                                                             <div className="flex items-center gap-2">
-                                                                {bank.Primary_Account__c && <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full font-medium">Primary</span>}
-                                                                {!bank.Primary_Account__c && (
+                                                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                                                                    bank.Status__c === 'Verified' ? 'bg-green-50 text-green-700 border-green-200' :
+                                                                    bank.Status__c === 'Rejected' ? 'bg-red-50 text-red-700 border-red-200' :
+                                                                    'bg-amber-50 text-amber-700 border-amber-200'
+                                                                } border whitespace-nowrap`}>
+                                                                    {bank.Status__c || 'Pending'}
+                                                                </span>
+                                                                {isHrUser && (!bank.Status__c || bank.Status__c === 'Pending') && (
+                                                                    <>
+                                                                        <button
+                                                                            onClick={() => verifyBankMutation.mutate({ bankId: bank.Id, action: 'approve' })}
+                                                                            disabled={verifyBankMutation.isPending}
+                                                                            className="text-xs px-2 py-1 rounded-md border border-green-200 text-green-600 hover:bg-green-50 disabled:opacity-50"
+                                                                            title="Verify Account"
+                                                                        >
+                                                                            Verify
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => verifyBankMutation.mutate({ bankId: bank.Id, action: 'reject' })}
+                                                                            disabled={verifyBankMutation.isPending}
+                                                                            className="text-xs px-2 py-1 rounded-md border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50"
+                                                                            title="Reject Account"
+                                                                        >
+                                                                            Reject
+                                                                        </button>
+                                                                    </>
+                                                                )}
+                                                                {bank.Primary_Account__c && <span className="bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded-full font-medium">Primary</span>}
+                                                                {/* {!bank.Primary_Account__c && (
                                                                     <button
                                                                         onClick={() => setPrimaryBankMutation.mutate(bank.Id)}
                                                                         disabled={setPrimaryBankMutation.isPending}
@@ -1546,7 +1594,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                                     >
                                                                         Set Primary
                                                                     </button>
-                                                                )}
+                                                                )} */}
                                                                 {currentUserRole === 'Admin' && (
                                                                     <button
                                                                         onClick={() => {

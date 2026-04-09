@@ -608,7 +608,15 @@ export default function NDAPage() {
                                                 {/* Fullscreen Toggle */}
                                                 <div className="absolute top-4 right-4 z-10 flex gap-2">
                                                     <button
-                                                        onClick={() => setIsEditing(!isEditing)}
+                                                        onClick={() => {
+                                                            if (isEditing) {
+                                                                const el = document.getElementById('nda-preview-content');
+                                                                if (el && el.innerHTML !== previewContent) {
+                                                                    setPreviewContent(el.innerHTML);
+                                                                }
+                                                            }
+                                                            setIsEditing(!isEditing);
+                                                        }}
                                                         className="p-2.5 bg-white/80 backdrop-blur-md rounded-xl shadow-lg border border-slate-200 hover:bg-slate-50 transition-all text-slate-600 hover:text-blue-600 hover:scale-105"
                                                         title={isEditing ? "Save Edits" : "Edit Document"}
                                                     >

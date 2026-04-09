@@ -99,7 +99,7 @@ async function getTemplateMap(): Promise<Map<string, string>> {
 /**
  * Load HTML template from Salesforce metadata and replace placeholders with data
  */
-async function loadTemplate(templateName: string, data: LeaveEmailData): Promise<string> {
+export async function loadTemplate(templateName: string, data: LeaveEmailData): Promise<string> {
   try {
     const templateMap = await getTemplateMap();
     const template = templateMap.get(templateName) || templateMap.get(normalizeTemplateKey(templateName));

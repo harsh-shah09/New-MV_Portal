@@ -310,7 +310,7 @@ export const getEmployeeById = async (id: string): Promise<any | null> => {
 
     // 2. Fetch Bank Details
     const bankQuery = `
-      SELECT Id, Name, Bank_Branch_Name__c, Bank_Account_Number__c, IFSC__c, Primary_Account__c
+      SELECT Id, Name, Bank_Branch_Name__c, Bank_Account_Number__c, IFSC__c, Primary_Account__c, Status__c
       FROM Bank_Detail__c
       WHERE Employee__c = '${id}'
     `;
