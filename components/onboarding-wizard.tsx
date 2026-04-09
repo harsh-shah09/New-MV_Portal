@@ -140,7 +140,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId , firsttime =
         if (publicMode && publicEmpId) {
             setDocumentsLoading(false)
             setDocuments([
-                'Adhaar Card',
+                'Aadhaar Card',
                 'PAN Card',
                 'Driving Licence',
             ])
@@ -391,6 +391,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId , firsttime =
             })
             if (!res.ok) throw new Error('Upload Failed')
             onSuccess("Ok")
+            setExistingDocuments(prev => [...prev, { Document_Type__c: doc }])
             message.success('Uploaded successfully')
         } catch (err) {
             onError({ err })
@@ -746,7 +747,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId , firsttime =
     if (publicMode && currentStep > stepItems.length) {
          return (
              <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-                 {showConfetti && <Confetti recycle={false} numberOfPieces={500} />}
+                 {true && <Confetti recycle={false} numberOfPieces={500} />}
                  <div className="bg-white rounded-3xl shadow-xl border border-slate-100 max-w-lg w-full p-10 text-center">
                      <CheckCircleOutlined className="text-6xl text-green-500 mb-6" />
                      <h2 className="text-3xl font-bold text-gray-800 mb-4">You're All Set!</h2>

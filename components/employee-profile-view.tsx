@@ -223,9 +223,6 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                 newErrors.Employee_Email__c = "Please enter a valid email address"
             }
 
-            if (companyEmail && !emailPattern.test(companyEmail)) {
-                newErrors.Company_Email__c = "Please enter a valid company email address"
-            }
 
             if (!phone) {
                 newErrors.Employee_Phone__c = "Phone number is required"
@@ -267,6 +264,22 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
             if (currentUserRole !== "Employee") {
                 if (!formData.Role__c) newErrors.Role__c = "Role is required"
                 if (!formData.Department__c) newErrors.Department__c = "Department is required"
+            }
+
+            const companyEmail = formData.Company_Email__c?.trim()
+            if (companyEmail) {
+                if (!emailPattern.test(companyEmail)) {
+                    newErrors.Company_Email__c = "Please enter a valid company email address";
+                } else if (employeesList) {
+                    const isDuplicate = employeesList.some((emp: any) => 
+                        emp.Id !== employeeId && 
+                        emp.Status__c === 'Active' && 
+                        emp.Company_Email__c?.trim().toLowerCase() === companyEmail.toLowerCase()
+                    );
+                    if (isDuplicate) {
+                        newErrors.Company_Email__c = "This Company Email is already assigned to another active employee";
+                    }
+                }
             }
         }
 
@@ -894,6 +907,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
         normalizeSfId(currentUserEmployeeId) !== '' &&
         normalizeSfId(currentUserEmployeeId) === normalizeSfId(employee?.Id || employeeId)
     const selectedDepartment = `${formData.Department__c ?? employee.Department__c ?? ''}`.trim().toLowerCase()
+    const selectedRole = `${formData.Role__c ?? employee.Role__c ?? ''}`.trim().toLowerCase()
     const canViewCompensation = isAdminUser || (!isHrUser && isOwnProfile) || (isHrUser && isOwnProfile)
     const canViewSalaryHistory = isAdminUser || (!isHrUser && isOwnProfile) || (isHrUser && isOwnProfile)
     const canToggleUserActive =
@@ -977,7 +991,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                     }
                                     setSendingEmail(true);
                                     try {
-                                        const res = await sendWelcomeEmailAction(employeeId, employee.Employee_Email__c, employee.Employee_Name__c);
+                                        const res = await sendWelcomeEmailAction(employeeId, employee.Employee_Email__c, employee.Employee_Name__c , employee.Name);
                                         if (res.error) throw new Error(res.error);
                                         message.success("Welcome Email sent successfully.");
                                     } catch (e) {
@@ -1019,10 +1033,10 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                         }
                                     });
                                 }}
-                                disabled={!employee.Active__c && !employee.Company_Email__c}
+                                disabled={!employee.Active__c && (!employee.Company_Email__c || !employee.Role__c || !employee.Title__c || !employee.Department__c)}
                                 className={cn(
                                     'flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all border shadow-lg',
-                                    (!employee.Active__c && !employee.Company_Email__c) && 'opacity-50 cursor-not-allowed',
+                                    (!employee.Active__c && (!employee.Company_Email__c || !employee.Role__c || !employee.Title__c || !employee.Department__c)) && 'opacity-50 cursor-not-allowed',
                                     employee.Active__c
                                         ? 'bg-red-600/90 text-white border-red-500/50 hover:bg-red-700'
                                         : 'bg-green-600/90 text-white border-green-500/50 hover:bg-green-700'
@@ -1149,7 +1163,6 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                                                 <Field label="Employee Name" value={employee.Employee_Name__c} fieldKey="Employee_Name__c" isEditing={isEditing} formData={formData} setFormData={setFormData} error={errors.Employee_Name__c} placeholder="e.g. John Doe" required />
                                                 <Field label="Personal Email" value={employee.Employee_Email__c} fieldKey="Employee_Email__c" type="email" isEditing={isEditing} formData={formData} setFormData={setFormData} error={errors.Employee_Email__c} placeholder="e.g. john@example.com" required />
-                                                <Field label="Company Email" value={employee.Company_Email__c} fieldKey="Company_Email__c" type="email" isEditing={isEditing} formData={formData} setFormData={setFormData} error={errors.Company_Email__c} placeholder="e.g. john@company.com" />
                                                 <Field label="Phone Number" value={employee.Employee_Phone__c} fieldKey="Employee_Phone__c" type="tel" isEditing={isEditing} formData={formData} setFormData={setFormData} error={errors.Employee_Phone__c} placeholder="+919876543210 or 9876543210" required />
                                                 <Field label="Date of Birth" value={employee.Birthdate__c} fieldKey="Birthdate__c" type="date" isEditing={isEditing} formData={formData} setFormData={setFormData} error={errors.Birthdate__c} required />
                                                 <Field label="Gender" value={employee.Gender__c} fieldKey="Gender__c" isEditing={isEditing} formData={formData} setFormData={setFormData} options={[{ label: 'Male', value: 'Male' }, { label: 'Female', value: 'Female' }]} type="select" error={errors.Gender__c} required />
@@ -1284,6 +1297,17 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                     options={titles}
                                                     placeholder="Select Job Title"
                                                 />
+                                                <Field
+                                                    label="Company Email"
+                                                    value={employee.Company_Email__c}
+                                                    fieldKey="Company_Email__c"
+                                                    type="email"
+                                                    isEditing={isEditing && ['HR', 'Admin'].includes(currentUserRole)}
+                                                    formData={formData}
+                                                    setFormData={setFormData}
+                                                    error={errors.Company_Email__c}
+                                                    placeholder="e.g. john@company.com"
+                                                />
 
                                                 {/* ── Total Experience: split into Years + Months ── */}
                                                 <div className="space-y-1.5">
@@ -1380,7 +1404,8 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                                     e.Id !== employeeId &&
                                                                     e.Status__c === 'Active' &&
                                                                     (e.Title__c || '').trim().toLowerCase() === 'team lead' &&
-                                                                    (e.Department__c || '').trim().toLowerCase() === selectedDepartment
+                                                                    ((e.Department__c || '').trim().toLowerCase() === selectedDepartment  || 
+                                                                    (e.Role__c || '').trim().toLowerCase() === selectedRole)
                                                                 ).map((e: any) => ({
                                                                     value: e.Id,
                                                                     label: `${e.Employee_Name__c || ''}`.trim()

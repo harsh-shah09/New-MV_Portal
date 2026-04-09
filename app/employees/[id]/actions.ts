@@ -61,12 +61,17 @@ export async function disable2FAAction(employeeId: string) {
 import { sendEmail } from '@/lib/email';
 import { onboardingMail } from '@/lib/email-templates';
 
-export async function sendWelcomeEmailAction(employeeId: string, email: string, name: string) {
+export async function sendWelcomeEmailAction(employeeId: string, email: string, name: string , empName : string) {
     try {
         const token = { expirationtime : Date.now() + 48 * 60 * 60 * 1000 , firsttime : true };
         const encryptedToken = btoa(JSON.stringify(token));
         const setupLink = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/welcome?id=${employeeId}&token=${encryptedToken}`;
-        const { subject, html } = await onboardingMail({ recipientName: name, setupLink });
+        let { subject, html } = await onboardingMail({ recipientName: name, setupLink });
+        
+        if (empName) {
+            html = html.replace(/{{Employee_Id}}/g, empName);
+        }
+
         await sendEmail({
             to: email,
             subject,

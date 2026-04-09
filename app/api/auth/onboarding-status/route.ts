@@ -1,7 +1,7 @@
 
 import { NextResponse } from 'next/server';
 import { verifySession } from '@/lib/auth';
-import { getIsFirstTimeLogin, getOnboardingStep, setOnboardingStep, clearOnboardingData } from '@/lib/dynamodb';
+import { getIsFirstTimeLogin, getOnboardingStep, setOnboardingStep, clearOnboardingData, setFirstTimeLogin } from '@/lib/dynamodb';
 import { updateEmployee, createBankDetail, createDocumentRecord, getEmployeeById } from '@/lib/salesforce';
 import { uploadFileToS3 } from '@/lib/s3';
 
@@ -81,6 +81,7 @@ export async function POST(req: Request) {
            
            if (action === 'complete') {
                await clearOnboardingData(session.employeeId);
+               await setFirstTimeLogin(session.employeeId, true);
                return NextResponse.json({ success: true, completed: true });
            }
 
