@@ -16,8 +16,7 @@ const AUTO_REPLACED_KEYS = new Set([
     'Employee_Role__c', 'Department__c', 'employee_Id', 'EmployeeId',
     'Joining_Date__c', 'joining_date', 'Base_Salary__c', 'Salary_CTC__c',
     'Seperation_Date__c', 'Employee_Title__c', 'Employee_ID__c',
-     'Email', 'Phone', 'Employee_Address',
-    'Father_Name','salary_per_month','CTC', 'Date','Employment_Duration__c' ,'Enrollment_Number__c','Technology__c'
+     'Email', 'Phone', 'Employee_Address','salary_per_month','CTC', 'Date','Employment_Duration__c' ,'Enrollment_Number__c','Technology__c'
 ]);
 
 /** Extract all {{KEY}} placeholders from an HTML template string */
@@ -222,12 +221,17 @@ export default function NDAPage() {
             const himHer = gender === 'male' ? 'Him' : gender === 'female' ? 'Her' : 'Him/her';
             const himHerLower = gender === 'male' ? 'him' : gender === 'female' ? 'her' : 'him/her';
             const himselfHerselfLower = gender === 'male' ? 'himself' : gender === 'female' ? 'herself' : 'himself/herself';
-
+            const sirMadam = gender === 'male' ? 'Sir' : gender === 'female' ? 'Madam' : 'Sir/Madam';
             html = html.replace(/\bHe\/she\b/g, heShe)
                        .replace(/\bhe\/she\b/g, heSheLower)
                        .replace(/\bHe \/ she\b/g, heShe)
                        .replace(/\bhe \/ she\b/g, heSheLower)
+                       .replace(/\bHe\/She\b/g, heShe)
+                       .replace(/\bHe\/She\b/g, heSheLower)
                        .replace(/\bHis\/her\b/g, hisHer)
+                       .replace(/\bhis\/her\b/g, hisHerLower)
+                       .replace(/\bHis\/Her\b/g, hisHer)
+                       .replace(/\bSir\/Madam\b/g, sirMadam)   
                        .replace(/\bhis\/her\b/g, hisHerLower)
                        .replace(/\bHim\/her\b/g, himHer)
                        .replace(/\bhim\/her\b/g, himHerLower)

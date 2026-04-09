@@ -140,9 +140,9 @@ export function OnboardingWizard({ publicMode = false, publicEmpId , firsttime =
         if (publicMode && publicEmpId) {
             setDocumentsLoading(false)
             setDocuments([
-                'Aadhaar Card',
+                'Adhaar Card',
                 'PAN Card',
-                'Driving License',
+                'Driving Licence',
             ])
             return;
         }
@@ -607,6 +607,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId , firsttime =
                                 }}
                                 className="!bg-gray-50 hover:!bg-blue-50 transition rounded-lg"
                                 disabled={passbookUploading}
+                                accept=".pdf,.jpg,.jpeg,.png"
                             >
                                 <p className="ant-upload-drag-icon">
                                     {passbookUploaded
