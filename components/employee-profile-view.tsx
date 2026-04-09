@@ -893,6 +893,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
     const isOwnProfile =
         normalizeSfId(currentUserEmployeeId) !== '' &&
         normalizeSfId(currentUserEmployeeId) === normalizeSfId(employee?.Id || employeeId)
+    const selectedDepartment = `${formData.Department__c ?? employee.Department__c ?? ''}`.trim().toLowerCase()
     const canViewCompensation = isAdminUser || (!isHrUser && isOwnProfile) || (isHrUser && isOwnProfile)
     const canViewSalaryHistory = isAdminUser || (!isHrUser && isOwnProfile) || (isHrUser && isOwnProfile)
     const canToggleUserActive =
@@ -1375,7 +1376,12 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                                 placeholder="Select Manager"
                                                                 value={formData.Team_Lead__c !== undefined ? formData.Team_Lead__c : employee.Team_Lead__c}
                                                                 onChange={(val: any) => setFormData({ ...formData, Team_Lead__c: val })}
-                                                                options={employeesList?.filter((e: any) => e.Id !== employeeId && e.Status__c === 'Active' && e.Title__c === 'Team Lead' && e.Role__c === currentUserRole).map((e: any) => ({
+                                                                options={employeesList?.filter((e: any) =>
+                                                                    e.Id !== employeeId &&
+                                                                    e.Status__c === 'Active' &&
+                                                                    (e.Title__c || '').trim().toLowerCase() === 'team lead' &&
+                                                                    (e.Department__c || '').trim().toLowerCase() === selectedDepartment
+                                                                ).map((e: any) => ({
                                                                     value: e.Id,
                                                                     label: `${e.Employee_Name__c || ''}`.trim()
                                                                 }))}
@@ -2052,6 +2058,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                     <EmployeeSalaryHistoryTab
                                         employeeId={employeeId}
                                         employeeName={employee?.Employee_Name__c}
+                                        employeeDisplayId={employee?.Name}
                                         employeeCode={employee?.Enrollment_Number__c}
                                         currentUserRole={currentUserRole}
                                     />

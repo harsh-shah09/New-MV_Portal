@@ -9,6 +9,7 @@ import { DollarSign, History } from "lucide-react"
 interface EmployeeSalaryHistoryTabProps {
   employeeId: string
   employeeName?: string
+  employeeDisplayId?: string
   employeeCode?: string
   currentUserRole: string
 }
@@ -56,11 +57,12 @@ const formatCurrency = (amount?: number | null) => {
   }).format(amount)
 }
 
-export function EmployeeSalaryHistoryTab({ employeeId, employeeName, employeeCode, currentUserRole }: EmployeeSalaryHistoryTabProps) {
+export function EmployeeSalaryHistoryTab({ employeeId, employeeName, employeeDisplayId, employeeCode, currentUserRole }: EmployeeSalaryHistoryTabProps) {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [form] = Form.useForm<SalaryHistoryFormValues>()
   const queryClient = useQueryClient()
-  const selectedEmployeeDisplay = employeeName?.trim() || employeeCode?.trim() || employeeId
+  const selectedEmployeeName = employeeName?.trim() || "Not set"
+  const selectedEmployeeId = employeeDisplayId?.trim() || employeeCode?.trim() || "Not set"
 
   const previousSalary = Form.useWatch("Previous_Salary__c", form)
   const currentSalary = Form.useWatch("Current_Salary__c", form)
@@ -244,9 +246,15 @@ export function EmployeeSalaryHistoryTab({ employeeId, employeeName, employeeCod
         >
           <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Selected Employee</p>
-            <Form.Item label="Employee" tooltip="Selected employee is picked automatically from this profile." className="!mb-0">
-              <Input value={selectedEmployeeDisplay} disabled className="!font-medium" />
-            </Form.Item>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <Form.Item label="Employee Name" tooltip="Selected employee is picked automatically from this profile." className="!mb-0">
+                <Input value={selectedEmployeeName} disabled className="!font-medium" />
+              </Form.Item>
+
+              <Form.Item label="Employee ID" tooltip="This shows the employee's ID, not the record id." className="!mb-0">
+                <Input value={selectedEmployeeId} disabled className="!font-medium" />
+              </Form.Item>
+            </div>
           </div>
 
           <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 px-4 py-4">
@@ -274,6 +282,7 @@ export function EmployeeSalaryHistoryTab({ employeeId, employeeName, employeeCod
                 label="Security Deposit"
                 name="Security_Deposite__c"
                 className="!mb-2"
+                // className="!mb-2 md:col-span-2"
               >
                 <InputNumber className="!w-full" min={0} step={0.01} placeholder="Enter security deposit" />
               </Form.Item>
@@ -316,7 +325,7 @@ export function EmployeeSalaryHistoryTab({ employeeId, employeeName, employeeCod
                 />
               </Form.Item>
 
-              <Form.Item label="Reason for Salary Change" name="Change_Type__c" className="!mb-2">
+              <Form.Item label="Reason for Salary Increment" name="Change_Type__c" className="!mb-2">
                 <Select
                   placeholder="Select change type"
                   options={data?.changeTypeOptions || []}
@@ -331,8 +340,8 @@ export function EmployeeSalaryHistoryTab({ employeeId, employeeName, employeeCod
               >
                 <Select
                   options={[
-                    { label: "Yes, this is the current salary", value: true },
-                    { label: "No, this is a past salary", value: false }
+                    { label: "Yes", value: true },
+                    { label: "No", value: false }
                   ]}
                   placeholder="Select current salary status"
                 />
