@@ -31,7 +31,8 @@ import {
     History,
     ChevronDown,
     ChevronUp,
-    Leaf
+    Leaf,
+    Calculator
 } from "lucide-react"
 import { generate2FASecretAction, verifyAndEnable2FAAction, disable2FAAction, getEmployeeTitles, sendWelcomeEmailAction } from "@/app/employees/[id]/actions"
 import { message, Spin, Select, Modal, Form, DatePicker, Space, Button, Pagination } from "antd"
@@ -49,13 +50,13 @@ interface ViewProps {
 
 export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", currentUserEmployeeId }: ViewProps) {
     // --- Query Parameter <-> Tab mapping ---
-    type TabId = "personal" | "employment" | "salary-history" | "bank" | "documents" | "security" | "assets" | "leaves"
+    type TabId = "personal" | "employment" | "salary-calculation" | "salary-history" | "bank" | "documents" | "security" | "assets" | "leaves"
     
     const getTabFromQuery = (): TabId => {
         if (typeof window === "undefined") return "personal"
         const params = new URLSearchParams(window.location.search)
         const tab = params.get("tab")?.toLowerCase()
-        const validTabs: TabId[] = ["personal", "employment", "salary-history", "bank", "documents", "security", "assets", "leaves"]
+        const validTabs: TabId[] = ["personal", "employment", "salary-calculation", "salary-history", "bank", "documents", "security", "assets", "leaves"]
         return validTabs.includes(tab as TabId) ? (tab as TabId) : "personal"
     }
 
@@ -69,6 +70,15 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
     const [currentPage, setCurrentPage] = useState(1);
     const [sendingEmail, setSendingEmail] = useState(false);
     const itemsPerPage = 6;
+    const salaryCalculationFields = [
+        { fieldKey: "Basic_Console__c", label: "Basic Console", kind: "percentage" as const },
+        { fieldKey: "HRA__c", label: "HRA", kind: "percentage" as const },
+        { fieldKey: "CONV__c", label: "Conveyance", kind: "percentage" as const },
+        { fieldKey: "S_All__c", label: "Special Allowance", kind: "percentage" as const },
+        { fieldKey: "PF__c", label: "PF", kind: "percentage" as const },
+        { fieldKey: "PT__c", label: "PT", kind: "number" as const },
+        { fieldKey: "ESI__c", label: "ESI", kind: "percentage" as const },
+    ]
     useEffect(() => {
         getEmployeeTitles().then(setTitles).catch(console.error)
     }, [])
@@ -92,6 +102,12 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
             }
         }
     }, [activeTab])
+
+    useEffect(() => {
+        if ((currentUserRole || "").trim().toLowerCase() !== "admin" && activeTab === "salary-calculation") {
+            setActiveTab("personal")
+        }
+    }, [activeTab, currentUserRole])
 
     // --- Tab change handler ---
     const handleTabChange = (tab: TabId) => {
@@ -198,6 +214,60 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
         return parts.join(' ')
     }
 
+    const parseNumberValue = (value: any): number | null => {
+        if (value === undefined || value === null || value === "") return null
+        const parsed = Number(value)
+        return Number.isFinite(parsed) ? parsed : null
+    }
+
+    const getSalaryFieldValue = (fieldKey: string) => {
+        return formData[fieldKey] !== undefined ? formData[fieldKey] : employee?.[fieldKey] ?? ""
+    }
+
+    const renderSalaryField = (field: { fieldKey: string; label: string; kind: "percentage" | "number" }) => {
+        const currentValue = getSalaryFieldValue(field.fieldKey)
+        const suffix = field.kind === "percentage" ? "%" : ""
+
+        return (
+            <div key={field.fieldKey} className="space-y-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 flex justify-between">
+                    <div>
+                        {field.label}
+                        {field.kind === "percentage" && <span className="text-slate-400 normal-case tracking-normal font-medium"> (%)</span>}
+                    </div>
+                    {errors[field.fieldKey] && isEditing && <span className="text-red-500 text-[10px] normal-case tracking-normal font-medium animate-pulse">{errors[field.fieldKey]}</span>}
+                </label>
+                {isEditing ? (
+                    <div className="relative">
+                        <input
+                            type="number"
+                            min="0"
+                            step={field.kind === "percentage" ? "0.01" : "1"}
+                            value={currentValue}
+                            onChange={(e) => setFormData({ ...formData, [field.fieldKey]: e.target.value })}
+                            className={cn(
+                                "w-full bg-slate-50 border rounded-lg px-3 py-2.5 text-sm text-slate-800 focus:ring-2 outline-none transition placeholder:text-slate-400",
+                                errors[field.fieldKey] ? "border-red-300 focus:ring-red-200" : "border-slate-200 focus:ring-blue-500/20 focus:border-blue-400"
+                            )}
+                            placeholder="0"
+                        />
+                        {suffix && (
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 pointer-events-none">
+                                {suffix}
+                            </span>
+                        )}
+                    </div>
+                ) : (
+                    <p className="font-medium text-slate-800 text-sm break-words py-1">
+                        {currentValue !== "" && currentValue !== null && currentValue !== undefined
+                            ? `${currentValue}${suffix}`
+                            : <span className="text-slate-400 italic">Not set</span>}
+                    </p>
+                )}
+            </div>
+        )
+    }
+
     const validateForm = () => {
         const newErrors: Record<string, string> = {}
 
@@ -283,6 +353,32 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
             }
         }
 
+        if (activeTab === 'salary-calculation') {
+            salaryCalculationFields.forEach((field) => {
+                const rawValue = formData[field.fieldKey]
+                const numericValue = parseNumberValue(rawValue)
+
+                if (rawValue === undefined || rawValue === null || rawValue === "") {
+                    newErrors[field.fieldKey] = `${field.label} is required`
+                    return
+                }
+
+                if (numericValue === null) {
+                    newErrors[field.fieldKey] = `${field.label} must be a valid number`
+                    return
+                }
+
+                if (field.kind === "percentage" && (numericValue < 0 || numericValue > 100)) {
+                    newErrors[field.fieldKey] = `${field.label} must be between 0 and 100`
+                    return
+                }
+
+                if (field.kind === "number" && numericValue < 0) {
+                    newErrors[field.fieldKey] = `${field.label} cannot be negative`
+                }
+            })
+        }
+
         setErrors(newErrors)
         return Object.keys(newErrors).length === 0
     }
@@ -324,6 +420,13 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                 Base_Salary__c: employee.Base_Salary__c,
                 Salary_CTC__c: employee.Salary_CTC__c,
                 Company_Security_Deduction__c: employee.Company_Security_Deduction__c,
+                Basic_Console__c: employee.Basic_Console__c,
+                HRA__c: employee.HRA__c,
+                CONV__c: employee.CONV__c,
+                S_All__c: employee.S_All__c,
+                PF__c: employee.PF__c,
+                PT__c: employee.PT__c,
+                ESI__c: employee.ESI__c,
                 Status__c: employee.Status__c
             })
             setIsEditing(true)
@@ -363,6 +466,25 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
             payload.Experience__c = yearsMonthsToDecimal(payload.exp_years ?? 0, payload.exp_months ?? 0)
             delete payload.exp_years
             delete payload.exp_months
+
+            const numericFields = [
+                "Base_Salary__c",
+                "Salary_CTC__c",
+                "Company_Security_Deduction__c",
+                "Basic_Console__c",
+                "HRA__c",
+                "CONV__c",
+                "S_All__c",
+                "PF__c",
+                "PT__c",
+                "ESI__c"
+            ]
+
+            numericFields.forEach((fieldKey) => {
+                if (payload[fieldKey] !== undefined && payload[fieldKey] !== null && payload[fieldKey] !== "") {
+                    payload[fieldKey] = Number(payload[fieldKey])
+                }
+            })
 
             updateMutation.mutate(payload)
         } else {
@@ -1094,6 +1216,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                         {[
                             { id: "personal", label: "Personal Details", icon: User },
                             { id: "employment", label: "Employment Details", icon: Building2 },
+                            ...(isAdminUser ? [{ id: "salary-calculation", label: "Salary Calculation", icon: Calculator }] : []),
                             ...(canViewSalaryHistory ? [{ id: "salary-history", label: "Salary History", icon: History }] : []),
                             { id: "assets", label: "Assets", icon: Laptop },
                             { id: "bank", label: "Bank Details", icon: CreditCard },
@@ -1453,6 +1576,68 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                 </div>
                                             </div>
                                         )}
+                                    </div>
+                                )}
+
+                                {activeTab === "salary-calculation" && isAdminUser && (
+                                    <div className="space-y-8">
+                                        <div>
+                                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                                                <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2 m-0">
+                                                    <Calculator className="w-5 h-5 text-blue-500" /> Salary Calculation
+                                                </h2>
+                                                <div className="flex w-full sm:w-auto justify-end">
+                                                    {!isEditing ? (
+                                                        <button
+                                                            onClick={handleEditToggle}
+                                                            className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold transition text-sm sm:text-base"
+                                                        >
+                                                            <Edit3 className="w-4 h-4" /> Edit Details
+                                                        </button>
+                                                    ) : (
+                                                        <div className="flex w-full items-center gap-3">
+                                                            <button
+                                                                onClick={handleEditToggle}
+                                                                className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold transition text-sm sm:text-base"
+                                                            >
+                                                                <X className="w-4 h-4" /> Cancel
+                                                            </button>
+                                                            <button
+                                                                onClick={handleSave}
+                                                                className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold transition shadow-lg shadow-blue-500/20 text-sm sm:text-base"
+                                                            >
+                                                                {updateMutation.isPending ? <Spin size="small" /> : <Save className="w-4 h-4" />} Save
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                                                {salaryCalculationFields.map(renderSalaryField)}
+                                            </div>
+
+                                            <div className="mt-8 p-4 rounded-2xl border border-slate-200 bg-slate-50">
+                                                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Quick Summary</p>
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-slate-700">
+                                                    <div>
+                                                        <span className="text-slate-500">Total percentage components:</span>{" "}
+                                                        <span className="font-semibold">
+                                                            {salaryCalculationFields
+                                                                .filter((field) => field.kind === "percentage")
+                                                                .reduce((total, field) => total + (parseNumberValue(getSalaryFieldValue(field.fieldKey)) || 0), 0)
+                                                                .toFixed(2)}%
+                                                        </span>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-slate-500">PT amount:</span>{" "}
+                                                        <span className="font-semibold">
+                                                            {parseNumberValue(getSalaryFieldValue("PT__c")) ?? 0}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 )}
 
