@@ -3,9 +3,24 @@ import { getIsFirstTimeLogin, getOnboardingStep, setOnboardingStep, clearOnboard
 import { updateEmployee, createBankDetail, createDocumentRecord, getEmployeeById } from '@/lib/salesforce';
 import { uploadFileToS3 } from '@/lib/s3';
 import { getHREmail, sendEmail } from '@/lib/email';
+import { getSpecificConfigurations } from '@/lib/admin-config';
 
-function verifyRequiredDocuments(employeeData: any): string[] {
-    const requiredDocs = ['Passbook', 'Aadhaar Card', 'PAN Card', 'Driving Licence'];
+async function verifyRequiredDocuments(employeeData: any): Promise<string[]> {
+    let mandatedDocs: string[] = [];
+    try {
+        const configs = await getSpecificConfigurations(['documents']);
+        if (configs.documents && configs.documents.length > 0) {
+            const common = configs.documents[0].Value__c;
+            if (common) {
+                mandatedDocs = common.split(',').map((s: string) => s.trim()).filter(Boolean);
+            }
+        }
+    } catch (e) {
+        console.error("Failed to fetch document configurations:", e);
+        mandatedDocs = ['Aadhaar Card', 'PAN Card', 'Driving Licence'];
+    }
+    
+    const requiredDocs = Array.from(new Set(['Passbook', ...mandatedDocs]));
     const uploadedDocTypes = new Set(
         (Array.isArray(employeeData?.documents) ? employeeData.documents : [])
             .map((doc: any) => (doc?.Document_Type__c || '').toString().trim().toLowerCase())
@@ -104,7 +119,7 @@ export async function POST(req: Request) {
                    return NextResponse.json({ error: 'Employee not found' }, { status: 404 });
                }
 
-               const missingDocuments = verifyRequiredDocuments(employeeData);
+               const missingDocuments = await verifyRequiredDocuments(employeeData);
                if (missingDocuments.length > 0) {
                    return NextResponse.json(
                        {

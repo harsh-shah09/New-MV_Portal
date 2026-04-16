@@ -143,6 +143,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId , firsttime =
                 'Aadhaar Card',
                 'PAN Card',
                 'Driving Licence',
+                'Degree/Marksheet(Latest)'
             ])
             return;
         }
@@ -415,11 +416,17 @@ export function OnboardingWizard({ publicMode = false, publicEmpId , firsttime =
 
         try {
             setLoading(true)
-            await fetch(endpoint, {
+            const res = await fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: 'complete', employeeId: publicMode ? publicEmpId : undefined })
             })
+            
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                throw new Error(data.error || 'Failed to complete onboarding');
+            }
+            
             // Fetch role for tour
             // try {
             //     const meRes = await fetch('/api/me')
@@ -440,8 +447,9 @@ export function OnboardingWizard({ publicMode = false, publicEmpId , firsttime =
                 setShowConfetti(false)
                 if (!publicMode) window.dispatchEvent(new CustomEvent('mv:tour:autostart'))
             }, 3000)
-        } catch (e) {
+        } catch (e: any) {
              setLoading(false)
+             message.error(e.message || "Failed to complete onboarding.")
         }
     }
 
@@ -877,20 +885,21 @@ export function OnboardingWizard({ publicMode = false, publicEmpId , firsttime =
                     
                     {currentStep <= stepItems.length && (
                         <div className="flex gap-2 sm:gap-3 order-1 sm:order-2 w-full sm:w-auto">
-                        {currentStep > 1 && currentStep <= stepItems.length && (
+                        {currentStep > 1 && (
                             <Button disabled={pageLoading} type="primary" size="large" onClick={handlePrevious} className="flex-1 sm:flex-initial">
                                 ← Previous
                             </Button>
                         )}
-                        <Button disabled={pageLoading} type="primary" size="large" onClick={handleNext} loading={loading} className="flex-1 sm:flex-initial">
-                            Next Step
-                        </Button>
+                        {currentStep < stepItems.length ? (
+                            <Button disabled={pageLoading} type="primary" size="large" onClick={handleNext} loading={loading} className="flex-1 sm:flex-initial">
+                                Next Step
+                            </Button>
+                        ) : (
+                            <Button disabled={pageLoading} type="primary" size="large" onClick={handleFinish} loading={loading} className="bg-green-600 hover:bg-green-700 w-full sm:w-auto flex-1 sm:flex-initial">
+                                Complete 
+                            </Button>
+                        )}
                         </div>
-                    )}
-                     {currentStep > stepItems.length && (
-                         <Button disabled={pageLoading} type="primary" size="large" onClick={handleFinish} loading={loading} className="bg-green-600 hover:bg-green-700 w-full sm:w-auto order-1 sm:order-2">
-                             Complete Onboarding
-                        </Button>
                     )}
                 </div>
             </ContentWrapper>
