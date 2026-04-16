@@ -2,6 +2,18 @@ import { NextResponse } from 'next/server';
 import { getIsFirstTimeLogin, getOnboardingStep, setOnboardingStep, clearOnboardingData, setFirstTimeLogin } from '@/lib/dynamodb';
 import { updateEmployee, createBankDetail, createDocumentRecord, getEmployeeById } from '@/lib/salesforce';
 import { uploadFileToS3 } from '@/lib/s3';
+import { getHREmail, sendEmail } from '@/lib/email';
+
+function verifyRequiredDocuments(employeeData: any): string[] {
+    const requiredDocs = ['Passbook', 'Aadhaar Card', 'PAN Card', 'Driving Licence'];
+    const uploadedDocTypes = new Set(
+        (Array.isArray(employeeData?.documents) ? employeeData.documents : [])
+            .map((doc: any) => (doc?.Document_Type__c || '').toString().trim().toLowerCase())
+            .filter(Boolean)
+    );
+
+    return requiredDocs.filter((docName) => !uploadedDocTypes.has(docName.toLowerCase()));
+}
 
 export async function GET(req: Request) {
    const { searchParams } = new URL(req.url);
@@ -84,11 +96,62 @@ export async function POST(req: Request) {
            const { step, data, action, employeeId } = body;
            
            if (!employeeId) return NextResponse.json({ error: 'Missing employeeId' }, { status: 400 });
-
+            console.log("Onboarding API called with", { step, action, employeeId });
            if (action === 'complete') {
+               const employeeData = await getEmployeeById(employeeId);
+
+               if (!employeeData) {
+                   return NextResponse.json({ error: 'Employee not found' }, { status: 404 });
+               }
+
+               const missingDocuments = verifyRequiredDocuments(employeeData);
+               if (missingDocuments.length > 0) {
+                   return NextResponse.json(
+                       {
+                           error: 'Please upload all required documents before completing onboarding',
+                           missingDocuments,
+                       },
+                       { status: 400 }
+                   );
+               }
+
+               let hrNotificationSent = false;
+               const hrEmail = await getHREmail();
+               console.log("HR Email for onboarding completion notification:", hrEmail);
+               if (hrEmail) {
+                   const employeeName = employeeData?.Employee_Name__c || employeeData?.Name || employeeId;
+                   const employeeEmail = employeeData?.Company_Email__c || employeeData?.Employee_Email__c || 'N/A';
+
+                   const emailBody = `
+                     <p>Dear HR Team,</p>
+                     <p>Onboarding data collection has been completed for the following employee:</p>
+                     <ul>
+                       <li><strong>Employee Name:</strong> ${employeeName}</li>
+                       <li><strong>Employee ID:</strong> ${employeeData?.Name || employeeId}</li>
+                       <li><strong>Email:</strong> ${employeeEmail}</li>
+                     </ul>
+                     <p>Please review the submitted onboarding details in HRMS.</p>
+                     <p>Regards,<br/>HRMS System</p>
+                   `;
+
+                   try {
+                       await sendEmail({
+                           to: hrEmail,
+                           subject: `Onboarding Completed - ${employeeName}`,
+                           body: emailBody,
+                           contentType: 'text/html',
+                           isInfo: true,
+                       });
+                       console.log(`Onboarding completion email sent to HR at ${hrEmail} for employee ${employeeName}`);
+                       hrNotificationSent = true;
+                   } catch (emailError) {
+                       console.error('Error sending onboarding completion email to HR', emailError);
+                   }
+               }
+
                await clearOnboardingData(employeeId);
                await setFirstTimeLogin(employeeId, true);
-               return NextResponse.json({ success: true, completed: true });
+               return NextResponse.json({ success: true, completed: true, hrNotificationSent });
            }
 
            if (step === 2) {

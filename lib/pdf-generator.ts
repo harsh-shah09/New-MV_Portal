@@ -99,7 +99,7 @@ const launchBrowser = async (): Promise<Browser> => {
     } catch (error) {
       lastError = error
       console.error('[PDF] Browser launch failed', { attempt, error })
-      if (attempt < maxAttempts) {
+      if (attempt < maxAttempts) {  
         await new Promise((resolve) => setTimeout(resolve, attempt * 1000))
       }
     }
