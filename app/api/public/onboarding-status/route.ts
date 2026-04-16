@@ -4,6 +4,7 @@ import { updateEmployee, createBankDetail, createDocumentRecord, getEmployeeById
 import { uploadFileToS3 } from '@/lib/s3';
 import { getHREmail, sendEmail } from '@/lib/email';
 import { getSpecificConfigurations } from '@/lib/admin-config';
+import { onboardingCompletedToHR } from '@/lib/email-templates';
 
 async function verifyRequiredDocuments(employeeData: any): Promise<string[]> {
     let mandatedDocs: string[] = [];
@@ -136,24 +137,18 @@ export async function POST(req: Request) {
                if (hrEmail) {
                    const employeeName = employeeData?.Employee_Name__c || employeeData?.Name || employeeId;
                    const employeeEmail = employeeData?.Company_Email__c || employeeData?.Employee_Email__c || 'N/A';
-
-                   const emailBody = `
-                     <p>Dear HR Team,</p>
-                     <p>Onboarding data collection has been completed for the following employee:</p>
-                     <ul>
-                       <li><strong>Employee Name:</strong> ${employeeName}</li>
-                       <li><strong>Employee ID:</strong> ${employeeData?.Name || employeeId}</li>
-                       <li><strong>Email:</strong> ${employeeEmail}</li>
-                     </ul>
-                     <p>Please review the submitted onboarding details in HRMS.</p>
-                     <p>Regards,<br/>HRMS System</p>
-                   `;
+                                     const { subject, html } = await onboardingCompletedToHR({
+                                             recipientName: 'HR Team',
+                                             employeeName,
+                                             employeeId: employeeData?.Name || employeeId,
+                                             employeeEmail,
+                                     });
 
                    try {
                        await sendEmail({
                            to: hrEmail,
-                           subject: `Onboarding Completed - ${employeeName}`,
-                           body: emailBody,
+                                                     subject,
+                                                     body: html,
                            contentType: 'text/html',
                            isInfo: true,
                        });
