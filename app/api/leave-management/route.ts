@@ -14,6 +14,7 @@ import {
   hrDecisionToTeamLead,
   adminDecisionToHR,
   hrLeaveRequestToAdmin,
+  doubtfulLeaveMarkedToAdmin,
   leaveAutoApproved,
   withdrawalRequestSubmitted,
   withdrawalRequestToHR,
@@ -513,6 +514,7 @@ export async function GET(request: NextRequest) {
           HR_Approval__c,
           Sandwich_Rule__c,
           OnePlusTwo_Rule__c,
+          Doubtfull_Case__c,
           Reason__c,
           Rule_Calculation_Details__c
         FROM Leave__c
@@ -548,6 +550,7 @@ export async function GET(request: NextRequest) {
           hrApproval: record.HR_Approval__c,
           sandwichRuleApplicable,
           onePlusTwoRuleApplicable,
+          doubtfullCase: record.Doubtfull_Case__c === true,
           withdrawalStartDate: partialRequest?.requested ? partialRequest.withdrawalStartDate : undefined,
           withdrawalEndDate: partialRequest?.requested ? partialRequest.withdrawalEndDate : undefined,
         };
@@ -575,6 +578,7 @@ export async function GET(request: NextRequest) {
           HR_Approval__c,
           Sandwich_Rule__c,
           OnePlusTwo_Rule__c,
+          Doubtfull_Case__c,
           Reason__c,
           Rule_Calculation_Details__c
         FROM Leave__c
@@ -610,6 +614,7 @@ export async function GET(request: NextRequest) {
           hrApproval: record.HR_Approval__c,
           sandwichRuleApplicable,
           onePlusTwoRuleApplicable,
+          doubtfullCase: record.Doubtfull_Case__c === true,
           withdrawalStartDate: partialRequest?.requested ? partialRequest.withdrawalStartDate : undefined,
           withdrawalEndDate: partialRequest?.requested ? partialRequest.withdrawalEndDate : undefined,
         };
@@ -634,6 +639,7 @@ export async function GET(request: NextRequest) {
           HR_Approval__c,
           Sandwich_Rule__c,
           OnePlusTwo_Rule__c,
+          Doubtfull_Case__c,
           Reason__c,
           Rule_Calculation_Details__c
         FROM Leave__c
@@ -669,6 +675,7 @@ export async function GET(request: NextRequest) {
           hrApproval: record.HR_Approval__c,
           sandwichRuleApplicable,
           onePlusTwoRuleApplicable,
+          doubtfullCase: record.Doubtfull_Case__c === true,
           withdrawalStartDate: partialRequest?.requested ? partialRequest.withdrawalStartDate : undefined,
           withdrawalEndDate: partialRequest?.requested ? partialRequest.withdrawalEndDate : undefined,
         };
@@ -835,7 +842,7 @@ export async function POST(request: NextRequest) {
       }
 
       const targetEmployeeQuery = await conn.query<any>(`
-        SELECT Id, Employee_Name__c, Employee_Email__c, Base_Salary__c,
+        SELECT Id, Employee_Name__c, Employee_Email__c, Salary_CTC__c,
                Team_Lead__c, Team_Lead__r.Employee_Name__c, Team_Lead__r.Employee_Email__c
         FROM Employee__c
         WHERE Id = '${targetEmployeeId}'
@@ -870,13 +877,13 @@ export async function POST(request: NextRequest) {
           'Loss of Pay',
           parsedStart.format('YYYY-MM-DD'),
           fullDayDuration,
-          targetEmployee.Base_Salary__c
+          targetEmployee.Salary_CTC__c
         ),
         After_Rule_Deduction__c: calculateLeaveDeduction(
           'Loss of Pay',
           parsedStart.format('YYYY-MM-DD'),
           fullDayDuration,
-          targetEmployee.Base_Salary__c
+          targetEmployee.Salary_CTC__c
         ),
       };
 
@@ -1481,12 +1488,12 @@ export async function POST(request: NextRequest) {
     let requesterBaseSalary = 0;
     if (isAdminAutoApprove) {
       const requesterSalaryQuery = await conn.query<any>(`
-        SELECT Id, Base_Salary__c
+        SELECT Id, Salary_CTC__c
         FROM Employee__c
         WHERE Id = '${employeeId}'
         LIMIT 1
       `);
-      requesterBaseSalary = requesterSalaryQuery.records?.[0]?.Base_Salary__c || 0;
+      requesterBaseSalary = requesterSalaryQuery.records?.[0]?.Salary_CTC__c || 0;
     }
 
     const leaveRecord: any = {
@@ -2526,6 +2533,103 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ success: true, message: "Withdrawal request rejected successfully" });
     }
 
+    // Handle mark doubtful case action (HR or Admin)
+    if (action === "mark_doubtful_case") {
+      const { role } = payload;
+      const isHR = role === 'HR';
+      const isAdmin = role === 'Admin';
+
+      if (!isHR && !isAdmin) {
+        return NextResponse.json({ error: "Only HR or Admin can mark doubtful cases" }, { status: 403 });
+      }
+
+      const updateResult = await conn.sobject('Leave__c').update({
+        Id: leaveId,
+        Doubtfull_Case__c: true,
+      });
+
+      const resultList = Array.isArray(updateResult) ? updateResult : [updateResult];
+      const firstResult = resultList[0];
+
+      if (!firstResult?.success) {
+        const firstError = firstResult?.errors?.[0];
+        if (firstError?.statusCode === 'NOT_FOUND') {
+          return NextResponse.json({ error: "Leave not found" }, { status: 404 });
+        }
+
+        return NextResponse.json({
+          error: firstError?.message || "Failed to mark leave as doubtful case",
+        }, { status: 400 });
+      }
+
+      try {
+        const leaveDataQuery = await conn.query<any>(`
+          SELECT Id, Employee__c, Employee__r.Employee_Name__c, Leave_Type__c, Leave_Category__c,
+                 Start_Date__c, End_Date__c, Total_Days__c, Reason__c
+          FROM Leave__c
+          WHERE Id = '${leaveId}'
+          LIMIT 1
+        `);
+
+        const leaveRecord = leaveDataQuery.records?.[0];
+
+        if (leaveRecord) {
+          const adminQuery = await conn.query<any>(`
+            SELECT Id, Employee_Name__c, Employee_Email__c
+            FROM Employee__c
+            WHERE Role__c = 'Admin' AND Active__c = true
+          `);
+
+          const admins = adminQuery.records || [];
+          const adminIds = admins.map((admin: any) => admin.Id).filter(Boolean);
+
+          if (adminIds.length > 0) {
+            const leaveTypeDisplay = getDisplayLeaveType(leaveRecord.Leave_Type__c, leaveRecord.Leave_Category__c || '');
+            const employeeName = leaveRecord.Employee__r?.Employee_Name__c || 'Employee';
+            const markedBy = payload?.name || payload?.email || (isAdmin ? 'Admin Team' : 'HR Team');
+
+            await sendInAppNotifications(
+              adminIds,
+              `${markedBy} has marked ${employeeName}'s leave (${leaveTypeDisplay}) from ${dayjs(leaveRecord.Start_Date__c).format('DD MMM YYYY')} to ${dayjs(leaveRecord.End_Date__c).format('DD MMM YYYY')} as doubtful. Please review.`,
+              'Leave',
+              true
+            );
+
+            for (const admin of admins) {
+              if (!admin.Employee_Email__c) continue;
+
+              const emailTemplate = await doubtfulLeaveMarkedToAdmin({
+                recipientName: admin.Employee_Name__c || 'Admin',
+                employeeName,
+                leaveType: leaveTypeDisplay,
+                startDate: dayjs(leaveRecord.Start_Date__c).format('YYYY-MM-DD'),
+                endDate: dayjs(leaveRecord.End_Date__c).format('YYYY-MM-DD'),
+                duration: leaveRecord.Total_Days__c || 0,
+                reason: leaveRecord.Reason__c || undefined,
+                approverName: markedBy,
+                approverTitle: isAdmin ? 'Admin' : 'HR',
+              });
+
+              logLeaveEmailDispatch('doubtful-leave-to-admin', admin.Employee_Email__c, undefined, emailTemplate.subject);
+              sendEmailAsync({
+                to: admin.Employee_Email__c,
+                subject: emailTemplate.subject,
+                body: emailTemplate.html,
+                senderEmployeeId: employeeId,
+              });
+            }
+          }
+        }
+      } catch (notificationError) {
+        console.error('Error sending doubtful-case notifications to admins:', notificationError);
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: "Leave marked as doubtful case",
+      });
+    }
+
     // Handle approve action (HR, Team Lead, or Admin)
     if (action === "approve") {
       const { role, title, name: approverName } = payload;
@@ -2551,7 +2655,7 @@ export async function PATCH(request: NextRequest) {
       }
 
       const leaveRecordQuery = await conn.query<any>(`
-        SELECT Id, Status__c, Employee__c, Employee__r.Role__c,Employee__r.Base_Salary__c, Leave_Category__c, Leave_Type__c, Total_Days__c, Total_Days_After_Rule__c, HR_Approval__c, TL_Approval__c, Start_Date__c, End_Date__c, Session__c, CreatedDate, Rule_Calculation_Details__c, Actual_Deduction__c, After_Rule_Deduction__c, Event_ID__c
+        SELECT Id, Status__c, Employee__c, Employee__r.Role__c,Employee__r.Salary_CTC__c, Leave_Category__c, Leave_Type__c, Total_Days__c, Total_Days_After_Rule__c, HR_Approval__c, TL_Approval__c, Start_Date__c, End_Date__c, Session__c, CreatedDate, Rule_Calculation_Details__c, Actual_Deduction__c, After_Rule_Deduction__c, Event_ID__c
         FROM Leave__c
         WHERE Id = '${leaveId}'
         LIMIT 1
@@ -2602,13 +2706,13 @@ export async function PATCH(request: NextRequest) {
           oldLeave.Leave_Category__c,
           oldLeave.Start_Date__c,
           recalculated.totalDays,
-          oldLeave.Employee__r?.Base_Salary__c
+          oldLeave.Employee__r?.Salary_CTC__c
         );
         updateData.After_Rule_Deduction__c = calculateLeaveDeduction(
           oldLeave.Leave_Category__c,
           oldLeave.Start_Date__c,
           recalculated.totalDaysAfterRule,
-          oldLeave.Employee__r?.Base_Salary__c
+          oldLeave.Employee__r?.Salary_CTC__c
         );
 
       } else if (isTeamLead) {
@@ -3169,10 +3273,10 @@ function calculateLeaveDeduction(
   Leave_Category__c: string,
   Start_Date__c: string,
   Total_Days__c: number,
-  Base_Salary__c: number
+  Salary_CTC__c: number
 ): number {
-  // If no base salary is provided, return 0
-  if (!Base_Salary__c || Base_Salary__c <= 0) {
+  // If no salary is provided, return 0
+  if (!Salary_CTC__c || Salary_CTC__c <= 0) {
     return 0;
   }
 
@@ -3181,7 +3285,7 @@ function calculateLeaveDeduction(
   const daysInMonth = startDate.daysInMonth();
 
   // Calculate daily salary based on actual days in the month
-  const dailySalary = Base_Salary__c / daysInMonth;
+  const dailySalary = Salary_CTC__c / daysInMonth;
   const deductionAmount = dailySalary * Total_Days__c;
 
   if (Leave_Category__c === 'Loss of Pay') {

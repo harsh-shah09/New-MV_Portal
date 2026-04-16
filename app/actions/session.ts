@@ -2,6 +2,7 @@
 
 import { verifySession } from "@/lib/auth";
 import { getEmployeeById } from "@/lib/salesforce";
+import { getIsFirstTimeLogin, setFirstTimeLogin as updateFirstTimeLogin } from "@/lib/dynamodb";
 
 /**
  * Server Action — safely callable from client components.
@@ -19,3 +20,27 @@ export async function getSessionRole(): Promise<string | null> {
     return null;
   }
 }
+
+export async function checkFirstTimeLogin(): Promise<boolean> {
+  try {
+    const session = await verifySession();
+    if (!session?.employeeId) return false;
+
+    return await getIsFirstTimeLogin(session.employeeId);
+  } catch {
+    return false;
+  }
+}
+
+export async function updateFirstTimeLoginAction(isFirstTime: boolean): Promise<boolean> {
+  try {
+    const session = await verifySession();
+    if (!session?.employeeId) return false;
+    
+    await updateFirstTimeLogin(session.employeeId, isFirstTime);
+    return true;
+  } catch {
+    return false;
+  }
+}
+

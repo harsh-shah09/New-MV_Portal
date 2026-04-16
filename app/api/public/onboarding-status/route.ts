@@ -1,59 +1,63 @@
-
 import { NextResponse } from 'next/server';
-import { verifySession } from '@/lib/auth';
 import { getIsFirstTimeLogin, getOnboardingStep, setOnboardingStep, clearOnboardingData, setFirstTimeLogin } from '@/lib/dynamodb';
 import { updateEmployee, createBankDetail, createDocumentRecord, getEmployeeById } from '@/lib/salesforce';
 import { uploadFileToS3 } from '@/lib/s3';
 
-export async function GET() {
-   const session = await verifySession();
-   if (!session?.employeeId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+export async function GET(req: Request) {
+   const { searchParams } = new URL(req.url);
+   const employeeId = searchParams.get('id');
+   const firsttime = searchParams.get('firsttime')
+   if (!employeeId) return NextResponse.json({ error: 'Missing employee ID' }, { status: 400 });
    
-   const isFirstTime = await getIsFirstTimeLogin(session.employeeId);
-   if (!isFirstTime) return NextResponse.json({ showOnboarding: false });
+   const isFirstTime = await getIsFirstTimeLogin(employeeId);
+   if (!isFirstTime && !firsttime) return NextResponse.json({ showOnboarding: false });
    
-   const currentStep = await getOnboardingStep(session.employeeId);
-   const employeeData = await getEmployeeById(session.employeeId);
+   const currentStep = await getOnboardingStep(employeeId);
+
+   let employeeData = null;
+   try {
+       employeeData = await getEmployeeById(employeeId);
+   } catch(e) {
+       console.error("Error fetching employee details for prefill", e);
+   }
    
    return NextResponse.json({ showOnboarding: true, currentStep, employeeData });
 }
 
 export async function POST(req: Request) {
-    const formData = await req.formData();
-    const id = formData.get('id') as string || '';
-   const session = await verifySession() || {employeeId : id};
-   
-   
    try {
-       // Using 'formData' for handling potential file uploads
        const contentType = req.headers.get('content-type') || '';
        
        if (contentType.includes('multipart/form-data')) {
-            // const formData = await req.formData();
+            const formData = await req.formData();
+            const employeeId = formData.get('employeeId') as string;
+            
+            if (!employeeId) return NextResponse.json({ error: 'Missing employeeId' }, { status: 400 });
+
             const step = parseInt(formData.get('step') as string);
             if (step === 1) {
                 // Profile Photo
                 const file = formData.get('file') as File;
                 if(file) {
                      const buffer = Buffer.from(await file.arrayBuffer());
-                     const url = await uploadFileToS3(buffer, `profile-photos/${session.employeeId}-${file.name}`, file.type);
-                     await updateEmployee(session.employeeId, { Profile_Photo__c: url });
+                     const url = await uploadFileToS3(buffer, `profile-photos/${employeeId}-${file.name}`, file.type);
+                     await updateEmployee(employeeId, { Profile_Photo__c: url });
                 }
-                await setOnboardingStep(session.employeeId, 2);
+                await setOnboardingStep(employeeId, 2);
             }
             else if (formData.get('step') === '3_passbook') {
-                 // Passbook Upload (sub-step within step 3, does NOT advance the step counter)
+                 // Passbook Upload
                  const file = formData.get('file') as File;
                  const type = formData.get('type') as string; // 'Passbook'
                  if(file) {
                      const buffer = Buffer.from(await file.arrayBuffer());
-                     const url = await uploadFileToS3(buffer, `documents/${session.employeeId}-${file.name}`, file.type);
+                     const url = await uploadFileToS3(buffer, `documents/${employeeId}-${file.name}`, file.type);
                      await createDocumentRecord({
                          Name: file.name,
                          Document_Type__c: type || 'Passbook',
                          File_URL__c: url,
                          Status__c: 'Uploaded',
-                         Employee__c: session.employeeId
+                         Employee__c: employeeId
                      });
                  }
             }
@@ -70,18 +74,20 @@ export async function POST(req: Request) {
                          Document_Type__c: type,
                          File_URL__c: url,
                          Status__c: 'Uploaded',
-                         Employee__c: session.employeeId
+                         Employee__c: employeeId
                      });
                  }
             }
        } else {
            // JSON
            const body = await req.json();
-           const { step, data, action } = body;
+           const { step, data, action, employeeId } = body;
            
+           if (!employeeId) return NextResponse.json({ error: 'Missing employeeId' }, { status: 400 });
+
            if (action === 'complete') {
-               await clearOnboardingData(session.employeeId);
-               await setFirstTimeLogin(session.employeeId, true);
+               await clearOnboardingData(employeeId);
+               await setFirstTimeLogin(employeeId, true);
                return NextResponse.json({ success: true, completed: true });
            }
 
@@ -116,7 +122,7 @@ export async function POST(req: Request) {
                         country : data.permanentcountry
                     })
                 }
-               await updateEmployee(session.employeeId, payload );
+               await updateEmployee(employeeId, payload );
            } else if (step === 3) {
                // Bank Details
                await createBankDetail({
@@ -125,12 +131,13 @@ export async function POST(req: Request) {
                    Bank_Account_Number__c: data.accountNumber,
                    IFSC__c: data.ifscCode,
                    Primary_Account__c: true,
-                   Employee__c: session.employeeId
+                   Employee__c: employeeId
                });
            }
            
            // Update Step in DB
-           await setOnboardingStep(session.employeeId, step + 1);
+           // Assume Google Sync is step 4 and does nothing on backend right now
+           await setOnboardingStep(employeeId, step + 1);
        }
        
        return NextResponse.json({ success: true });

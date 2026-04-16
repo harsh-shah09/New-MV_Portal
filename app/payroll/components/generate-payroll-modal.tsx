@@ -50,6 +50,48 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
   const [selectedEmployee, setSelectedEmployee] = useState<PayrollEmployeeDetail | null>(null)
   const [editMode, setEditMode] = useState(false)
 
+  const formatCurrency = (value?: number | null) => {
+    const rounded = Math.round(Number(value) || 0)
+    return `₹${rounded.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  }
+
+  const sumAdjustments = (adjustments: PayrollAdjustment[] | undefined, type: "Addition" | "Deduction") => {
+    return adjustments
+      ?.filter((adjustment) => adjustment.adjustmentType === type)
+      .reduce((sum, adjustment) => sum + Number(adjustment.adjustmentAmount || 0), 0) || 0
+  }
+
+  const recalculateEmployeePayroll = (
+    employee: PayrollEmployeeDetail,
+    overrides?: {
+      bonus?: number
+      adjustments?: PayrollAdjustment[]
+    }
+  ): PayrollEmployeeDetail => {
+    const originalEmployee = originalEmployeeData.find((item) => item.employeeId === employee.employeeId)
+    const bonus = overrides?.bonus ?? Number(employee.bonus || 0)
+    const adjustments = overrides?.adjustments ?? employee.adjustments ?? []
+
+    const baseExtraDayPay = Number(originalEmployee?.totalAdditions || 0)
+    const grossIncome = Number(employee.grossIncome || 0)
+    const salaryStructureDeductions = Number(employee.pfDeduction || 0) + Number(employee.ptDeduction || 0) + Number(employee.esiDeduction || 0)
+    const adjustmentAdditions = sumAdjustments(adjustments, "Addition")
+    const adjustmentDeductions = sumAdjustments(adjustments, "Deduction")
+
+    const totalAdditions = baseExtraDayPay + bonus + adjustmentAdditions
+    const totalDeductions = salaryStructureDeductions + adjustmentDeductions
+    const netSalary = grossIncome + totalAdditions - totalDeductions
+
+    return {
+      ...employee,
+      bonus,
+      adjustments,
+      totalAdditions: Math.round(totalAdditions * 100) / 100,
+      totalDeductions: Math.round(totalDeductions * 100) / 100,
+      netSalary: Math.round(netSalary * 100) / 100,
+    }
+  }
+
   const isFuturePayrollPeriod = (month: string, year: number) => {
     const monthIndex = months.indexOf(month)
     if (monthIndex < 0) return false
@@ -89,7 +131,8 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
       }
 
       const data = await response.json()
-      setEmployeeData(data.employees || [])
+      const normalizedEmployees = (data.employees || []).map((employee: PayrollEmployeeDetail) => recalculateEmployeePayroll(employee))
+      setEmployeeData(normalizedEmployees)
       setOriginalEmployeeData(data.employees || [])
       setShowResults(true)
       message.success(`Payroll generated for ${selectedMonth} ${selectedYear} - ${data.totalEmployees} employees`)
@@ -222,40 +265,7 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
       if (emp.employeeId === selectedEmployee.employeeId) {
         // In edit mode, replace adjustment; otherwise add it
         const adjustments = editMode ? [adjustment] : [...(emp.adjustments || []), adjustment]
-        
-        // Get current employee data (may already have bonus)
-        const baseSalary = emp.baseSalary || 0
-        const bonus = emp.bonus || 0
-        
-        // Get ORIGINAL base values from API (Extra Day Pay and Leave Deductions from leaves)
-        const originalEmp = originalEmployeeData.find(e => e.employeeId === emp.employeeId)
-        const baseExtraDayPay = originalEmp?.totalAdditions || 0
-        const baseLeaveDeductions = originalEmp?.totalDeductions || 0
-        
-        // Recalculate adjustment totals
-        const totalAdjustmentAdditions = adjustments
-          .filter(adj => adj.adjustmentType === "Addition")
-          .reduce((sum, adj) => sum + adj.adjustmentAmount, 0)
-        
-        const totalAdjustmentDeductions = adjustments
-          .filter(adj => adj.adjustmentType === "Deduction")
-          .reduce((sum, adj) => sum + adj.adjustmentAmount, 0)
-        
-        // Total additions = Extra Day Pay (from API) + Bonus + Adjustment Additions
-        const totalAdditions = baseExtraDayPay + bonus + totalAdjustmentAdditions
-        
-        // Total deductions = Leave Deductions (from API) + Adjustment Deductions
-        const totalDeductions = baseLeaveDeductions + totalAdjustmentDeductions
-        
-        const netSalary = baseSalary + totalAdditions - totalDeductions
-
-        return {
-          ...emp,
-          adjustments,
-          totalAdditions,
-          totalDeductions,
-          netSalary: Math.round(netSalary * 100) / 100,
-        }
+        return recalculateEmployeePayroll(emp, { adjustments })
       }
       return emp
     })
@@ -271,37 +281,7 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
 
     const updatedEmployees = employeeData.map(emp => {
       if (emp.employeeId === selectedEmployee.employeeId) {
-        const baseSalary = emp.baseSalary || 0
-        
-        // Get ORIGINAL base values from API (Extra Day Pay and Leave Deductions from leaves)
-        const originalEmp = originalEmployeeData.find(e => e.employeeId === emp.employeeId)
-        const baseExtraDayPay = originalEmp?.totalAdditions || 0
-        const baseLeaveDeductions = originalEmp?.totalDeductions || 0
-        
-        // Get current adjustment totals (may have been added before bonus)
-        const adjustmentAdditions = emp.adjustments
-          ?.filter(adj => adj.adjustmentType === "Addition")
-          .reduce((sum, adj) => sum + adj.adjustmentAmount, 0) || 0
-        
-        const adjustmentDeductions = emp.adjustments
-          ?.filter(adj => adj.adjustmentType === "Deduction")
-          .reduce((sum, adj) => sum + adj.adjustmentAmount, 0) || 0
-        
-        // Total additions = Extra Day Pay (from API) + Bonus + Adjustment Additions
-        const totalAdditions = baseExtraDayPay + bonusAmount + adjustmentAdditions
-        
-        // Total deductions = Leave Deductions (from API) + Adjustment Deductions
-        const totalDeductions = baseLeaveDeductions + adjustmentDeductions
-        
-        const netSalary = baseSalary + totalAdditions - totalDeductions
-
-        return {
-          ...emp,
-          bonus: bonusAmount,
-          totalAdditions,
-          totalDeductions,
-          netSalary: Math.round(netSalary * 100) / 100,
-        }
+        return recalculateEmployeePayroll(emp, { bonus: bonusAmount })
       }
       return emp
     })
@@ -315,26 +295,7 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
   const handleDeleteAdjustment = (employeeId: string) => {
     const updatedEmployees = employeeData.map(emp => {
       if (emp.employeeId === employeeId) {
-        const baseSalary = emp.baseSalary || 0
-        const bonus = emp.bonus || 0
-        
-        // Get ORIGINAL base values from API
-        const originalEmp = originalEmployeeData.find(e => e.employeeId === emp.employeeId)
-        const baseExtraDayPay = originalEmp?.totalAdditions || 0
-        const baseLeaveDeductions = originalEmp?.totalDeductions || 0
-        
-        // Recalculate without adjustments
-        const totalAdditions = baseExtraDayPay + bonus
-        const totalDeductions = baseLeaveDeductions
-        const netSalary = baseSalary + totalAdditions - totalDeductions
-
-        return {
-          ...emp,
-          adjustments: [],
-          totalAdditions,
-          totalDeductions,
-          netSalary: Math.round(netSalary * 100) / 100,
-        }
+        return recalculateEmployeePayroll(emp, { adjustments: [] })
       }
       return emp
     })
@@ -346,34 +307,7 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
   const handleDeleteBonus = (employeeId: string) => {
     const updatedEmployees = employeeData.map(emp => {
       if (emp.employeeId === employeeId) {
-        const baseSalary = emp.baseSalary || 0
-        
-        // Get ORIGINAL base values from API
-        const originalEmp = originalEmployeeData.find(e => e.employeeId === emp.employeeId)
-        const baseExtraDayPay = originalEmp?.totalAdditions || 0
-        const baseLeaveDeductions = originalEmp?.totalDeductions || 0
-        
-        // Get current adjustment totals
-        const adjustmentAdditions = emp.adjustments
-          ?.filter(adj => adj.adjustmentType === "Addition")
-          .reduce((sum, adj) => sum + adj.adjustmentAmount, 0) || 0
-        
-        const adjustmentDeductions = emp.adjustments
-          ?.filter(adj => adj.adjustmentType === "Deduction")
-          .reduce((sum, adj) => sum + adj.adjustmentAmount, 0) || 0
-        
-        // Recalculate without bonus
-        const totalAdditions = baseExtraDayPay + adjustmentAdditions
-        const totalDeductions = baseLeaveDeductions + adjustmentDeductions
-        const netSalary = baseSalary + totalAdditions - totalDeductions
-
-        return {
-          ...emp,
-          bonus: 0,
-          totalAdditions,
-          totalDeductions,
-          netSalary: Math.round(netSalary * 100) / 100,
-        }
+        return recalculateEmployeePayroll(emp, { bonus: 0 })
       }
       return emp
     })
@@ -387,94 +321,114 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
       title: "Employee Name",
       dataIndex: "employeeName",
       key: "employeeName",
-      width: 200,
+      width: 160,
       fixed: useFixedColumns ? "left" : undefined,
+      className: "text-xs",
     },
     {
       title: "Email",
       dataIndex: "email",
       key: "email",
-      width: 200,
+      width: 180,
+      className: "text-xs",
     },
     {
       title: "Department",
       dataIndex: "department",
       key: "department",
-      width: 150,
+      width: 120,
+      className: "text-xs",
     },
     {
       title: "Role",
       dataIndex: "role",
       key: "role",
-      width: 150,
-    },
-    {
-      title: "Base Salary",
-      dataIndex: "baseSalary",
-      key: "baseSalary",
       width: 120,
-      render: (amount: number) => `₹${amount?.toLocaleString() || 0}`,
+      className: "text-xs",
     },
     {
-      title: "Additions",
-      dataIndex: "totalAdditions",
-      key: "totalAdditions",
+      title: "Basic Console",
+      dataIndex: "basicComponent",
+      key: "basicComponent",
+      width: 100,
+      render: (amount: number) => formatCurrency(amount),
+    },
+    {
+      title: "HRA",
+      dataIndex: "hraComponent",
+      key: "hraComponent",
+      width: 90,
+      render: (amount: number) => formatCurrency(amount),
+    },
+    {
+      title: "CONV",
+      dataIndex: "convComponent",
+      key: "convComponent",
+      width: 90,
+      render: (amount: number) => formatCurrency(amount),
+    },
+    {
+      title: "SA",
+      dataIndex: "specialAllowanceComponent",
+      key: "specialAllowanceComponent",
+      width: 90,
+      render: (amount: number) => formatCurrency(amount),
+    },
+    {
+      title: "PF",
+      dataIndex: "pfDeduction",
+      key: "pfDeduction",
+      width: 90,
+      render: (amount: number) => formatCurrency(amount),
+    },
+    {
+      title: "PT",
+      dataIndex: "ptDeduction",
+      key: "ptDeduction",
+      width: 90,
+      render: (amount: number) => formatCurrency(amount),
+    },
+    {
+      title: "ESI",
+      dataIndex: "esiDeduction",
+      key: "esiDeduction",
+      width: 90,
+      render: (amount: number) => formatCurrency(amount),
+    },
+    {
+      title: "Gross Income",
+      dataIndex: "grossIncome",
+      key: "grossIncome",
       width: 100,
       render: (amount: number) => (
-        <span className={amount > 0 ? "text-green-600" : ""}>
-          ₹{amount?.toLocaleString() || 0}
-        </span>
+        <span className="font-semibold text-blue-600">{formatCurrency(amount)}</span>
       ),
     },
     {
-      title: "Anniversary Bonus",
-      dataIndex: "anniversaryBonus",
-      key: "anniversaryBonus",
-      width: 130,
+      title: "Gross Deduction",
+      dataIndex: "salaryStructureDeductions",
+      key: "salaryStructureDeductions",
+      width: 110,
       render: (amount: number) => (
-        <span className={amount > 0 ? "text-purple-600 font-semibold" : ""}>
-          {amount > 0 ? `₹${amount?.toLocaleString()}` : '-'}
-        </span>
+        <span className="font-semibold text-orange-600">{formatCurrency(amount)}</span>
       ),
     },
     {
       title: "Leave Days",
       dataIndex: "totalLeaveDays",
       key: "totalLeaveDays",
-      width: 100,
+      width: 85,
       render: (days: number) => (
         <Tag color={days > 0 ? "orange" : "green"}>{days || 0} days</Tag>
-      ),
-    },
-    {
-      title: "Deductions",
-      dataIndex: "totalDeductions",
-      key: "totalDeductions",
-      width: 120,
-      render: (amount: number) => (
-        <span className={amount > 0 ? "text-red-600" : ""}>
-          ₹{amount?.toLocaleString() || 0}
-        </span>
-      ),
-    },
-    {
-      title: "Security Deduction",
-      dataIndex: "companySecurityDeduction",
-      key: "companySecurityDeduction",
-      width: 130,
-      render: (amount: number) => (
-        <span className={amount > 0 ? "text-orange-600" : ""}>
-          ₹{amount?.toLocaleString() || 0}
-        </span>
       ),
     },
     {
       title: "Net Salary",
       dataIndex: "netSalary",
       key: "netSalary",
-      width: 120,
+      width: 110,
       render: (amount: number) => (
-        <span className="font-semibold text-green-600">₹{amount?.toLocaleString() || 0}</span>
+        <span className="font-semibold text-green-600">{formatCurrency(amount)}</span>
       ),
     },
     {
@@ -545,14 +499,14 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
     const hasBonus = record.bonus && record.bonus > 0
 
     if (!hasLeaves && !hasAdjustments && !hasBonus) {
-      return <p className="text-gray-500 p-4">No leaves, adjustments, or bonus for this month</p>
+      return <p className="text-gray-500 px-2 py-1 text-[11px]">No leaves, adjustments, or bonus for this month</p>
     }
 
     return (
-      <div className="space-y-4 p-4">
+      <div className="space-y-2 px-2 py-1 text-[11px] leading-tight">
         {hasLeaves && (
           <div>
-            <h4 className="font-semibold mb-2">Leave Details</h4>
+            <h4 className="font-semibold mb-1 text-[11px]">Leave Details</h4>
             <Table
               columns={[
                 {
@@ -589,7 +543,7 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
                   title: "Deduction",
                   dataIndex: "afterRuleDeduction",
                   key: "afterRuleDeduction",
-                  render: (amount: number, record: any) => `₹${(amount || record.actualDeduction || 0).toLocaleString()}`,
+                  render: (amount: number, record: any) => formatCurrency(amount || record.actualDeduction || 0),
                 },
                 {
                   title: "Status",
@@ -604,14 +558,14 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
               pagination={false}
               rowKey="id"
               size="small"
-              scroll={{ x: 900 }}
+              scroll={{ x: 720 }}
             />
           </div>
         )}
 
         {hasAdjustments && (
           <div>
-            <h4 className="font-semibold mb-2">Adjustments</h4>
+            <h4 className="font-semibold mb-1 text-[11px]">Adjustments</h4>
             <Table
               columns={[
                 {
@@ -628,7 +582,7 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
                   key: "adjustmentAmount",
                   render: (amount: number, record: any) => (
                     <span className={record.adjustmentType === "Addition" ? "text-green-600" : "text-red-600"}>
-                      {record.adjustmentType === "Addition" ? "+" : "-"}₹{amount.toLocaleString()}
+                      {record.adjustmentType === "Addition" ? "+" : "-"}{formatCurrency(amount)}
                     </span>
                   ),
                 },
@@ -642,18 +596,18 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
               pagination={false}
               rowKey="id"
               size="small"
-              scroll={{ x: 700 }}
+              scroll={{ x: 560 }}
             />
           </div>
         )}
 
         {hasBonus && (
           <div>
-            <h4 className="font-semibold mb-2">Bonus</h4>
-            <div className="p-3 bg-green-50 border border-green-200 rounded">
+            <h4 className="font-semibold mb-1 text-[11px]">Bonus</h4>
+            <div className="px-2 py-1 bg-green-50 border border-green-200 rounded text-[11px]">
               <div>
-                <p className="text-sm text-gray-600">Bonus Amount</p>
-                <p className="text-lg font-semibold text-green-600">+₹{record.bonus?.toLocaleString()}</p>
+                <p className="text-[11px] text-gray-600">Bonus Amount</p>
+                <p className="text-xs font-semibold text-green-600">+{formatCurrency(record.bonus)}</p>
               </div>
             </div>
           </div>
@@ -665,24 +619,24 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
   return (
     <Modal
       title={
-        <div className="flex items-center gap-2 sm:gap-3 pr-6">
+        <div className="flex items-center gap-2 sm:gap-3 pr-4">
           <Image
             src="/mv_logo1.png"
             alt="MV Clouds Logo"
-            width={40}
-            height={40}
-            className="object-contain w-8 h-8 sm:w-10 sm:h-10"
+            width={36}
+            height={36}
+            className="object-contain w-7 h-7 sm:w-9 sm:h-9"
           />
-          <span className="text-sm sm:text-base break-words leading-snug">
+          <span className="text-xs sm:text-sm md:text-base break-words leading-snug">
             {showResults ? `Payroll Preview - ${selectedMonth} ${selectedYear}` : "Generate Payroll"}
           </span>
         </div>
       }
       open={open}
       onCancel={handleClose}
-      width={showResults ? "min(1200px, calc(100vw - 24px))" : "min(500px, calc(100vw - 24px))"}
+      width={showResults ? "min(1540px, calc(100vw - 12px))" : "min(460px, calc(100vw - 12px))"}
       centered
-      styles={{ body: { maxHeight: "calc(100vh - 220px)", overflowY: "auto", overflowX: "hidden" } }}
+      styles={{ body: { maxHeight: "calc(100vh - 180px)", overflowY: "auto", overflowX: "hidden", padding: 8 } }}
       footer={
         showResults
           ? (
@@ -745,48 +699,42 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
           </div>
         </div>
       ) : (
-        <div className="py-4 min-w-0">
+        <div className="py-1 min-w-0">
           {loading ? (
-            <div className="flex justify-center items-center py-12">
+            <div className="flex justify-center items-center py-6">
               <Spin size="large" />
             </div>
           ) : (
             <>
-              <div className="mb-4 p-3 sm:p-4 bg-blue-50 rounded-lg">
-                <h3 className="font-semibold text-lg mb-2">Summary</h3>
-                <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 2xl:grid-cols-6 gap-3 sm:gap-4">
+              <div className="mb-2 p-2 bg-blue-50 rounded-lg">
+                <h3 className="font-semibold text-xs mb-1">Summary</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-[11px] leading-tight">
                   <div>
-                    <p className="text-sm text-gray-600">Total Employees</p>
-                    <p className="text-xl sm:text-2xl font-bold">{employeeData.length}</p>
+                    <p className="text-[11px] text-gray-600">Total Employees</p>
+                    <p className="text-sm font-bold">{employeeData.length}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600">Total Additions</p>
-                    <p className="text-xl sm:text-2xl font-bold text-green-600">
-                      ₹{employeeData.reduce((sum, emp) => sum + (emp.totalAdditions || 0), 0).toLocaleString()}
+                    <p className="text-[11px] text-gray-600">Total Additions</p>
+                    <p className="text-sm font-bold text-green-600">
+                      {formatCurrency(employeeData.reduce((sum, emp) => sum + (emp.totalAdditions || 0), 0))}
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600">Anniversary Bonus</p>
-                    <p className="text-xl sm:text-2xl font-bold">
-                      ₹{employeeData.reduce((sum, emp) => sum + (emp.anniversaryBonus || 0), 0).toLocaleString()}
+                    <p className="text-[11px] text-gray-600">Gross Income</p>
+                    <p className="text-sm font-bold text-blue-600">
+                      {formatCurrency(employeeData.reduce((sum, emp) => sum + (emp.grossIncome || 0), 0))}
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600">Total Deductions</p>
-                    <p className="text-xl sm:text-2xl font-bold text-red-600">
-                      ₹{employeeData.reduce((sum, emp) => sum + (emp.totalDeductions || 0), 0).toLocaleString()}
+                    <p className="text-[11px] text-gray-600">Gross Deduction</p>
+                    <p className="text-sm font-bold text-orange-600">
+                      {formatCurrency(employeeData.reduce((sum, emp) => sum + (emp.pfDeduction || 0) + (emp.ptDeduction || 0) + (emp.esiDeduction || 0), 0))}
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600">Security Deductions</p>
-                    <p className="text-xl sm:text-2xl font-bold">
-                      ₹{employeeData.reduce((sum, emp) => sum + (emp.companySecurityDeduction || 0), 0).toLocaleString()}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Net Payroll</p>
-                    <p className="text-xl sm:text-2xl font-bold">
-                      ₹{employeeData.reduce((sum, emp) => sum + (emp.netSalary || 0), 0).toLocaleString()}
+                    <p className="text-[11px] text-gray-600">Net Payroll</p>
+                    <p className="text-sm font-bold">
+                      {formatCurrency(employeeData.reduce((sum, emp) => sum + (emp.netSalary || 0), 0))}
                     </p>
                   </div>
                 </div>
@@ -796,8 +744,9 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
                   columns={columns}
                   dataSource={employeeData}
                   rowKey="id"
-                  pagination={{ pageSize: 10 }}
-                  scroll={{ x: "max-content", y: 420 }}
+                  pagination={{ pageSize: 10, size: "small" }}
+                  size="small"
+                  scroll={{ x: "max-content", y: 300 }}
                   expandable={{
                     expandedRowRender,
                     rowExpandable: (record) => 

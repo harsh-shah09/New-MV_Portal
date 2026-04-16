@@ -84,7 +84,7 @@ export default function EmployeesClient({ role }: EmployeesClientProps) {
             joinDate: record.Joining_Date__c || '',
             status: record.Status__c,
             active: record.Active__c,
-            salary: record.Base_Salary__c || 0,
+            salary: record.Salary_CTC__c || 0,
             profilePhoto: record.Profile_Photo__c,
             personalDetails: {
                 address: street,
@@ -124,8 +124,6 @@ export default function EmployeesClient({ role }: EmployeesClientProps) {
   })
 
   const handleAddEmployee = (data: Employee) => {
-    console.log("Add not implemented fully via API yet", data);
-    message.info("Add Employee feature coming soon via API");
     setShowForm(false)
   }
 
@@ -140,7 +138,7 @@ export default function EmployeesClient({ role }: EmployeesClientProps) {
             Department__c: data.department,
             Role__c: data.position,
             Joining_Date__c: data.joinDate,
-            Base_Salary__c: data.salary,
+            Salary_CTC__c: data.salary,
             Status__c: data.status,
             // Store structured address object (API will JSON.stringify it)
             Employee_Current_Address__c: {

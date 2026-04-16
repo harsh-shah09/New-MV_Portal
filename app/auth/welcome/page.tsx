@@ -6,12 +6,15 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { message } from "antd"
 import Link from "next/link"
 
+import { useRef } from "react"
+
 function WelcomeContent() {
     const router = useRouter()
     const searchParams = useSearchParams()
     const id = searchParams.get("id")
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(false)
+    const hasRun = useRef(false)
 
     useEffect(() => {
         if (!id) {
@@ -19,6 +22,9 @@ function WelcomeContent() {
             setLoading(false)
             return
         }
+
+        if (hasRun.current) return;
+        hasRun.current = true;
 
         // Verify and track first time login
         const initWelcome = async () => {

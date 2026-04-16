@@ -31,14 +31,21 @@ export function PayrollEmployeeList({ employees, month, year, onSelectEmployee }
       width: 150,
     },
     {
-      title: "Base Salary",
+      title: "Monthly Income",
       dataIndex: "baseSalary",
       key: "baseSalary",
       width: 120,
       render: (amount: number, record) => {
-        const salary = amount || record.basicSalary || 0
+        const salary = amount || record.monthlyIncome || record.basicSalary || 0
         return `₹${salary.toLocaleString()}`
       },
+    },
+    {
+      title: "Gross Income",
+      dataIndex: "grossIncome",
+      key: "grossIncome",
+      width: 120,
+      render: (amount: number) => `₹${(amount || 0).toLocaleString()}`,
     },
     {
       title: "Additions",

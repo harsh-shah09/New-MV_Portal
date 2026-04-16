@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Joyride, STATUS, EVENTS, ACTIONS } from "react-joyride";
 import type { Step, EventData } from "react-joyride";
 import { HelpCircle, X } from "lucide-react";
-import { getSessionRole } from "@/app/actions/session";
+import { getSessionRole, checkFirstTimeLogin, updateFirstTimeLoginAction } from "@/app/actions/session";
 
 /* ─────────────────────────────────────────────
    Helper: build a Step with skipBeacon
@@ -180,7 +180,22 @@ export function AppTour() {
         window.dispatchEvent(new CustomEvent('mv:tour:start'));
       }
     };
+    
     window.addEventListener('mv:tour:autostart', handleAutoStart);
+    
+    // Auto-start tour on first-time after onboarding or first-time login
+    if (steps.length > 0 && mounted) {
+      checkFirstTimeLogin().then((isFirstTime) => {
+        const isClientFirstTime = localStorage.getItem('mv:onboarding:completed') === 'true';
+        if (isFirstTime || isClientFirstTime) {
+          setTimeout(() => {
+            handleAutoStart();
+            localStorage.removeItem('mv:onboarding:completed'); // Clear flag after starting tour
+          }, 1000);
+        }
+      });
+    }
+    
     return () => window.removeEventListener('mv:tour:autostart', handleAutoStart);
   }, [steps.length, mounted]);
 
@@ -198,6 +213,14 @@ export function AppTour() {
       setRun(false);
       // Tell sidebar to close on mobile
       window.dispatchEvent(new CustomEvent('mv:tour:end'));
+
+      // If it's a first-time login, show google integration modal
+      checkFirstTimeLogin().then((isFirstTime) => {
+        if (isFirstTime) {
+          window.dispatchEvent(new CustomEvent('mv:google:auth:firsttime'));
+          updateFirstTimeLoginAction(false); // Clear it so it doesn't restart the tour if they redirect!
+        }
+      });
       return;
     }
 

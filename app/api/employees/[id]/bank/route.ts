@@ -2,6 +2,8 @@
 import { NextResponse } from 'next/server';
 import { verifySession } from '@/lib/auth';
 import { createBankDetail, deleteBankDetail, updateBankDetail } from '@/lib/salesforce';
+import { sendEmail, getHREmail } from '@/lib/email';
+import { loadTemplate } from '@/lib/email-templates'; // We might need to export loadTemplate or just load it
 
 export async function POST(
   request: Request,
@@ -13,10 +15,6 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (!['HR', 'Admin'].includes(session.role)) {
-      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
-    }
-
     const { id } = await params;
     const body = await request.json();
     
@@ -25,10 +23,38 @@ export async function POST(
     
     const bankData = {
         ...body,
-        Employee__c: id
+        Employee__c: id,
+        Status__c: 'Pending'
     };
 
     await createBankDetail(bankData);
+
+    const hrEmail = await getHREmail();
+    if (hrEmail) {
+        try {
+            let bodyHtml = await loadTemplate('Bank-Approval-Pending', {
+                recipientName: 'HR Team',
+                employeeName: session.name, // Better to pass name if available, but id works for now or fetch employee
+                // Add bank details if applicable
+            });
+            bodyHtml = bodyHtml.replace('{{employeeId}}', session.name);
+            bodyHtml = bodyHtml.replace('{{department}}', body.Department__c);
+            bodyHtml = bodyHtml.replace('{{bankName}}', body.Name);
+            bodyHtml = bodyHtml.replace('{{bankBranchName}}', body.Bank_Branch_Name__c);
+            bodyHtml = bodyHtml.replace('{{accountNumber}}', body.Bank_Account_Number__c);
+            bodyHtml = bodyHtml.replace('{{ifscCode}}', body.IFSC__c);
+            bodyHtml = bodyHtml.replace('{{accountHolderName}}', session.name);
+            await sendEmail({
+                to: hrEmail,
+                subject: 'New Bank Account Added - Pending Verification',
+                body: bodyHtml,
+                contentType: 'text/html',
+                isInfo: true
+            });
+        } catch (emailError) {
+            console.error('Error sending Bank-Approval-Pending email:', emailError);
+        }
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

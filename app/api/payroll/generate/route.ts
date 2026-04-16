@@ -21,10 +21,6 @@ interface LeaveConfig {
 /**
  * Payroll Configuration Interface
  */
-interface PayrollConfig {
-  anniversaryBonusEnabled: boolean
-}
-
 /**
  * Fetch Leave Configurations from Salesforce Custom Metadata
  */
@@ -71,36 +67,6 @@ async function fetchLeaveConfigurations(conn: any): Promise<LeaveConfig> {
       penaltyAppliesTo: ['Developer'],
       minWorkingDayNoticePeriod: 5,
       penaltyDaysPerDay: 2,
-    }
-  }
-}
-
-/**
- * Fetch Payroll Configurations from Salesforce Custom Metadata
- */
-async function fetchPayrollConfigurations(conn: any): Promise<PayrollConfig> {
-  try {
-    const configQuery = await conn.query(
-      "SELECT DeveloperName, Value__c FROM Payroll_Configurations__mdt"
-    )
-
-    const configs = configQuery.records || []
-    const configMap = new Map<string, string>()
-
-    configs.forEach((config: any) => {
-      configMap.set(config.DeveloperName, config.Value__c)
-    })
-
-    // Parse configurations with defaults
-    const anniversaryBonusEnabled = configMap.get('Auto_Apply_Anniversary_Bonus')?.toLowerCase() === 'true'
-
-    return {
-      anniversaryBonusEnabled,
-    }
-  } catch (error) {
-    console.error('Error fetching payroll configurations:', error)
-    return {
-      anniversaryBonusEnabled: false,
     }
   }
 }
@@ -211,13 +177,6 @@ export async function POST(request: NextRequest) {
     console.log('  • Penalty Per Day:', leaveConfig.penaltyDaysPerDay, 'days')
     console.log('------------------------------------------\n')
 
-    // Fetch payroll configurations
-    const payrollConfig = await fetchPayrollConfigurations(conn)
-    
-    console.log('💰 PAYROLL CONFIGURATIONS:')
-    console.log('  • Anniversary Bonus Enabled:', payrollConfig.anniversaryBonusEnabled)
-    console.log('------------------------------------------\n')
-
     // Get all active employees with their salary details
     const employeeRecords = await conn.query<any>(`
       SELECT 
@@ -225,8 +184,17 @@ export async function POST(request: NextRequest) {
         Name,
         Employee_Name__c,
         Employee_Email__c,
-        Base_Salary__c,
-        Company_Security_Deduction__c,
+        Salary_CTC__c,
+        Basic_Console__c,
+        HRA__c,
+        CONV__c,
+        S_All__c,
+        PF__c,
+        PT__c,
+        ESI__c,
+        PF_Number__c,
+        ESI_Number__c,
+        UAN_Number__c,
         Joining_Date__c,
         Department__c,
         Role__c,
@@ -240,6 +208,31 @@ export async function POST(request: NextRequest) {
     console.log('📊 DATA FETCHING:')
     console.log(`  ✓ Fetched ${employeeRecords.totalSize} active employees`)
 
+    const employeeIds = (employeeRecords.records || []).map((employee: any) => employee.Id).filter(Boolean)
+    const bankByEmployeeId = new Map<string, { bankName: string; accountNumber: string }>()
+
+    if (employeeIds.length > 0) {
+      const escapedEmployeeIds = employeeIds.map((id: string) => `'${String(id).replace(/'/g, "\\'")}'`).join(',')
+      const bankRecords = await conn.query<any>(`
+        SELECT Employee__c, Name, Bank_Account_Number__c, Primary_Account__c
+        FROM Bank_Detail__c
+        WHERE Employee__c IN (${escapedEmployeeIds})
+        ORDER BY Primary_Account__c DESC, CreatedDate DESC
+      `)
+
+      for (const bank of bankRecords.records || []) {
+        const employeeId = bank.Employee__c
+        if (!employeeId || bankByEmployeeId.has(employeeId)) {
+          continue
+        }
+
+        bankByEmployeeId.set(employeeId, {
+          bankName: bank.Name || '',
+          accountNumber: bank.Bank_Account_Number__c || '',
+        })
+      }
+    }
+
     // Calculate the date range for the selected month
     const startDate = new Date(parsedYear, monthIndex, 1)
     const endDate = new Date(parsedYear, monthIndex + 1, 0)
@@ -251,6 +244,9 @@ export async function POST(request: NextRequest) {
       const d = String(date.getDate()).padStart(2, '0')
       return `${y}-${m}-${d}`
     }
+
+    const round2 = (value: number) => Math.round((Number(value) || 0) * 100) / 100
+    const toNumber = (value: any) => Number.isFinite(Number(value)) ? Number(value) : 0
 
     const startDateStr = formatDate(startDate)
     const endDateStr = formatDate(endDate)
@@ -607,29 +603,20 @@ export async function POST(request: NextRequest) {
     // Map employees with their salary and leave details
     const employeePayrollData = employeeRecords.records.map((emp: any) => {
       const employeeLeaves = leavesByEmployee.get(emp.Id) || []
-      const baseSalary = emp.Base_Salary__c || 0
+      const originalCTC = toNumber(emp.Salary_CTC__c)
       
       console.log(`👤 ${emp.Employee_Name__c}`)
-      console.log(`   Base Salary: ₹${baseSalary.toLocaleString()}`)
+      console.log(`   Original CTC: ₹${originalCTC.toLocaleString()}`)
       console.log(`   Leaves Count: ${employeeLeaves.length}`)
       
-      // Calculate total leave days that fall in this month (before rules)
-      const totalLeaveDays = employeeLeaves.reduce((sum, leave) => sum + leave.daysInSelectedMonth, 0)
-      
-      // Calculate total leave days after rules (includes sandwich and 1+2 penalties)
-      const totalLeaveDaysAfterRule = employeeLeaves.reduce((sum, leave) => sum + leave.daysAfterRuleInMonth, 0)
-      
-      console.log(`   Leave Days (Before Rules): ${totalLeaveDays}`)
-      console.log(`   Leave Days (After Rules): ${totalLeaveDaysAfterRule}`)
-      
-      // Calculate deduction/addition for each leave
+      // STEP 1: Calculate leave deductions FIRST
       const leavesWithDeductions = employeeLeaves.map(leave => {
         const normalizedCategory = leave.leaveCategory?.toLowerCase().replace(/\s+/g, '-') || ''
         const isHalfDay = leave.totalDays < 1 // Check if it's a half-day leave
         
         // For Extra Day Pay, add amount instead of deducting
         if (normalizedCategory === 'extra-day-pay') {
-          const extraPayAmount = calculateDeduction(baseSalary, leave.daysInSelectedMonth, startDate)
+          const extraPayAmount = calculateDeduction(originalCTC, leave.daysInSelectedMonth, startDate)
           console.log(`     • Leave ${leave.id.substring(0, 8)} (Extra Day Pay): +₹${extraPayAmount}`)
           return {
             ...leave,
@@ -642,7 +629,7 @@ export async function POST(request: NextRequest) {
         if (normalizedCategory === 'loss-of-pay') {
           // For half-day, ignore sandwich and 1+2 rules, use actual days only
           if (isHalfDay) {
-            const halfDayDeduction = calculateDeduction(baseSalary, leave.daysInSelectedMonth, startDate)
+            const halfDayDeduction = calculateDeduction(originalCTC, leave.daysInSelectedMonth, startDate)
             console.log(`     • Leave ${leave.id.substring(0, 8)} (Half Day): ₹${halfDayDeduction}`)
             return {
               ...leave,
@@ -652,8 +639,8 @@ export async function POST(request: NextRequest) {
           }
           
           // For full-day, apply rules
-          const actualDeduction = calculateDeduction(baseSalary, leave.daysInSelectedMonth, startDate)
-          const afterRuleDeduction = calculateDeduction(baseSalary, leave.daysAfterRuleInMonth, startDate)
+          const actualDeduction = calculateDeduction(originalCTC, leave.daysInSelectedMonth, startDate)
+          const afterRuleDeduction = calculateDeduction(originalCTC, leave.daysAfterRuleInMonth, startDate)
           console.log(`     • Leave ${leave.id.substring(0, 8)}: ₹${actualDeduction} → ₹${afterRuleDeduction}`)
           return {
             ...leave,
@@ -663,8 +650,8 @@ export async function POST(request: NextRequest) {
         }
         
         // For other leave types, deduct actual days
-        const actualDeduction = calculateDeduction(baseSalary, leave.daysInSelectedMonth, startDate)
-        const afterRuleDeduction = calculateDeduction(baseSalary, leave.daysAfterRuleInMonth, startDate)
+        const actualDeduction = calculateDeduction(originalCTC, leave.daysInSelectedMonth, startDate)
+        const afterRuleDeduction = calculateDeduction(originalCTC, leave.daysAfterRuleInMonth, startDate)
         console.log(`     • Leave ${leave.id.substring(0, 8)}: ₹${actualDeduction} → ₹${afterRuleDeduction}`)
         return {
           ...leave,
@@ -673,83 +660,70 @@ export async function POST(request: NextRequest) {
         }
       })
       
-      // Calculate total deductions (negative values = additions)
-      const totalDeductions = leavesWithDeductions.reduce((sum, leave) => sum + leave.afterRuleDeduction, 0)
-      
-      // Separate additions and deductions for clarity
-      const totalAdditions = leavesWithDeductions
-        .filter(leave => leave.afterRuleDeduction < 0)
-        .reduce((sum, leave) => sum + Math.abs(leave.afterRuleDeduction), 0)
-      
+      // Calculate total leave deductions
       const totalActualDeductions = leavesWithDeductions
         .filter(leave => leave.afterRuleDeduction > 0)
         .reduce((sum, leave) => sum + leave.afterRuleDeduction, 0)
       
-      // Calculate Anniversary Bonus
-      let anniversaryBonus = 0
-      if (payrollConfig.anniversaryBonusEnabled && emp.Joining_Date__c) {
-        console.log(`   🎂 Checking Anniversary Bonus Eligibility:`)
-        const joiningDate = new Date(emp.Joining_Date__c)
-        const joiningMonth = joiningDate.getMonth() // 0-11
-        const payrollMonth = monthIndex // 0-11
-        
-        console.log(`     • Joining Date: ${emp.Joining_Date__c}`)
-        console.log(`     • Joining Month: ${joiningMonth} (${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][joiningMonth]})`)
-        console.log(`     • Payroll Month: ${payrollMonth} (${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][payrollMonth]})`)
-        console.log(`     • Month Match: ${joiningMonth === payrollMonth ? '✅ Yes' : '❌ No'}`)
-        
-        // Check if current payroll month matches joining month
-        if (joiningMonth === payrollMonth) {
-          const currentYear = year
-          const joiningYear = joiningDate.getFullYear()
-          const yearsCompleted = currentYear - joiningYear
-          
-          console.log(`     • Joining Year: ${joiningYear}`)
-          console.log(`     • Current Year: ${currentYear}`)
-          console.log(`     • Years Completed: ${yearsCompleted}`)
-          console.log(`     • Eligible (>0 years): ${yearsCompleted > 0 ? '✅ Yes' : '❌ No'}`)
-          
-          // Only give bonus if at least 1 year is completed
-          if (yearsCompleted > 0) {
-            const companySecurityDeduction = emp.Company_Security_Deduction__c || 0
-            anniversaryBonus = companySecurityDeduction * 12
-            console.log(`   🎉 Anniversary Bonus Calculation:`)
-            console.log(`     • Company Security: ₹${companySecurityDeduction.toLocaleString()}`)
-            console.log(`     • Formula: Security × 12`)
-            console.log(`     • Bonus Amount: ₹${anniversaryBonus.toLocaleString()}`)
-            console.log(`   🎂 Completed ${yearsCompleted} year(s) with the company`)
-          } else {
-            console.log(`   ❌ No Anniversary Bonus (less than 1 year completed)`)
-          }
-        } else {
-          console.log(`   ❌ No Anniversary Bonus (not anniversary month)`)
-        }
-      } else if (!payrollConfig.anniversaryBonusEnabled) {
-        console.log(`   ⚙️  Anniversary Bonus: Disabled in configuration`)
-      } else {
-        console.log(`   ⚠️  Anniversary Bonus: No joining date on record`)
-      }
+      const totalAdditions = leavesWithDeductions
+        .filter(leave => leave.afterRuleDeduction < 0)
+        .reduce((sum, leave) => sum + Math.abs(leave.afterRuleDeduction), 0)
       
-      // Add Company Security Deduction
-      const companySecurityDeduction = emp.Company_Security_Deduction__c || 0
-      const totalDeductionsWithSecurity = totalActualDeductions + companySecurityDeduction
+      // STEP 2: Deduct leave amount from CTC to get adjusted salary
+      const adjustedMonthlyIncome = round2(originalCTC - totalActualDeductions)
+      const baseSalary = adjustedMonthlyIncome
       
-      // Update total additions to include anniversary bonus
-      const totalAdditionsWithBonus = totalAdditions + anniversaryBonus
+      const totalLeaveDays = employeeLeaves.reduce((sum, leave) => sum + leave.daysInSelectedMonth, 0)
+      const totalLeaveDaysAfterRule = employeeLeaves.reduce((sum, leave) => sum + leave.daysAfterRuleInMonth, 0)
       
-      const netSalary = baseSalary + totalAdditionsWithBonus - totalDeductions - companySecurityDeduction
+      console.log(`   Leave Deduction: ₹${totalActualDeductions.toLocaleString()}`)
+      console.log(`   Adjusted Monthly Income (CTC - Leave): ₹${adjustedMonthlyIncome.toLocaleString()}`)
+      console.log(`   Leave Days (Before Rules): ${totalLeaveDays}`)
+      console.log(`   Leave Days (After Rules): ${totalLeaveDaysAfterRule}`)
+      
+      // STEP 3: Calculate salary components based on ADJUSTED income
+      const basicPercentage = toNumber(emp.Basic_Console__c)
+      const hraPercentage = toNumber(emp.HRA__c)
+      const convPercentage = toNumber(emp.CONV__c)
+      const specialAllowancePercentage = toNumber(emp.S_All__c)
+      const pfPercentage = toNumber(emp.PF__c)
+      const ptAmount = toNumber(emp.PT__c)
+      const esiPercentage = toNumber(emp.ESI__c)
+
+      const actualMonthlyIncome = round2(originalCTC)
+      const actualBasicComponent = round2(actualMonthlyIncome * (basicPercentage / 100))
+      const actualHraComponent = round2(actualMonthlyIncome * (hraPercentage / 100))
+      const actualConvComponent = round2(actualMonthlyIncome * (convPercentage / 100))
+      const actualSpecialAllowanceComponent = round2(actualMonthlyIncome * (specialAllowancePercentage / 100))
+      const actualGrossIncome = round2(
+        actualBasicComponent + actualHraComponent + actualConvComponent + actualSpecialAllowanceComponent
+      )
+
+      const basicComponent = round2(adjustedMonthlyIncome * (basicPercentage / 100))
+      const hraComponent = round2(adjustedMonthlyIncome * (hraPercentage / 100))
+      const convComponent = round2(adjustedMonthlyIncome * (convPercentage / 100))
+      const specialAllowanceComponent = round2(adjustedMonthlyIncome * (specialAllowancePercentage / 100))
+      const grossIncome = round2(basicComponent + hraComponent + convComponent + specialAllowanceComponent)
+      const pfDeduction = round2(basicComponent * (pfPercentage / 100))
+      const esiDeduction = round2(grossIncome * (esiPercentage / 100))
+      const salaryStructureDeductions = round2(pfDeduction + ptAmount + esiDeduction)
+      
+      console.log(`   Gross Income (after leave): ₹${grossIncome.toLocaleString()}`)
+      
+      const totalDeductionsWithSecurity = round2(totalActualDeductions + salaryStructureDeductions)
+      
+      const totalAdditionsWithBonus = totalAdditions
+      
+      const netSalary = round2(grossIncome - salaryStructureDeductions)
       
       if (totalAdditions > 0) {
         console.log(`   Total Additions: ₹${totalAdditions.toLocaleString()}`)
       }
-      if (anniversaryBonus > 0) {
-        console.log(`   Anniversary Bonus: ₹${anniversaryBonus.toLocaleString()}`)
-      }
       if (totalActualDeductions > 0) {
         console.log(`   Total Deductions: ₹${totalActualDeductions.toLocaleString()}`)
       }
-      if (companySecurityDeduction > 0) {
-        console.log(`   Company Security Deduction: ₹${companySecurityDeduction.toLocaleString()}`)
+      if (salaryStructureDeductions > 0) {
+        console.log(`   Salary Structure Deductions (PF/PT/ESI): ₹${salaryStructureDeductions.toLocaleString()}`)
       }
       console.log(`   Net Salary: ₹${netSalary.toLocaleString()}`)
       console.log(`   ✅ Payroll Calculated\n`)
@@ -761,13 +735,34 @@ export async function POST(request: NextRequest) {
         email: emp.Employee_Email__c || "",
         department: emp.Department__c || "",
         role: emp.Role__c || "",
-        baseSalary,
+        dateOfJoining: emp.Joining_Date__c || '',
+        pfNumber: emp.PF_Number__c || '',
+        esiNumber: emp.ESI_Number__c || '',
+        uanNumber: emp.UAN_Number__c || '',
+        bankName: bankByEmployeeId.get(emp.Id)?.bankName || '',
+        accountNumber: bankByEmployeeId.get(emp.Id)?.accountNumber || '',
+        monthlyIncome: round2(adjustedMonthlyIncome),
+        baseSalary: round2(adjustedMonthlyIncome),
+        basicSalary: round2(adjustedMonthlyIncome),
+        actualMonthlyIncome,
+        actualBasicComponent,
+        actualHraComponent,
+        actualConvComponent,
+        actualSpecialAllowanceComponent,
+        actualGrossIncome,
+        basicComponent,
+        hraComponent,
+        convComponent,
+        specialAllowanceComponent,
+        grossIncome,
+        pfDeduction,
+        ptDeduction: round2(ptAmount),
+        esiDeduction,
+        salaryStructureDeductions,
         totalLeaveDays,
         totalLeaveDaysAfterRule,
         totalAdditions: Math.round(totalAdditionsWithBonus * 100) / 100,
         totalDeductions: Math.round(totalDeductionsWithSecurity * 100) / 100,
-        companySecurityDeduction: Math.round(companySecurityDeduction * 100) / 100,
-        anniversaryBonus: Math.round(anniversaryBonus * 100) / 100,
         leaves: leavesWithDeductions,
         netSalary: Math.round(netSalary * 100) / 100,
       }

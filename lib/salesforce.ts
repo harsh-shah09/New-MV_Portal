@@ -104,11 +104,12 @@ export interface Employee {
   Employee_Email__c?: string;
   Password__c?: string; // Stored hash
   Employee_Name__c: string; // Replaces Name/FirstName/LastName
-  
+  Company_Email__c?: string;
   // New fields directly on Employee__c
   Department__c?: string;
   Role__c?: string;
   Title__c?: string;
+  Salary_CTC__c?: number;
   Employee_Address__c?: any; // Compound address field
   Employee_Current_Address__c?: any;
   Experience__c?: number;
@@ -120,6 +121,13 @@ export interface Employee {
   Gender__c?: string;
   Is2FAEnabled__c?: boolean;
   Active__c?: boolean;
+  Basic_Console__c?: number;
+  HRA__c?: number;
+  CONV__c?: number;
+  S_All__c?: number;
+  PF__c?: number;
+  PT__c?: number;
+  ESI__c?: number;
   
   // Standard fields
   Name?: string; // Standard name field often exists, but we rely on Employee_Name__c
@@ -141,9 +149,9 @@ export const findEmployee = async (identifier: string): Promise<Employee | null>
   const escapedIdentifier = identifier.replace(/'/g, "\\'");
   // Updated query to fetch fields from Employee__c directly
   const query = `
-    SELECT Id , Employee_Name__c, Employee_Email__c, Password__c, Role__c, Title__c, Is2FAEnabled__c, Name, Active__c
+    SELECT Id , Employee_Name__c, Employee_Email__c,Company_Email__c, Password__c, Role__c, Title__c, Is2FAEnabled__c, Name, Active__c
     FROM Employee__c 
-    WHERE ${isEmail ? 'Employee_Email__c' : 'Name'} = '${escapedIdentifier}' 
+    WHERE ${isEmail ? 'Company_Email__c' : 'Name'} = '${escapedIdentifier}' 
     LIMIT 1
   `;
   console.log(query)
@@ -162,11 +170,11 @@ export const getAllEmployees = async (): Promise<any[]> => {
   if (!conn) return [];
 
   const query = `
-    SELECT Id, Name, Joining_Date__c, Base_Salary__c, Company_Security_Deduction__c, Status__c, Salary_CTC__c, Profile_Photo__c, Active__c,
+    SELECT Id, Name, Joining_Date__c, Status__c, Salary_CTC__c, Profile_Photo__c, Active__c,
            Employee_Name__c, Employee_Email__c, Employee_Phone__c, Birthdate__c, Gender__c, 
            Employee_Address__c , Employee_Current_Address__c,
            Emergency_Contact_Name__c, Emergency_Contact_Number__c, Emergency_Contact_Relation__c, 
-           Experience__c, Department__c, Role__c, Title__c, Employee_ID__c
+           Experience__c, Department__c, Role__c, Title__c, Employee_ID__c, Company_Email__c, Technology__c, Enrollment_Number__c
     FROM Employee__c
   `;
 
@@ -295,10 +303,10 @@ export const getEmployeeById = async (id: string): Promise<any | null> => {
 
     // 1. Fetch Employee Details (All component fields directly)
     const empQuery = `
-      SELECT Id, Name,Employee_Id__c , Employee_Name__c, Employee_Email__c, Joining_Date__c, Onboarding_Date__c, Base_Salary__c, Company_Security_Deduction__c, Salary_CTC__c, Status__c, Active__c, Profile_Photo__c, Team_Lead__c, Password__c, Is2FAEnabled__c,
+          SELECT Id, Name,Employee_Id__c , Employee_Name__c, Employee_Email__c, Joining_Date__c, Onboarding_Date__c, Basic_Console__c, HRA__c, CONV__c, S_All__c, PF__c, PT__c, ESI__c, Salary_CTC__c, Status__c, Active__c, Profile_Photo__c, Team_Lead__c, Password__c, Is2FAEnabled__c,
              Employee_Phone__c, Birthdate__c, Gender__c, Employee_Address__c, Employee_Current_Address__c,
              Emergency_Contact_Name__c, Emergency_Contact_Number__c, Emergency_Contact_Relation__c, 
-             Experience__c, Department__c, Role__c, Title__c
+             Experience__c, Department__c, Role__c, Title__c, Company_Email__c, Technology__c, Enrollment_Number__c
       FROM Employee__c 
       WHERE Id = '${id}'
       LIMIT 1
@@ -310,7 +318,7 @@ export const getEmployeeById = async (id: string): Promise<any | null> => {
 
     // 2. Fetch Bank Details
     const bankQuery = `
-      SELECT Id, Name, Bank_Branch_Name__c, Bank_Account_Number__c, IFSC__c, Primary_Account__c
+      SELECT Id, Name, Bank_Branch_Name__c, Bank_Account_Number__c, IFSC__c, Primary_Account__c, Status__c
       FROM Bank_Detail__c
       WHERE Employee__c = '${id}'
     `;
@@ -628,3 +636,60 @@ export const isTrustedDevice = async (employeeId: string, deviceId: string) => {
     const result = await db.send(getCmd);
     return !!result.Item;
 };
+
+export interface SalaryHistoryRecord {
+  Id?: string;
+  Employee__c: string;
+  Current_Salary__c: number;
+  Previous_Salary__c: number;
+  Security_Deposite__c?: number;
+  Increment_Amount__c: number;
+  Increment_Percent__c: number;
+  Effective_Date__c: string;
+  End_Date__c?: string | null;
+  Is_Current__c?: boolean;
+  Change_Type__c?: string;
+  Description__c?: string;
+  CreatedDate?: string;
+}
+
+export const getSalaryHistoryByEmployee = async (employeeId: string): Promise<SalaryHistoryRecord[]> => {
+    const conn = await getSalesforceConnection();
+    if (!conn) throw new Error("No Salesforce connection");
+
+    const query = `
+      SELECT Id, Employee__c, Current_Salary__c, Previous_Salary__c, Security_Deposite__c, Increment_Amount__c, Increment_Percent__c,
+             Effective_Date__c, End_Date__c, Is_Current__c, Change_Type__c, Description__c, CreatedDate
+      FROM Salary_History_Tracking__c
+      WHERE Employee__c = '${employeeId}'
+      ORDER BY Effective_Date__c DESC
+    `;
+
+    const result = await conn.query<SalaryHistoryRecord>(query);
+    return result.records;
+}
+
+export const createSalaryHistoryRecord = async (record: SalaryHistoryRecord) => {
+    const conn = await getSalesforceConnection();
+    if (!conn) throw new Error("No Salesforce connection");
+    return await conn.sobject("Salary_History_Tracking__c").create(record);
+}
+
+export async function getSalaryHistoryChangeTypeOptions(): Promise<Array<{ label: string; value: string }>> {
+    const conn = await getSalesforceConnection();
+    if (!conn) throw new Error("No Salesforce connection");
+
+    const describe = await conn.sobject('Salary_History_Tracking__c').describe() as {
+      fields?: Array<{ name: string; picklistValues?: Array<{ active: boolean; value: string; label: string }> }>;
+    };
+
+    const changeTypeField = describe.fields?.find((field) => field.name === 'Change_Type__c');
+    if (!changeTypeField?.picklistValues) return [];
+
+    return changeTypeField.picklistValues
+      .filter((option) => option.active)
+      .map((option) => ({
+        label: option.label,
+        value: option.value
+      }));
+}

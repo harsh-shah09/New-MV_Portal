@@ -42,6 +42,14 @@ export async function GET(
         Employee__r.Employee_Email__c,
         Employee__r.Department__c,
         Employee__r.Role__c,
+        Employee__r.Salary_CTC__c,
+        Employee__r.Basic_Console__c,
+        Employee__r.HRA__c,
+        Employee__r.CONV__c,
+        Employee__r.S_All__c,
+        Employee__r.PF__c,
+        Employee__r.PT__c,
+        Employee__r.ESI__c,
         Payroll_Month__c,
         Payroll_Summary__r.Payroll_Year__c,
         Basic_Salary__c,
@@ -56,6 +64,9 @@ export async function GET(
       WHERE Payroll_Summary__c = '${summaryId}'
       ORDER BY Employee__r.Employee_Name__c
     `)
+
+    const round2 = (value: number) => Math.round((Number(value) || 0) * 100) / 100
+    const toNumber = (value: any) => Number.isFinite(Number(value)) ? Number(value) : 0
 
     const employeePayrolls = payrolls.records.map((record: any) => {
       const adjustments = []
@@ -77,8 +88,29 @@ export async function GET(
         role: record.Employee__r?.Role__c || "",
         payrollMonth: record.Payroll_Month__c,
         year: record.Payroll_Summary__r?.Payroll_Year__c,
-        baseSalary: record.Basic_Salary__c || 0,
-        basicSalary: record.Basic_Salary__c || 0,
+        monthlyIncome: record.Basic_Salary__c || record.Employee__r?.Salary_CTC__c || 0,
+        baseSalary: record.Basic_Salary__c || record.Employee__r?.Salary_CTC__c || 0,
+        basicSalary: record.Basic_Salary__c || record.Employee__r?.Salary_CTC__c || 0,
+        basicComponent: round2(toNumber(record.Employee__r?.Salary_CTC__c || record.Basic_Salary__c) * (toNumber(record.Employee__r?.Basic_Console__c) / 100)),
+        hraComponent: round2(toNumber(record.Employee__r?.Salary_CTC__c || record.Basic_Salary__c) * (toNumber(record.Employee__r?.HRA__c) / 100)),
+        convComponent: round2(toNumber(record.Employee__r?.Salary_CTC__c || record.Basic_Salary__c) * (toNumber(record.Employee__r?.CONV__c) / 100)),
+        specialAllowanceComponent: round2(toNumber(record.Employee__r?.Salary_CTC__c || record.Basic_Salary__c) * (toNumber(record.Employee__r?.S_All__c) / 100)),
+        grossIncome: round2(
+          round2(toNumber(record.Employee__r?.Salary_CTC__c || record.Basic_Salary__c) * (toNumber(record.Employee__r?.Basic_Console__c) / 100)) +
+          round2(toNumber(record.Employee__r?.Salary_CTC__c || record.Basic_Salary__c) * (toNumber(record.Employee__r?.HRA__c) / 100)) +
+          round2(toNumber(record.Employee__r?.Salary_CTC__c || record.Basic_Salary__c) * (toNumber(record.Employee__r?.CONV__c) / 100)) +
+          round2(toNumber(record.Employee__r?.Salary_CTC__c || record.Basic_Salary__c) * (toNumber(record.Employee__r?.S_All__c) / 100))
+        ),
+        pfDeduction: round2(round2(toNumber(record.Employee__r?.Salary_CTC__c || record.Basic_Salary__c) * (toNumber(record.Employee__r?.Basic_Console__c) / 100)) * (toNumber(record.Employee__r?.PF__c) / 100)),
+        ptDeduction: round2(toNumber(record.Employee__r?.PT__c)),
+        esiDeduction: round2(
+          round2(
+            round2(toNumber(record.Employee__r?.Salary_CTC__c || record.Basic_Salary__c) * (toNumber(record.Employee__r?.Basic_Console__c) / 100)) +
+            round2(toNumber(record.Employee__r?.Salary_CTC__c || record.Basic_Salary__c) * (toNumber(record.Employee__r?.HRA__c) / 100)) +
+            round2(toNumber(record.Employee__r?.Salary_CTC__c || record.Basic_Salary__c) * (toNumber(record.Employee__r?.CONV__c) / 100)) +
+            round2(toNumber(record.Employee__r?.Salary_CTC__c || record.Basic_Salary__c) * (toNumber(record.Employee__r?.S_All__c) / 100))
+          ) * (toNumber(record.Employee__r?.ESI__c) / 100)
+        ),
         bonus: record.Bonus__c || 0,
         totalAdditions: record.Total_Additions__c || 0,
         totalDeductions: record.Total_Deductions__c || 0,

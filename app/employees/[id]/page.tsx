@@ -7,6 +7,7 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
   const { id } = await params;
   const session = await verifySession();
   const role = (session?.role as string) || 'Employee';
+    const currentUserEmployeeId = session?.employeeId as string | undefined;
   return (
     <div className="min-h-screen bg-slate-50/50">
         <div className="w-full px-6 lg:px-10 pt-6 pb-0">
@@ -20,8 +21,8 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
             </Link>
             )}
         </div>
-        <div className="-mt-4">
-            <EmployeeProfileView employeeId={id} currentUserRole={role} />
+        <div className="mt-1">
+                        <EmployeeProfileView employeeId={id} currentUserRole={role} currentUserEmployeeId={currentUserEmployeeId} />
         </div>
     </div>
   );

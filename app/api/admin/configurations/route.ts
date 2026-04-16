@@ -24,6 +24,26 @@ async function getRolePicklistOptions() {
   }
 }
 
+async function getPayrollCalculationTypeOptions() {
+  try {
+    const conn = await getSalesforceConnection();
+    if (!conn) return [];
+
+    const description = await conn.sobject('Payroll_Configurations__mdt').describe();
+    const calcTypeField = description.fields?.find((field: any) => field.name === 'Calculation_Type__c');
+
+    if (!calcTypeField?.picklistValues) return [];
+
+    return calcTypeField.picklistValues
+      .filter((picklistValue: any) => picklistValue.active)
+      .map((picklistValue: any) => picklistValue.value)
+      .filter((value: string) => Boolean(value));
+  } catch (error) {
+    console.error('Error fetching Calculation_Type__c picklist options:', error);
+    return [];
+  }
+}
+
 export async function GET(req: Request) {
   try {
     const session = await verifySession();
@@ -40,11 +60,12 @@ export async function GET(req: Request) {
       return NextResponse.json(configs);
     }
 
-    const [configs, roleOptions] = await Promise.all([
+    const [configs, roleOptions, payrollCalculationTypeOptions] = await Promise.all([
       getAllConfigurations(),
-      getRolePicklistOptions()
+      getRolePicklistOptions(),
+      getPayrollCalculationTypeOptions()
     ]);
-    return NextResponse.json({ ...configs, roleOptions });
+    return NextResponse.json({ ...configs, roleOptions, payrollCalculationTypeOptions });
 
   } catch (error) {
     console.error('Error fetching admin configurations:', error);
@@ -90,6 +111,19 @@ export async function POST(req: Request) {
                 ]
             };
         }
+
+      if (u.metadataType === 'Payroll_Configurations__mdt') {
+        const allowedPayrollFields = ['Value__c', 'Calculation_Type__c', 'Is_Active__c'];
+        const fieldName = allowedPayrollFields.includes(u.field) ? u.field : 'Value__c';
+
+        return {
+          fullName: u.fullName,
+          label: u.label,
+          values: [
+            { field: fieldName, value: u.value }
+          ]
+        };
+      }
 
         // Default handling for 'Value__c'
         return {

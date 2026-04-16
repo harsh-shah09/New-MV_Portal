@@ -11,7 +11,6 @@ export async function GET() {
         const docs = await getDocumentsByEmployee(session.employeeId);
         return NextResponse.json(docs);
     } catch(e: any) {
-        console.log(e);
         return NextResponse.json({ error: e.message }, { status: 500 });
     }
 }

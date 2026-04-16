@@ -4,7 +4,7 @@ import Link from "next/link"
 import { useState, useEffect, useRef } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { Select, Button, Spin, message, Card, Tabs, Empty, Input, Table, Tag, Modal, Upload, Form } from "antd"
-import { Download, FileText, User, Search, Printer, FileCheck, UploadCloud, RefreshCw, Maximize2, Minimize2, X, Settings2 } from "lucide-react"
+import { Download, FileText, User, Search, Printer, FileCheck, UploadCloud, RefreshCw, Maximize2, Minimize2, X, Settings2, Edit3, Check } from "lucide-react"
 import { UploadOutlined } from '@ant-design/icons'
 import { generateNDAPDF } from "./actions"
 import { RoleGuard } from "@/components/role-guard"
@@ -14,10 +14,9 @@ import { PageHeader } from "@/components/page-header"
 const AUTO_REPLACED_KEYS = new Set([
     'FirstName', 'LastName', 'Employee_Name__c', 'Company_Name', 'Name',
     'Employee_Role__c', 'Department__c', 'employee_Id', 'EmployeeId',
-    'Joining_Date__c', 'joining_date', 'Base_Salary__c', 'Salary_CTC__c',
+    'Joining_Date__c', 'joining_date', 'Salary_CTC__c',
     'Seperation_Date__c', 'Employee_Title__c', 'Employee_ID__c',
-     'Email', 'Phone', 'Employee_Address',
-    'Father_Name',
+     'Email', 'Phone', 'Employee_Address','salary_per_month','CTC', 'Date','Employment_Duration__c' ,'Enrollment_Number__c','Technology__c'
 ]);
 
 /** Extract all {{KEY}} placeholders from an HTML template string */
@@ -49,6 +48,8 @@ export default function NDAPage() {
     const [uploading, setUploading] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [isControlsOpen, setIsControlsOpen] = useState(false);
+    const [isEditing, setIsEditing] = useState(false);
+    const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
 
     // Fetch Employees
     const { data: employees, isLoading: loadingEmployees } = useQuery({
@@ -58,6 +59,17 @@ export default function NDAPage() {
             if (!res.ok) throw new Error("Failed to fetch employees");
             return res.json();
         }
+    })
+
+    const { data: employeeDetails } = useQuery({
+        queryKey: ['employeeDetails', selectedEmpId],
+        queryFn: async () => {
+            if (!selectedEmpId) return null;
+            const res = await fetch(`/api/employees/${selectedEmpId}`);
+            if (!res.ok) throw new Error("Failed to fetch employee details");
+            return res.json();
+        },
+        enabled: !!selectedEmpId,
     })
 
     // Fetch Templates List
@@ -111,17 +123,35 @@ export default function NDAPage() {
         setManualValues(prev => {
             const next = { ...prev };
             manualKeys.forEach(k => {
-                if (!(k in next)) {
+                if (k === 'Model Number' && employeeDetails?.assetHistory?.length > 0) {
+                    let activeAsset;
+                    if (selectedAssetId) {
+                        activeAsset = employeeDetails.assetHistory.find((a:any) => a.Id === selectedAssetId);
+                    } else {
+                        activeAsset = employeeDetails.assetHistory.find((a:any) => !a.AMS_Unassigned_Date__c) || employeeDetails.assetHistory[0];
+                    }
+                    next[k] = activeAsset?.AMS_Asset__r?.AMS_Asset_Serial_Number__c || '';
+                } else if (!(k in next) || !next[k]) {
                     // Default Date to today, everything else to empty string
-                    next[k] = k === 'Date'
-                        ? new Date().toISOString().split('T')[0]
-                        : '';
+                    if (k === 'Date') {
+                        next[k] = new Date().toISOString().split('T')[0];
+                    } else {
+                        next[k] = '';
+                    }
                 }
             });
             return next;
         });
-    }, [templateContent])
-
+    }, [templateContent, employeeDetails, selectedAssetId])
+    function formatToDDMMYYYY(dateInput: any) {
+        const d = new Date(dateInput);
+        if (isNaN(d.getTime())) return ''; // handle invalid date
+      
+        return String(d.getDate()).padStart(2, '0') + '/' +
+               String(d.getMonth() + 1).padStart(2, '0') + '/' +
+               d.getFullYear();
+      }
+      
     // Handle Employee Selection & Preview Generation
     useEffect(() => {
         if (!selectedEmpId || !employees || !templateContent) {
@@ -155,17 +185,24 @@ export default function NDAPage() {
             // expose partition / employee id into templates
             replace('employee_Id', emp.Name || emp.Id);
             replace('EmployeeId', emp.Employee_Id || emp.PartitionKey || emp.Id);
-            replace('Joining_Date__c', emp.Joining_Date__c);
-            replace('joining_date', emp.Joining_Date__c);
-            replace('Base_Salary__c', emp.Base_Salary__c);
-            replace('Salary_CTC__c', emp.Salary_CTC__c);
-            replace('Date', manualValues.Date || new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }));
-            replace('Seperation_Date__c', emp.Seperation_Date__c || new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }));
+            replace('Joining_Date__c', formatToDDMMYYYY(emp.Joining_Date__c));
+            replace('joining_date', formatToDDMMYYYY(emp.Joining_Date__c));
+            replace('salary_per_month', emp.Salary_CTC__c);
+            replace('CTC', emp.Salary_CTC__c);
+            replace(
+            'Date',
+            manualValues.Date
+                ? formatToDDMMYYYY(manualValues.Date)
+                : formatToDDMMYYYY(new Date())
+            );
+            replace('Seperation_Date__c', formatToDDMMYYYY(emp.Seperation_Date__c || new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })));
             replace('Employee_Title__c' , emp.Title__c + ' ' + emp.Role__c);
             replace('Employee_ID__c' , emp.Name);
-            replace('Email' , emp.Employee_Email__c);
+            replace('Email' , emp.Company_Email__c);
             replace('Phone' , emp.Employee_Phone__c);
-            
+            replace('Employment_Duration__c' , formatToDDMMYYYY(emp.Joining_Date__c) + ' - ' + formatToDDMMYYYY(emp.Seperation_Date__c))
+            replace('Enrollment_Number__c' , emp.Enrollment_Number__c);
+            replace('Technology__c' , emp.Technology__c)
             // Manual Fields
             Object.keys(manualValues).forEach(key => {
                 replace(key, manualValues[key]);
@@ -174,6 +211,31 @@ export default function NDAPage() {
 
             // Address handling (Salesforce Composite Field)
             replace('Employee_Address', address.street + ', ' + address.city + ', ' + address.state + ' - ' + address.postalCode + ', ' + address.country);
+
+            // Gender Pronouns
+            const gender = emp.Gender__c?.toLowerCase() || '';
+            const heShe = gender === 'male' ? 'He' : gender === 'female' ? 'She' : 'He/she';
+            const heSheLower = gender === 'male' ? 'he' : gender === 'female' ? 'she' : 'he/she';
+            const hisHer = gender === 'male' ? 'His' : gender === 'female' ? 'Her' : 'His/her';
+            const hisHerLower = gender === 'male' ? 'his' : gender === 'female' ? 'her' : 'his/her';
+            const himHer = gender === 'male' ? 'Him' : gender === 'female' ? 'Her' : 'Him/her';
+            const himHerLower = gender === 'male' ? 'him' : gender === 'female' ? 'her' : 'him/her';
+            const himselfHerselfLower = gender === 'male' ? 'himself' : gender === 'female' ? 'herself' : 'himself/herself';
+            const sirMadam = gender === 'male' ? 'Sir' : gender === 'female' ? 'Madam' : 'Sir/Madam';
+            html = html.replace(/\bHe\/she\b/g, heShe)
+                       .replace(/\bhe\/she\b/g, heSheLower)
+                       .replace(/\bHe \/ she\b/g, heShe)
+                       .replace(/\bhe \/ she\b/g, heSheLower)
+                       .replace(/\bHe\/She\b/g, heShe)
+                       .replace(/\bHe\/She\b/g, heSheLower)
+                       .replace(/\bHis\/her\b/g, hisHer)
+                       .replace(/\bhis\/her\b/g, hisHerLower)
+                       .replace(/\bHis\/Her\b/g, hisHer)
+                       .replace(/\bSir\/Madam\b/g, sirMadam)   
+                       .replace(/\bhis\/her\b/g, hisHerLower)
+                       .replace(/\bHim\/her\b/g, himHer)
+                       .replace(/\bhim\/her\b/g, himHerLower)
+                       .replace(/\bhimself\/herself\b/g, himselfHerselfLower);
 
             setPreviewContent(html);
         }
@@ -202,13 +264,15 @@ export default function NDAPage() {
 
     const generatePDF = async (elementId: string, fileName: string) => {
         try {
-            if (!previewContent) {
+            const previewEl = document.getElementById(elementId);
+            const contentToGenerate = previewEl?.innerHTML || previewContent;
+            if (!contentToGenerate) {
                 message.error("No content to generate");
                 return;
             }
             setLoadingTemplate(true);
 
-            const base64Pdf = await generateNDAPDF(previewContent);
+            const base64Pdf = await generateNDAPDF(contentToGenerate);
             const binaryString = window.atob(base64Pdf as any);
             const len = binaryString.length;
             const bytes = new Uint8Array(len);
@@ -377,6 +441,7 @@ export default function NDAPage() {
                                                         placeholder="Search employee..."
                                                         onChange={(value: any) => {
                                                             setSelectedEmpId(value);
+                                                            setSelectedAssetId(null);
                                                             if (!value) {
                                                                 setSelectedPartitionKey(null);
                                                                 return;
@@ -404,7 +469,7 @@ export default function NDAPage() {
                                                             </div>
                                                             <div className="flex-1 min-w-0">
                                                                 <h3 className="font-bold text-card-foreground truncate text-base">{selectedEmployee.Employee_Name__c}</h3>
-                                                                <p className="text-xs text-muted-foreground truncate mb-2">{selectedEmployee.Employee_Email__c}</p>
+                                                                <p className="text-xs text-muted-foreground truncate mb-2">{selectedEmployee.Company_Email__c}</p>
 
                                                                 <div className="flex flex-col gap-1.5 mt-2 pt-2 border-t border-primary/20">
                                                                     <div className="flex justify-between items-center text-xs group">
@@ -458,6 +523,30 @@ export default function NDAPage() {
                                                             </div>
                                                         ))}
                                                     </div>
+                                                </div>
+                                            )}
+
+                                            {/* Asset Selector */}
+                                            {selectedTemplateFile === 'Asset-Management-Letter.html' && employeeDetails?.assetHistory?.length > 0 && (
+                                                <div className="bg-card rounded-2xl shadow-sm border border-border p-6 transition-all hover:shadow-md animate-in fade-in slide-in-from-top-2">
+                                                    <h2 className="text-lg font-bold text-card-foreground mb-4 flex items-center gap-2">
+                                                        <Printer className="w-5 h-5 text-blue-500" /> Select Asset
+                                                    </h2>
+                                                    <p className="text-xs text-muted-foreground mb-4">
+                                                        {employeeDetails.assetHistory.length > 1 
+                                                            ? "Multiple assets found for this employee. Select which asset this document applies to." 
+                                                            : "One active asset found. Verify the asset below."}
+                                                    </p>
+                                                    <Select
+                                                        className="w-full"
+                                                        placeholder="Choose an asset..."
+                                                        value={selectedAssetId || (employeeDetails.assetHistory.find((a:any) => !a.AMS_Unassigned_Date__c) || employeeDetails.assetHistory[0])?.Id}
+                                                        onChange={setSelectedAssetId}
+                                                        options={employeeDetails.assetHistory.map((a: any) => ({
+                                                            value: a.Id,
+                                                            label: `${a.AMS_Asset__r?.AMS_Product__r?.Name || 'Unknown Product'} - ${a.AMS_Asset__r?.AMS_Asset_Serial_Number__c || 'No Serial'}`
+                                                        }))}
+                                                    />
                                                 </div>
                                             )}
 
@@ -517,20 +606,38 @@ export default function NDAPage() {
                                         <div className={`${isFullscreen ? 'fixed inset-0 z-[100] bg-background/95 backdrop-blur-sm p-4 md:p-8 flex flex-col animate-in fade-in' : 'lg:max-h-[75vh] lg:col-span-8 flex flex-col lg:sticky lg:top-6 mt-4 lg:mt-0'}`}>
                                             <div className={`bg-muted/30 rounded-2xl flex-1 overflow-auto shadow-inner border border-border relative group ${isFullscreen ? 'p-4 md:p-8 pb-32 max-w-5xl mx-auto w-full' : 'p-4 lg:p-8 min-h-[500px] lg:min-h-0'}`}>
                                                 {/* Fullscreen Toggle */}
-                                                <button
-                                                    onClick={() => setIsFullscreen(!isFullscreen)}
-                                                    className="absolute top-4 right-4 z-10 p-2.5 bg-white/80 backdrop-blur-md rounded-xl shadow-lg border border-slate-200 hover:bg-slate-50 transition-all text-slate-600 hover:text-blue-600 hover:scale-105"
-                                                    title={isFullscreen ? "Exit Full Screen" : "View Full Screen"}
-                                                >
-                                                    {isFullscreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
-                                                </button>
+                                                <div className="absolute top-4 right-4 z-10 flex gap-2">
+                                                    <button
+                                                        onClick={() => {
+                                                            if (isEditing) {
+                                                                const el = document.getElementById('nda-preview-content');
+                                                                if (el && el.innerHTML !== previewContent) {
+                                                                    setPreviewContent(el.innerHTML);
+                                                                }
+                                                            }
+                                                            setIsEditing(!isEditing);
+                                                        }}
+                                                        className="p-2.5 bg-white/80 backdrop-blur-md rounded-xl shadow-lg border border-slate-200 hover:bg-slate-50 transition-all text-slate-600 hover:text-blue-600 hover:scale-105"
+                                                        title={isEditing ? "Save Edits" : "Edit Document"}
+                                                    >
+                                                        {isEditing ? <Check className="w-5 h-5 text-green-600" /> : <Edit3 className="w-5 h-5" />}
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setIsFullscreen(!isFullscreen)}
+                                                        className="p-2.5 bg-white/80 backdrop-blur-md rounded-xl shadow-lg border border-slate-200 hover:bg-slate-50 transition-all text-slate-600 hover:text-blue-600 hover:scale-105"
+                                                        title={isFullscreen ? "Exit Full Screen" : "View Full Screen"}
+                                                    >
+                                                        {isFullscreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
+                                                    </button>
+                                                </div>
 
                                                 {previewContent ? (
                                                     <div className={`bg-white shadow-2xl animate-in zoom-in-95 duration-500 origin-top flex flex-col mx-auto transition-transform ${isFullscreen ? 'w-full' : 'w-full md:min-w-[210mm] lg:min-w-0 max-w-full md:max-w-[210mm]'}`}>
                                                         {/* Print Header/Toolbar could go here */}
                                                         <div id="nda-preview-content"
-                                                            contentEditable
-                                                            className="text-slate-900 text-sm md:text-base leading-relaxed flex-1 font-serif overflow-x-auto overflow-y-hidden"
+                                                            contentEditable={isEditing}
+                                                            suppressContentEditableWarning={true}
+                                                            className={`text-slate-900 text-sm md:text-base leading-relaxed flex-1 font-serif overflow-x-auto overflow-y-hidden ${isEditing ? 'ring-2 ring-blue-500 outline-none p-4' : ''}`}
                                                             dangerouslySetInnerHTML={{ __html: previewContent }}
                                                         />
                                                     </div>

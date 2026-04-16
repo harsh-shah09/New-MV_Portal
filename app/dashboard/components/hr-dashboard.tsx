@@ -65,7 +65,11 @@ export function HRDashboard({ data, dashboardRole = "HR" }: HRDashboardProps) {
       <Row gutter={[16, 16]}>
       {/* Pending Approvals Queue */}
       <Col xs={24} lg={24}>
-        <PendingApprovalsQueue initialPendingApprovals={pendingApprovals} dashboardView="hr" />
+        <PendingApprovalsQueue
+          initialPendingApprovals={pendingApprovals}
+          dashboardView="hr"
+          canUseLeaveRulesPopup={dashboardRole === "Admin"}
+        />
       </Col>
       {/* Analytics and Stats Row */}
         <Col xs={24} lg={12}>

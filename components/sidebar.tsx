@@ -67,13 +67,11 @@ export function Sidebar({
     navItems.push({ href: "/employees", label: "Employees", icon: Users });
     navItems.push({ href: "/assets", label: "Assets", icon: Tag });
   }
-  // Add Payroll and My Payslips based on role
-  if (user?.role?.includes('HR') || user?.role?.includes('Admin')) {
+  // Add Payroll for Admin only; My Payslips for all roles
+  if (user?.role?.includes('Admin')) {
     navItems.push({ href: "/payroll", label: "Payroll", icon: Banknote });
-    navItems.push({ href: "/my-payrolls", label: "My Payslips", icon: Banknote });
-  } else {
-    navItems.push({ href: "/my-payrolls", label: "My Payslips", icon: Banknote });
   }
+  navItems.push({ href: "/my-payrolls", label: "My Payslips", icon: Banknote });
 
   // Add Document Manager for HR only
   if (user?.role?.includes('HR') || user?.role?.includes('Admin')) {

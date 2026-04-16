@@ -8,6 +8,8 @@ export interface MetadataRecord {
   Label?: string;
   QualifiedApiName?: string;
   Value__c: string;
+  Calculation_Type__c?: string;
+  Is_Active__c?: boolean;
   NamespacePrefix?: string;
 }
 
@@ -40,7 +42,7 @@ export const getAllConfigurations = async (): Promise<AdminConfigs> => {
     conn.query(`SELECT Id, DeveloperName, MasterLabel, QualifiedApiName, Value__c FROM ${METADATA_TYPES.DOCUMENTS}`),
     conn.query(`SELECT Id, DeveloperName, MasterLabel, QualifiedApiName, Value__c FROM ${METADATA_TYPES.EMAIL}`),
     conn.query(`SELECT Id, DeveloperName, MasterLabel, QualifiedApiName, Value__c FROM ${METADATA_TYPES.LEAVE}`),
-    conn.query(`SELECT Id, DeveloperName, MasterLabel, QualifiedApiName, Value__c FROM ${METADATA_TYPES.PAYROLL}`),
+    conn.query(`SELECT Id, DeveloperName, MasterLabel, QualifiedApiName, Value__c, Calculation_Type__c, Is_Active__c FROM ${METADATA_TYPES.PAYROLL}`),
     conn.query(`SELECT Id, DeveloperName, MasterLabel, QualifiedApiName, Bypass_Validation__c FROM Asset_Configuration__mdt`),
   ]);
 
@@ -75,7 +77,7 @@ export const getSpecificConfigurations = async (
     leave: () =>
       Promise.resolve(conn.query(`SELECT Id, DeveloperName, MasterLabel, QualifiedApiName, Value__c FROM ${METADATA_TYPES.LEAVE}`)),
     payroll: () =>
-      Promise.resolve(conn.query(`SELECT Id, DeveloperName, MasterLabel, QualifiedApiName, Value__c FROM ${METADATA_TYPES.PAYROLL}`)),
+      Promise.resolve(conn.query(`SELECT Id, DeveloperName, MasterLabel, QualifiedApiName, Value__c, Calculation_Type__c, Is_Active__c FROM ${METADATA_TYPES.PAYROLL}`)),
     assets: () =>
       Promise.resolve(conn.query(`SELECT Id, DeveloperName, MasterLabel, QualifiedApiName, Bypass_Validation__c FROM Asset_Configuration__mdt`)),
   };

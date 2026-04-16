@@ -76,7 +76,7 @@ export async function GET(req: NextRequest) {
                 pendingApprovalsQueryPromise = conn.query(`
                     SELECT Id, Name, Employee__c, Employee__r.Employee_Name__c, 
                            Leave_Type__c, Leave_Category__c, Start_Date__c, 
-                           End_Date__c, Total_Days__c, TL_Approval__c, Sandwich_Rule__c, OnePlusTwo_Rule__c
+                           End_Date__c, Total_Days__c, TL_Approval__c, Sandwich_Rule__c, OnePlusTwo_Rule__c, Doubtfull_Case__c
                     FROM Leave__c
                     WHERE Status__c = 'Applied'
                     ORDER BY Start_Date__c ASC
@@ -85,7 +85,7 @@ export async function GET(req: NextRequest) {
                 pendingApprovalsQueryPromise = conn.query(`
                     SELECT Id, Name, Employee__c, Employee__r.Employee_Name__c, 
                            Leave_Type__c, Leave_Category__c, Start_Date__c, 
-                           End_Date__c, Total_Days__c, TL_Approval__c, Sandwich_Rule__c, OnePlusTwo_Rule__c
+                           End_Date__c, Total_Days__c, TL_Approval__c, Sandwich_Rule__c, OnePlusTwo_Rule__c, Doubtfull_Case__c
                     FROM Leave__c
                     WHERE Status__c = 'Applied' ${hrDashboardLeaveFilter}
                     ORDER BY Start_Date__c ASC
@@ -94,7 +94,7 @@ export async function GET(req: NextRequest) {
                 pendingApprovalsQueryPromise = conn.query(`
                     SELECT Id,Name, Employee__c, Employee__r.Employee_Name__c, 
                            Leave_Type__c, Leave_Category__c, Start_Date__c, 
-                           End_Date__c, Total_Days__c, TL_Approval__c, Sandwich_Rule__c, OnePlusTwo_Rule__c
+                           End_Date__c, Total_Days__c, TL_Approval__c, Sandwich_Rule__c, OnePlusTwo_Rule__c, Doubtfull_Case__c
                     FROM Leave__c
                     WHERE Status__c = 'Applied' AND Employee__r.Role__c != 'HR'
                     ORDER BY Start_Date__c ASC
@@ -192,6 +192,7 @@ export async function GET(req: NextRequest) {
                     tlApproved: record.TL_Approval__c,
                     sandwichRuleApplicable,
                     onePlusTwoRuleApplicable,
+                    doubtfullCase: record.Doubtfull_Case__c === true,
                 }
             });
 

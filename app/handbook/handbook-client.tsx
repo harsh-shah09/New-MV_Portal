@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Input, Button, Card, Modal, Form, Select, Upload, message, Tag, Empty, Tooltip, Spin } from "antd"
-import { Search, Plus, FileText, Download, Eye, File as FileIcon } from "lucide-react"
+import { Search, Plus, FileText, Download, Eye, File as FileIcon, Trash2 } from "lucide-react"
 import { InboxOutlined, SearchOutlined } from "@ant-design/icons"
 import { PageHeader } from "@/components/page-header"
 
@@ -54,6 +54,35 @@ export default function HandbookClient({ role, userId }: HandbookClientProps) {
           message.error("Failed to upload handbook");
       }
   });
+
+  const deleteMutation = useMutation({
+      mutationFn: async (id: string) => {
+           const res = await fetch(`/api/handbook?id=${id}`, {
+               method: 'DELETE'
+           });
+           if(!res.ok) throw new Error("Delete failed");
+           return res.json();
+      },
+      onSuccess: () => {
+          message.success("Document deleted");
+          queryClient.invalidateQueries({ queryKey: ['handbooks'] });
+      },
+      onError: () => {
+          message.error("Failed to delete document");
+      }
+  });
+
+  const handleDelete = (id: string) => {
+      Modal.confirm({
+          title: 'Delete Document',
+          content: 'Are you sure you want to delete this document?',
+          okText: 'Delete',
+          okType: 'danger',
+          onOk() {
+              deleteMutation.mutate(id);
+          }
+      });
+  }
 
   const handleUpload = (values: any) => {
        const formData = new FormData();
@@ -165,6 +194,11 @@ export default function HandbookClient({ role, userId }: HandbookClientProps) {
                                    <Tooltip title="Download">
                                         <Button shape="circle" icon={<Download size={18} />} href={doc.File_URL__c} target="_blank" className="border-0 shadow-lg hover:scale-110 transition-transform"/>
                                    </Tooltip>
+                                   {isHR && (
+                                       <Tooltip title="Delete">
+                                            <Button shape="circle" danger icon={<Trash2 size={18} />} onClick={() => handleDelete(doc.Id)} className="border-0 shadow-lg hover:scale-110 transition-transform text-red-500 hover:text-red-700"/>
+                                       </Tooltip>
+                                   )}
                              </div>
                          </div>
                          <div className="p-5 flex-1 flex flex-col">

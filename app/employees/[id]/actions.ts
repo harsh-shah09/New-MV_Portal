@@ -57,3 +57,31 @@ export async function disable2FAAction(employeeId: string) {
         return { error: "Failed to disable 2FA" };
     }
 }
+
+import { sendEmail } from '@/lib/email';
+import { onboardingMail } from '@/lib/email-templates';
+
+export async function sendWelcomeEmailAction(employeeId: string, email: string, name: string , empName : string) {
+    try {
+        const token = { expirationtime : Date.now() + 48 * 60 * 60 * 1000 , firsttime : true };
+        const encryptedToken = btoa(JSON.stringify(token));
+        const setupLink = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/welcome?id=${employeeId}&token=${encryptedToken}`;
+        let { subject, html } = await onboardingMail({ recipientName: name, setupLink });
+        
+        if (empName) {
+            html = html.replace(/{{Employee_Id}}/g, empName);
+        }
+
+        await sendEmail({
+            to: email,
+            subject,
+            body: html,
+            contentType: 'text/html',
+            isInfo: true
+        });
+        return { success: true };
+    } catch (e) {
+        console.error(e);
+        return { error: "Failed to send welcome email" };
+    }
+}

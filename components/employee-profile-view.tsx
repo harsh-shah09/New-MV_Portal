@@ -31,29 +31,32 @@ import {
     History,
     ChevronDown,
     ChevronUp,
-    Leaf
+    Leaf,
+    Calculator
 } from "lucide-react"
-import { generate2FASecretAction, verifyAndEnable2FAAction, disable2FAAction, getEmployeeTitles } from "@/app/employees/[id]/actions"
-import { message, Spin, Select, Modal, Form, DatePicker, Space, Button } from "antd"
+import { generate2FASecretAction, verifyAndEnable2FAAction, disable2FAAction, getEmployeeTitles, sendWelcomeEmailAction } from "@/app/employees/[id]/actions"
+import { message, Spin, Select, Modal, Form, DatePicker, Space, Button, Pagination } from "antd"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import dayjs from "dayjs"
 import { cn } from "@/lib/utils"
 import { Field } from "./field-component"
+import { EmployeeSalaryHistoryTab } from "./employee-salary-history-tab"
 
 interface ViewProps {
     employeeId: string;
     currentUserRole?: string;
+    currentUserEmployeeId?: string;
 }
 
-export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }: ViewProps) {
+export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", currentUserEmployeeId }: ViewProps) {
     // --- Query Parameter <-> Tab mapping ---
-    type TabId = "personal" | "employment" | "bank" | "documents" | "security" | "assets" | "leaves"
+    type TabId = "personal" | "employment" | "salary-calculation" | "salary-history" | "bank" | "documents" | "security" | "assets" | "leaves"
     
     const getTabFromQuery = (): TabId => {
         if (typeof window === "undefined") return "personal"
         const params = new URLSearchParams(window.location.search)
         const tab = params.get("tab")?.toLowerCase()
-        const validTabs: TabId[] = ["personal", "employment", "bank", "documents", "security", "assets", "leaves"]
+        const validTabs: TabId[] = ["personal", "employment", "salary-calculation", "salary-history", "bank", "documents", "security", "assets", "leaves"]
         return validTabs.includes(tab as TabId) ? (tab as TabId) : "personal"
     }
 
@@ -64,7 +67,18 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
     const queryClient = useQueryClient()
     const [titles, setTitles] = useState<{ label: string, value: string }[]>([])
     const [leaveFilters, setLeaveFilters] = useState({ status: '', type: '', dateRange: [null, null] as [any, any] })
-
+    const [currentPage, setCurrentPage] = useState(1);
+    const [sendingEmail, setSendingEmail] = useState(false);
+    const itemsPerPage = 6;
+    const salaryCalculationFields = [
+        { fieldKey: "Basic_Console__c", label: "Basic Console", kind: "percentage" as const },
+        { fieldKey: "HRA__c", label: "HRA", kind: "percentage" as const },
+        { fieldKey: "CONV__c", label: "Conveyance", kind: "percentage" as const },
+        { fieldKey: "S_All__c", label: "Special Allowance", kind: "percentage" as const },
+        { fieldKey: "PF__c", label: "PF", kind: "percentage" as const },
+        { fieldKey: "PT__c", label: "PT", kind: "number" as const },
+        { fieldKey: "ESI__c", label: "ESI", kind: "percentage" as const },
+    ]
     useEffect(() => {
         getEmployeeTitles().then(setTitles).catch(console.error)
     }, [])
@@ -88,6 +102,12 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
             }
         }
     }, [activeTab])
+
+    useEffect(() => {
+        if ((currentUserRole || "").trim().toLowerCase() !== "admin" && activeTab === "salary-calculation") {
+            setActiveTab("personal")
+        }
+    }, [activeTab, currentUserRole])
 
     // --- Tab change handler ---
     const handleTabChange = (tab: TabId) => {
@@ -194,6 +214,60 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
         return parts.join(' ')
     }
 
+    const parseNumberValue = (value: any): number | null => {
+        if (value === undefined || value === null || value === "") return null
+        const parsed = Number(value)
+        return Number.isFinite(parsed) ? parsed : null
+    }
+
+    const getSalaryFieldValue = (fieldKey: string) => {
+        return formData[fieldKey] !== undefined ? formData[fieldKey] : employee?.[fieldKey] ?? ""
+    }
+
+    const renderSalaryField = (field: { fieldKey: string; label: string; kind: "percentage" | "number" }) => {
+        const currentValue = getSalaryFieldValue(field.fieldKey)
+        const suffix = field.kind === "percentage" ? "%" : ""
+
+        return (
+            <div key={field.fieldKey} className="space-y-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 flex justify-between">
+                    <div>
+                        {field.label}
+                        {field.kind === "percentage" && <span className="text-slate-400 normal-case tracking-normal font-medium"> (%)</span>}
+                    </div>
+                    {errors[field.fieldKey] && isEditing && <span className="text-red-500 text-[10px] normal-case tracking-normal font-medium animate-pulse">{errors[field.fieldKey]}</span>}
+                </label>
+                {isEditing ? (
+                    <div className="relative">
+                        <input
+                            type="number"
+                            min="0"
+                            step={field.kind === "percentage" ? "0.01" : "1"}
+                            value={currentValue}
+                            onChange={(e) => setFormData({ ...formData, [field.fieldKey]: e.target.value })}
+                            className={cn(
+                                "w-full bg-slate-50 border rounded-lg px-3 py-2.5 text-sm text-slate-800 focus:ring-2 outline-none transition placeholder:text-slate-400",
+                                errors[field.fieldKey] ? "border-red-300 focus:ring-red-200" : "border-slate-200 focus:ring-blue-500/20 focus:border-blue-400"
+                            )}
+                            placeholder="0"
+                        />
+                        {suffix && (
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 pointer-events-none">
+                                {suffix}
+                            </span>
+                        )}
+                    </div>
+                ) : (
+                    <p className="font-medium text-slate-800 text-sm break-words py-1">
+                        {currentValue !== "" && currentValue !== null && currentValue !== undefined
+                            ? `${currentValue}${suffix}`
+                            : <span className="text-slate-400 italic">Not set</span>}
+                    </p>
+                )}
+            </div>
+        )
+    }
+
     const validateForm = () => {
         const newErrors: Record<string, string> = {}
 
@@ -202,6 +276,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
             const employeeName = formData.Employee_Name__c?.trim()
             const email = formData.Employee_Email__c?.trim()
             const phone = formData.Employee_Phone__c?.trim()
+            const companyEmail = formData.Company_Email__c?.trim()
             const normalizedPhone = phone?.replace(/[\s-]/g, "")
             const emergencyPhone = formData.Emergency_Contact_Number__c?.trim()
             const normalizedEmergencyPhone = emergencyPhone?.replace(/[\s-]/g, "")
@@ -217,6 +292,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
             } else if (!emailPattern.test(email)) {
                 newErrors.Employee_Email__c = "Please enter a valid email address"
             }
+
 
             if (!phone) {
                 newErrors.Employee_Phone__c = "Phone number is required"
@@ -259,6 +335,48 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                 if (!formData.Role__c) newErrors.Role__c = "Role is required"
                 if (!formData.Department__c) newErrors.Department__c = "Department is required"
             }
+
+            const companyEmail = formData.Company_Email__c?.trim()
+            if (companyEmail) {
+                if (!emailPattern.test(companyEmail)) {
+                    newErrors.Company_Email__c = "Please enter a valid company email address";
+                } else if (employeesList) {
+                    const isDuplicate = employeesList.some((emp: any) => 
+                        emp.Id !== employeeId && 
+                        emp.Status__c === 'Active' && 
+                        emp.Company_Email__c?.trim().toLowerCase() === companyEmail.toLowerCase()
+                    );
+                    if (isDuplicate) {
+                        newErrors.Company_Email__c = "This Company Email is already assigned to another active employee";
+                    }
+                }
+            }
+        }
+
+        if (activeTab === 'salary-calculation') {
+            salaryCalculationFields.forEach((field) => {
+                const rawValue = formData[field.fieldKey]
+                const numericValue = parseNumberValue(rawValue)
+
+                if (rawValue === undefined || rawValue === null || rawValue === "") {
+                    newErrors[field.fieldKey] = `${field.label} is required`
+                    return
+                }
+
+                if (numericValue === null) {
+                    newErrors[field.fieldKey] = `${field.label} must be a valid number`
+                    return
+                }
+
+                if (field.kind === "percentage" && (numericValue < 0 || numericValue > 100)) {
+                    newErrors[field.fieldKey] = `${field.label} must be between 0 and 100`
+                    return
+                }
+
+                if (field.kind === "number" && numericValue < 0) {
+                    newErrors[field.fieldKey] = `${field.label} cannot be negative`
+                }
+            })
         }
 
         setErrors(newErrors)
@@ -273,10 +391,10 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
             setWarningMsg(null)
         } else {
             const expParsed = decimalToYearsMonths(employee.Experience__c)
-            console.log(employee)
             setFormData({
                 Employee_Name__c: employee.Employee_Name__c,
                 Employee_Email__c: employee.Employee_Email__c,
+                Company_Email__c: employee.Company_Email__c,
                 Employee_Phone__c: employee.Employee_Phone__c,
                 Birthdate__c: employee.Birthdate__c,
                 Gender__c: employee.Gender__c,
@@ -288,6 +406,8 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                 Employee_Address__CountryCode__s: employee.Employee_Current_Address__c?.country || '',
                 Emergency_Contact_Name__c: employee.Emergency_Contact_Name__c,
                 Emergency_Contact_Number__c: employee.Emergency_Contact_Number__c,
+                Technology__c: employee.Technology__c,
+                Enrollment_Number__c: employee.Enrollment_Number__c,
                 exp_years: expParsed.years,
                 exp_months: expParsed.months,
                 Experience__c: employee.Experience__c,
@@ -297,9 +417,14 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                 Team_Lead__c: employee.Team_Lead__c,
                 Joining_Date__c: employee.Joining_Date__c,
                 Onboarding_Date__c: employee.Onboarding_Date__c,
-                Base_Salary__c: employee.Base_Salary__c,
                 Salary_CTC__c: employee.Salary_CTC__c,
-                Company_Security_Deduction__c: employee.Company_Security_Deduction__c,
+                Basic_Console__c: employee.Basic_Console__c,
+                HRA__c: employee.HRA__c,
+                CONV__c: employee.CONV__c,
+                S_All__c: employee.S_All__c,
+                PF__c: employee.PF__c,
+                PT__c: employee.PT__c,
+                ESI__c: employee.ESI__c,
                 Status__c: employee.Status__c
             })
             setIsEditing(true)
@@ -314,6 +439,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
             const payload = { ...formData };
             payload.Employee_Name__c = payload.Employee_Name__c?.trim();
             payload.Employee_Email__c = payload.Employee_Email__c?.trim();
+            payload.Company_Email__c = payload.Company_Email__c?.trim();
             payload.Employee_Phone__c = payload.Employee_Phone__c?.trim()?.replace(/[\s-]/g, '');
             payload.Emergency_Contact_Number__c = payload.Emergency_Contact_Number__c?.trim()?.replace(/[\s-]/g, '');
             payload.Employee_Current_Address__c = JSON.stringify(
@@ -325,7 +451,6 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                     country: formData.Employee_Address__CountryCode__s
                 }
             );
-            console.log(payload);
 
             // Remove flattened address fields from payload
             delete payload.Employee_Address__Street__s;
@@ -339,6 +464,23 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
             payload.Experience__c = yearsMonthsToDecimal(payload.exp_years ?? 0, payload.exp_months ?? 0)
             delete payload.exp_years
             delete payload.exp_months
+
+            const numericFields = [
+                "Salary_CTC__c",
+                "Basic_Console__c",
+                "HRA__c",
+                "CONV__c",
+                "S_All__c",
+                "PF__c",
+                "PT__c",
+                "ESI__c"
+            ]
+
+            numericFields.forEach((fieldKey) => {
+                if (payload[fieldKey] !== undefined && payload[fieldKey] !== null && payload[fieldKey] !== "") {
+                    payload[fieldKey] = Number(payload[fieldKey])
+                }
+            })
 
             updateMutation.mutate(payload)
         } else {
@@ -645,6 +787,26 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
         onError: () => message.error("Failed to add bank account")
     })
 
+    const verifyBankMutation = useMutation({
+        mutationFn: async ({ bankId, action }: { bankId: string, action: 'approve' | 'reject' }) => {
+            const res = await fetch(`/api/employees/${employeeId}/bank/verify`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ bankId, action })
+            })
+            const data = await res.json()
+            if (!res.ok) throw new Error(data.error || 'Failed to verify bank account')
+            return data
+        },
+        onSuccess: (_data, variables) => {
+            message.success(`Bank account ${variables.action === 'approve' ? 'verified' : 'rejected'} successfully`)
+            queryClient.invalidateQueries({ queryKey: ["employee", employeeId] })
+        },
+        onError: (error: any) => {
+            message.error(error?.message || 'Failed to verify bank account')
+        }
+    })
+
     // --- Delete Bank Mutation ---
     const deleteBankMutation = useMutation({
         mutationFn: async (bankId: string) => {
@@ -686,10 +848,10 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
     const canManageBankAccounts = ['HR', 'Admin'].includes(currentUserRole)
 
     const handleAddBank = () => {
-        if (!canManageBankAccounts) {
-            message.error("Only HR or Admin can add bank accounts")
-            return
-        }
+        // if (!canManageBankAccounts) {
+        //     message.error("Only HR or Admin can add bank accounts")
+        //     return
+        // }
 
         const newErrors: Record<string, string> = {}
 
@@ -863,6 +1025,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
         updateMutation.isPending ||
         uploadMutation.isPending ||
         addBankMutation.isPending ||
+        verifyBankMutation.isPending ||
         setPrimaryBankMutation.isPending ||
         deleteBankMutation.isPending ||
         customDocMutation.isPending ||
@@ -875,6 +1038,17 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
     if (!employee) return <div className="flex h-screen items-center justify-center text-red-500">Employee not found</div>
 
     const viewedEmployeeRole = (employee.Role__c || "").trim()
+    const normalizedCurrentRole = (currentUserRole || "").trim().toLowerCase()
+    const isAdminUser = normalizedCurrentRole === 'admin'
+    const isHrUser = normalizedCurrentRole === 'hr'
+    const normalizeSfId = (id?: string) => (id || '').trim().toLowerCase().slice(0, 15)
+    const isOwnProfile =
+        normalizeSfId(currentUserEmployeeId) !== '' &&
+        normalizeSfId(currentUserEmployeeId) === normalizeSfId(employee?.Id || employeeId)
+    const selectedDepartment = `${formData.Department__c ?? employee.Department__c ?? ''}`.trim().toLowerCase()
+    const selectedRole = `${formData.Role__c ?? employee.Role__c ?? ''}`.trim().toLowerCase()
+    const canViewCompensation = isAdminUser || (!isHrUser && isOwnProfile) || (isHrUser && isOwnProfile)
+    const canViewSalaryHistory = isAdminUser || (!isHrUser && isOwnProfile) || (isHrUser && isOwnProfile)
     const canToggleUserActive =
         currentUserRole === 'Admin'
             ? true
@@ -892,7 +1066,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
         )
     }
     return (
-        <div className="w-full mx-auto p-6 lg:p-10 space-y-8 animate-in fade-in duration-500">
+        <div className="w-full mx-auto px-8 max-h-[85vh] overflow-y-auto space-y-8 animate-in fade-in duration-500">
             {/* {isScreenActionLoading && (
                 <div className="fixed z-[999] h-[80vh] overflow-hidden inset-0 backdrop-blur-sm flex items-center justify-center">
                     <div className="bg-white rounded-xl shadow-xl px-6 py-5 flex items-center gap-3 border border-slate-100">
@@ -947,7 +1121,30 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
 
                     {/* Action Button */}
                     {canToggleUserActive && (
-                        <div className="shrink-0">
+                        <div className="shrink-0 flex items-center gap-3">
+                            <button
+                                onClick={async () => {
+                                    if (!employee.Employee_Email__c) {
+                                        message.error("Employee Email is required to send welcome email.");
+                                        return;
+                                    }
+                                    setSendingEmail(true);
+                                    try {
+                                        const res = await sendWelcomeEmailAction(employeeId, employee.Employee_Email__c, employee.Employee_Name__c , employee.Name);
+                                        if (res.error) throw new Error(res.error);
+                                        message.success("Welcome Email sent successfully.");
+                                    } catch (e) {
+                                        message.error("Failed to send Welcome Email.");
+                                    } finally {
+                                        setSendingEmail(false);
+                                    }
+                                }}
+                                disabled={sendingEmail || !employee.Employee_Email__c}
+                                className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all border shadow-lg bg-white border-gray-200 text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <Mail className="w-4 h-4" />
+                                {sendingEmail ? 'Sending...' : 'Send Welcome Email'}
+                            </button>
                             <button
                                 onClick={() => {
                                     const isActivating = !employee.Active__c;
@@ -975,8 +1172,10 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                         }
                                     });
                                 }}
+                                disabled={!employee.Active__c && (!employee.Company_Email__c || !employee.Role__c || !employee.Title__c || !employee.Department__c)}
                                 className={cn(
                                     'flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all border shadow-lg',
+                                    (!employee.Active__c && (!employee.Company_Email__c || !employee.Role__c || !employee.Title__c || !employee.Department__c)) && 'opacity-50 cursor-not-allowed',
                                     employee.Active__c
                                         ? 'bg-red-600/90 text-white border-red-500/50 hover:bg-red-700'
                                         : 'bg-green-600/90 text-white border-green-500/50 hover:bg-green-700'
@@ -1013,6 +1212,8 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                         {[
                             { id: "personal", label: "Personal Details", icon: User },
                             { id: "employment", label: "Employment Details", icon: Building2 },
+                            ...(isAdminUser ? [{ id: "salary-calculation", label: "Salary Calculation", icon: Calculator }] : []),
+                            ...(canViewSalaryHistory ? [{ id: "salary-history", label: "Salary History", icon: History }] : []),
                             { id: "assets", label: "Assets", icon: Laptop },
                             { id: "bank", label: "Bank Details", icon: CreditCard },
                             { id: "documents", label: "Documents", icon: FileText },
@@ -1101,7 +1302,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                             </div>
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                                                 <Field label="Employee Name" value={employee.Employee_Name__c} fieldKey="Employee_Name__c" isEditing={isEditing} formData={formData} setFormData={setFormData} error={errors.Employee_Name__c} placeholder="e.g. John Doe" required />
-                                                <Field label="Email Address" value={employee.Employee_Email__c} fieldKey="Employee_Email__c" type="email" isEditing={isEditing} formData={formData} setFormData={setFormData} error={errors.Employee_Email__c} placeholder="e.g. john@example.com" required />
+                                                <Field label="Personal Email" value={employee.Employee_Email__c} fieldKey="Employee_Email__c" type="email" isEditing={isEditing} formData={formData} setFormData={setFormData} error={errors.Employee_Email__c} placeholder="e.g. john@example.com" required />
                                                 <Field label="Phone Number" value={employee.Employee_Phone__c} fieldKey="Employee_Phone__c" type="tel" isEditing={isEditing} formData={formData} setFormData={setFormData} error={errors.Employee_Phone__c} placeholder="+919876543210 or 9876543210" required />
                                                 <Field label="Date of Birth" value={employee.Birthdate__c} fieldKey="Birthdate__c" type="date" isEditing={isEditing} formData={formData} setFormData={setFormData} error={errors.Birthdate__c} required />
                                                 <Field label="Gender" value={employee.Gender__c} fieldKey="Gender__c" isEditing={isEditing} formData={formData} setFormData={setFormData} options={[{ label: 'Male', value: 'Male' }, { label: 'Female', value: 'Female' }]} type="select" error={errors.Gender__c} required />
@@ -1138,6 +1339,15 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                                                 <Field label="Contact Name" value={employee.Emergency_Contact_Name__c} fieldKey="Emergency_Contact_Name__c" isEditing={isEditing} formData={formData} setFormData={setFormData} error={errors.Emergency_Contact_Name__c} />
                                                 <Field label="Contact Number" value={employee.Emergency_Contact_Number__c} fieldKey="Emergency_Contact_Number__c" isEditing={isEditing} formData={formData} setFormData={setFormData} pattern="^(?:\\+91\\d{10}|\\d{10})$" type="tel" error={errors.Emergency_Contact_Number__c} placeholder="+919876543210 or 9876543210" />
+                                            </div>
+                                        </div>
+                                        <div className="border-t border-slate-100 pt-8 mt-8">
+                                            <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+                                                <FileText className="w-5 h-5 text-purple-500" /> Academic & Other Details
+                                            </h2>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                                                <Field label="Technology" value={employee.Technology__c} fieldKey="Technology__c" isEditing={isEditing} formData={formData} setFormData={setFormData} placeholder="e.g. React" />
+                                                <Field label="Enrollment Number" value={employee.Enrollment_Number__c} fieldKey="Enrollment_Number__c" isEditing={isEditing} formData={formData} setFormData={setFormData} placeholder="e.g. EN12345" />
                                             </div>
                                         </div>
                                     </div>
@@ -1226,6 +1436,17 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                                     type="select"
                                                     options={titles}
                                                     placeholder="Select Job Title"
+                                                />
+                                                <Field
+                                                    label="Company Email"
+                                                    value={employee.Company_Email__c}
+                                                    fieldKey="Company_Email__c"
+                                                    type="email"
+                                                    isEditing={isEditing && ['HR', 'Admin'].includes(currentUserRole)}
+                                                    formData={formData}
+                                                    setFormData={setFormData}
+                                                    error={errors.Company_Email__c}
+                                                    placeholder="e.g. john@company.com"
                                                 />
 
                                                 {/* ── Total Experience: split into Years + Months ── */}
@@ -1319,7 +1540,13 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                                                 placeholder="Select Manager"
                                                                 value={formData.Team_Lead__c !== undefined ? formData.Team_Lead__c : employee.Team_Lead__c}
                                                                 onChange={(val: any) => setFormData({ ...formData, Team_Lead__c: val })}
-                                                                options={employeesList?.filter((e: any) => e.Id !== employeeId && e.Status__c === 'Active' && e.Title__c === 'Team Lead' && e.Role__c === currentUserRole).map((e: any) => ({
+                                                                options={employeesList?.filter((e: any) =>
+                                                                    e.Id !== employeeId &&
+                                                                    e.Status__c === 'Active' &&
+                                                                    (e.Title__c || '').trim().toLowerCase() === 'team lead' &&
+                                                                    ((e.Department__c || '').trim().toLowerCase() === selectedDepartment  || 
+                                                                    (e.Role__c || '').trim().toLowerCase() === selectedRole)
+                                                                ).map((e: any) => ({
                                                                     value: e.Id,
                                                                     label: `${e.Employee_Name__c || ''}`.trim()
                                                                 }))}
@@ -1333,14 +1560,76 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                             </div>
                                         </div>
 
-                                        <div className="border-t border-slate-100 pt-8">
-                                            <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
-                                                <CreditCard className="w-5 h-5 text-green-500" /> Compensation
-                                            </h2>
+                                        {canViewCompensation && (
+                                            <div className="border-t border-slate-100 pt-8">
+                                                <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+                                                    <CreditCard className="w-5 h-5 text-green-500" /> Compensation
+                                                </h2>
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                                                    <Field label="CTC" value={employee.Salary_CTC__c} fieldKey="Salary_CTC__c" type="number" isEditing={isEditing && currentUserRole === 'Admin'} formData={formData} setFormData={setFormData} />
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {activeTab === "salary-calculation" && isAdminUser && (
+                                    <div className="space-y-8">
+                                        <div>
+                                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                                                <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2 m-0">
+                                                    <Calculator className="w-5 h-5 text-blue-500" /> Salary Calculation
+                                                </h2>
+                                                <div className="flex w-full sm:w-auto justify-end">
+                                                    {!isEditing ? (
+                                                        <button
+                                                            onClick={handleEditToggle}
+                                                            className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold transition text-sm sm:text-base"
+                                                        >
+                                                            <Edit3 className="w-4 h-4" /> Edit Details
+                                                        </button>
+                                                    ) : (
+                                                        <div className="flex w-full items-center gap-3">
+                                                            <button
+                                                                onClick={handleEditToggle}
+                                                                className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold transition text-sm sm:text-base"
+                                                            >
+                                                                <X className="w-4 h-4" /> Cancel
+                                                            </button>
+                                                            <button
+                                                                onClick={handleSave}
+                                                                className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold transition shadow-lg shadow-blue-500/20 text-sm sm:text-base"
+                                                            >
+                                                                {updateMutation.isPending ? <Spin size="small" /> : <Save className="w-4 h-4" />} Save
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-                                                <Field label="Base Salary" value={employee.Base_Salary__c} fieldKey="Base_Salary__c" type="number" isEditing={isEditing && ['HR', 'Admin'].includes(currentUserRole)} formData={formData} setFormData={setFormData} />
-                                                <Field label="CTC" value={employee.Salary_CTC__c} fieldKey="Salary_CTC__c" type="number" isEditing={isEditing && ['HR', 'Admin'].includes(currentUserRole)} formData={formData} setFormData={setFormData} />
-                                                <Field label="Security Deduction" value={employee.Company_Security_Deduction__c} fieldKey="Company_Security_Deduction__c" type="number" isEditing={isEditing && ['HR', 'Admin'].includes(currentUserRole)} formData={formData} setFormData={setFormData} />
+                                                {salaryCalculationFields.map(renderSalaryField)}
+                                            </div>
+
+                                            <div className="mt-8 p-4 rounded-2xl border border-slate-200 bg-slate-50">
+                                                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Quick Summary</p>
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-slate-700">
+                                                    <div>
+                                                        <span className="text-slate-500">Total percentage components:</span>{" "}
+                                                        <span className="font-semibold">
+                                                            {salaryCalculationFields
+                                                                .filter((field) => field.kind === "percentage")
+                                                                .reduce((total, field) => total + (parseNumberValue(getSalaryFieldValue(field.fieldKey)) || 0), 0)
+                                                                .toFixed(2)}%
+                                                        </span>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-slate-500">PT amount:</span>{" "}
+                                                        <span className="font-semibold">
+                                                            {parseNumberValue(getSalaryFieldValue("PT__c")) ?? 0}
+                                                        </span>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -1447,8 +1736,35 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                                                 <p className="text-sm text-slate-500">{bank.Bank_Branch_Name__c}</p>
                                                             </div>
                                                             <div className="flex items-center gap-2">
-                                                                {bank.Primary_Account__c && <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full font-medium">Primary</span>}
-                                                                {!bank.Primary_Account__c && (
+                                                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                                                                    bank.Status__c === 'Verified' ? 'bg-green-50 text-green-700 border-green-200' :
+                                                                    bank.Status__c === 'Rejected' ? 'bg-red-50 text-red-700 border-red-200' :
+                                                                    'bg-amber-50 text-amber-700 border-amber-200'
+                                                                } border whitespace-nowrap`}>
+                                                                    {bank.Status__c || 'Pending'}
+                                                                </span>
+                                                                {isHrUser && (!bank.Status__c || bank.Status__c === 'Pending') && (
+                                                                    <>
+                                                                        <button
+                                                                            onClick={() => verifyBankMutation.mutate({ bankId: bank.Id, action: 'approve' })}
+                                                                            disabled={verifyBankMutation.isPending}
+                                                                            className="text-xs px-2 py-1 rounded-md border border-green-200 text-green-600 hover:bg-green-50 disabled:opacity-50"
+                                                                            title="Verify Account"
+                                                                        >
+                                                                            Verify
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => verifyBankMutation.mutate({ bankId: bank.Id, action: 'reject' })}
+                                                                            disabled={verifyBankMutation.isPending}
+                                                                            className="text-xs px-2 py-1 rounded-md border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50"
+                                                                            title="Reject Account"
+                                                                        >
+                                                                            Reject
+                                                                        </button>
+                                                                    </>
+                                                                )}
+                                                                {bank.Primary_Account__c && <span className="bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded-full font-medium">Primary</span>}
+                                                                {/* {!bank.Primary_Account__c && (
                                                                     <button
                                                                         onClick={() => setPrimaryBankMutation.mutate(bank.Id)}
                                                                         disabled={setPrimaryBankMutation.isPending}
@@ -1457,7 +1773,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                                                     >
                                                                         Set Primary
                                                                     </button>
-                                                                )}
+                                                                )} */}
                                                                 {currentUserRole === 'Admin' && (
                                                                     <button
                                                                         onClick={() => {
@@ -1567,7 +1883,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                         {/* ── Required Documents Tiles ── */}
                                         <div>
                                             <h2 className="text-xl font-bold text-slate-800 mb-1 flex items-center gap-2">
-                                                <FileText className="w-5 h-5 text-orange-500" /> Required Documents
+                                                <FileText className="w-5 h-5 text-orange-500" /> Documents
                                             </h2>
                                             <p className="text-sm text-slate-500 mb-5">Click on a tile to upload the corresponding document.</p>
 
@@ -1629,7 +1945,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                                                 {!uploaded && !isUploading && (
                                                                     <span className="text-[10px] text-slate-400">Click to upload</span>
                                                                 )}
-                                                                {/* View link for uploaded docs */}
+                                                                {/* View link for uploaded docs
                                                                 {uploaded && uploaded.File_URL__c && (
                                                                     <button
                                                                         type="button"
@@ -1641,7 +1957,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                                                     >
                                                                         <Eye className="w-3 h-3" /> View
                                                                     </button>
-                                                                )}
+                                                                )} */}
                                                             </label>
                                                         )
                                                     })}
@@ -1653,7 +1969,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                         <div className="border-t border-slate-100 pt-6">
                                             <div className="flex justify-between items-center mb-4">
                                                 <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                                                    <Download className="w-4 h-4 text-slate-500" /> All Uploaded Documents
+                                                    <Download className="w-4 h-4 text-slate-500" /> Uploaded Documents
                                                 </h3>
                                                 {['HR', 'Admin'].includes(currentUserRole) && (
                                                 <Button
@@ -1669,9 +1985,13 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                                 const nonPayslipDocs = (employee.documents || []).filter(
                                                     (doc: any) => doc.Document_Type__c?.trim().toLowerCase() !== 'payslip'
                                                 )
-                                                return nonPayslipDocs.length > 0 ? (
+                                                const totalDocs = nonPayslipDocs.length;
+                                                const startIndex = (currentPage - 1) * itemsPerPage;
+                                                const paginatedDocs = nonPayslipDocs.slice(startIndex, startIndex + itemsPerPage);
+                                                return totalDocs > 0 ? (
+                                                    <>
                                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                                        {nonPayslipDocs.map((doc: any) => (
+                                                        {paginatedDocs.map((doc: any) => (
                                                             <div key={doc.Id} className="group p-4 border border-slate-200 rounded-xl hover:border-blue-300 hover:bg-blue-50/10 transition relative">
                                                                 {/* Top row: icon + name + approve/reject */}
                                                                 <div className="flex items-start gap-3">
@@ -1746,6 +2066,21 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                                             </div>
                                                         ))}
                                                     </div>
+                                                    {/* Pagination */}
+                                                    {totalDocs > itemsPerPage && (
+                                                        <div className="flex justify-end mt-6">
+                                                            <Pagination
+                                                                current={currentPage}
+                                                                total={totalDocs}
+                                                                pageSize={itemsPerPage}
+                                                                onChange={(page) => setCurrentPage(page)}
+                                                                showSizeChanger={false}
+                                                                className="ant-pagination-custom"
+                                                                
+                                                            />
+                                                        </div>
+                                                    )}
+                                                </>
                                                 ) : (
                                                     <div className="text-center py-10 bg-slate-50 rounded-xl border-dashed border-2 border-slate-200">
                                                         <FileText className="w-10 h-10 text-slate-300 mx-auto mb-2" />
@@ -1753,6 +2088,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                                     </div>
                                                 )
                                             })()}
+                                            
                                         </div>
 
                                         {/* Custom Document Upload Modal */}
@@ -1968,6 +2304,16 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee" }
                                             </div>
                                         )}
                                     </div>
+                                )}
+
+                                {activeTab === "salary-history" && canViewSalaryHistory && (
+                                    <EmployeeSalaryHistoryTab
+                                        employeeId={employeeId}
+                                        employeeName={employee?.Employee_Name__c}
+                                        employeeDisplayId={employee?.Name}
+                                        employeeCode={employee?.Enrollment_Number__c}
+                                        currentUserRole={currentUserRole}
+                                    />
                                 )}
 
                                 {activeTab === "assets" && (

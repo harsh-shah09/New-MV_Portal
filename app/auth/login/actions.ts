@@ -39,7 +39,6 @@ export async function loginAction(
 
   try {
     const employee = await findEmployee(identifier);
-    console.log(employee);
     if (!employee) {
       return { error: 'Invalid credentials' };
     }
@@ -199,7 +198,7 @@ export async function forgotPasswordAction(identifier: string) {
         return { error: 'Failed to update employee record' };
     }
 
-    const email = employee.Employee_Email__c;
+    const email = employee.Company_Email__c;
     if (!email) {
         return { error: 'No email address found for this employee' };
     }

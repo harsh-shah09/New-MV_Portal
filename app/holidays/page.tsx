@@ -83,15 +83,15 @@ export default function HolidaysPage() {
     new Date(a.date).getTime() - new Date(b.date).getTime()
   )
 
-  console.log("Holidays data:", { 
-    totalHolidays: holidays.length, 
-    availableYears, 
-    selectedYear, 
-    filteredCount: filteredHolidays.length,
-    userRole,
-    isHR,
-    sampleHoliday: holidays[0]
-  })
+  // console.log("Holidays data:", { 
+  //   totalHolidays: holidays.length, 
+  //   availableYears, 
+  //   selectedYear, 
+  //   filteredCount: filteredHolidays.length,
+  //   userRole,
+  //   isHR,
+  //   sampleHoliday: holidays[0]
+  // })
 
   // Auto-fill day when date is selected in bulk form
   const updateBulkRowDate = (index: number, date: string) => {

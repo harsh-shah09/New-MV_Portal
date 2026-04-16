@@ -97,28 +97,32 @@ export async function POST(request: NextRequest) {
       // Extract adjustment details (only 1 adjustment allowed per employee)
       const adjustment = emp.adjustments && emp.adjustments.length > 0 ? emp.adjustments[0] : null
       
-      // totalAdditions and totalDeductions already include all calculations from frontend
-      // (Extra Day Pay + Bonus + Anniversary Bonus + Adjustments for additions)
-      // (Leave Deductions + Adjustments + Company Security Deduction for deductions)
-      const totalAdditions = emp.totalAdditions || 0
-      const totalDeductions = emp.totalDeductions || 0
-      const companySecurityDeduction = emp.companySecurityDeduction || 0
+      const totalAdditions = Number(emp.totalAdditions || 0)
+      const companySecurityDeduction = Number(emp.companySecurityDeduction || 0)
+      const grossIncome = Number(emp.grossIncome || emp.baseSalary || emp.monthlyIncome || 0)
+      const salaryStructureDeductions = Number(emp.pfDeduction || 0) + Number(emp.ptDeduction || 0) + Number(emp.esiDeduction || 0)
+      const adjustmentDeductions = (emp.adjustments || [])
+        .filter((item: any) => item.adjustmentType === 'Deduction')
+        .reduce((sum: number, item: any) => sum + Number(item.adjustmentAmount || 0), 0)
+      const totalDeductions = salaryStructureDeductions + adjustmentDeductions + companySecurityDeduction
       const anniversaryBonus = emp.anniversaryBonus || 0
       
       // Combine manual bonus and anniversary bonus for Bonus__c field
       const totalBonus = (emp.bonus || 0) + anniversaryBonus
+      const netSalary = grossIncome + totalAdditions - totalDeductions
       
       return {
         Payroll_Summary__c: summaryId,
         Employee__c: emp.id,
         Payroll_Month__c: month,
-        Basic_Salary__c: emp.baseSalary || emp.basicSalary || 0,
+        Basic_Salary__c: emp.monthlyIncome || emp.baseSalary || emp.basicSalary || 0,
         Bonus__c: totalBonus,
         Adjustment_Type__c: adjustment?.adjustmentType || null,
         Adjustment_Amount__c: adjustment?.adjustmentAmount || null,
         Adjustment_Description__c: adjustment?.adjustmentDescription || null,
         Total_Additions__c: totalAdditions,
         Total_Deductions__c: totalDeductions,
+        Net_Salary__c: Math.round(netSalary * 100) / 100,
       }
     })
 
@@ -190,10 +194,31 @@ export async function POST(request: NextRequest) {
           employeeId: emp.employeeId,
           email: emp.email || "",
           department: emp.department || "",
+          bankName: emp.bankName || "",
+          accountNumber: emp.accountNumber || "",
+          dateOfJoining: emp.dateOfJoining || "",
+          pfNumber: emp.pfNumber || "",
+          esiNumber: emp.esiNumber || "",
+          uanNumber: emp.uanNumber || "",
           role: emp.role || "",
           payrollMonth: month,
           payrollYear: year,
-          basicSalary: emp.baseSalary || emp.basicSalary || 0,
+          monthlyIncome: emp.monthlyIncome || emp.baseSalary || emp.basicSalary || 0,
+          basicSalary: emp.baseSalary || emp.basicSalary || emp.monthlyIncome || 0,
+          actualMonthlyIncome: emp.actualMonthlyIncome || 0,
+          actualBasicComponent: emp.actualBasicComponent || 0,
+          actualHraComponent: emp.actualHraComponent || 0,
+          actualConvComponent: emp.actualConvComponent || 0,
+          actualSpecialAllowanceComponent: emp.actualSpecialAllowanceComponent || 0,
+          actualGrossIncome: emp.actualGrossIncome || 0,
+          basicComponent: emp.basicComponent || 0,
+          hraComponent: emp.hraComponent || 0,
+          convComponent: emp.convComponent || 0,
+          specialAllowanceComponent: emp.specialAllowanceComponent || 0,
+          grossIncome: emp.grossIncome || 0,
+          pfDeduction: emp.pfDeduction || 0,
+          ptDeduction: emp.ptDeduction || 0,
+          esiDeduction: emp.esiDeduction || 0,
           bonus: emp.bonus || 0,
           anniversaryBonus: emp.anniversaryBonus || 0,
           totalAdditions: emp.totalAdditions || 0,

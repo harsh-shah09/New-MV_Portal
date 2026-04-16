@@ -50,6 +50,7 @@ export default function AdminConsole() {
     const [activeTab, setActiveTab] = useState<AdminTab>("admin");
     const [configs, setConfigs] = useState<any>(null);
     const [roleOptions, setRoleOptions] = useState<string[]>([]);
+    const [payrollCalculationTypeOptions, setPayrollCalculationTypeOptions] = useState<string[]>([]);
     const [users, setUsers] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [loadingUsers, setLoadingUsers] = useState(false);
@@ -141,7 +142,6 @@ export default function AdminConsole() {
             const res = await fetch('/api/admin/users');
             if (!res.ok) throw new Error("Failed to fetch users");
             const data = await res.json();
-            console.log('users', data)
             setUsers(data);
         } catch (e) {
             message.error("Failed to load users");
@@ -182,7 +182,12 @@ export default function AdminConsole() {
             if (!res.ok) throw new Error("Failed to fetch configurations");
             const data = await res.json();
             setRoleOptions(data.roleOptions || []);
-            const { roleOptions: _roleOptions, ...configData } = data;
+            setPayrollCalculationTypeOptions(data.payrollCalculationTypeOptions || []);
+            const {
+                roleOptions: _roleOptions,
+                payrollCalculationTypeOptions: _payrollCalculationTypeOptions,
+                ...configData
+            } = data;
             setConfigs(configData);
         } catch (error) {
             console.error(error);
@@ -192,7 +197,7 @@ export default function AdminConsole() {
         }
     };
 
-    const handleInputChange = (metadataType: string, record: any, newValue: any) => {
+    const handleInputChange = (metadataType: string, record: any, newValue: any, field: string = 'Value__c') => {
         // Update local state for display
         const sectionKey = Object.keys(configs).find(key =>
             configs[key].includes(record)
@@ -209,18 +214,20 @@ export default function AdminConsole() {
         setConfigs((prev: any) => ({
             ...prev,
             [section]: prev[section].map((r: any) =>
-                r.Id === record.Id ? { ...r, Value__c: newValue } : r
+                r.Id === record.Id ? { ...r, [field]: newValue } : r
             )
         }));
 
         // Track changes for save
         setUnsavedChanges(prev => {
             // Remove existing change for this record if any
-            const filtered = prev.filter(c => c.fullName !== `${metadataType}.${record.DeveloperName}`);
+            const fullName = `${metadataType}.${record.DeveloperName}`;
+            const filtered = prev.filter(c => !(c.fullName === fullName && c.field === field));
             return [...filtered, {
                 metadataType,
-                fullName: `${metadataType}.${record.DeveloperName}`,
+                fullName,
                 label: record.MasterLabel,
+                field,
                 value: newValue
             }];
         });
@@ -344,7 +351,7 @@ export default function AdminConsole() {
 
     return (
         <RoleGuard>
-            <div className="min-h-screen bg-slate-50 p-6 lg:p-10">
+            <div className="min-h-screen bg-slate-50 p-6">
                 <div className="w-full mx-auto space-y-4 lg:space-y-8">
 
                     {/* Header */}
@@ -392,7 +399,7 @@ export default function AdminConsole() {
 
                         {/* Content */}
                         <div className="lg:col-span-3">
-                            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 sm:p-6 lg:p-8 min-h-[600px]">
+                            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 sm:p-6 lg:p-8 max-h-[70vh] overflow-y-auto">
                                 <AnimatePresence mode="wait">
                                     <motion.div
                                         key={activeTab}
@@ -572,28 +579,56 @@ export default function AdminConsole() {
                                         {activeTab === "payroll" && (
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                                 {configs.payroll?.map((record: any) => (
-                                                    <div key={record.Id} className="group">
-                                                        <label className="block text-sm font-semibold text-slate-700 mb-2">
-                                                            {formatLabel(record.MasterLabel)}
-                                                        </label>
-                                                        {['Auto_Apply_Anniversary_Bonus'].includes(record.DeveloperName) ? (
+                                                    <div key={record.Id} className="group bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-4">
+                                                        <div>
+                                                            <label className="block text-xs font-semibold text-slate-500 mb-1">Configuration</label>
+                                                            <div className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-700">
+                                                                {record.MasterLabel || record.DeveloperName}
+                                                            </div>
+                                                        </div>
+
+                                                        <div>
+                                                            <label className="block text-xs font-semibold text-slate-500 mb-1">Value</label>
+                                                            <input
+                                                                type="text"
+                                                                value={record.Value__c || ''}
+                                                                onChange={(e) => handleInputChange('Payroll_Configurations__mdt', record, e.target.value, 'Value__c')}
+                                                                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition"
+                                                            />
+                                                        </div>
+
+                                                        <div>
+                                                            <label className="block text-xs font-semibold text-slate-500 mb-1">Calculation Type</label>
+                                                            {payrollCalculationTypeOptions.length > 0 ? (
+                                                                <Select
+                                                                    value={record.Calculation_Type__c || undefined}
+                                                                    onChange={(value) => handleInputChange('Payroll_Configurations__mdt', record, value, 'Calculation_Type__c')}
+                                                                    className="w-full"
+                                                                    options={payrollCalculationTypeOptions.map((option) => ({ value: option, label: option }))}
+                                                                    placeholder="Select calculation type"
+                                                                />
+                                                            ) : (
+                                                                <input
+                                                                    type="text"
+                                                                    value={record.Calculation_Type__c || ''}
+                                                                    onChange={(e) => handleInputChange('Payroll_Configurations__mdt', record, e.target.value, 'Calculation_Type__c')}
+                                                                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition"
+                                                                />
+                                                            )}
+                                                        </div>
+
+                                                        <div>
+                                                            <label className="block text-xs font-semibold text-slate-500 mb-1">Is Active</label>
                                                             <Select
-                                                                value={record.Value__c || 'false'}
-                                                                onChange={(e) => handleInputChange('Payroll_Configurations__mdt', record, e.target.value)}
-                                                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                                                                value={record.Is_Active__c ? 'true' : 'false'}
+                                                                onChange={(value) => handleInputChange('Payroll_Configurations__mdt', record, value === 'true', 'Is_Active__c')}
+                                                                className="w-full"
                                                                 options={[
                                                                     { value: 'true', label: 'Enabled' },
                                                                     { value: 'false', label: 'Disabled' }
                                                                 ]}
                                                             />
-                                                        ) : (
-                                                            <input
-                                                                type="text"
-                                                                value={record.Value__c || ''}
-                                                                onChange={(e) => handleInputChange('Payroll_Configurations__mdt', record, e.target.value)}
-                                                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition group-hover:bg-white"
-                                                            />
-                                                        )}
+                                                        </div>
                                                     </div>
                                                 ))}
                                             </div>
@@ -691,8 +726,7 @@ export default function AdminConsole() {
                                                                                                 const data = {
                                                                                                     Active__c: user.Active__c ? false : true
                                                                                                 }
-                                                                                                console.log(data)
-                                                                                                updateUser(user.Id, data)
+                                                                                                                                                                                     updateUser(user.Id, data)
                                                                                             }}
                                                                                             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${user.Active__c
                                                                                                 ? "bg-green-100 text-green-700 hover:bg-green-200"
