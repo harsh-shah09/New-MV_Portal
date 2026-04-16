@@ -27,6 +27,13 @@ interface SalaryHistoryRecord {
   Is_Current__c?: boolean
   Change_Type__c?: string
   Description__c?: string
+  Basic_Console__c?: number
+  CONV__c?: number
+  ESI__c?: number
+  HRA__c?: number
+  PF__c?: number
+  PT__c?: number
+  SP_All__c?: number
   CreatedDate?: string
 }
 
@@ -46,6 +53,13 @@ interface SalaryHistoryFormValues {
   Is_Current__c?: boolean
   Change_Type__c?: string
   Description__c?: string
+  Basic_Console__c?: number
+  CONV__c?: number
+  ESI__c?: number
+  HRA__c?: number
+  PF__c?: number
+  PT__c?: number
+  SP_All__c?: number
 }
 
 const formatCurrency = (amount?: number | null) => {
@@ -59,10 +73,23 @@ const formatCurrency = (amount?: number | null) => {
 
 export function EmployeeSalaryHistoryTab({ employeeId, employeeName, employeeDisplayId, employeeCode, currentUserRole }: EmployeeSalaryHistoryTabProps) {
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
+  const [selectedRecord, setSelectedRecord] = useState<SalaryHistoryRecord | null>(null)
   const [form] = Form.useForm<SalaryHistoryFormValues>()
   const queryClient = useQueryClient()
   const selectedEmployeeName = employeeName?.trim() || "Not set"
   const selectedEmployeeId = employeeDisplayId?.trim() || employeeCode?.trim() || "Not set"
+
+  const formatDate = (value?: string | null) => (value ? dayjs(value).format("DD MMM YYYY") : "-")
+  const formatPercent = (value?: number | null) => {
+    if (value === null || value === undefined || Number.isNaN(value)) return "-"
+    return `${Number(value).toFixed(2)}%`
+  }
+
+  const handleRecordClick = (record: SalaryHistoryRecord) => {
+    setSelectedRecord(record)
+    setIsDetailsModalOpen(true)
+  }
 
   const previousSalary = Form.useWatch("Previous_Salary__c", form)
   const currentSalary = Form.useWatch("Current_Salary__c", form)
@@ -108,7 +135,14 @@ export function EmployeeSalaryHistoryTab({ employeeId, employeeName, employeeDis
         End_Date__c: values.End_Date__c?.format("YYYY-MM-DD"),
         Is_Current__c: values.Is_Current__c ?? false,
         Change_Type__c: values.Change_Type__c,
-        Description__c: values.Description__c
+        Description__c: values.Description__c,
+        Basic_Console__c: values.Basic_Console__c,
+        CONV__c: values.CONV__c,
+        ESI__c: values.ESI__c,
+        HRA__c: values.HRA__c,
+        PF__c: values.PF__c,
+        PT__c: values.PT__c,
+        SP_All__c: values.SP_All__c
       }
 
       const res = await fetch(`/api/employees/${employeeId}/salary-history`, {
@@ -139,7 +173,7 @@ export function EmployeeSalaryHistoryTab({ employeeId, employeeName, employeeDis
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2 m-0">
-          <History className="w-5 h-5 text-emerald-600" /> Salary History
+          <History className="w-5 h-5 text-emerald-600" /> Increment History
         </h2>
 
         {currentUserRole === "Admin" && (
@@ -148,7 +182,7 @@ export function EmployeeSalaryHistoryTab({ employeeId, employeeName, employeeDis
             onClick={() => setIsModalOpen(true)}
             className="!bg-emerald-600 !hover:bg-emerald-700 !border-emerald-600"
           >
-            Add Salary Record
+            Add Increment Record
           </Button>
         )}
       </div>
@@ -175,19 +209,23 @@ export function EmployeeSalaryHistoryTab({ employeeId, employeeName, employeeDis
             </thead>
             <tbody className="divide-y divide-slate-200">
               {data.records.map((record) => (
-                <tr key={record.Id} className="hover:bg-slate-50 transition">
+                <tr
+                  key={record.Id}
+                  className="hover:bg-slate-50 transition cursor-pointer"
+                  onClick={() => handleRecordClick(record)}
+                >
                   <td className="px-4 py-3 text-slate-700 whitespace-nowrap">
-                    {record.Effective_Date__c ? dayjs(record.Effective_Date__c).format("DD MMM YYYY") : "-"}
+                    {formatDate(record.Effective_Date__c)}
                   </td>
                   <td className="px-4 py-3 text-slate-700 whitespace-nowrap">
-                    {record.End_Date__c ? dayjs(record.End_Date__c).format("DD MMM YYYY") : "-"}
+                    {formatDate(record.End_Date__c)}
                   </td>
                   <td className="px-4 py-3 text-slate-700">{record.Change_Type__c || "-"}</td>
                   <td className="px-4 py-3 text-right text-slate-700">{formatCurrency(record.Previous_Salary__c)}</td>
                   <td className="px-4 py-3 text-right text-slate-800 font-semibold">{formatCurrency(record.Current_Salary__c)}</td>
                   <td className="px-4 py-3 text-right text-slate-700">{formatCurrency(record.Security_Deposite__c)}</td>
                   <td className="px-4 py-3 text-right text-emerald-700">{formatCurrency(record.Increment_Amount__c)}</td>
-                  <td className="px-4 py-3 text-right text-emerald-700">{record.Increment_Percent__c?.toFixed(2) ?? "0.00"}%</td>
+                  <td className="px-4 py-3 text-right text-emerald-700">{formatPercent(record.Increment_Percent__c)}</td>
                   <td className="px-4 py-3 text-center">
                     {record.Is_Current__c ? (
                       <span className="px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">Yes</span>
@@ -217,9 +255,136 @@ export function EmployeeSalaryHistoryTab({ employeeId, employeeName, employeeDis
       ) : null}
 
       <Modal
-        title="Add Salary History Record"
+        title="Increment Record Details"
+        open={isDetailsModalOpen}
+        width={860}
+        centered
+        styles={{
+          body: {
+            maxHeight: "70vh",
+            overflowY: "auto",
+            overscrollBehavior: "contain",
+            paddingRight: 8
+          }
+        }}
+        onCancel={() => {
+          setIsDetailsModalOpen(false)
+          setSelectedRecord(null)
+        }}
+        footer={[
+          <Button
+            key="close"
+            onClick={() => {
+              setIsDetailsModalOpen(false)
+              setSelectedRecord(null)
+            }}
+          >
+            Close
+          </Button>
+        ]}
+        destroyOnHidden
+      >
+        {selectedRecord ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="rounded-lg border border-slate-200 p-3">
+              <p className="text-xs text-slate-500 mb-1">Record ID</p>
+              <p className="text-sm font-medium text-slate-800 break-all">{selectedRecord.Id || "-"}</p>
+            </div>
+            <div className="rounded-lg border border-slate-200 p-3">
+              <p className="text-xs text-slate-500 mb-1">Employee ID</p>
+              <p className="text-sm font-medium text-slate-800 break-all">{selectedRecord.Employee__c || "-"}</p>
+            </div>
+
+            <div className="rounded-lg border border-slate-200 p-3">
+              <p className="text-xs text-slate-500 mb-1">Current Salary</p>
+              <p className="text-sm font-medium text-slate-800">{formatCurrency(selectedRecord.Current_Salary__c)}</p>
+            </div>
+            <div className="rounded-lg border border-slate-200 p-3">
+              <p className="text-xs text-slate-500 mb-1">Previous Salary</p>
+              <p className="text-sm font-medium text-slate-800">{formatCurrency(selectedRecord.Previous_Salary__c)}</p>
+            </div>
+
+            <div className="rounded-lg border border-slate-200 p-3">
+              <p className="text-xs text-slate-500 mb-1">Security Deposit</p>
+              <p className="text-sm font-medium text-slate-800">{formatCurrency(selectedRecord.Security_Deposite__c)}</p>
+            </div>
+            <div className="rounded-lg border border-slate-200 p-3">
+              <p className="text-xs text-slate-500 mb-1">Increment Amount</p>
+              <p className="text-sm font-medium text-slate-800">{formatCurrency(selectedRecord.Increment_Amount__c)}</p>
+            </div>
+
+            <div className="rounded-lg border border-slate-200 p-3">
+              <p className="text-xs text-slate-500 mb-1">Increment Percent</p>
+              <p className="text-sm font-medium text-slate-800">{formatPercent(selectedRecord.Increment_Percent__c)}</p>
+            </div>
+            <div className="rounded-lg border border-slate-200 p-3">
+              <p className="text-xs text-slate-500 mb-1">Current Salary Record</p>
+              <p className="text-sm font-medium text-slate-800">{selectedRecord.Is_Current__c ? "Yes" : "No"}</p>
+            </div>
+
+            <div className="rounded-lg border border-slate-200 p-3">
+              <p className="text-xs text-slate-500 mb-1">Effective Date</p>
+              <p className="text-sm font-medium text-slate-800">{formatDate(selectedRecord.Effective_Date__c)}</p>
+            </div>
+            <div className="rounded-lg border border-slate-200 p-3">
+              <p className="text-xs text-slate-500 mb-1">End Date</p>
+              <p className="text-sm font-medium text-slate-800">{formatDate(selectedRecord.End_Date__c)}</p>
+            </div>
+
+            <div className="rounded-lg border border-slate-200 p-3">
+              <p className="text-xs text-slate-500 mb-1">Change Type</p>
+              <p className="text-sm font-medium text-slate-800">{selectedRecord.Change_Type__c || "-"}</p>
+            </div>
+            <div className="rounded-lg border border-slate-200 p-3">
+              <p className="text-xs text-slate-500 mb-1">Created Date</p>
+              <p className="text-sm font-medium text-slate-800">{formatDate(selectedRecord.CreatedDate)}</p>
+            </div>
+
+            <div className="rounded-lg border border-slate-200 p-3">
+              <p className="text-xs text-slate-500 mb-1">Basic Console (%)</p>
+              <p className="text-sm font-medium text-slate-800">{formatPercent(selectedRecord.Basic_Console__c)}</p>
+            </div>
+            <div className="rounded-lg border border-slate-200 p-3">
+              <p className="text-xs text-slate-500 mb-1">CONV (%)</p>
+              <p className="text-sm font-medium text-slate-800">{formatPercent(selectedRecord.CONV__c)}</p>
+            </div>
+
+            <div className="rounded-lg border border-slate-200 p-3">
+              <p className="text-xs text-slate-500 mb-1">ESI (%)</p>
+              <p className="text-sm font-medium text-slate-800">{formatPercent(selectedRecord.ESI__c)}</p>
+            </div>
+            <div className="rounded-lg border border-slate-200 p-3">
+              <p className="text-xs text-slate-500 mb-1">HRA (%)</p>
+              <p className="text-sm font-medium text-slate-800">{formatPercent(selectedRecord.HRA__c)}</p>
+            </div>
+
+            <div className="rounded-lg border border-slate-200 p-3">
+              <p className="text-xs text-slate-500 mb-1">PF (%)</p>
+              <p className="text-sm font-medium text-slate-800">{formatPercent(selectedRecord.PF__c)}</p>
+            </div>
+            <div className="rounded-lg border border-slate-200 p-3">
+              <p className="text-xs text-slate-500 mb-1">PT</p>
+              <p className="text-sm font-medium text-slate-800">{selectedRecord.PT__c ?? "-"}</p>
+            </div>
+
+            <div className="rounded-lg border border-slate-200 p-3">
+              <p className="text-xs text-slate-500 mb-1">SP All (%)</p>
+              <p className="text-sm font-medium text-slate-800">{formatPercent(selectedRecord.SP_All__c)}</p>
+            </div>
+
+            <div className="rounded-lg border border-slate-200 p-3 md:col-span-2">
+              <p className="text-xs text-slate-500 mb-1">Description</p>
+              <p className="text-sm font-medium text-slate-800 whitespace-pre-wrap">{selectedRecord.Description__c || "-"}</p>
+            </div>
+          </div>
+        ) : null}
+      </Modal>
+
+      <Modal
+        title="Add Increment History"
         open={isModalOpen}
         width={820}
+        centered
         styles={{
           body: {
             maxHeight: "70vh",
@@ -240,7 +405,7 @@ export function EmployeeSalaryHistoryTab({ employeeId, employeeName, employeeDis
         <Form<SalaryHistoryFormValues>
           layout="vertical"
           form={form}
-          initialValues={{ Is_Current__c: true }}
+          initialValues={{}}
           onFinish={(values) => createMutation.mutate(values)}
           className="space-y-5"
         >
@@ -281,6 +446,7 @@ export function EmployeeSalaryHistoryTab({ employeeId, employeeName, employeeDis
               <Form.Item
                 label="Security Deposit"
                 name="Security_Deposite__c"
+                rules={[{ required: true, message: "Security deposit is required" }]}
                 className="!mb-2"
                 // className="!mb-2 md:col-span-2"
               >
@@ -325,7 +491,12 @@ export function EmployeeSalaryHistoryTab({ employeeId, employeeName, employeeDis
                 />
               </Form.Item>
 
-              <Form.Item label="Reason for Salary Increment" name="Change_Type__c" className="!mb-2">
+              <Form.Item
+                label="Reason for Salary Increment"
+                name="Change_Type__c"
+                rules={[{ required: true, message: "Reason for increment is required" }]}
+                className="!mb-2"
+              >
                 <Select
                   placeholder="Select change type"
                   options={data?.changeTypeOptions || []}
@@ -336,6 +507,7 @@ export function EmployeeSalaryHistoryTab({ employeeId, employeeName, employeeDis
               <Form.Item
                 label="Mark as Current Salary"
                 name="Is_Current__c"
+                rules={[{ required: true, message: "Current salary status is required" }]}
                 className="!mb-2"
               >
                 <Select
@@ -356,6 +528,74 @@ export function EmployeeSalaryHistoryTab({ employeeId, employeeName, employeeDis
                 maxLength={500}
               />
             </Form.Item>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white px-4 py-4">
+            <h4 className="text-sm font-semibold text-slate-700 mb-3">Salary Components</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <Form.Item
+                label="Basic Console(%)"
+                name="Basic_Console__c"
+                rules={[{ required: true, message: "Basic Console is required" }]}
+                className="!mb-2"
+              >
+                <InputNumber className="!w-full" min={0} step={0.01} placeholder="Enter basic console" />
+              </Form.Item>
+
+              <Form.Item
+                label="Conveyance (CONV)(%)"
+                name="CONV__c"
+                rules={[{ required: true, message: "Conveyance is required" }]}
+                className="!mb-2"
+              >
+                <InputNumber className="!w-full" min={0} step={0.01} placeholder="Enter conveyance" />
+              </Form.Item>
+
+              <Form.Item
+                label="ESI(%)"
+                name="ESI__c"
+                rules={[{ required: true, message: "ESI is required" }]}
+                className="!mb-2"
+              >
+                <InputNumber className="!w-full" min={0} step={0.01} placeholder="Enter ESI" />
+              </Form.Item>
+
+              <Form.Item
+                label="HRA(%)"
+                name="HRA__c"
+                rules={[{ required: true, message: "HRA is required" }]}
+                className="!mb-2"
+              >
+                <InputNumber className="!w-full" min={0} step={0.01} placeholder="Enter HRA" />
+              </Form.Item>
+
+              <Form.Item
+                label="PF(%)"
+                name="PF__c"
+                rules={[{ required: true, message: "PF is required" }]}
+                className="!mb-2"
+              >
+                <InputNumber className="!w-full" min={0} step={0.01} placeholder="Enter PF" />
+              </Form.Item>
+
+              <Form.Item
+                label="PT(%)"
+                name="PT__c"
+                rules={[{ required: true, message: "PT is required" }]}
+                className="!mb-2"
+              >
+                <InputNumber className="!w-full" min={0} step={0.01} placeholder="Enter PT" />
+              </Form.Item>
+
+              <Form.Item
+                label="SP All(%)"
+                name="SP_All__c"
+                rules={[{ required: true, message: "SP All is required" }]}
+                className="!mb-0 md:col-span-2"
+              >
+                <InputNumber className="!w-full" min={0} step={0.01} placeholder="Enter special allowance" />
+              </Form.Item>
+            </div>
           </div>
         </Form>
       </Modal>

@@ -14,6 +14,13 @@ interface SalaryHistoryPayload {
   Current_Salary__c: number;
   Previous_Salary__c: number;
   Security_Deposite__c?: number;
+  Basic_Console__c?: number;
+  CONV__c?: number;
+  ESI__c?: number;
+  HRA__c?: number;
+  PF__c?: number;
+  PT__c?: number;
+  SP_All__c?: number;
   Effective_Date__c: string;
   End_Date__c?: string;
   Is_Current__c?: boolean;
@@ -99,6 +106,13 @@ export async function POST(
       Current_Salary__c: currentSalary,
       Previous_Salary__c: previousSalary,
       Security_Deposite__c: toNumber(payload.Security_Deposite__c) ?? undefined,
+      Basic_Console__c: toNumber(payload.Basic_Console__c) ?? undefined,
+      CONV__c: toNumber(payload.CONV__c) ?? undefined,
+      ESI__c: toNumber(payload.ESI__c) ?? undefined,
+      HRA__c: toNumber(payload.HRA__c) ?? undefined,
+      PF__c: toNumber(payload.PF__c) ?? undefined,
+      PT__c: toNumber(payload.PT__c) ?? undefined,
+      SP_All__c: toNumber(payload.SP_All__c) ?? undefined,
       Increment_Amount__c: incrementAmount,
       Increment_Percent__c: incrementPercent,
       Effective_Date__c: payload.Effective_Date__c,
@@ -135,6 +149,39 @@ export async function POST(
             }))
           );
         }
+
+        const employeeUpdatePayload: {
+          Id: string;
+          Salary_CTC__c: number;
+          Basic_Console__c?: number;
+          CONV__c?: number;
+          ESI__c?: number;
+          HRA__c?: number;
+          PF__c?: number;
+          PT__c?: number;
+          S_All__c?: number;
+        } = {
+          Id: id,
+          Salary_CTC__c: currentSalary
+        };
+
+        const basicConsole = toNumber(payload.Basic_Console__c);
+        const conv = toNumber(payload.CONV__c);
+        const esi = toNumber(payload.ESI__c);
+        const hra = toNumber(payload.HRA__c);
+        const pf = toNumber(payload.PF__c);
+        const pt = toNumber(payload.PT__c);
+        const spAll = toNumber(payload.SP_All__c);
+
+        if (basicConsole !== null) employeeUpdatePayload.Basic_Console__c = basicConsole;
+        if (conv !== null) employeeUpdatePayload.CONV__c = conv;
+        if (esi !== null) employeeUpdatePayload.ESI__c = esi;
+        if (hra !== null) employeeUpdatePayload.HRA__c = hra;
+        if (pf !== null) employeeUpdatePayload.PF__c = pf;
+        if (pt !== null) employeeUpdatePayload.PT__c = pt;
+        if (spAll !== null) employeeUpdatePayload.S_All__c = spAll;
+
+        await conn.sobject('Employee__c').update(employeeUpdatePayload);
       }
     }
 
