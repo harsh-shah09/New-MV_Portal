@@ -203,12 +203,32 @@ export interface PayrollEmployeeDetail {
   email?: string
   department?: string
   role?: string
+  dateOfJoining?: string
+  pfNumber?: string
+  esiNumber?: string
+  uanNumber?: string
+  bankName?: string
+  accountNumber?: string
   year?: number
+  monthlyIncome?: number
   basicSalary?: number
   baseSalary?: number
+  actualMonthlyIncome?: number
+  actualBasicComponent?: number
+  actualHraComponent?: number
+  actualConvComponent?: number
+  actualSpecialAllowanceComponent?: number
+  actualGrossIncome?: number
+  basicComponent?: number
+  hraComponent?: number
+  convComponent?: number
+  specialAllowanceComponent?: number
+  grossIncome?: number
+  pfDeduction?: number
+  ptDeduction?: number
+  esiDeduction?: number
   totalAdditions?: number
   totalDeductions?: number
-  companySecurityDeduction?: number
   anniversaryBonus?: number
   totalLeaveDays?: number
   bonus?: number

@@ -14,7 +14,7 @@ import { PageHeader } from "@/components/page-header"
 const AUTO_REPLACED_KEYS = new Set([
     'FirstName', 'LastName', 'Employee_Name__c', 'Company_Name', 'Name',
     'Employee_Role__c', 'Department__c', 'employee_Id', 'EmployeeId',
-    'Joining_Date__c', 'joining_date', 'Base_Salary__c', 'Salary_CTC__c',
+    'Joining_Date__c', 'joining_date', 'Salary_CTC__c',
     'Seperation_Date__c', 'Employee_Title__c', 'Employee_ID__c',
      'Email', 'Phone', 'Employee_Address','salary_per_month','CTC', 'Date','Employment_Duration__c' ,'Enrollment_Number__c','Technology__c'
 ]);
@@ -187,7 +187,7 @@ export default function NDAPage() {
             replace('EmployeeId', emp.Employee_Id || emp.PartitionKey || emp.Id);
             replace('Joining_Date__c', formatToDDMMYYYY(emp.Joining_Date__c));
             replace('joining_date', formatToDDMMYYYY(emp.Joining_Date__c));
-            replace('salary_per_month', emp.Base_Salary__c);
+            replace('salary_per_month', emp.Salary_CTC__c);
             replace('CTC', emp.Salary_CTC__c);
             replace(
             'Date',

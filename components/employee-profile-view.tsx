@@ -417,9 +417,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                 Team_Lead__c: employee.Team_Lead__c,
                 Joining_Date__c: employee.Joining_Date__c,
                 Onboarding_Date__c: employee.Onboarding_Date__c,
-                Base_Salary__c: employee.Base_Salary__c,
                 Salary_CTC__c: employee.Salary_CTC__c,
-                Company_Security_Deduction__c: employee.Company_Security_Deduction__c,
                 Basic_Console__c: employee.Basic_Console__c,
                 HRA__c: employee.HRA__c,
                 CONV__c: employee.CONV__c,
@@ -468,9 +466,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
             delete payload.exp_months
 
             const numericFields = [
-                "Base_Salary__c",
                 "Salary_CTC__c",
-                "Company_Security_Deduction__c",
                 "Basic_Console__c",
                 "HRA__c",
                 "CONV__c",
@@ -1570,9 +1566,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                     <CreditCard className="w-5 h-5 text-green-500" /> Compensation
                                                 </h2>
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-                                                    <Field label="Base Salary" value={employee.Base_Salary__c} fieldKey="Base_Salary__c" type="number" isEditing={isEditing && currentUserRole === 'Admin'} formData={formData} setFormData={setFormData} />
                                                     <Field label="CTC" value={employee.Salary_CTC__c} fieldKey="Salary_CTC__c" type="number" isEditing={isEditing && currentUserRole === 'Admin'} formData={formData} setFormData={setFormData} />
-                                                    <Field label="Security Deduction" value={employee.Company_Security_Deduction__c} fieldKey="Company_Security_Deduction__c" type="number" isEditing={isEditing && currentUserRole === 'Admin'} formData={formData} setFormData={setFormData} />
                                                 </div>
                                             </div>
                                         )}

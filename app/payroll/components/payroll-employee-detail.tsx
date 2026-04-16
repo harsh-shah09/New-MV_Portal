@@ -31,7 +31,15 @@ export function PayrollEmployeeDetailView({ employee, onBack }: PayrollEmployeeD
             <Descriptions.Item label="Payroll Month">
               {employee.payrollMonth} {employee.year}
             </Descriptions.Item>
-            <Descriptions.Item label="Basic Salary">₹{employee.basicSalary?.toLocaleString() || 0}</Descriptions.Item>
+            <Descriptions.Item label="Monthly Income">₹{employee.monthlyIncome?.toLocaleString() || employee.basicSalary?.toLocaleString() || 0}</Descriptions.Item>
+            <Descriptions.Item label="Basic Component">₹{employee.basicComponent?.toLocaleString() || 0}</Descriptions.Item>
+            <Descriptions.Item label="HRA">₹{employee.hraComponent?.toLocaleString() || 0}</Descriptions.Item>
+            <Descriptions.Item label="Conveyance">₹{employee.convComponent?.toLocaleString() || 0}</Descriptions.Item>
+            <Descriptions.Item label="Special Allowance">₹{employee.specialAllowanceComponent?.toLocaleString() || 0}</Descriptions.Item>
+            <Descriptions.Item label="Gross Income">₹{employee.grossIncome?.toLocaleString() || 0}</Descriptions.Item>
+            <Descriptions.Item label="PF Deduction">₹{employee.pfDeduction?.toLocaleString() || 0}</Descriptions.Item>
+            <Descriptions.Item label="PT Deduction">₹{employee.ptDeduction?.toLocaleString() || 0}</Descriptions.Item>
+            <Descriptions.Item label="ESI Deduction">₹{employee.esiDeduction?.toLocaleString() || 0}</Descriptions.Item>
             <Descriptions.Item label="Total Additions">₹{employee.totalAdditions?.toLocaleString() || 0}</Descriptions.Item>
             <Descriptions.Item label="Total Deductions">₹{employee.totalDeductions?.toLocaleString() || 0}</Descriptions.Item>
             <Descriptions.Item label="Bonus">₹{employee.bonus?.toLocaleString() || 0}</Descriptions.Item>

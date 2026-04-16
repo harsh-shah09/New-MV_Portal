@@ -842,7 +842,7 @@ export async function POST(request: NextRequest) {
       }
 
       const targetEmployeeQuery = await conn.query<any>(`
-        SELECT Id, Employee_Name__c, Employee_Email__c, Base_Salary__c,
+        SELECT Id, Employee_Name__c, Employee_Email__c, Salary_CTC__c,
                Team_Lead__c, Team_Lead__r.Employee_Name__c, Team_Lead__r.Employee_Email__c
         FROM Employee__c
         WHERE Id = '${targetEmployeeId}'
@@ -877,13 +877,13 @@ export async function POST(request: NextRequest) {
           'Loss of Pay',
           parsedStart.format('YYYY-MM-DD'),
           fullDayDuration,
-          targetEmployee.Base_Salary__c
+          targetEmployee.Salary_CTC__c
         ),
         After_Rule_Deduction__c: calculateLeaveDeduction(
           'Loss of Pay',
           parsedStart.format('YYYY-MM-DD'),
           fullDayDuration,
-          targetEmployee.Base_Salary__c
+          targetEmployee.Salary_CTC__c
         ),
       };
 
@@ -1488,12 +1488,12 @@ export async function POST(request: NextRequest) {
     let requesterBaseSalary = 0;
     if (isAdminAutoApprove) {
       const requesterSalaryQuery = await conn.query<any>(`
-        SELECT Id, Base_Salary__c
+        SELECT Id, Salary_CTC__c
         FROM Employee__c
         WHERE Id = '${employeeId}'
         LIMIT 1
       `);
-      requesterBaseSalary = requesterSalaryQuery.records?.[0]?.Base_Salary__c || 0;
+      requesterBaseSalary = requesterSalaryQuery.records?.[0]?.Salary_CTC__c || 0;
     }
 
     const leaveRecord: any = {
@@ -2655,7 +2655,7 @@ export async function PATCH(request: NextRequest) {
       }
 
       const leaveRecordQuery = await conn.query<any>(`
-        SELECT Id, Status__c, Employee__c, Employee__r.Role__c,Employee__r.Base_Salary__c, Leave_Category__c, Leave_Type__c, Total_Days__c, Total_Days_After_Rule__c, HR_Approval__c, TL_Approval__c, Start_Date__c, End_Date__c, Session__c, CreatedDate, Rule_Calculation_Details__c, Actual_Deduction__c, After_Rule_Deduction__c, Event_ID__c
+        SELECT Id, Status__c, Employee__c, Employee__r.Role__c,Employee__r.Salary_CTC__c, Leave_Category__c, Leave_Type__c, Total_Days__c, Total_Days_After_Rule__c, HR_Approval__c, TL_Approval__c, Start_Date__c, End_Date__c, Session__c, CreatedDate, Rule_Calculation_Details__c, Actual_Deduction__c, After_Rule_Deduction__c, Event_ID__c
         FROM Leave__c
         WHERE Id = '${leaveId}'
         LIMIT 1
@@ -2706,13 +2706,13 @@ export async function PATCH(request: NextRequest) {
           oldLeave.Leave_Category__c,
           oldLeave.Start_Date__c,
           recalculated.totalDays,
-          oldLeave.Employee__r?.Base_Salary__c
+          oldLeave.Employee__r?.Salary_CTC__c
         );
         updateData.After_Rule_Deduction__c = calculateLeaveDeduction(
           oldLeave.Leave_Category__c,
           oldLeave.Start_Date__c,
           recalculated.totalDaysAfterRule,
-          oldLeave.Employee__r?.Base_Salary__c
+          oldLeave.Employee__r?.Salary_CTC__c
         );
 
       } else if (isTeamLead) {
@@ -3273,10 +3273,10 @@ function calculateLeaveDeduction(
   Leave_Category__c: string,
   Start_Date__c: string,
   Total_Days__c: number,
-  Base_Salary__c: number
+  Salary_CTC__c: number
 ): number {
-  // If no base salary is provided, return 0
-  if (!Base_Salary__c || Base_Salary__c <= 0) {
+  // If no salary is provided, return 0
+  if (!Salary_CTC__c || Salary_CTC__c <= 0) {
     return 0;
   }
 
@@ -3285,7 +3285,7 @@ function calculateLeaveDeduction(
   const daysInMonth = startDate.daysInMonth();
 
   // Calculate daily salary based on actual days in the month
-  const dailySalary = Base_Salary__c / daysInMonth;
+  const dailySalary = Salary_CTC__c / daysInMonth;
   const deductionAmount = dailySalary * Total_Days__c;
 
   if (Leave_Category__c === 'Loss of Pay') {
