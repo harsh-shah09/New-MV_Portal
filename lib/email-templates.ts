@@ -23,6 +23,7 @@ interface LeaveEmailData {
   decisionStatusClass?: string;
   setupLink?: string;
   appLink?: string;
+  documentName? :string;
 }
 
 const EMAIL_TEMPLATE_METADATA = 'Email_Templates__mdt';
@@ -54,6 +55,7 @@ function applyTemplateData(template: string, data: LeaveEmailData): string {
   html = html.replace(/{{decisionStatusClass}}/g, data.decisionStatusClass || 'approved');
   html = html.replace(/{{setupLink}}/g, data.setupLink || '');
   html = html.replace(/{{appLink}}/g, data.appLink || '');
+  html = html.replace(/{{documentName}}/g, data.documentName || '');
   html = html.replace(/{{year}}/g, new Date().getFullYear().toString());
 
   if (data.reason) {
