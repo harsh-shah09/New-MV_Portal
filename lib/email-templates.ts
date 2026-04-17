@@ -9,6 +9,8 @@ import { getSalesforceConnection } from './salesforce';
 interface LeaveEmailData {
   recipientName: string;
   employeeName?: string;
+  employeeId?: string;
+  employeeEmail?: string;
   leaveType?: string;
   startDate?: string;
   endDate?: string;
@@ -20,6 +22,7 @@ interface LeaveEmailData {
   decisionStatus?: string;
   decisionStatusClass?: string;
   setupLink?: string;
+  appLink?: string;
 }
 
 const EMAIL_TEMPLATE_METADATA = 'Email_Templates__mdt';
@@ -37,6 +40,8 @@ function applyTemplateData(template: string, data: LeaveEmailData): string {
 
   html = html.replace(/{{recipientName}}/g, data.recipientName || 'Employee');
   html = html.replace(/{{employeeName}}/g, data.employeeName || 'Unknown');
+  html = html.replace(/{{employeeId}}/g, data.employeeId || 'N/A');
+  html = html.replace(/{{employeeEmail}}/g, data.employeeEmail || 'N/A');
   html = html.replace(/{{leaveType}}/g, data.leaveType || 'N/A');
   html = html.replace(/{{startDate}}/g, data.startDate || 'N/A');
   html = html.replace(/{{endDate}}/g, data.endDate || 'N/A');
@@ -48,6 +53,7 @@ function applyTemplateData(template: string, data: LeaveEmailData): string {
   html = html.replace(/{{decisionStatus}}/g, data.decisionStatus || 'Pending');
   html = html.replace(/{{decisionStatusClass}}/g, data.decisionStatusClass || 'approved');
   html = html.replace(/{{setupLink}}/g, data.setupLink || '');
+  html = html.replace(/{{appLink}}/g, data.appLink || '');
   html = html.replace(/{{year}}/g, new Date().getFullYear().toString());
 
   if (data.reason) {
@@ -315,5 +321,26 @@ export async function onboardingMail(data: { recipientName: string; setupLink: s
   });
   
   const text = `...`;
+  return { subject, html, text };
+}
+
+export async function onboardingCompletedToHR(data: {
+  recipientName?: string;
+  employeeName: string;
+  employeeId: string;
+  employeeEmail: string;
+}): Promise<{ subject: string; html: string; text: string }> {
+  const subject = `Onboarding Completed - ${data.employeeName}`;
+  const recipientName = data.recipientName || 'HR Team';
+  const html = await loadTemplate('onboarding-completed-to-hr', {
+    recipientName,
+    employeeName: data.employeeName,
+    employeeId: data.employeeId,
+    employeeEmail: data.employeeEmail,
+    appLink: process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_BASE_URL || '',
+  });
+
+  const text = `Dear ${recipientName},\n\nOnboarding data collection has been completed for the following employee:\n- Employee Name: ${data.employeeName}\n- Employee ID: ${data.employeeId}\n- Email: ${data.employeeEmail}\n\nPlease review the submitted onboarding details in HRMS.\n\nRegards,\nHRMS System`;
+
   return { subject, html, text };
 }
