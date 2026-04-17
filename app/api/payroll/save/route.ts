@@ -192,6 +192,7 @@ export async function POST(request: NextRequest) {
         const payslipData = {
           employeeName: emp.employeeName,
           employeeId: emp.employeeId,
+          Employee_Id__c: emp.Employee_Id__c || emp.employeeId,
           email: emp.email || "",
           department: emp.department || "",
           bankName: emp.bankName || "",
@@ -238,13 +239,14 @@ export async function POST(request: NextRequest) {
         const pdfBuffer = await generatePayslipPDF(payslipData)
 
         // Upload to S3
-        const s3Url = await uploadPayslipToS3(pdfBuffer, emp.employeeId, month, year)
+        const employeeCode = emp.Employee_Id__c || emp.employeeId
+        const s3Url = await uploadPayslipToS3(pdfBuffer, employeeCode, month, year)
 
         console.log(`✓ PDF uploaded for ${emp.employeeName}: ${s3Url}`)
         
         // Create Document__c record for the payslip
         try {
-          const documentName = `Payslip_${emp.employeeId}_${month}_${year}`
+          const documentName = `Payslip_${employeeCode}_${month}_${year}`
           const documentRecord = {
             Name: documentName,
             Document_Category__c: 'Payslip',

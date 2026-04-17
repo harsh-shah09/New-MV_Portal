@@ -100,7 +100,7 @@ export const getSalesforceConnection = async () => {
 
 export interface Employee {
   Id: string;
-  Employee_ID__c?: string;
+  Employee_Id__c?: string;
   Employee_Email__c?: string;
   Password__c?: string; // Stored hash
   Employee_Name__c: string; // Replaces Name/FirstName/LastName
@@ -143,21 +143,19 @@ export const findEmployee = async (identifier: string): Promise<Employee | null>
   const conn = await getSalesforceConnection();
   if(!conn) return null;
 
-  // Search by Employee_ID__c OR Employee_Email__c
+  // Search by Company_Email__c OR Employee_Id__c
   const isEmail = identifier.includes('@');
   // Be careful with SOQL injection in real apps. 
   const escapedIdentifier = identifier.replace(/'/g, "\\'");
   // Updated query to fetch fields from Employee__c directly
   const query = `
-    SELECT Id , Employee_Name__c, Employee_Email__c,Company_Email__c, Password__c, Role__c, Title__c, Is2FAEnabled__c, Name, Active__c
+    SELECT Id ,Employee_Id__c, Employee_Name__c, Employee_Email__c,Company_Email__c, Password__c, Role__c, Title__c, Is2FAEnabled__c, Name, Active__c
     FROM Employee__c 
-    WHERE ${isEmail ? 'Company_Email__c' : 'Name'} = '${escapedIdentifier}' 
+    WHERE ${isEmail ? 'Company_Email__c' : 'Employee_Id__c'} = '${escapedIdentifier}' 
     LIMIT 1
   `;
   console.log(query)
-  // Note: Searching by 'Name' standard field might still be safer if Employee_Name__c isn't unique or standardized for login. 
-  // But user said "Employee_Name__c ... use this only". I'll try to match user intent. 
-  // If login fails, user might need to adjust valid identifiers.
+  // Login accepts email or employee ID.
   
   const result = await conn.query(query);
 
@@ -643,6 +641,13 @@ export interface SalaryHistoryRecord {
   Current_Salary__c: number;
   Previous_Salary__c: number;
   Security_Deposite__c?: number;
+  Basic_Console__c?: number;
+  CONV__c?: number;
+  ESI__c?: number;
+  HRA__c?: number;
+  PF__c?: number;
+  PT__c?: number;
+  SP_All__c?: number;
   Increment_Amount__c: number;
   Increment_Percent__c: number;
   Effective_Date__c: string;
@@ -658,7 +663,7 @@ export const getSalaryHistoryByEmployee = async (employeeId: string): Promise<Sa
     if (!conn) throw new Error("No Salesforce connection");
 
     const query = `
-      SELECT Id, Employee__c, Current_Salary__c, Previous_Salary__c, Security_Deposite__c, Increment_Amount__c, Increment_Percent__c,
+      SELECT Id, Employee__c, Current_Salary__c, Previous_Salary__c, Security_Deposite__c, Basic_Console__c, CONV__c, ESI__c, HRA__c, PF__c, PT__c, SP_All__c, Increment_Amount__c, Increment_Percent__c,
              Effective_Date__c, End_Date__c, Is_Current__c, Change_Type__c, Description__c, CreatedDate
       FROM Salary_History_Tracking__c
       WHERE Employee__c = '${employeeId}'

@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Onboarding Completion Notification</title>
+
+  <style>
+    .oc-wrapper {
+      font-family: Tahoma, Verdana, Segoe, sans-serif;
+      font-size: 11pt;
+      color: #000;
+      background-color: #edf7ef;
+      margin: 0;
+      padding: 40px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .oc-page {
+      width: 100%;
+      max-width: 800px;
+      background: #ffffff;
+      padding: 72px;
+      border: 1px solid #8bc59a;
+      box-sizing: border-box;
+    }
+
+    .oc-text {
+      font-size: 11pt;
+      margin: 8px 0;
+      line-height: 1.35;
+      text-align: left;
+    }
+
+    .oc-right {
+      text-align: right;
+    }
+
+    .oc-center {
+      text-align: center;
+    }
+
+    .oc-title {
+      font-size: 14pt;
+      font-weight: bold;
+    }
+
+    .oc-subtitle {
+      font-size: 11pt;
+      margin-top: 4px;
+    }
+
+    .oc-highlight {
+      font-weight: bold;
+    }
+
+    .oc-panel {
+      margin-top: 16px;
+      border: 1px solid #8bc59a;
+      background: #f7fbf8;
+      padding: 12px 16px;
+    }
+
+    .oc-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .oc-row td {
+      padding: 7px 6px;
+      vertical-align: top;
+      border-bottom: 1px solid #e5e7eb;
+    }
+
+    .oc-label {
+      width: 35%;
+      font-weight: 600;
+    }
+
+    .oc-value {
+      font-weight: 600;
+      word-break: break-word;
+    }
+
+    .oc-button-wrap {
+      margin: 24px 0 8px;
+      text-align: center;
+    }
+
+    .oc-button {
+      display: inline-block;
+      background: #1f7a3f;
+      color: #ffffff;
+      text-decoration: none;
+      padding: 8px 16px;
+      border: 1px solid #1f7a3f;
+      border-radius: 0;
+      font-weight: 600;
+    }
+
+    .oc-signoff {
+      margin-top: 18px;
+    }
+
+    .oc-footer {
+      margin-top: 24px;
+      font-size: 10pt;
+      color: #5f8f6a;
+      text-align: center;
+    }
+
+    @media (max-width: 768px) {
+      .oc-wrapper {
+        padding: 24px;
+      }
+
+      .oc-page {
+        padding: 48px;
+      }
+
+      .oc-row td {
+        width: 100%;
+        display: block;
+      }
+
+      .oc-label {
+        padding-bottom: 0;
+      }
+
+      .oc-value {
+        padding-top: 0;
+      }
+    }
+
+    @media print {
+      .oc-wrapper {
+        background: none;
+        padding: 0;
+      }
+
+      .oc-page {
+        border: none;
+        max-width: 100%;
+      }
+
+      .oc-button-wrap {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="oc-wrapper">
+    <div class="oc-page">
+      <div class="oc-text oc-right">
+        HRMS Notification
+      </div>
+
+      <div class="oc-text oc-center oc-title">
+        Employee Onboarding Completed
+      </div>
+
+      <div class="oc-text oc-center oc-subtitle">
+        Personal and Confidential
+      </div>
+
+      <div class="oc-text">
+        Dear <span class="oc-highlight">{{recipientName}}</span>,
+      </div>
+
+      <div class="oc-text">
+        Onboarding data collection has been completed for the following employee. Please review the submitted details in the HRMS portal.
+      </div>
+
+      <div class="oc-panel">
+        <table class="oc-table">
+          <tr class="oc-row">
+            <td class="oc-label">Employee Name</td>
+            <td class="oc-value">{{employeeName}}</td>
+          </tr>
+          <tr class="oc-row">
+            <td class="oc-label">Employee ID</td>
+            <td class="oc-value">{{employeeId}}</td>
+          </tr>
+          <tr class="oc-row">
+            <td class="oc-label">Email</td>
+            <td class="oc-value">{{employeeEmail}}</td>
+          </tr>
+        </table>
+      </div>
+
+      <div class="oc-button-wrap">
+        <a class="oc-button" href="{{appLink}}">Open HRMS</a>
+      </div>
+
+      <div class="oc-text oc-signoff">
+        Regards,
+      </div>
+
+      <div class="oc-text">
+        HRMS System
+      </div>
+
+      <div class="oc-footer">
+        © {{year}} MV Clouds
+      </div>
+    </div>
+  </div>
+</body>
+</html>

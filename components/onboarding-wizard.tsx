@@ -2,7 +2,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Modal, Steps, Form,Grid, Input, Button, Upload, message, Collapse ,Checkbox , Divider , Card} from "antd"
+import { Modal, Steps, Form,Grid, Input, Button, Upload, message, Collapse ,Checkbox , Divider , Card , Spin} from "antd"
 import { UploadOutlined, BankOutlined, UserOutlined, FileTextOutlined, CheckCircleOutlined, CameraOutlined, GoogleOutlined, CheckCircleFilled } from "@ant-design/icons"
 import { useQueryClient } from "@tanstack/react-query"
 import Confetti from "react-confetti"
@@ -14,11 +14,12 @@ export interface OnboardingWizardProps {
     publicMode?: boolean;
     publicEmpId?: string;
     firsttime?: boolean;
+    step?: number;
 }
 
-export function OnboardingWizard({ publicMode = false, publicEmpId , firsttime = false }: OnboardingWizardProps = {}) {
+export function OnboardingWizard({ publicMode = false, publicEmpId , firsttime = false , step = 1}: OnboardingWizardProps = {}) {
     const [open, setOpen] = useState(publicMode ? true : false)
-    const [currentStep, setCurrentStep] = useState(1)
+    const [currentStep, setCurrentStep] = useState(step)
     const [loading, setLoading] = useState(false)
     const [pageLoading, setPageLoading] = useState(true)
     const [form] = Form.useForm()
@@ -38,6 +39,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId , firsttime =
     const [googleNotification, setGoogleNotification] = useState<{ type: 'success' | 'error', message: string } | null>(null)
     const [documents, setDocuments] = useState<string[]>([])
     const [documentsLoading, setDocumentsLoading] = useState(true)
+    const [documentsUploading, setdocumentsUploading] = useState(false)
     const [existingProfilePhoto, setExistingProfilePhoto] = useState<string | null>(null)
     const [existingDocuments, setExistingDocuments] = useState<any[]>([])
     const [isExpired, setIsExpired] = useState(false)
@@ -143,6 +145,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId , firsttime =
                 'Aadhaar Card',
                 'PAN Card',
                 'Driving Licence',
+                'Degree/Marksheet(Latest)'
             ])
             return;
         }
@@ -374,6 +377,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId , firsttime =
 
     const handleDocumentUpload = async (options: any , doc : any) => {
         const { file, onSuccess, onError } = options
+        setdocumentsUploading(true)
         const formData = new FormData()
         formData.append('file', file)
         formData.append('type', doc)
@@ -396,6 +400,9 @@ export function OnboardingWizard({ publicMode = false, publicEmpId , firsttime =
         } catch (err) {
             onError({ err })
             message.error('Upload failed')
+            setdocumentsUploading(false)
+        }finally{
+            setdocumentsUploading(false)
         }
     }
 
@@ -415,11 +422,17 @@ export function OnboardingWizard({ publicMode = false, publicEmpId , firsttime =
 
         try {
             setLoading(true)
-            await fetch(endpoint, {
+            const res = await fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: 'complete', employeeId: publicMode ? publicEmpId : undefined })
             })
+            
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                throw new Error(data.error || 'Failed to complete onboarding');
+            }
+            
             // Fetch role for tour
             // try {
             //     const meRes = await fetch('/api/me')
@@ -440,8 +453,9 @@ export function OnboardingWizard({ publicMode = false, publicEmpId , firsttime =
                 setShowConfetti(false)
                 if (!publicMode) window.dispatchEvent(new CustomEvent('mv:tour:autostart'))
             }, 3000)
-        } catch (e) {
+        } catch (e: any) {
              setLoading(false)
+             message.error(e.message || "Failed to complete onboarding.")
         }
     }
 
@@ -827,10 +841,8 @@ export function OnboardingWizard({ publicMode = false, publicEmpId , firsttime =
                         <Steps current={currentStep - 1} items={stepItems} />
                     </div>
                     )}
-
-                <div className="min-h-[300px]" style={{    height: '100%',
-    flex: 1,
-    overflowY: 'auto'}}>
+                <Spin spinning={loading || passbookUploading || documentsUploading} size="large" tip="Processing...">
+                <div className="min-h-[300px]" style={{    height: '100%', flex: 1,overflowY: 'auto'}}>
                     {pageLoading ? (
                         <div className="flex flex-col items-center justify-center h-full min-h-[300px]">
                             <Loader2 className="w-10 h-10 animate-spin text-blue-500 mb-4" />
@@ -865,7 +877,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId , firsttime =
                     </Form>
                     )}
                 </div>
-
+                </Spin>
                 <div className="flex flex-col sm:flex-row justify-between pt-6 border-t border-gray-100 mt-6 gap-3">
                     <div className="flex gap-2 sm:gap-3 order-2 sm:order-1">
                         {!publicMode && (
@@ -877,20 +889,21 @@ export function OnboardingWizard({ publicMode = false, publicEmpId , firsttime =
                     
                     {currentStep <= stepItems.length && (
                         <div className="flex gap-2 sm:gap-3 order-1 sm:order-2 w-full sm:w-auto">
-                        {currentStep > 1 && currentStep <= stepItems.length && (
+                        {currentStep > 1 && (
                             <Button disabled={pageLoading} type="primary" size="large" onClick={handlePrevious} className="flex-1 sm:flex-initial">
                                 ← Previous
                             </Button>
                         )}
-                        <Button disabled={pageLoading} type="primary" size="large" onClick={handleNext} loading={loading} className="flex-1 sm:flex-initial">
-                            Next Step
-                        </Button>
+                        {currentStep < stepItems.length ? (
+                            <Button disabled={pageLoading} type="primary" size="large" onClick={handleNext} loading={loading} className="flex-1 sm:flex-initial">
+                                Next Step
+                            </Button>
+                        ) : (
+                            <Button disabled={pageLoading} type="primary" size="large" onClick={handleFinish} loading={loading} className="bg-green-600 hover:bg-green-700 w-full sm:w-auto flex-1 sm:flex-initial">
+                                Complete 
+                            </Button>
+                        )}
                         </div>
-                    )}
-                     {currentStep > stepItems.length && (
-                         <Button disabled={pageLoading} type="primary" size="large" onClick={handleFinish} loading={loading} className="bg-green-600 hover:bg-green-700 w-full sm:w-auto order-1 sm:order-2">
-                             Complete Onboarding
-                        </Button>
                     )}
                 </div>
             </ContentWrapper>

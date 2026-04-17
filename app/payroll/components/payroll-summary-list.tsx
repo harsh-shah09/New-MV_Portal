@@ -11,9 +11,10 @@ interface PayrollSummaryListProps {
   onDeleteSummary?: (summaryId: string) => Promise<void>
   isAdmin?: boolean
   onStatusChange?: (summaryId: string, status: "draft" | "paid") => Promise<void>
+  isBusy?: boolean
 }
 
-export function PayrollSummaryList({ summaries, onSelectSummary, onDeleteSummary, isAdmin = false, onStatusChange }: PayrollSummaryListProps) {
+export function PayrollSummaryList({ summaries, onSelectSummary, onDeleteSummary, isAdmin = false, onStatusChange, isBusy = false }: PayrollSummaryListProps) {
   const handleDelete = async (summaryId: string, event: React.MouseEvent) => {
     event.stopPropagation() // Prevent row click
     
@@ -62,6 +63,7 @@ export function PayrollSummaryList({ summaries, onSelectSummary, onDeleteSummary
                 value={safeValue}
                 size="small"
                 style={{ minWidth: 110 }}
+                disabled={isBusy}
                 options={[
                   { value: "draft", label: "Draft" },
                   { value: "paid", label: "Paid" },
@@ -103,12 +105,14 @@ export function PayrollSummaryList({ summaries, onSelectSummary, onDeleteSummary
           onConfirm={(e) => handleDelete(record.id, e as any)}
           okText="Yes, Delete"
           cancelText="Cancel"
-          okButtonProps={{ danger: true }}
+          okButtonProps={{ danger: true, loading: isBusy, disabled: isBusy }}
+          cancelButtonProps={{ disabled: isBusy }}
         >
           <Button 
             danger 
             icon={<DeleteOutlined />} 
             size="small"
+            disabled={isBusy}
             onClick={(e) => e.stopPropagation()}
           >
             Delete
@@ -126,8 +130,8 @@ export function PayrollSummaryList({ summaries, onSelectSummary, onDeleteSummary
       pagination={{ pageSize: 10 }}
       scroll={{ x: 900 }}
       onRow={(record) => ({
-        onClick: () => onSelectSummary(record),
-        style: { cursor: "pointer" },
+        onClick: isBusy ? undefined : () => onSelectSummary(record),
+        style: { cursor: isBusy ? "not-allowed" : "pointer" },
       })}
       className="bg-card rounded-lg shadow-sm border border-border"
     />

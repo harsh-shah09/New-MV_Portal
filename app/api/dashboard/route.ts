@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
 
         const [birthdayquery, anniversaryQuery] = await Promise.all([
             conn.query(`
-                SELECT Id, Name, Employee_Name__c, Role__c, Title__c, Profile_Photo__c, Department__c
+                SELECT Id, Name, Employee_Id__c, Employee_Name__c, Role__c, Title__c, Profile_Photo__c, Department__c
                 FROM Employee__c
                 WHERE Birthdate__c != null
                 AND CALENDAR_MONTH(Birthdate__c) = ${todayMonth}
@@ -52,7 +52,7 @@ export async function GET(req: NextRequest) {
                 AND Active__c = true
             `),
             conn.query(`
-                SELECT Id, Name, Employee_Name__c, Role__c, Title__c, Profile_Photo__c, Department__c, Onboarding_Date__c
+                SELECT Id, Name, Employee_Id__c, Employee_Name__c, Role__c, Title__c, Profile_Photo__c, Department__c, Onboarding_Date__c
                 FROM Employee__c
                 WHERE Onboarding_Date__c != null
                 AND CALENDAR_MONTH(Onboarding_Date__c) = ${todayMonth}

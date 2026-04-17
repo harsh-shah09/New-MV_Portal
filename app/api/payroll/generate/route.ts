@@ -182,6 +182,7 @@ export async function POST(request: NextRequest) {
       SELECT 
         Id,
         Name,
+        Employee_Id__c,
         Employee_Name__c,
         Employee_Email__c,
         Salary_CTC__c,
@@ -730,7 +731,8 @@ export async function POST(request: NextRequest) {
 
       return {
         id: emp.Id,
-        employeeId: emp.Name || emp.Id,
+        employeeId: emp.Employee_Id__c || emp.Name || emp.Id,
+        Employee_Id__c: emp.Employee_Id__c || '',
         employeeName: emp.Employee_Name__c || "Unknown",
         email: emp.Employee_Email__c || "",
         department: emp.Department__c || "",

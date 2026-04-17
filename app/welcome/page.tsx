@@ -12,10 +12,12 @@ function WelcomeContent() {
     const [firsttime , setFirsttime] = useState(false)
     const [isExpired, setIsExpired] = useState(false)
     const [isValidating, setIsValidating] = useState(true)
-
+    const [step , setStep] = useState(1);
     useEffect(() => {
+        console.log(id , token)
         if (!id || !token) {
             setIsExpired(true)
+            console.log('here')
             setIsValidating(false)
             return
         }
@@ -23,12 +25,15 @@ function WelcomeContent() {
         try {
             const decodedStr = atob(token)
             const decoded = JSON.parse(decodedStr)
+            console.log( decoded)
             setFirsttime(decoded.firsttime)
+            setStep(decoded.step ?? step)
             if (decoded.expirationtime && decoded.expirationtime < Date.now()) {
                 setIsExpired(true)
             }
         } catch (e) {
             setIsExpired(true)
+            console.log(e)
         }
         
         setIsValidating(false)
@@ -54,7 +59,7 @@ function WelcomeContent() {
         )
     }
 
-    return <OnboardingWizard publicMode={true} publicEmpId={id} firsttime={firsttime}/>
+    return <OnboardingWizard publicMode={true} publicEmpId={id} firsttime={firsttime} step = {step}/>
 }
 
 export default function WelcomePage() {

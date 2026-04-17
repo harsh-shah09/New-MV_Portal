@@ -27,7 +27,7 @@ export async function POST(request: Request) {
     if (!employee) {
          return NextResponse.json({ error: 'Employee not found' }, { status: 404 });
     }
-    const empName = employee.Employee_Name__c || employee.Name || 'Unknown';
+    const empName = employee.Employee_Name__c || employee.Employee_Id__c || 'Unknown';
     // Sanitize folder name: remove special chars, replace spaces with underscores
     const safeEmpName = empName.replace(/[^a-zA-Z0-9 ]/g, "").replace(/\s+/g, "_");
 

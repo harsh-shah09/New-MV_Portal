@@ -50,7 +50,7 @@ export async function PATCH(
                   recipientName: employee.Employee_Name__c || 'Employee',
                   employeeName: employee.Employee_Name__c || 'Employee',
               }); 
-              bodyHtml = bodyHtml.replace('{{employeeId}}', employee.Name);
+            bodyHtml = bodyHtml.replace('{{employeeId}}', employee.Employee_Id__c);
               bodyHtml = bodyHtml.replace('{{bankName}}', body.Name);
               bodyHtml = bodyHtml.replace('{{bankBranchName}}', body.Bank_Branch_Name__c);
               bodyHtml = bodyHtml.replace('{{accountNumber}}', body.Bank_Account_Number__c);

@@ -498,7 +498,7 @@ export async function GET(request: NextRequest) {
         SELECT 
           Id, 
           Employee__c,
-          Employee__r.Name,
+          Employee__r.Employee_Id__c,
           Employee__r.Employee_Name__c,
           Employee__r.Team_Lead__r.Employee_Name__c,
           Employee__r.Role__c,
@@ -532,7 +532,7 @@ export async function GET(request: NextRequest) {
 
         return {
           id: record.Id,
-          employeeId: record.Employee__r.Name,
+          employeeId: record.Employee__r.Employee_Id__c,
           employeeName: record.Employee__r?.Employee_Name__c || "Unknown",
           teamLeadName: record.Employee__r?.Team_Lead__r?.Employee_Name__c || "No Team Lead",
           leaveType: record.Leave_Category__c === 'Extra Day Pay' ? 'Extra Day Pay' : (record.Leave_Type__c || ""),
@@ -561,7 +561,7 @@ export async function GET(request: NextRequest) {
         SELECT 
           Id, 
           Employee__c,
-          Employee__r.Name,
+          Employee__r.Employee_Id__c,
           Employee__r.Employee_Name__c,
           Employee__r.Team_Lead__r.Employee_Name__c,
           Employee__r.Role__c,
@@ -596,7 +596,7 @@ export async function GET(request: NextRequest) {
 
         return {
           id: record.Id,
-          employeeId: record.Employee__r.Name,
+          employeeId: record.Employee__r.Employee_Id__c,
           employeeName: record.Employee__r?.Employee_Name__c || "Unknown",
           teamLeadName: record.Employee__r?.Team_Lead__r?.Employee_Name__c || "No Team Lead",
           leaveType: record.Leave_Category__c === 'Extra Day Pay' ? 'Extra Day Pay' : (record.Leave_Type__c || ""),
@@ -1959,7 +1959,7 @@ export async function PATCH(request: NextRequest) {
       // Send notifications to HR for withdrawal approval
       try {
         const empData = await conn.query<any>(`
-          SELECT Id, Name, Employee_Email__c, Employee_Name__c, Role__c, Title__c,
+          SELECT Id, Name,, Employee_Email__c, Employee_Name__c, Role__c, Title__c,
                  Team_Lead__c, Team_Lead__r.Employee_Name__c, Team_Lead__r.Employee_Email__c
           FROM Employee__c
           WHERE Id = '${leave.Employee__c}'
@@ -2356,7 +2356,7 @@ export async function PATCH(request: NextRequest) {
       // Send notification emails
       try {
         const empData = await conn.query<any>(`
-          SELECT Id, Name, Employee_Email__c, Employee_Name__c, Role__c, Title__c,
+          SELECT Id, Name, Employee_Id__c, Employee_Email__c, Employee_Name__c, Role__c, Title__c,
                  Team_Lead__c, Team_Lead__r.Employee_Name__c, Team_Lead__r.Employee_Email__c
           FROM Employee__c
           WHERE Id = '${leave.Employee__c}'
@@ -2486,7 +2486,7 @@ export async function PATCH(request: NextRequest) {
       // Send notification emails
       try {
         const empData = await conn.query<any>(`
-          SELECT Id, Name, Employee_Email__c, Employee_Name__c, Role__c, Title__c,
+          SELECT Id, Name, Employee_Id__c, Employee_Email__c, Employee_Name__c, Role__c, Title__c,
                  Team_Lead__c, Team_Lead__r.Employee_Name__c
           FROM Employee__c
           WHERE Id = '${leave.Employee__c}'

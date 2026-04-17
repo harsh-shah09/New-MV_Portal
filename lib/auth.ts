@@ -51,4 +51,11 @@ export async function hashPassword(password: string): Promise<string> {
   return hmac.digest("hex");
 }
 
+export async function refreshSession() {
+  const session = await verifySession();
 
+  if (!session) return;
+
+  // Re-create session with new expiry
+  await createSession(session);
+}

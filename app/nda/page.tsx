@@ -487,7 +487,7 @@ export default function NDAPage() {
                                                                     <div className="flex justify-between items-center text-xs group">
                                                                         <span className="text-muted-foreground font-medium">Employee Id</span>
                                                                         <span className="font-semibold text-card-foreground bg-background px-2 py-0.5 rounded border border-border group-hover:border-primary/30 transition-colors">
-                                                                            {selectedEmployee.Name || '-'}
+                                                                                {selectedEmployee.Employee_Id__c || '-'}
                                                                         </span>
                                                                     </div>
                                                                 </div>

@@ -79,7 +79,7 @@ export const metadata: Metadata = {
 import AntdStyledRegistry from '@/components/AntdStyledRegistry'
 import Providers from './providers'
 import { AppLayout } from '@/components/app-layout'
-
+import ActivityProvider from './ActivityProvider'
 export default function RootLayout({
   children,
 }: {
@@ -89,9 +89,11 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${geist.variable} ${geistMono.variable} font-sans antialiased`}>
         <AntdStyledRegistry>
+        <ActivityProvider>
           <Providers>
             <AppLayout>{children}</AppLayout>
           </Providers>
+        </ActivityProvider>
         </AntdStyledRegistry>
         <Toaster position="top-right" richColors closeButton expand={true} />
       </body>

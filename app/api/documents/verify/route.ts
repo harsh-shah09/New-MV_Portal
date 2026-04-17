@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { verifySession } from '@/lib/auth';
-import { createNotification, getSalesforceConnection, updateDocument } from '@/lib/salesforce';
+import { createNotification, deleteDocument, getSalesforceConnection, updateDocument } from '@/lib/salesforce';
+import { sendEmail } from '@/lib/email';
+import { loadTemplate } from '@/lib/email-templates';
 
 export async function PATCH(req: Request) {
   try {
@@ -28,7 +30,7 @@ export async function PATCH(req: Request) {
     if (!conn) return NextResponse.json({ error: 'No Salesforce connection' }, { status: 500 });
 
     const docQuery = `
-      SELECT Id, Name, Document_Type__c, Status__c, Employee__c, Employee__r.Employee_Name__c, Employee__r.Role__c
+      SELECT Id, Name, Document_Type__c, Status__c, Employee__c,Employee__r.Employee_Id__c, Employee__r.Employee_Name__c, Employee__r.Role__c , Employee__r.Active__c,Employee__r.Employee_Email__c
       FROM Document__c
       WHERE Id = '${documentId}'
       LIMIT 1
@@ -49,6 +51,26 @@ export async function PATCH(req: Request) {
     // - HR verifies non-HR employee docs
     // - Admin verifies HR employee docs
     const employeeRole = doc.Employee__r?.Role__c || '';
+    const name = doc.Employee__r?.Employee_Name__c
+    const empname = doc.Employee__r.Employee_Id__c;
+    const employeeId = doc.Employee__c;
+    const personalEmail = doc.Employee__r?.Employee_Email__c;
+    const active = doc.Employee__r?.Active__c ?? true;
+    const data = {
+      expirationtime: Date.now() + 48 * 60 * 60 * 1000, // also fix time (see below)
+      firsttime: false,
+      step : 4
+    };
+    const encoded = btoa(JSON.stringify(data));
+    if(!active && action != 'approve'){
+      const template = await loadTemplate('Document_Rejected' , {employeeEmail : personalEmail , employeeId : name , employeeName : empname , endDate : Date.now().toLocaleString(), recipientName : name , appLink : process.env.NEXTAUTH_URL + `/welcome?id=${employeeId}&token=${encoded}` , documentName : doc.Document_Type__c})
+      await sendEmail({
+        isInfo : true,
+        to : personalEmail,
+        body : template,
+        subject : `Document Verification - ${doc.Document_Type__c} - ${action.toUpperCase()}ED`
+      })
+    }
     if (employeeRole === 'HR' && session.role !== 'Admin') {
       return NextResponse.json({ error: 'Only Admin can verify HR documents' }, { status: 403 });
     }
@@ -62,7 +84,9 @@ export async function PATCH(req: Request) {
       Id: documentId,
       Status__c: nextStatus,
     });
-
+    if(!active && action === 'reject'){
+      await deleteDocument(documentId);
+    }
     // Notify employee
     if (doc.Employee__c) {
       await createNotification({
