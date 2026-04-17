@@ -2,7 +2,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Modal, Steps, Form,Grid, Input, Button, Upload, message, Collapse ,Checkbox , Divider , Card} from "antd"
+import { Modal, Steps, Form,Grid, Input, Button, Upload, message, Collapse ,Checkbox , Divider , Card , Spin} from "antd"
 import { UploadOutlined, BankOutlined, UserOutlined, FileTextOutlined, CheckCircleOutlined, CameraOutlined, GoogleOutlined, CheckCircleFilled } from "@ant-design/icons"
 import { useQueryClient } from "@tanstack/react-query"
 import Confetti from "react-confetti"
@@ -38,6 +38,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId , firsttime =
     const [googleNotification, setGoogleNotification] = useState<{ type: 'success' | 'error', message: string } | null>(null)
     const [documents, setDocuments] = useState<string[]>([])
     const [documentsLoading, setDocumentsLoading] = useState(true)
+    const [documentsUploading, setdocumentsUploading] = useState(false)
     const [existingProfilePhoto, setExistingProfilePhoto] = useState<string | null>(null)
     const [existingDocuments, setExistingDocuments] = useState<any[]>([])
     const [isExpired, setIsExpired] = useState(false)
@@ -375,6 +376,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId , firsttime =
 
     const handleDocumentUpload = async (options: any , doc : any) => {
         const { file, onSuccess, onError } = options
+        setdocumentsUploading(true)
         const formData = new FormData()
         formData.append('file', file)
         formData.append('type', doc)
@@ -397,6 +399,9 @@ export function OnboardingWizard({ publicMode = false, publicEmpId , firsttime =
         } catch (err) {
             onError({ err })
             message.error('Upload failed')
+            setdocumentsUploading(false)
+        }finally{
+            setdocumentsUploading(false)
         }
     }
 
@@ -835,10 +840,8 @@ export function OnboardingWizard({ publicMode = false, publicEmpId , firsttime =
                         <Steps current={currentStep - 1} items={stepItems} />
                     </div>
                     )}
-
-                <div className="min-h-[300px]" style={{    height: '100%',
-    flex: 1,
-    overflowY: 'auto'}}>
+                <Spin spinning={loading || passbookUploading || documentsUploading} size="large" tip="Processing...">
+                <div className="min-h-[300px]" style={{    height: '100%', flex: 1,overflowY: 'auto'}}>
                     {pageLoading ? (
                         <div className="flex flex-col items-center justify-center h-full min-h-[300px]">
                             <Loader2 className="w-10 h-10 animate-spin text-blue-500 mb-4" />
@@ -873,7 +876,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId , firsttime =
                     </Form>
                     )}
                 </div>
-
+                </Spin>
                 <div className="flex flex-col sm:flex-row justify-between pt-6 border-t border-gray-100 mt-6 gap-3">
                     <div className="flex gap-2 sm:gap-3 order-2 sm:order-1">
                         {!publicMode && (
