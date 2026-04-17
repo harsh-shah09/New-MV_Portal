@@ -31,6 +31,8 @@ export default function PayrollPage() {
   const [selectedEmployee, setSelectedEmployee] = useState<PayrollEmployeeDetail | null>(null)
   const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false)
   const [loadingEmployees, setLoadingEmployees] = useState(false)
+  const [isPayrollSaving, setIsPayrollSaving] = useState(false)
+  const [isPayrollDeleting, setIsPayrollDeleting] = useState(false)
 
   // Fetch payroll summaries
   const { data: summariesData, isLoading: loadingSummaries, refetch: refetchSummaries } = useQuery({
@@ -96,6 +98,7 @@ export default function PayrollPage() {
   }
 
   const handleDeleteSummary = async (summaryId: string) => {
+    setIsPayrollDeleting(true)
     try {
       const res = await fetch(`/api/payroll/summaries/${summaryId}`, {
         method: "DELETE",
@@ -120,6 +123,8 @@ export default function PayrollPage() {
       console.error("Error deleting payroll summary:", error)
       message.error(error.message || "Failed to delete payroll summary")
       throw error // Re-throw to let the component know deletion failed
+    } finally {
+      setIsPayrollDeleting(false)
     }
   }
 
@@ -161,7 +166,17 @@ export default function PayrollPage() {
   return (
     <RoleGuard>
       <PageContainer>
-        <div className="w-full min-w-0 mx-auto flex-1 flex flex-col bg-white p-2 sm:p-3 lg:p-4 rounded-xl">
+        <div className="relative w-full min-w-0 mx-auto flex-1 flex flex-col bg-white p-2 sm:p-3 lg:p-4 rounded-xl">
+          {(isPayrollSaving || isPayrollDeleting) && (
+            <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-white/70 backdrop-blur-sm">
+              <div className="flex flex-col items-center gap-3 rounded-2xl border border-slate-200 bg-white px-6 py-5 shadow-2xl">
+                <Spin size="large" />
+                <p className="text-sm font-medium text-slate-700">
+                  {isPayrollDeleting ? "Deleting payroll..." : "Saving payroll..."}
+                </p>
+              </div>
+            </div>
+          )}
           <PageHeader
             title="Payroll Management"
             subtitle="Manage employee payrolls and generate monthly summaries"
@@ -173,6 +188,7 @@ export default function PayrollPage() {
                 onClick={() => setIsGenerateModalOpen(true)}
                 size="large"
                 className="w-full sm:w-auto"
+                  disabled={isPayrollSaving || isPayrollDeleting}
               >
                 Generate Payroll
               </Button>
@@ -195,6 +211,7 @@ export default function PayrollPage() {
                     onDeleteSummary={handleDeleteSummary}
                     isAdmin={isAdmin}
                     onStatusChange={handleSummaryStatusChange}
+                    isBusy={isPayrollSaving || isPayrollDeleting}
                   />
                   {/* </div> */}
                 </div>
@@ -239,6 +256,7 @@ export default function PayrollPage() {
             open={isGenerateModalOpen}
             onClose={() => setIsGenerateModalOpen(false)}
             onGenerate={handleGeneratePayroll}
+            onSavingChange={setIsPayrollSaving}
           />
         </div>
       </PageContainer>

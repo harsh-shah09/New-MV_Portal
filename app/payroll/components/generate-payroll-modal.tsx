@@ -14,6 +14,7 @@ interface GeneratePayrollModalProps {
   open: boolean
   onClose: () => void
   onGenerate: (month: string, year: number, employees: PayrollEmployeeDetail[]) => void
+  onSavingChange?: (saving: boolean) => void
 }
 
 const months = [
@@ -34,7 +35,7 @@ const months = [
 const currentYear = new Date().getFullYear()
 const years = Array.from({ length: 5 }, (_, i) => currentYear - i)
 
-export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayrollModalProps) {
+export function GeneratePayrollModal({ open, onClose, onGenerate, onSavingChange }: GeneratePayrollModalProps) {
   const screens = Grid.useBreakpoint()
   const useFixedColumns = !!screens.lg
 
@@ -161,6 +162,7 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
     }
 
     setSaving(true)
+    onSavingChange?.(true)
     try {
       const res = await fetch("/api/payroll/save", {
         method: "POST",
@@ -199,6 +201,7 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
       message.error(error?.message || "Failed to save payroll")
     } finally {
       setSaving(false)
+      onSavingChange?.(false)
     }
   }
 
@@ -634,6 +637,9 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
       }
       open={open}
       onCancel={handleClose}
+        closable={!saving}
+        maskClosable={!saving}
+        keyboard={!saving}
       width={showResults ? "min(1540px, calc(100vw - 12px))" : "min(460px, calc(100vw - 12px))"}
       centered
       styles={{ body: { maxHeight: "calc(100vh - 180px)", overflowY: "auto", overflowX: "hidden", padding: 8 } }}
@@ -641,7 +647,7 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
         showResults
           ? (
               <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
-                <Button key="cancel" onClick={handleClose} className="w-full sm:w-auto">
+                <Button key="cancel" onClick={handleClose} disabled={saving} className="w-full sm:w-auto">
                   Cancel
                 </Button>
                 <Button
@@ -658,7 +664,7 @@ export function GeneratePayrollModal({ open, onClose, onGenerate }: GeneratePayr
             )
           : (
               <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
-                <Button key="cancel" onClick={handleClose} className="w-full sm:w-auto">
+                <Button key="cancel" onClick={handleClose} disabled={saving} className="w-full sm:w-auto">
                   Cancel
                 </Button>
                 <Button key="generate" type="primary" onClick={handleGenerate} loading={loading} className="w-full sm:w-auto">

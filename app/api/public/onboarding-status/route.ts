@@ -142,6 +142,7 @@ export async function POST(req: Request) {
                                              employeeName,
                                              employeeId: employeeData?.Name || employeeId,
                                              employeeEmail,
+                                           recordId: employeeId,
                                      });
 
                    try {
