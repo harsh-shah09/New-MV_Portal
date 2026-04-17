@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { verifySession } from '@/lib/auth';
-import { createNotification, getSalesforceConnection, updateDocument } from '@/lib/salesforce';
+import { createNotification, deleteDocument, getSalesforceConnection, updateDocument } from '@/lib/salesforce';
 import { sendEmail } from '@/lib/email';
 import { loadTemplate } from '@/lib/email-templates';
 
@@ -56,8 +56,14 @@ export async function PATCH(req: Request) {
     const employeeId = doc.Employee__c;
     const personalEmail = doc.Employee__r?.Employee_Email__c;
     const active = doc.Employee__r?.Active__c ?? true;
+    const data = {
+      expirationtime: Date.now() + 48 * 60 * 60 * 1000, // also fix time (see below)
+      firsttime: false,
+      step : 4
+    };
+    const encoded = btoa(JSON.stringify(data));
     if(!active && action != 'approve'){
-      const template = await loadTemplate('Document_Rejected' , {employeeEmail : personalEmail , employeeId : name , employeeName : empname , endDate : Date.now().toLocaleString(), recipientName : name , appLink : process.env.NEXTAUTH_URL + `/welcome?id=${employeeId}&token=${encodeURIComponent(`{expirationtime : ${Date.now() + 48 * 60 * 60} ,firsttime : false }`)}` , documentName : doc.Document_Type__c})
+      const template = await loadTemplate('Document_Rejected' , {employeeEmail : personalEmail , employeeId : name , employeeName : empname , endDate : Date.now().toLocaleString(), recipientName : name , appLink : process.env.NEXTAUTH_URL + `/welcome?id=${employeeId}&token=${encoded}` , documentName : doc.Document_Type__c})
       await sendEmail({
         isInfo : true,
         to : personalEmail,
@@ -78,7 +84,9 @@ export async function PATCH(req: Request) {
       Id: documentId,
       Status__c: nextStatus,
     });
-
+    if(!active && action === 'reject'){
+      await deleteDocument(documentId);
+    }
     // Notify employee
     if (doc.Employee__c) {
       await createNotification({

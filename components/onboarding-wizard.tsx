@@ -14,11 +14,12 @@ export interface OnboardingWizardProps {
     publicMode?: boolean;
     publicEmpId?: string;
     firsttime?: boolean;
+    step?: number;
 }
 
-export function OnboardingWizard({ publicMode = false, publicEmpId , firsttime = false }: OnboardingWizardProps = {}) {
+export function OnboardingWizard({ publicMode = false, publicEmpId , firsttime = false , step = 1}: OnboardingWizardProps = {}) {
     const [open, setOpen] = useState(publicMode ? true : false)
-    const [currentStep, setCurrentStep] = useState(1)
+    const [currentStep, setCurrentStep] = useState(step)
     const [loading, setLoading] = useState(false)
     const [pageLoading, setPageLoading] = useState(true)
     const [form] = Form.useForm()
