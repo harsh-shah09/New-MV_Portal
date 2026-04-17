@@ -331,15 +331,20 @@ export async function onboardingCompletedToHR(data: {
   employeeName: string;
   employeeId: string;
   employeeEmail: string;
+  recordId: string;
 }): Promise<{ subject: string; html: string; text: string }> {
   const subject = `Onboarding Completed - ${data.employeeName}`;
   const recipientName = data.recipientName || 'HR Team';
+  const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_BASE_URL || '').replace(/\/$/, '');
+  const appLink = baseUrl && data.recordId
+    ? `${baseUrl}/employees/${encodeURIComponent(data.recordId)}?tab=personal`
+    : '';
   const html = await loadTemplate('onboarding-completed-to-hr', {
     recipientName,
     employeeName: data.employeeName,
     employeeId: data.employeeId,
     employeeEmail: data.employeeEmail,
-    appLink: process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_BASE_URL || '',
+    appLink,
   });
 
   const text = `Dear ${recipientName},\n\nOnboarding data collection has been completed for the following employee:\n- Employee Name: ${data.employeeName}\n- Employee ID: ${data.employeeId}\n- Email: ${data.employeeEmail}\n\nPlease review the submitted onboarding details in HRMS.\n\nRegards,\nHRMS System`;
