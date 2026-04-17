@@ -57,7 +57,7 @@ export async function PATCH(req: Request) {
     const personalEmail = doc.Employee__r?.Employee_Email__c;
     const active = doc.Employee__r?.Active__c ?? true;
     if(!active && action != 'approve'){
-      const template = await loadTemplate('Document_Rejected' , {employeeEmail : personalEmail , employeeId : name , employeeName : empname , endDate : Date.now().toLocaleString(), recipientName : name , appLink : process.env.NEXTAUTH_URL + `/employees/${employeeId}?tab=documents` , documentName : doc.Document_Type__c})
+      const template = await loadTemplate('Document_Rejected' , {employeeEmail : personalEmail , employeeId : name , employeeName : empname , endDate : Date.now().toLocaleString(), recipientName : name , appLink : process.env.NEXTAUTH_URL + `/welcome?id=${employeeId}&token=${encodeURIComponent(`{expirationtime : ${Date.now() + 48 * 60 * 60} ,firsttime : false }`)}` , documentName : doc.Document_Type__c})
       await sendEmail({
         isInfo : true,
         to : personalEmail,
