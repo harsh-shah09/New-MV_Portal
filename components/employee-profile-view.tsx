@@ -51,7 +51,7 @@ interface ViewProps {
 export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", currentUserEmployeeId }: ViewProps) {
     // --- Query Parameter <-> Tab mapping ---
     type TabId = "personal" | "employment" | "salary-calculation" | "salary-history" | "bank" | "documents" | "security" | "assets" | "leaves"
-    
+
     const getTabFromQuery = (): TabId => {
         if (typeof window === "undefined") return "personal"
         const params = new URLSearchParams(window.location.search)
@@ -341,9 +341,9 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                 if (!emailPattern.test(companyEmail)) {
                     newErrors.Company_Email__c = "Please enter a valid company email address";
                 } else if (employeesList) {
-                    const isDuplicate = employeesList.some((emp: any) => 
-                        emp.Id !== employeeId && 
-                        emp.Status__c === 'Active' && 
+                    const isDuplicate = employeesList.some((emp: any) =>
+                        emp.Id !== employeeId &&
+                        emp.Status__c === 'Active' &&
                         emp.Company_Email__c?.trim().toLowerCase() === companyEmail.toLowerCase()
                     );
                     if (isDuplicate) {
@@ -395,6 +395,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                 Employee_Name__c: employee.Employee_Name__c,
                 Employee_Email__c: employee.Employee_Email__c,
                 Company_Email__c: employee.Company_Email__c,
+                Employee_Id__c: employee.Employee_Id__c,
                 Employee_Phone__c: employee.Employee_Phone__c,
                 Birthdate__c: employee.Birthdate__c,
                 Gender__c: employee.Gender__c,
@@ -440,6 +441,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
             payload.Employee_Name__c = payload.Employee_Name__c?.trim();
             payload.Employee_Email__c = payload.Employee_Email__c?.trim();
             payload.Company_Email__c = payload.Company_Email__c?.trim();
+            payload.Employee_Id__c = payload.Employee_Id__c?.trim();
             payload.Employee_Phone__c = payload.Employee_Phone__c?.trim()?.replace(/[\s-]/g, '');
             payload.Emergency_Contact_Number__c = payload.Emergency_Contact_Number__c?.trim()?.replace(/[\s-]/g, '');
             payload.Employee_Current_Address__c = JSON.stringify(
@@ -923,9 +925,9 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
         formData.append("type", "document")
         formData.append("category", customDocCategory)
         formData.append("docType", customDocName.trim())
-        
+
         customDocMutation.mutate(formData)
-        
+
         // Reset modal on success (will happen in mutation success callback)
     }
 
@@ -1047,6 +1049,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
         normalizeSfId(currentUserEmployeeId) === normalizeSfId(employee?.Id || employeeId)
     const selectedDepartment = `${formData.Department__c ?? employee.Department__c ?? ''}`.trim().toLowerCase()
     const selectedRole = `${formData.Role__c ?? employee.Role__c ?? ''}`.trim().toLowerCase()
+    const currentEmployeeCode = `${formData.Employee_Id__c ?? employee.Employee_Id__c ?? ''}`.trim()
     const canViewCompensation = isAdminUser || (!isHrUser && isOwnProfile) || (isHrUser && isOwnProfile)
     const canViewSalaryHistory = isAdminUser || (!isHrUser && isOwnProfile) || (isHrUser && isOwnProfile)
     const canToggleUserActive =
@@ -1130,7 +1133,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                     }
                                     setSendingEmail(true);
                                     try {
-                                        const res = await sendWelcomeEmailAction(employeeId, employee.Employee_Email__c, employee.Employee_Name__c , employee.Name);
+                                        const res = await sendWelcomeEmailAction(employeeId, employee.Employee_Email__c, employee.Employee_Name__c, employee.Employee_Id__c);
                                         if (res.error) throw new Error(res.error);
                                         message.success("Welcome Email sent successfully.");
                                     } catch (e) {
@@ -1172,10 +1175,10 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                         }
                                     });
                                 }}
-                                disabled={!employee.Active__c && (!employee.Company_Email__c || !employee.Role__c || !employee.Title__c || !employee.Department__c)}
+                                disabled={!employee.Active__c && (!currentEmployeeCode || !employee.Company_Email__c || !employee.Role__c || !employee.Title__c || !employee.Department__c)}
                                 className={cn(
                                     'flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all border shadow-lg',
-                                    (!employee.Active__c && (!employee.Company_Email__c || !employee.Role__c || !employee.Title__c || !employee.Department__c)) && 'opacity-50 cursor-not-allowed',
+                                    (!employee.Active__c && (!currentEmployeeCode || !employee.Company_Email__c || !employee.Role__c || !employee.Title__c || !employee.Department__c)) && 'opacity-50 cursor-not-allowed',
                                     employee.Active__c
                                         ? 'bg-red-600/90 text-white border-red-500/50 hover:bg-red-700'
                                         : 'bg-green-600/90 text-white border-green-500/50 hover:bg-green-700'
@@ -1250,7 +1253,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                             <div className="w-px h-8 bg-slate-700 block lg:hidden" />
                             <div className="text-center lg:text-left">
                                 <p className="text-slate-400 text-[10px] lg:text-xs uppercase tracking-wider mb-1 lg:mb-0">Employee ID</p>
-                                <p className="font-mono text-sm lg:text-base">{employee.Name || 'Not set'}</p>
+                                <p className="font-mono text-sm lg:text-base">{employee.Employee_Id__c || 'Not set'}</p>
                             </div>
                         </div>
                     </div>
@@ -1390,6 +1393,15 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                             </div>
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                                                 <Field
+                                                    label="Employee ID"
+                                                    value={employee.Employee_Id__c}
+                                                    fieldKey="Employee_Id__c"
+                                                    isEditing={isEditing && ['HR', 'Admin'].includes(currentUserRole)}
+                                                    formData={formData}
+                                                    setFormData={setFormData}
+                                                    placeholder="e.g. EMP001"
+                                                />
+                                                <Field
                                                     label="Department"
                                                     value={employee.Department__c}
                                                     fieldKey="Department__c"
@@ -1448,6 +1460,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                     error={errors.Company_Email__c}
                                                     placeholder="e.g. john@company.com"
                                                 />
+
 
                                                 {/* ── Total Experience: split into Years + Months ── */}
                                                 <div className="space-y-1.5">
@@ -1544,8 +1557,8 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                                     e.Id !== employeeId &&
                                                                     e.Status__c === 'Active' &&
                                                                     (e.Title__c || '').trim().toLowerCase() === 'team lead' &&
-                                                                    ((e.Department__c || '').trim().toLowerCase() === selectedDepartment  || 
-                                                                    (e.Role__c || '').trim().toLowerCase() === selectedRole)
+                                                                    ((e.Department__c || '').trim().toLowerCase() === selectedDepartment ||
+                                                                        (e.Role__c || '').trim().toLowerCase() === selectedRole)
                                                                 ).map((e: any) => ({
                                                                     value: e.Id,
                                                                     label: `${e.Employee_Name__c || ''}`.trim()
@@ -1736,11 +1749,10 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                                 <p className="text-sm text-slate-500">{bank.Bank_Branch_Name__c}</p>
                                                             </div>
                                                             <div className="flex items-center gap-2">
-                                                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                                                                    bank.Status__c === 'Verified' ? 'bg-green-50 text-green-700 border-green-200' :
-                                                                    bank.Status__c === 'Rejected' ? 'bg-red-50 text-red-700 border-red-200' :
-                                                                    'bg-amber-50 text-amber-700 border-amber-200'
-                                                                } border whitespace-nowrap`}>
+                                                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${bank.Status__c === 'Verified' ? 'bg-green-50 text-green-700 border-green-200' :
+                                                                        bank.Status__c === 'Rejected' ? 'bg-red-50 text-red-700 border-red-200' :
+                                                                            'bg-amber-50 text-amber-700 border-amber-200'
+                                                                    } border whitespace-nowrap`}>
                                                                     {bank.Status__c || 'Pending'}
                                                                 </span>
                                                                 {isHrUser && (!bank.Status__c || bank.Status__c === 'Pending') && (
@@ -1972,13 +1984,13 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                     <Download className="w-4 h-4 text-slate-500" /> Uploaded Documents
                                                 </h3>
                                                 {['HR', 'Admin'].includes(currentUserRole) && (
-                                                <Button
-                                                    type="primary"
-                                                    onClick={() => setShowCustomDocModal(true)}
-                                                    className="inline-flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition"
-                                                >
-                                                    <Upload className="w-4 h-4" /> Upload Document
-                                                </Button>
+                                                    <Button
+                                                        type="primary"
+                                                        onClick={() => setShowCustomDocModal(true)}
+                                                        className="inline-flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition"
+                                                    >
+                                                        <Upload className="w-4 h-4" /> Upload Document
+                                                    </Button>
                                                 )}
                                             </div>
                                             {(() => {
@@ -1990,97 +2002,97 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                 const paginatedDocs = nonPayslipDocs.slice(startIndex, startIndex + itemsPerPage);
                                                 return totalDocs > 0 ? (
                                                     <>
-                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                                        {paginatedDocs.map((doc: any) => (
-                                                            <div key={doc.Id} className="group p-4 border border-slate-200 rounded-xl hover:border-blue-300 hover:bg-blue-50/10 transition relative">
-                                                                {/* Top row: icon + name + approve/reject */}
-                                                                <div className="flex items-start gap-3">
-                                                                    <div className="w-10 h-10 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center shrink-0">
-                                                                        <FileText className="w-5 h-5" />
+                                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                            {paginatedDocs.map((doc: any) => (
+                                                                <div key={doc.Id} className="group p-4 border border-slate-200 rounded-xl hover:border-blue-300 hover:bg-blue-50/10 transition relative">
+                                                                    {/* Top row: icon + name + approve/reject */}
+                                                                    <div className="flex items-start gap-3">
+                                                                        <div className="w-10 h-10 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center shrink-0">
+                                                                            <FileText className="w-5 h-5" />
+                                                                        </div>
+                                                                        <div className="flex-1 min-w-0">
+                                                                            <h4 className="font-semibold text-slate-800 truncate" title={doc.Document_Type__c}>{doc.Document_Type__c}</h4>
+                                                                            <p className="text-xs text-slate-500">{doc.Document_Category__c} • {doc.Status__c}</p>
+                                                                        </div>
+                                                                        {/* Approve / Reject — top right */}
+                                                                        {doc.Status__c === 'Uploaded' &&
+                                                                            ((currentUserRole === 'HR' && employee.Role__c !== 'HR') || (currentUserRole === 'Admin' && employee.Role__c === 'HR')) && (
+                                                                                <div className="flex items-center gap-1.5 shrink-0">
+                                                                                    <button
+                                                                                        onClick={() => verifyDocumentMutation.mutate({ docId: doc.Id, action: 'approve' })}
+                                                                                        disabled={verifyDocumentMutation.isPending}
+                                                                                        className="bg-white border border-green-200 text-green-600 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-green-50 transition disabled:opacity-50"
+                                                                                    >
+                                                                                        Approve
+                                                                                    </button>
+                                                                                    <button
+                                                                                        onClick={() => verifyDocumentMutation.mutate({ docId: doc.Id, action: 'reject' })}
+                                                                                        disabled={verifyDocumentMutation.isPending}
+                                                                                        className="bg-white border border-amber-200 text-amber-600 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-amber-50 transition disabled:opacity-50"
+                                                                                    >
+                                                                                        Reject
+                                                                                    </button>
+                                                                                </div>
+                                                                            )
+                                                                        }
                                                                     </div>
-                                                                    <div className="flex-1 min-w-0">
-                                                                        <h4 className="font-semibold text-slate-800 truncate" title={doc.Document_Type__c}>{doc.Document_Type__c}</h4>
-                                                                        <p className="text-xs text-slate-500">{doc.Document_Category__c} • {doc.Status__c}</p>
-                                                                    </div>
-                                                                    {/* Approve / Reject — top right */}
-                                                                    {doc.Status__c === 'Uploaded' &&
-                                                                        ((currentUserRole === 'HR' && employee.Role__c !== 'HR') || (currentUserRole === 'Admin' && employee.Role__c === 'HR')) && (
-                                                                            <div className="flex items-center gap-1.5 shrink-0">
-                                                                                <button
-                                                                                    onClick={() => verifyDocumentMutation.mutate({ docId: doc.Id, action: 'approve' })}
-                                                                                    disabled={verifyDocumentMutation.isPending}
-                                                                                    className="bg-white border border-green-200 text-green-600 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-green-50 transition disabled:opacity-50"
-                                                                                >
-                                                                                    Approve
-                                                                                </button>
-                                                                                <button
-                                                                                    onClick={() => verifyDocumentMutation.mutate({ docId: doc.Id, action: 'reject' })}
-                                                                                    disabled={verifyDocumentMutation.isPending}
-                                                                                    className="bg-white border border-amber-200 text-amber-600 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-amber-50 transition disabled:opacity-50"
-                                                                                >
-                                                                                    Reject
-                                                                                </button>
-                                                                            </div>
-                                                                        )
-                                                                    }
-                                                                </div>
-                                                                {/* Bottom row: View / Download / Delete */}
-                                                                <div className="mt-4 flex gap-2">
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => openDocumentPreview(doc.File_URL__c, doc.Document_Type__c)}
-                                                                        className="flex-1 bg-white border border-slate-200 text-slate-600 text-xs font-semibold py-2 rounded-lg flex items-center justify-center gap-2 hover:bg-slate-50 transition"
-                                                                    >
-                                                                        <Eye className="w-3 h-3" /> View
-                                                                    </button>
-                                                                    {doc.File_URL__c && (
+                                                                    {/* Bottom row: View / Download / Delete */}
+                                                                    <div className="mt-4 flex gap-2">
                                                                         <button
                                                                             type="button"
-                                                                            onClick={() => handleDocumentDownload(doc.Id, doc.Document_Type__c)}
+                                                                            onClick={() => openDocumentPreview(doc.File_URL__c, doc.Document_Type__c)}
                                                                             className="flex-1 bg-white border border-slate-200 text-slate-600 text-xs font-semibold py-2 rounded-lg flex items-center justify-center gap-2 hover:bg-slate-50 transition"
                                                                         >
-                                                                            <Download className="w-3 h-3" /> Download
+                                                                            <Eye className="w-3 h-3" /> View
                                                                         </button>
-                                                                    )}
-                                                                    {['HR', 'Admin'].includes(currentUserRole) && (
-                                                                        <button
-                                                                            onClick={() => {
-                                                                                Modal.confirm({
-                                                                                    title: 'Delete this document?',
-                                                                                    content: 'This action cannot be undone. The document will be permanently removed.',
-                                                                                    okText: 'Delete',
-                                                                                    okType: 'danger',
-                                                                                    cancelText: 'Cancel',
-                                                                                    centered: true,
-                                                                                    onOk: async () => {
-                                                                                        deleteDocumentMutation.mutate(doc.Id)
-                                                                                    }
-                                                                                })
-                                                                            }}
-                                                                            className="flex-1 bg-white border border-red-100 text-red-500 text-xs font-semibold py-2 rounded-lg flex items-center justify-center gap-2 hover:bg-red-50 transition"
-                                                                        >
-                                                                            <Trash2 className="w-3 h-3" /> Delete
-                                                                        </button>
-                                                                    )}
+                                                                        {doc.File_URL__c && (
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => handleDocumentDownload(doc.Id, doc.Document_Type__c)}
+                                                                                className="flex-1 bg-white border border-slate-200 text-slate-600 text-xs font-semibold py-2 rounded-lg flex items-center justify-center gap-2 hover:bg-slate-50 transition"
+                                                                            >
+                                                                                <Download className="w-3 h-3" /> Download
+                                                                            </button>
+                                                                        )}
+                                                                        {['HR', 'Admin'].includes(currentUserRole) && (
+                                                                            <button
+                                                                                onClick={() => {
+                                                                                    Modal.confirm({
+                                                                                        title: 'Delete this document?',
+                                                                                        content: 'This action cannot be undone. The document will be permanently removed.',
+                                                                                        okText: 'Delete',
+                                                                                        okType: 'danger',
+                                                                                        cancelText: 'Cancel',
+                                                                                        centered: true,
+                                                                                        onOk: async () => {
+                                                                                            deleteDocumentMutation.mutate(doc.Id)
+                                                                                        }
+                                                                                    })
+                                                                                }}
+                                                                                className="flex-1 bg-white border border-red-100 text-red-500 text-xs font-semibold py-2 rounded-lg flex items-center justify-center gap-2 hover:bg-red-50 transition"
+                                                                            >
+                                                                                <Trash2 className="w-3 h-3" /> Delete
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
                                                                 </div>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                    {/* Pagination */}
-                                                    {totalDocs > itemsPerPage && (
-                                                        <div className="flex justify-end mt-6">
-                                                            <Pagination
-                                                                current={currentPage}
-                                                                total={totalDocs}
-                                                                pageSize={itemsPerPage}
-                                                                onChange={(page) => setCurrentPage(page)}
-                                                                showSizeChanger={false}
-                                                                className="ant-pagination-custom"
-                                                                
-                                                            />
+                                                            ))}
                                                         </div>
-                                                    )}
-                                                </>
+                                                        {/* Pagination */}
+                                                        {totalDocs > itemsPerPage && (
+                                                            <div className="flex justify-end mt-6">
+                                                                <Pagination
+                                                                    current={currentPage}
+                                                                    total={totalDocs}
+                                                                    pageSize={itemsPerPage}
+                                                                    onChange={(page) => setCurrentPage(page)}
+                                                                    showSizeChanger={false}
+                                                                    className="ant-pagination-custom"
+
+                                                                />
+                                                            </div>
+                                                        )}
+                                                    </>
                                                 ) : (
                                                     <div className="text-center py-10 bg-slate-50 rounded-xl border-dashed border-2 border-slate-200">
                                                         <FileText className="w-10 h-10 text-slate-300 mx-auto mb-2" />
@@ -2088,7 +2100,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                     </div>
                                                 )
                                             })()}
-                                            
+
                                         </div>
 
                                         {/* Custom Document Upload Modal */}

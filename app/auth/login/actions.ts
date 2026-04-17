@@ -88,7 +88,7 @@ export async function loginAction(
     await createSession({
       employeeId: employee.Id || '',
       email: employee.Employee_Email__c || '',
-      name: employee.Employee_Name__c || employee.Name || '',
+      name: employee.Employee_Name__c || employee.Employee_Id__c || '',
       role: employee.Role__c || 'Employee',
       title : employee.Title__c || ''
     });
@@ -226,7 +226,7 @@ export async function forgotPasswordAction(identifier: string) {
             emailHtml = `
             <div style="font-family: Arial, sans-serif; color: #333;">
               <h2>Password Reset Request</h2>
-              <p>Hello <strong>${employee.Name}</strong>,</p>
+              <p>Hello <strong>${employee.Employee_Id__c}</strong>,</p>
               <p>A password reset has been requested for your account.</p>
               <p>Please click the button below to reset your password:</p>
               <a href="${resetLink}" style="display: inline-block; background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Reset Password</a>
@@ -239,7 +239,7 @@ export async function forgotPasswordAction(identifier: string) {
         emailHtml = `
         <div style="font-family: Arial, sans-serif; color: #333;">
           <h2>Password Reset Request</h2>
-          <p>Hello <strong>${employee.Name}</strong>,</p>
+          <p>Hello <strong>${employee.Employee_Id__c}</strong>,</p>
           <p>Please click the button below to reset your password:</p>
           <a href="${resetLink}" style="display: inline-block; background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Reset Password</a>
           <p>If you did not request this, please ignore this email.</p>

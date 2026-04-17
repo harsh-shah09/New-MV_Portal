@@ -30,7 +30,7 @@ export async function PATCH(req: Request) {
     if (!conn) return NextResponse.json({ error: 'No Salesforce connection' }, { status: 500 });
 
     const docQuery = `
-      SELECT Id, Name, Document_Type__c, Status__c, Employee__c,Employee__r.Name, Employee__r.Employee_Name__c, Employee__r.Role__c , Employee__r.Active__c,Employee__r.Employee_Email__c
+      SELECT Id, Name, Document_Type__c, Status__c, Employee__c,Employee__r.Employee_Id__c, Employee__r.Employee_Name__c, Employee__r.Role__c , Employee__r.Active__c,Employee__r.Employee_Email__c
       FROM Document__c
       WHERE Id = '${documentId}'
       LIMIT 1
@@ -52,7 +52,7 @@ export async function PATCH(req: Request) {
     // - Admin verifies HR employee docs
     const employeeRole = doc.Employee__r?.Role__c || '';
     const name = doc.Employee__r?.Employee_Name__c
-    const empname = doc.Employee__r.Name;
+    const empname = doc.Employee__r.Employee_Id__c;
     const employeeId = doc.Employee__c;
     const personalEmail = doc.Employee__r?.Employee_Email__c;
     const active = doc.Employee__r?.Active__c ?? true;

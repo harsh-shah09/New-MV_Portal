@@ -29,6 +29,7 @@ interface Adjustment {
 interface PayslipData {
   employeeName: string
   employeeId: string
+  Employee_Id__c?: string
   email: string
   department: string
   role: string
@@ -190,7 +191,7 @@ function generatePayslipHTML(payslip: PayslipData): string {
   }
 
   const employeeDetails = [
-    { label: 'Emp. Id', value: payslip.employeeId.slice(0, 15) },
+    { label: 'Emp. Id', value: payslip.Employee_Id__c || payslip.employeeId },
     { label: 'Emp Name', value: payslip.employeeName },
     { label: 'Department', value: payslip.department || 'N/A' },
     { label: 'Designation', value: '' },

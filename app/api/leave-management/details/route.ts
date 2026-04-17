@@ -37,6 +37,7 @@ export async function GET(request: NextRequest) {
         Id,
         Employee__c,
         Employee__r.Name,
+        Employee__r.Employee_Id__c,
         Employee__r.Employee_Name__c,
         Employee__r.Team_Lead__r.Employee_Name__c,
         Start_Date__c,
@@ -78,7 +79,7 @@ export async function GET(request: NextRequest) {
     const leave: LeaveRequest = {
       id: record.Id,
       employeeId: record.Employee__c || "",
-      employeeRecordName: record.Employee__r?.Name || "",
+      employeeRecordName: record.Employee__r?.Employee_Id__c || "",
       employeeName: record.Employee__r?.Employee_Name__c || "Unknown",
       teamLeadName: record.Employee__r?.Team_Lead__r?.Employee_Name__c || undefined,
       startDate: record.Start_Date__c || "",

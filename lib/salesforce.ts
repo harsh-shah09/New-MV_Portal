@@ -100,7 +100,7 @@ export const getSalesforceConnection = async () => {
 
 export interface Employee {
   Id: string;
-  Employee_ID__c?: string;
+  Employee_Id__c?: string;
   Employee_Email__c?: string;
   Password__c?: string; // Stored hash
   Employee_Name__c: string; // Replaces Name/FirstName/LastName
@@ -143,21 +143,19 @@ export const findEmployee = async (identifier: string): Promise<Employee | null>
   const conn = await getSalesforceConnection();
   if(!conn) return null;
 
-  // Search by Employee_ID__c OR Employee_Email__c
+  // Search by Company_Email__c OR Employee_Id__c
   const isEmail = identifier.includes('@');
   // Be careful with SOQL injection in real apps. 
   const escapedIdentifier = identifier.replace(/'/g, "\\'");
   // Updated query to fetch fields from Employee__c directly
   const query = `
-    SELECT Id , Employee_Name__c, Employee_Email__c,Company_Email__c, Password__c, Role__c, Title__c, Is2FAEnabled__c, Name, Active__c
+    SELECT Id ,Employee_Id__c, Employee_Name__c, Employee_Email__c,Company_Email__c, Password__c, Role__c, Title__c, Is2FAEnabled__c, Name, Active__c
     FROM Employee__c 
-    WHERE ${isEmail ? 'Company_Email__c' : 'Name'} = '${escapedIdentifier}' 
+    WHERE ${isEmail ? 'Company_Email__c' : 'Employee_Id__c'} = '${escapedIdentifier}' 
     LIMIT 1
   `;
   console.log(query)
-  // Note: Searching by 'Name' standard field might still be safer if Employee_Name__c isn't unique or standardized for login. 
-  // But user said "Employee_Name__c ... use this only". I'll try to match user intent. 
-  // If login fails, user might need to adjust valid identifiers.
+  // Login accepts email or employee ID.
   
   const result = await conn.query(query);
 

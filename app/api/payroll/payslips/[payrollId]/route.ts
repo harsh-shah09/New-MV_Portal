@@ -38,6 +38,7 @@ export async function GET(
       SELECT 
         Id,
         Employee__c,
+        Employee__r.Employee_Id__c,
         Employee__r.Employee_Name__c,
         Employee__r.Name,
         Payroll_Summary__r.Payroll_Month__c,
@@ -54,7 +55,7 @@ export async function GET(
     }
 
     const payroll = payrollResult.records[0]
-    const employeeId = payroll.Employee__r?.Name
+  const employeeId = payroll.Employee__r?.Employee_Id__c || payroll.Employee__r?.Name
     const payrollMonth = payroll.Payroll_Summary__r?.Payroll_Month__c || payroll.Payroll_Month__c
     const payrollYear = payroll.Payroll_Summary__r?.Payroll_Year__c || new Date().getFullYear()
 

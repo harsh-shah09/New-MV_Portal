@@ -34,8 +34,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
                     setupLink
                 });
 
-                if (employee.Name) {
-                    html = html.replace(/{{Employee_Id}}/g, employee.Name);
+                if (employee.Employee_Id__c) {
+                    html = html.replace(/{{Employee_Id}}/g, employee.Employee_Id__c);
                 }
 
                 await sendEmail({
