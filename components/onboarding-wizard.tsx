@@ -23,7 +23,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId , firsttime =
     const [loading, setLoading] = useState(false)
     const [pageLoading, setPageLoading] = useState(true)
     const [form] = Form.useForm()
-    const phonePattern = /^(\+91|91)?[6-9]\d{9}$|^[6-9]\d{9}$/
+    const phonePattern = /^(?:\+91[6-9]\d{9}|[6-9]\d{9})$/
     const [formErrors, setFormErrors] = useState<Record<string, string>>({})
     const queryClient = useQueryClient()
     const [showConfetti, setShowConfetti] = useState(false)
@@ -225,7 +225,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId , firsttime =
 
     const validateEmergencyPhone = (value: string) => {
         if (!value) return true
-        const normalized = value.replace(/[\s-]/g, "")
+        const normalized = value.replace(/\s+/g, "")
         return phonePattern.test(normalized)
     }
 

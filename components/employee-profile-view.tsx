@@ -1399,7 +1399,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                     isEditing={isEditing && ['HR', 'Admin'].includes(currentUserRole)}
                                                     formData={formData}
                                                     setFormData={setFormData}
-                                                    placeholder="e.g. EMP001"
+                                                    placeholder="e.g. MV001"
                                                 />
                                                 <Field
                                                     label="Department"

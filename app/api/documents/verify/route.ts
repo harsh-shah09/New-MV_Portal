@@ -49,7 +49,7 @@ export async function PATCH(req: Request) {
 
     // Rule:
     // - HR verifies non-HR employee docs
-    // - Admin verifies HR employee docs
+    // - Admin verifies HR Invalid Dateemployee docs
     const employeeRole = doc.Employee__r?.Role__c || '';
     const name = doc.Employee__r?.Employee_Name__c
     const empname = doc.Employee__r.Employee_Id__c;
