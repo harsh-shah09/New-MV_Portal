@@ -50,8 +50,12 @@ export function EmployeeTable({ employees, onEdit, onDelete, onView, loading, is
       title: 'Join Date',
       dataIndex: 'joinDate',
       key: 'joinDate',
-      render: (date) => formatDate(date),
-      sorter: (a, b) => new Date(a.joinDate).getTime() - new Date(b.joinDate).getTime(),
+      render: (date) => (date ? formatDate(date) : ''),
+      sorter: (a, b) => {
+        const left = a.joinDate ? new Date(a.joinDate).getTime() : 0
+        const right = b.joinDate ? new Date(b.joinDate).getTime() : 0
+        return left - right
+      },
       responsive: ['lg'],
     }
   ];
@@ -189,7 +193,7 @@ export function EmployeeTable({ employees, onEdit, onDelete, onView, loading, is
                         </div>
                          <div className="flex justify-between text-sm">
                             <span className="text-muted-foreground">Joined:</span>
-                            <span className="text-card-foreground">{formatDate(employee.joinDate)}</span>
+                          <span className="text-card-foreground">{employee.joinDate ? formatDate(employee.joinDate) : ''}</span>
                         </div>
                     </div>
 

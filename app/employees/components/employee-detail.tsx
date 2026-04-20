@@ -66,7 +66,7 @@ export function EmployeeDetail({ employee, onClose, onEdit, currentUserRole = 'E
                   <DetailItem label="Phone" value={employee.phone} />
                   <DetailItem label="Department" value={employee.department} />
                   <DetailItem label="Position" value={employee.position} />
-                  <DetailItem label="Join Date" value={formatDate(employee.joinDate)} />
+                  <DetailItem label="Join Date" value={employee.joinDate ? formatDate(employee.joinDate) : "-"} />
                   <DetailItem label="Salary" value={`$${(employee.salary / 1000).toFixed(0)}K`} />
                   <div>
                     <label className="text-sm font-medium text-gray-500 block mb-1">Status</label>
