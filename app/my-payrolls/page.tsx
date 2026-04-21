@@ -110,6 +110,7 @@ export default function MyPayrollsPage() {
     {
       title: "Month",
       key: "month",
+      width: 120,
       render: (_, record) => (
         <span className="font-semibold">
           {record.payrollMonth} {record.payrollYear}
@@ -125,6 +126,7 @@ export default function MyPayrollsPage() {
       title: "Basic Salary",
       dataIndex: "basicSalary",
       key: "basicSalary",
+      width: 140,
       render: (amount: number, record) =>
         renderSensitiveValue(record, "basicSalary", `₹${amount.toLocaleString()}`),
     },
@@ -132,6 +134,7 @@ export default function MyPayrollsPage() {
       title: "Bonus",
       dataIndex: "bonus",
       key: "bonus",
+      width: 130,
       render: (amount: number, record) =>
         renderSensitiveValue(
           record,
@@ -144,6 +147,7 @@ export default function MyPayrollsPage() {
       title: "Deductions",
       dataIndex: "totalDeductions",
       key: "totalDeductions",
+      width: 140,
       render: (amount: number, record) =>
         renderSensitiveValue(
           record,
@@ -156,6 +160,7 @@ export default function MyPayrollsPage() {
       title: "Net Salary",
       dataIndex: "netSalary",
       key: "netSalary",
+      width: 140,
       render: (amount: number, record) =>
         renderSensitiveValue(
           record,
@@ -167,6 +172,7 @@ export default function MyPayrollsPage() {
     {
       title: "Action",
       key: "action",
+      width: 160,
       render: (_, record) => (
         <Button
           type="primary"
