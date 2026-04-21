@@ -66,6 +66,8 @@ export interface LeaveRequest {
   teamLeadName?: string
   leaveType: string
   session?: string
+  sessionStart?: string
+  sessionEnd?: string
   leaveCategory?: string
   startDate: string
   endDate: string
@@ -190,6 +192,7 @@ export interface PayrollSummary {
   month: string
   year: number
   totalEmployees: number
+  totalDaysAfterRule?: number
   netTotalSalary: number
   status: "draft" | "processed" | "paid"
   createdAt: string
@@ -218,11 +221,13 @@ export interface PayrollEmployeeDetail {
   actualHraComponent?: number
   actualConvComponent?: number
   actualSpecialAllowanceComponent?: number
+  actualPerformanceComponent?: number
   actualGrossIncome?: number
   basicComponent?: number
   hraComponent?: number
   convComponent?: number
   specialAllowanceComponent?: number
+  performanceComponent?: number
   grossIncome?: number
   pfDeduction?: number
   ptDeduction?: number
@@ -231,6 +236,7 @@ export interface PayrollEmployeeDetail {
   totalDeductions?: number
   anniversaryBonus?: number
   totalLeaveDays?: number
+  totalLeaveDaysAfterRule?: number
   bonus?: number
   netSalary?: number
   leaves?: PayrollLeaveDetail[]

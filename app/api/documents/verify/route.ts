@@ -3,6 +3,7 @@ import { verifySession } from '@/lib/auth';
 import { createNotification, deleteDocument, getSalesforceConnection, updateDocument } from '@/lib/salesforce';
 import { sendEmail } from '@/lib/email';
 import { loadTemplate } from '@/lib/email-templates';
+import { setOnboardingStep, setFirstTimeLogin, setOnboardingCompleted } from '@/lib/dynamodb';
 
 export async function PATCH(req: Request) {
   try {
@@ -56,21 +57,40 @@ export async function PATCH(req: Request) {
     const employeeId = doc.Employee__c;
     const personalEmail = doc.Employee__r?.Employee_Email__c;
     const active = doc.Employee__r?.Active__c ?? true;
+
+    // Token carries step=4 so the re-opened wizard lands on Documents
     const data = {
-      expirationtime: Date.now() + 48 * 60 * 60 * 1000, // also fix time (see below)
-      firsttime: false,
-      step : 4
+      expirationtime: Date.now() + 48 * 60 * 60 * 1000,
+      firsttime: true,
+      step: doc.Document_Type__c === 'Passbook' ? 3 : 4
     };
     const encoded = btoa(JSON.stringify(data));
-    if(!active && action != 'approve'){
-      const template = await loadTemplate('Document_Rejected' , {employeeEmail : personalEmail , employeeId : name , employeeName : empname , endDate : Date.now().toLocaleString(), recipientName : name , appLink : process.env.NEXTAUTH_URL + `/welcome?id=${employeeId}&token=${encoded}` , documentName : doc.Document_Type__c})
+
+    if (!active && action !== 'approve') {
+      const template = await loadTemplate('Document_Rejected', {
+        employeeEmail: personalEmail,
+        employeeId: name,
+        employeeName: empname,
+        endDate: Date.now().toLocaleString(),
+        recipientName: name,
+        appLink: process.env.NEXTAUTH_URL + `/welcome?id=${employeeId}&token=${encoded}`,
+        documentName: doc.Document_Type__c,
+      });
       await sendEmail({
-        isInfo : true,
-        to : personalEmail,
-        body : template,
-        subject : `Document Verification - ${doc.Document_Type__c} - ${action.toUpperCase()}ED`
-      })
+        isInfo: true,
+        to: personalEmail,
+        body: template,
+        subject: `Document Verification - ${doc.Document_Type__c} - ${action.toUpperCase()}ED`,
+      });
+
+      // Reset onboarding state so the wizard re-opens at the Documents step (step 4)
+      await Promise.all([
+        setOnboardingStep(employeeId, doc.Document_Type__c === 'Passbook' ? 3 : 4),          // land on Documents step
+        setFirstTimeLogin(employeeId, true),        // re-enable wizard on next login
+        setOnboardingCompleted(employeeId, false),  // remove completion flag
+      ]);
     }
+
     if (employeeRole === 'HR' && session.role !== 'Admin') {
       return NextResponse.json({ error: 'Only Admin can verify HR documents' }, { status: 403 });
     }
@@ -84,9 +104,10 @@ export async function PATCH(req: Request) {
       Id: documentId,
       Status__c: nextStatus,
     });
-    if(!active && action === 'reject'){
+    if (!active && action === 'reject') {
       await deleteDocument(documentId);
     }
+
     // Notify employee
     if (doc.Employee__c) {
       await createNotification({

@@ -15,8 +15,10 @@ export function GoogleIntegration() {
     const [showFirstTimeModal, setShowFirstTimeModal] = useState(false)
 
     useEffect(() => {
+        // 1. Check Google connection status
         checkStatus();
-        
+
+        // 2. Handle OAuth callback query params (success / error)
         const params = new URLSearchParams(window.location.search);
         const success = params.get('success');
         const error = params.get('error');
@@ -26,23 +28,56 @@ export function GoogleIntegration() {
             window.history.replaceState({}, document.title, window.location.pathname);
             setConnected(true);
             updateFirstTimeLoginAction(false);
+            // Clear the DynamoDB "tour pending Google auth" flag
+            fetch('/api/auth/app-tour', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'clear_pending' }),
+            }).catch(console.error);
         } else if (error) {
             showNotification('error', decodeURIComponent(error));
             window.history.replaceState({}, document.title, window.location.pathname);
         }
 
-        // Check if this is first-time and should show Google auth modal
-        const shouldShowGoogleAuth = localStorage.getItem('mv:show:google:auth') === 'true';
-        if (shouldShowGoogleAuth) {
-            setTimeout(() => {
-                setShowFirstTimeModal(true);
-                localStorage.removeItem('mv:show:google:auth'); // Clear flag after showing
-            }, 2000); // Show after 2 seconds to let page fully load
-        }
+        // 3. Check DynamoDB flag – show modal if tour is done but Google auth is still pending
+        const checkTourPending = async () => {
+            try {
+                const res = await fetch('/api/auth/app-tour');
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.showGoogleAuthModal) {
+                        setTimeout(() => setShowFirstTimeModal(true), 1500);
+                    }
+                }
+            } catch (e) {
+                // Fallback: check localStorage flag set by tour
+                const shouldShowGoogleAuth = localStorage.getItem('mv:show:google:auth') === 'true';
+                if (shouldShowGoogleAuth) {
+                    setTimeout(() => {
+                        setShowFirstTimeModal(true);
+                        localStorage.removeItem('mv:show:google:auth');
+                    }, 2000);
+                }
+            }
+        };
+        checkTourPending();
 
-        const handleGoogleFirstTime = () => setShowFirstTimeModal(true);
+        // 4. Listen for the tour-complete event (fired by the app tour component)
+        const handleGoogleFirstTime = async () => {
+            setShowFirstTimeModal(true);
+            // Persist to DynamoDB so it survives a refresh
+            try {
+                await fetch('/api/auth/app-tour', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'set_pending' }),
+                });
+            } catch (e) {
+                console.error('Failed to persist tour state:', e);
+            }
+        };
         window.addEventListener('mv:google:auth:firsttime', handleGoogleFirstTime);
-        
+
         return () => window.removeEventListener('mv:google:auth:firsttime', handleGoogleFirstTime);
     }, []);
 

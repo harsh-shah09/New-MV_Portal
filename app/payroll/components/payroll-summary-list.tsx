@@ -1,7 +1,8 @@
 "use client"
 
+import { useState } from "react"
 import { Table, Tag, Button, Popconfirm, Select } from "antd"
-import { DeleteOutlined } from "@ant-design/icons"
+import { DeleteOutlined, EyeOutlined, EyeInvisibleOutlined } from "@ant-design/icons"
 import type { ColumnsType } from "antd/es/table"
 import type { PayrollSummary } from "@/types"
 
@@ -15,6 +16,41 @@ interface PayrollSummaryListProps {
 }
 
 export function PayrollSummaryList({ summaries, onSelectSummary, onDeleteSummary, isAdmin = false, onStatusChange, isBusy = false }: PayrollSummaryListProps) {
+  const [visibleCellKey, setVisibleCellKey] = useState<string | null>(null)
+
+  const getCellKey = (recordId: string, field: string) => `${recordId}-${field}`
+
+  const maskDigits = (value: string) => value.replace(/[\d,]+(?:\.\d+)?/g, "X,XXX")
+
+  const renderSensitiveValue = (
+    record: PayrollSummary,
+    field: string,
+    value: string,
+  ) => {
+    if (!/\d/.test(value)) {
+      return <span>{value}</span>
+    }
+
+    const cellKey = getCellKey(record.id, field)
+    const isVisible = visibleCellKey === cellKey
+
+    return (
+      <div className="inline-flex items-center gap-1">
+        <span>{isVisible ? value : maskDigits(value)}</span>
+        <Button
+          type="text"
+          size="small"
+          icon={isVisible ? <EyeInvisibleOutlined /> : <EyeOutlined />}
+          onClick={(e) => {
+            e.stopPropagation()
+            setVisibleCellKey(isVisible ? null : cellKey)
+          }}
+          aria-label={isVisible ? "Hide value" : "Show value"}
+        />
+      </div>
+    )
+  }
+
   const handleDelete = async (summaryId: string, event: React.MouseEvent) => {
     event.stopPropagation() // Prevent row click
     
@@ -45,10 +81,19 @@ export function PayrollSummaryList({ summaries, onSelectSummary, onDeleteSummary
       key: "totalEmployees",
     },
     {
+      title: "Total Days After Rule",
+      dataIndex: "totalDaysAfterRule",
+      key: "totalDaysAfterRule",
+      render: (value: number) => (Number(value || 0)).toFixed(1),
+    },
+    {
       title: "Net Total Salary",
       dataIndex: "netTotalSalary",
       key: "netTotalSalary",
-      render: (amount: number) => `₹${amount.toLocaleString()}`,
+      render: (amount: number, record: PayrollSummary) => {
+        const rounded = Math.round(amount || 0)
+        return renderSensitiveValue(record, "netTotalSalary", `₹${rounded.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
+      },
     },
     {
       title: "Status",

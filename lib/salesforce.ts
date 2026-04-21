@@ -125,6 +125,7 @@ export interface Employee {
   HRA__c?: number;
   CONV__c?: number;
   S_All__c?: number;
+  PF_Basic__c?: number;
   PF__c?: number;
   PT__c?: number;
   ESI__c?: number;
@@ -301,7 +302,7 @@ export const getEmployeeById = async (id: string): Promise<any | null> => {
 
     // 1. Fetch Employee Details (All component fields directly)
     const empQuery = `
-          SELECT Id, Name,Employee_Id__c , Employee_Name__c, Employee_Email__c, Joining_Date__c, Onboarding_Date__c, Basic_Console__c, HRA__c, CONV__c, S_All__c, PF__c, PT__c, ESI__c, Salary_CTC__c, Status__c, Active__c, Profile_Photo__c, Team_Lead__c, Password__c, Is2FAEnabled__c,
+           SELECT Id, Name,Employee_Id__c , Employee_Name__c, Employee_Email__c, Joining_Date__c, Onboarding_Date__c, Basic_Console__c, HRA__c, CONV__c, S_All__c, PF_Basic__c, PF__c, PT__c, ESI__c, Salary_CTC__c, Status__c, Active__c, Profile_Photo__c, Team_Lead__c, Password__c, Is2FAEnabled__c,
              Employee_Phone__c, Birthdate__c, Gender__c, Employee_Address__c, Employee_Current_Address__c,
              Emergency_Contact_Name__c, Emergency_Contact_Number__c, Emergency_Contact_Relation__c, 
              Experience__c, Department__c, Role__c, Title__c, Company_Email__c, Technology__c, Enrollment_Number__c
@@ -368,6 +369,50 @@ export const createDocumentRecord = async (docData: any) => {
     return await conn.sobject("Document__c").create(docData);
 };
 
+/**
+ * Upsert a document record for onboarding.
+ * If a Document__c record already exists for this employee with the same
+ * Document_Type__c, update it in-place (new file URL, reset status).
+ * Otherwise create a new record.
+ * This prevents duplicate rows when a user re-uploads the same document type.
+ */
+export const upsertDocumentRecord = async (docData: {
+    Name: string;
+    Document_Type__c: string;
+    File_URL__c: string;
+    Status__c: string;
+    Employee__c: string;
+}) => {
+    const conn = await getSalesforceConnection();
+    if (!conn) throw new Error("No Salesforce connection");
+
+    const { Employee__c, Document_Type__c } = docData;
+
+    // Check for an existing record of the same type for this employee
+    const existingQuery = `
+      SELECT Id
+      FROM Document__c
+      WHERE Employee__c = '${Employee__c}'
+        AND Document_Type__c = '${Document_Type__c}'
+      LIMIT 1
+    `;
+    const existingResult = await conn.query(existingQuery);
+
+    if (existingResult.records.length > 0) {
+        const existingId = (existingResult.records[0] as any).Id;
+        // Update the existing record with the new file info
+        return await conn.sobject("Document__c").update({
+            Id: existingId,
+            Name: docData.Name,
+            File_URL__c: docData.File_URL__c,
+            Status__c: docData.Status__c,
+        });
+    } else {
+        // No existing record – create a fresh one
+        return await conn.sobject("Document__c").create(docData);
+    }
+};
+
 export const createBankDetail = async (bankData: any) => {
     const conn = await getSalesforceConnection();
     if (!conn) throw new Error("No Salesforce connection");
@@ -392,6 +437,45 @@ export const createBankDetail = async (bankData: any) => {
   }
 
     return await conn.sobject("Bank_Detail__c").create(bankData);
+};
+
+/**
+ * Upsert bank detail for onboarding: if a bank record already exists for this
+ * employee, update it in-place. Otherwise create a new one.
+ * This prevents duplicate records when 'Next' is pressed multiple times.
+ */
+export const upsertBankDetail = async (bankData: any) => {
+    const conn = await getSalesforceConnection();
+    if (!conn) throw new Error("No Salesforce connection");
+
+    const employeeId = bankData?.Employee__c;
+    if (!employeeId) return await conn.sobject("Bank_Detail__c").create(bankData);
+
+    // Check if a bank record already exists for this employee
+    const existingQuery = `
+      SELECT Id
+      FROM Bank_Detail__c
+      WHERE Employee__c = '${employeeId}'
+      LIMIT 1
+    `;
+    const existingResult = await conn.query(existingQuery);
+
+    if (existingResult.records.length > 0) {
+        const existingId = (existingResult.records[0] as any).Id;
+        // Update existing record
+        return await conn.sobject("Bank_Detail__c").update({
+            Id: existingId,
+            Name: bankData.Name,
+            Bank_Branch_Name__c: bankData.Bank_Branch_Name__c,
+            Bank_Account_Number__c: bankData.Bank_Account_Number__c,
+            IFSC__c: bankData.IFSC__c,
+            Primary_Account__c: bankData.Primary_Account__c,
+            Status__c : bankData.Status__c
+        });
+    } else {
+        // No record yet – create new
+        return await conn.sobject("Bank_Detail__c").create(bankData);
+    }
 };
 
 

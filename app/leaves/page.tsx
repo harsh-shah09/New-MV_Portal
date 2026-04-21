@@ -522,7 +522,7 @@ export default function LeavesPage() {
                 <div className="bg-blue-50 p-4 rounded-lg space-y-2">
                   <div className="flex justify-between">
                     <span className="font-medium">Original working days requested:</span>
-                    <span className="font-semibold text-blue-600">{details.workingDaysInRange ?? payload.duration ?? "-"}</span>
+                    <span className="font-semibold text-blue-600">{details.rangeLeaveDays ?? payload.duration ?? "-"}</span>
                   </div>
                   {details.sandwichApplied && (
                     <>
@@ -1178,8 +1178,16 @@ export default function LeavesPage() {
                         const displayDuration = hasRequestedWithdrawalRange
                           ? dayjs(displayEndDate).diff(dayjs(displayStartDate), 'day') + 1
                           : leave.duration
-                        const isHalfDaySession = leave.session === 'Session-1' || leave.session === 'Session-2'
-                        const sessionLabel = leave.session === 'Session-1' ? 'Session 1' : leave.session === 'Session-2' ? 'Session 2' : leave.session
+                        const isHalfDaySession = leave.sessionStart && leave.sessionEnd
+                          ? leave.sessionStart === leave.sessionEnd && (leave.sessionStart === 'Session-1' || leave.sessionStart === 'Session-2')
+                          : leave.session === 'Session-1' || leave.session === 'Session-2'
+                        const startSessionLabel = leave.sessionStart === 'Session-1' ? 'Session 1' : leave.sessionStart === 'Session-2' ? 'Session 2' : leave.sessionStart
+                        const endSessionLabel = leave.sessionEnd === 'Session-1' ? 'Session 1' : leave.sessionEnd === 'Session-2' ? 'Session 2' : leave.sessionEnd
+                        const sessionLabel = leave.sessionStart && leave.sessionEnd
+                          ? leave.sessionStart === leave.sessionEnd
+                            ? startSessionLabel
+                            : `${startSessionLabel} → ${endSessionLabel}`
+                          : leave.session === 'Session-1' ? 'Session 1' : leave.session === 'Session-2' ? 'Session 2' : leave.session
                         // For withdrawal requests, always show action buttons regardless of previous approval status
                         const alreadyActioned = leave.isWithdrawalRequest ? false : (isTeamLead ? (tlApproved || tlRejected) : (hrApproved || hrRejected))
 

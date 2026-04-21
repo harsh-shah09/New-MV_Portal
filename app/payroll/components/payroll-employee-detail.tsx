@@ -31,20 +31,20 @@ export function PayrollEmployeeDetailView({ employee, onBack }: PayrollEmployeeD
             <Descriptions.Item label="Payroll Month">
               {employee.payrollMonth} {employee.year}
             </Descriptions.Item>
-            <Descriptions.Item label="Monthly Income">₹{employee.monthlyIncome?.toLocaleString() || employee.basicSalary?.toLocaleString() || 0}</Descriptions.Item>
-            <Descriptions.Item label="Basic Component">₹{employee.basicComponent?.toLocaleString() || 0}</Descriptions.Item>
-            <Descriptions.Item label="HRA">₹{employee.hraComponent?.toLocaleString() || 0}</Descriptions.Item>
-            <Descriptions.Item label="Conveyance">₹{employee.convComponent?.toLocaleString() || 0}</Descriptions.Item>
-            <Descriptions.Item label="Special Allowance">₹{employee.specialAllowanceComponent?.toLocaleString() || 0}</Descriptions.Item>
-            <Descriptions.Item label="Gross Income">₹{employee.grossIncome?.toLocaleString() || 0}</Descriptions.Item>
-            <Descriptions.Item label="PF Deduction">₹{employee.pfDeduction?.toLocaleString() || 0}</Descriptions.Item>
-            <Descriptions.Item label="PT Deduction">₹{employee.ptDeduction?.toLocaleString() || 0}</Descriptions.Item>
-            <Descriptions.Item label="ESI Deduction">₹{employee.esiDeduction?.toLocaleString() || 0}</Descriptions.Item>
-            <Descriptions.Item label="Total Additions">₹{employee.totalAdditions?.toLocaleString() || 0}</Descriptions.Item>
-            <Descriptions.Item label="Total Deductions">₹{employee.totalDeductions?.toLocaleString() || 0}</Descriptions.Item>
-            <Descriptions.Item label="Bonus">₹{employee.bonus?.toLocaleString() || 0}</Descriptions.Item>
+            <Descriptions.Item label="Monthly Income">₹{Math.round(employee.monthlyIncome || employee.basicSalary || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Descriptions.Item>
+            <Descriptions.Item label="Basic Component">₹{Math.round(employee.basicComponent || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Descriptions.Item>
+            <Descriptions.Item label="HRA">₹{Math.round(employee.hraComponent || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Descriptions.Item>
+            <Descriptions.Item label="Conveyance">₹{Math.round(employee.convComponent || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Descriptions.Item>
+            <Descriptions.Item label="Special Allowance">₹{Math.round(employee.specialAllowanceComponent || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Descriptions.Item>
+            <Descriptions.Item label="Gross Income">₹{Math.round(employee.grossIncome || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Descriptions.Item>
+            <Descriptions.Item label="PF Deduction">₹{Math.round(employee.pfDeduction || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Descriptions.Item>
+            <Descriptions.Item label="PT Deduction">₹{Math.round(employee.ptDeduction || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Descriptions.Item>
+            <Descriptions.Item label="ESI Deduction">₹{Math.round(employee.esiDeduction || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Descriptions.Item>
+            <Descriptions.Item label="Total Additions">₹{Math.round(employee.totalAdditions || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Descriptions.Item>
+            <Descriptions.Item label="Total Deductions">₹{Math.round(employee.totalDeductions || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Descriptions.Item>
+            <Descriptions.Item label="Bonus">₹{Math.round(employee.bonus || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Descriptions.Item>
             <Descriptions.Item label="Net Salary">
-              <span className="text-xl font-bold text-green-600">₹{employee.netSalary?.toLocaleString() || 0}</span>
+              <span className="text-xl font-bold text-green-600">₹{Math.round(employee.netSalary || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </Descriptions.Item>
           </Descriptions>
         </Card>
