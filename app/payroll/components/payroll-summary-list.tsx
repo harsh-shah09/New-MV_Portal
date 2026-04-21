@@ -90,8 +90,10 @@ export function PayrollSummaryList({ summaries, onSelectSummary, onDeleteSummary
       title: "Net Total Salary",
       dataIndex: "netTotalSalary",
       key: "netTotalSalary",
-      render: (amount: number, record: PayrollSummary) =>
-        renderSensitiveValue(record, "netTotalSalary", `₹${amount.toLocaleString()}`),
+      render: (amount: number, record: PayrollSummary) => {
+        const rounded = Math.round(amount || 0)
+        return renderSensitiveValue(record, "netTotalSalary", `₹${rounded.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
+      },
     },
     {
       title: "Status",

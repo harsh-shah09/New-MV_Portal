@@ -36,8 +36,8 @@ export function PayrollEmployeeList({ employees, month, year, onSelectEmployee }
       key: "baseSalary",
       width: 120,
       render: (amount: number, record) => {
-        const salary = amount || record.monthlyIncome || record.basicSalary || 0
-        return `₹${salary.toLocaleString()}`
+        const salary = Math.round(amount || record.monthlyIncome || record.basicSalary || 0)
+        return `₹${salary.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
       },
     },
     {
@@ -45,38 +45,50 @@ export function PayrollEmployeeList({ employees, month, year, onSelectEmployee }
       dataIndex: "grossIncome",
       key: "grossIncome",
       width: 120,
-      render: (amount: number) => `₹${(amount || 0).toLocaleString()}`,
+      render: (amount: number) => {
+        const rounded = Math.round(amount || 0)
+        return `₹${rounded.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      },
     },
     {
       title: "Additions",
       dataIndex: "totalAdditions",
       key: "totalAdditions",
       width: 100,
-      render: (amount: number) => (
-        <span className={amount > 0 ? "text-green-600" : ""}>
-          ₹{(amount || 0).toLocaleString()}
-        </span>
-      ),
+      render: (amount: number) => {
+        const rounded = Math.round(amount || 0)
+        return (
+          <span className={rounded > 0 ? "text-green-600" : ""}>
+            ₹{rounded.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </span>
+        )
+      },
     },
     {
       title: "Deductions",
       dataIndex: "totalDeductions",
       key: "totalDeductions",
       width: 120,
-      render: (amount: number) => (
-        <span className={amount > 0 ? "text-red-600" : ""}>
-          ₹{(amount || 0).toLocaleString()}
-        </span>
-      ),
+      render: (amount: number) => {
+        const rounded = Math.round(amount || 0)
+        return (
+          <span className={rounded > 0 ? "text-red-600" : ""}>
+            ₹{rounded.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </span>
+        )
+      },
     },
     {
       title: "Net Salary",
       dataIndex: "netSalary",
       key: "netSalary",
       width: 120,
-      render: (amount: number) => (
-        <span className="font-semibold">₹{(amount || 0).toLocaleString()}</span>
-      ),
+      render: (amount: number) => {
+        const rounded = Math.round(amount || 0)
+        return (
+          <span className="font-semibold">₹{rounded.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+        )
+      },
     },
     {
       title: "Action",
@@ -161,7 +173,10 @@ export function PayrollEmployeeList({ employees, month, year, onSelectEmployee }
                   title: "Deduction",
                   dataIndex: "afterRuleDeduction",
                   key: "afterRuleDeduction",
-                  render: (amount: number, record: any) => `₹${(amount || record.actualDeduction || 0).toLocaleString()}`,
+                  render: (amount: number, record: any) => {
+                    const rounded = Math.round(amount || record.actualDeduction || 0)
+                    return `₹${rounded.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                  },
                 },
                 {
                   title: "Status",
@@ -198,11 +213,14 @@ export function PayrollEmployeeList({ employees, month, year, onSelectEmployee }
                   title: "Amount",
                   dataIndex: "adjustmentAmount",
                   key: "adjustmentAmount",
-                  render: (amount: number, record: any) => (
-                    <span className={record.adjustmentType === "Addition" ? "text-green-600" : "text-red-600"}>
-                      {record.adjustmentType === "Addition" ? "+" : "-"}${amount.toLocaleString()}
-                    </span>
-                  ),
+                  render: (amount: number, record: any) => {
+                    const rounded = Math.round(amount || 0)
+                    return (
+                      <span className={record.adjustmentType === "Addition" ? "text-green-600" : "text-red-600"}>
+                        {record.adjustmentType === "Addition" ? "+" : "-"}₹{rounded.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    )
+                  },
                 },
                 {
                   title: "Description",
@@ -225,7 +243,7 @@ export function PayrollEmployeeList({ employees, month, year, onSelectEmployee }
             <div className="p-3 bg-green-50 border border-green-200 rounded">
               <div>
                 <p className="text-sm text-gray-600">Bonus Amount</p>
-                <p className="text-lg font-semibold text-green-600">+${record.bonus?.toLocaleString()}</p>
+                <p className="text-lg font-semibold text-green-600">+₹{Math.round(record.bonus || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
               </div>
             </div>
           </div>
