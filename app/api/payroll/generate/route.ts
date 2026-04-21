@@ -190,6 +190,7 @@ export async function POST(request: NextRequest) {
         HRA__c,
         CONV__c,
         S_All__c,
+        PF_Basic__c,
         PF__c,
         PT__c,
         ESI__c,
@@ -267,7 +268,8 @@ export async function POST(request: NextRequest) {
           Leave_Category__c,
           Start_Date__c,
           End_Date__c,
-          Session__c,
+          Session_Start__c,
+          Session_End__c,
           Status__c,
           Sandwich_Rule__c,
           OnePlusTwo_Rule__c,
@@ -353,7 +355,8 @@ export async function POST(request: NextRequest) {
       const employeeRole = leave.Employee__r?.Role__c || ""
       const leaveType = leave.Leave_Type__c
       const leaveCategory = leave.Leave_Category__c
-      const sessionValue = leave.Session__c
+      const sessionStartValue = leave.Session_Start__c
+      const sessionEndValue = leave.Session_End__c
       const normalizedCategory = leaveCategory?.toLowerCase().replace(/\s+/g, '-') || ''
       const normalizedType = leaveType?.toLowerCase() || ''
       const createdDate = dayjs(leave.CreatedDate)
@@ -363,13 +366,17 @@ export async function POST(request: NextRequest) {
       const end = dayjs(leave.End_Date__c)
       
       // Check if half-day leave
-      const isHalfDay = sessionValue === "Session-1" || sessionValue === "Session-2"
+      const isHalfDay = start.isSame(end, "day")
+        && sessionStartValue === sessionEndValue
+        && (sessionStartValue === "Session-1" || sessionStartValue === "Session-2")
+      const startDayIsPartial = sessionStartValue && sessionStartValue !== "Session-1"
+      const endDayIsPartial = sessionEndValue && sessionEndValue !== "Session-2"
       
       console.log(`\n📝 Leave ID: ${leave.Id.substring(0, 8)}...`)
       console.log(`   Employee: ${leave.Employee__r?.Employee_Name__c} (${employeeRole})`)
       console.log(`   Period: ${leave.Start_Date__c} → ${leave.End_Date__c}`)
       console.log(`   Type: ${leaveType} | Category: ${leaveCategory}`)
-      console.log(`   Session: ${sessionValue} | Half Day: ${isHalfDay}`)
+      console.log(`   Session: ${sessionStartValue || '-'} → ${sessionEndValue || '-'} | Half Day: ${isHalfDay}`)
       console.log(`   Created: ${createdDate.format('YYYY-MM-DD')}`)
       
       // Calculate base calendar days for the FULL leave period
@@ -382,6 +389,15 @@ export async function POST(request: NextRequest) {
         }
         nonWorkingCursor = nonWorkingCursor.add(1, "day")
       }
+      const workingDaysInRange = baseCalendarDays - nonWorkingDaysInRange
+      const startPartialWorkingAdjustment =
+        startDayIsPartial && !start.isSame(end, "day") && !isNonWorking(start) ? 1 : 0
+      const endPartialWorkingAdjustment =
+        endDayIsPartial && !start.isSame(end, "day") && !isNonWorking(end) ? 1 : 0
+      const fullWorkingDaysInRange = Math.max(
+        0,
+        workingDaysInRange - startPartialWorkingAdjustment - endPartialWorkingAdjustment
+      )
       
       // Calculate in-month overlap and base leave days for payroll month
       const monthStartDay = dayjs(startDate)
@@ -411,6 +427,22 @@ export async function POST(request: NextRequest) {
       if (isHalfDay) {
         daysInSelectedMonth = daysInSelectedMonth * 0.5
       }
+      if (!isHalfDay && normalizedCategory === 'loss-of-pay') {
+        const includesStartInMonth =
+          (start.isSame(monthStartDay, 'day') || start.isAfter(monthStartDay, 'day')) &&
+          (start.isSame(monthEndDay, 'day') || start.isBefore(monthEndDay, 'day'))
+        const includesEndInMonth =
+          (end.isSame(monthStartDay, 'day') || end.isAfter(monthStartDay, 'day')) &&
+          (end.isSame(monthEndDay, 'day') || end.isBefore(monthEndDay, 'day'))
+
+        if (startDayIsPartial && includesStartInMonth && !isNonWorking(start)) {
+          daysInSelectedMonth -= 0.5
+        }
+        if (endDayIsPartial && includesEndInMonth && !isNonWorking(end)) {
+          daysInSelectedMonth -= 0.5
+        }
+        daysInSelectedMonth = Math.max(0, daysInSelectedMonth)
+      }
       
       console.log(`   Base Days: ${baseCalendarDays} | Days in Month: ${daysInSelectedMonth}${isHalfDay ? ' (Half Day)' : ''}`)
       
@@ -425,8 +457,8 @@ export async function POST(request: NextRequest) {
       const sandwichRuleApprovedOnLeave = leave.Sandwich_Rule__c === true
       const onePlusTwoRuleApprovedOnLeave = leave.OnePlusTwo_Rule__c === true
       
-      const applySandwichRule = applyRules && !isHalfDay && sandwichRuleApprovedOnLeave
-      const applyOnePlusTwoRule = applyRules && !isHalfDay && onePlusTwoRuleApprovedOnLeave
+      const applySandwichRule = applyRules && !isHalfDay && fullWorkingDaysInRange > 0 && sandwichRuleApprovedOnLeave
+      const applyOnePlusTwoRule = applyRules && !isHalfDay && fullWorkingDaysInRange > 0 && onePlusTwoRuleApprovedOnLeave
       
       console.log(`   Rules Evaluation:`)
       console.log(`     • applyRules: ${applyRules} (category: '${leaveCategory}' → '${normalizedCategory}', type: '${leaveType}' → '${normalizedType}')`)
@@ -496,6 +528,13 @@ export async function POST(request: NextRequest) {
       let rangeLeaveDays = isHalfDay ? baseCalendarDays * 0.5 : baseCalendarDays
       if (!isHalfDay && normalizedCategory === 'loss-of-pay') {
         rangeLeaveDays = baseCalendarDays - nonWorkingDaysInRange
+        if (startDayIsPartial && !start.isSame(end, 'day') && !isNonWorking(start)) {
+          rangeLeaveDays -= 0.5
+        }
+        if (endDayIsPartial && !start.isSame(end, 'day') && !isNonWorking(end)) {
+          rangeLeaveDays -= 0.5
+        }
+        rangeLeaveDays = Math.max(0, rangeLeaveDays)
       }
       const sandwichExtra = sandwichApplied ? sandwichDates.length : 0
       const totalSandwichDeduction = rangeLeaveDays + sandwichExtra
@@ -527,8 +566,18 @@ export async function POST(request: NextRequest) {
         
         const penaltyMultiplier = leaveConfig.penaltyDaysPerDay
         
-        let cursorPenalty = start.startOf("day")
-        const endPenalty = end.startOf("day")
+        let penaltyStart = start.clone()
+        let penaltyEnd = end.clone()
+
+        if (startDayIsPartial && !start.isSame(end, 'day')) {
+          penaltyStart = penaltyStart.add(1, 'day')
+        }
+        if (endDayIsPartial && !start.isSame(end, 'day')) {
+          penaltyEnd = penaltyEnd.subtract(1, 'day')
+        }
+
+        let cursorPenalty = penaltyStart.startOf("day")
+        const endPenalty = penaltyEnd.startOf("day")
         
         while (cursorPenalty.isSame(endPenalty) || cursorPenalty.isBefore(endPenalty)) {
           if (!isNonWorking(cursorPenalty)) {
@@ -669,13 +718,15 @@ export async function POST(request: NextRequest) {
       const totalAdditions = leavesWithDeductions
         .filter(leave => leave.afterRuleDeduction < 0)
         .reduce((sum, leave) => sum + Math.abs(leave.afterRuleDeduction), 0)
+
+      const performanceComponent = round2(totalAdditions)
       
       // STEP 2: Deduct leave amount from CTC to get adjusted salary
       const adjustedMonthlyIncome = round2(originalCTC - totalActualDeductions)
       const baseSalary = adjustedMonthlyIncome
       
-      const totalLeaveDays = employeeLeaves.reduce((sum, leave) => sum + leave.daysInSelectedMonth, 0)
-      const totalLeaveDaysAfterRule = employeeLeaves.reduce((sum, leave) => sum + leave.daysAfterRuleInMonth, 0)
+      const totalLeaveDays = round2(employeeLeaves.reduce((sum, leave) => sum + leave.daysInSelectedMonth, 0))
+      const totalLeaveDaysAfterRule = round2(employeeLeaves.reduce((sum, leave) => sum + leave.daysAfterRuleInMonth, 0))
       
       console.log(`   Leave Deduction: ₹${totalActualDeductions.toLocaleString()}`)
       console.log(`   Adjusted Monthly Income (CTC - Leave): ₹${adjustedMonthlyIncome.toLocaleString()}`)
@@ -696,24 +747,57 @@ export async function POST(request: NextRequest) {
       const actualHraComponent = round2(actualMonthlyIncome * (hraPercentage / 100))
       const actualConvComponent = round2(actualMonthlyIncome * (convPercentage / 100))
       const actualSpecialAllowanceComponent = round2(actualMonthlyIncome * (specialAllowancePercentage / 100))
+      const actualPerformanceComponent = performanceComponent
       const actualGrossIncome = round2(
-        actualBasicComponent + actualHraComponent + actualConvComponent + actualSpecialAllowanceComponent
+        actualBasicComponent +
+        actualHraComponent +
+        actualConvComponent +
+        actualSpecialAllowanceComponent +
+        actualPerformanceComponent
       )
 
       const basicComponent = round2(adjustedMonthlyIncome * (basicPercentage / 100))
       const hraComponent = round2(adjustedMonthlyIncome * (hraPercentage / 100))
       const convComponent = round2(adjustedMonthlyIncome * (convPercentage / 100))
       const specialAllowanceComponent = round2(adjustedMonthlyIncome * (specialAllowancePercentage / 100))
-      const grossIncome = round2(basicComponent + hraComponent + convComponent + specialAllowanceComponent)
-      const pfDeduction = round2(basicComponent * (pfPercentage / 100))
-      const esiDeduction = round2(grossIncome * (esiPercentage / 100))
+      const grossIncome = round2(
+        basicComponent + hraComponent + convComponent + specialAllowanceComponent + performanceComponent
+      )
+      const esiEligibleGrossIncome = round2(
+        basicComponent + hraComponent + convComponent + specialAllowanceComponent
+      )
+      const totalDaysInPayrollMonth = endDate.getDate()
+      const configuredPfBase = toNumber(emp.PF_Basic__c)
+      const pfBase = configuredPfBase > 0 ? configuredPfBase : basicComponent
+      const lossOfPayLeaveDaysAfterRule = round2(
+        leavesWithDeductions
+          .filter((leave) => {
+            const normalizedCategory = leave.leaveCategory?.toLowerCase().replace(/\s+/g, '-') || ''
+            return normalizedCategory === 'loss-of-pay'
+          })
+          .reduce((sum, leave) => sum + Number(leave.daysAfterRuleInMonth || 0), 0)
+      )
+      const hasLeaveInMonth = lossOfPayLeaveDaysAfterRule > 0
+
+      // If employee has leave:
+      // PF = (((total days in month - days after rule) * PF_Base) / total days in month) * PF%
+      const payableDaysForPf = Math.max(0, totalDaysInPayrollMonth - lossOfPayLeaveDaysAfterRule)
+      const proratedPfBase = totalDaysInPayrollMonth > 0
+        ? (payableDaysForPf * pfBase) / totalDaysInPayrollMonth
+        : 0
+      const pfDeduction = round2(
+        (hasLeaveInMonth ? proratedPfBase : pfBase) * (pfPercentage / 100)
+      )
+      const esiDeduction = round2(esiEligibleGrossIncome * (esiPercentage / 100))
       const salaryStructureDeductions = round2(pfDeduction + ptAmount + esiDeduction)
       
       console.log(`   Gross Income (after leave): ₹${grossIncome.toLocaleString()}`)
       
       const totalDeductionsWithSecurity = round2(totalActualDeductions + salaryStructureDeductions)
       
-      const totalAdditionsWithBonus = totalAdditions
+      // Extra Day Pay is included in grossIncome via performanceComponent.
+      // Keep additions bucket free for manual bonus/adjustments from UI.
+      const totalAdditionsWithBonus = 0
       
       const netSalary = round2(grossIncome - salaryStructureDeductions)
       
@@ -726,6 +810,14 @@ export async function POST(request: NextRequest) {
       if (salaryStructureDeductions > 0) {
         console.log(`   Salary Structure Deductions (PF/PT/ESI): ₹${salaryStructureDeductions.toLocaleString()}`)
       }
+      console.log(
+        `   PF Debug: base=₹${pfBase.toLocaleString()}, totalDays=${totalDaysInPayrollMonth}, ` +
+        `lopLeaveAfterRule=${lossOfPayLeaveDaysAfterRule}, payableDays=${payableDaysForPf}, ` +
+        `proratedBase=₹${round2(proratedPfBase).toLocaleString()}, PF%=${pfPercentage}, PF=₹${pfDeduction.toLocaleString()}`
+      )
+      console.log(
+        `   ESI Debug: eligibleGross=₹${esiEligibleGrossIncome.toLocaleString()}, ESI%=${esiPercentage}, ESI=₹${esiDeduction.toLocaleString()}`
+      )
       console.log(`   Net Salary: ₹${netSalary.toLocaleString()}`)
       console.log(`   ✅ Payroll Calculated\n`)
 
@@ -751,11 +843,13 @@ export async function POST(request: NextRequest) {
         actualHraComponent,
         actualConvComponent,
         actualSpecialAllowanceComponent,
+        actualPerformanceComponent,
         actualGrossIncome,
         basicComponent,
         hraComponent,
         convComponent,
         specialAllowanceComponent,
+        performanceComponent,
         grossIncome,
         pfDeduction,
         ptDeduction: round2(ptAmount),

@@ -54,6 +54,7 @@ export async function GET(request: NextRequest) {
         Employee__r.HRA__c,
         Employee__r.CONV__c,
         Employee__r.S_All__c,
+        Employee__r.PF_Basic__c,
         Employee__r.PF__c,
         Employee__r.PT__c,
         Employee__r.ESI__c,
@@ -98,7 +99,7 @@ export async function GET(request: NextRequest) {
         round2(toNumber(record.Employee__r?.Salary_CTC__c || record.Basic_Salary__c) * (toNumber(record.Employee__r?.CONV__c) / 100)) +
         round2(toNumber(record.Employee__r?.Salary_CTC__c || record.Basic_Salary__c) * (toNumber(record.Employee__r?.S_All__c) / 100))
       ),
-      pfDeduction: round2(round2(toNumber(record.Employee__r?.Salary_CTC__c || record.Basic_Salary__c) * (toNumber(record.Employee__r?.Basic_Console__c) / 100)) * (toNumber(record.Employee__r?.PF__c) / 100)),
+      pfDeduction: round2(toNumber(record.Employee__r?.PF_Basic__c) * (toNumber(record.Employee__r?.PF__c) / 100)),
       ptDeduction: round2(toNumber(record.Employee__r?.PT__c)),
       esiDeduction: round2(
         round2(

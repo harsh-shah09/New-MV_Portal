@@ -45,6 +45,12 @@ export function PayrollSummaryList({ summaries, onSelectSummary, onDeleteSummary
       key: "totalEmployees",
     },
     {
+      title: "Total Days After Rule",
+      dataIndex: "totalDaysAfterRule",
+      key: "totalDaysAfterRule",
+      render: (value: number) => (Number(value || 0)).toFixed(1),
+    },
+    {
       title: "Net Total Salary",
       dataIndex: "netTotalSalary",
       key: "netTotalSalary",

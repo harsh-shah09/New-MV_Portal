@@ -51,8 +51,14 @@ export function LeaveDetailsModal({ leave, visible, loading = false, onClose }: 
   const safeDisplayStartDate = displayStartDate || leave?.startDate || ""
   const safeDisplayEndDate = displayEndDate || leave?.endDate || ""
   const displayType = leave?.leaveCategory === "Extra Day Pay" ? "Extra Day Pay" : leave?.leaveType
-  const isHalfDaySession = leave?.session === "Session-1" || leave?.session === "Session-2"
-  const sessionLabel = leave?.session === "Session-1" ? "Session 1" : leave?.session === "Session-2" ? "Session 2" : leave?.session
+  const sessionStartLabel = leave?.sessionStart === "Session-1" ? "Session 1" : leave?.sessionStart === "Session-2" ? "Session 2" : leave?.sessionStart
+  const sessionEndLabel = leave?.sessionEnd === "Session-1" ? "Session 1" : leave?.sessionEnd === "Session-2" ? "Session 2" : leave?.sessionEnd
+  const isHalfDaySession = leave?.sessionStart === leave?.sessionEnd && (leave?.sessionStart === "Session-1" || leave?.sessionStart === "Session-2")
+  const sessionLabel = leave?.sessionStart && leave?.sessionEnd
+    ? leave.sessionStart === leave.sessionEnd
+      ? sessionStartLabel
+      : `${sessionStartLabel} → ${sessionEndLabel}`
+    : leave?.session || undefined
 
   // Calculate days between dates
   const calculatedDays = displayStartDate && displayEndDate
@@ -74,7 +80,8 @@ export function LeaveDetailsModal({ leave, visible, loading = false, onClose }: 
       onCancel={onClose}
       footer={null}
       width={900}
-      bodyStyle={{ maxHeight: "85vh", overflowY: "auto" }}
+      centered
+      bodyStyle={{ maxHeight: "85vh", overflowY: "auto", overscrollBehavior: "contain" }}
     >
       <Spin spinning={loading}>
       <div className="flex flex-col gap-6 py-1">
@@ -94,7 +101,7 @@ export function LeaveDetailsModal({ leave, visible, loading = false, onClose }: 
                 <div className="flex flex-wrap gap-2 pt-1">
                   <Tag color="purple" className="rounded-full px-2.5 py-0.5">{leave?.leaveCategory || "N/A"}</Tag>
                   <Tag color="geekblue" className="rounded-full px-2.5 py-0.5">{calculatedDays} day(s)</Tag>
-                  {leave?.session && <Tag color="cyan" className="rounded-full px-2.5 py-0.5">{sessionLabel}</Tag>}
+                  {(leave?.sessionStart || leave?.sessionEnd || leave?.session) && <Tag color="cyan" className="rounded-full px-2.5 py-0.5">{sessionLabel}</Tag>}
                 </div>
               </div>
             </Col>
@@ -334,10 +341,10 @@ export function LeaveDetailsModal({ leave, visible, loading = false, onClose }: 
             <Descriptions.Item label="Sandwich Rule">
               <span className="font-medium text-gray-700">{leave?.sandwichRuleApplicable ? "Yes" : "No"}</span>
             </Descriptions.Item>
-            {leave?.session && (
+            {(leave?.sessionStart || leave?.sessionEnd || leave?.session) && (
               <Descriptions.Item label="Session">
                 <span className="font-medium text-gray-700">
-                  {leave?.session === "Session-1" ? "Session 1" : leave?.session === "Session-2" ? "Session 2" : leave?.session}
+                  {sessionLabel}
                 </span>
               </Descriptions.Item>
             )}

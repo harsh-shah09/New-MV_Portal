@@ -49,11 +49,13 @@ interface PayslipData {
   actualHraComponent?: number
   actualConvComponent?: number
   actualSpecialAllowanceComponent?: number
+  actualPerformanceComponent?: number
   actualGrossIncome?: number
   basicComponent?: number
   hraComponent?: number
   convComponent?: number
   specialAllowanceComponent?: number
+  performanceComponent?: number
   grossIncome?: number
   pfDeduction?: number
   ptDeduction?: number
@@ -154,24 +156,20 @@ function generatePayslipHTML(payslip: PayslipData): string {
     return `₹${rounded.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   }
 
-  // Calculate extra day pay
-  const adjustmentAdditions = payslip.adjustments
-    ?.filter(a => a.adjustmentType === 'Addition')
-    .reduce((sum, a) => sum + a.adjustmentAmount, 0) || 0
-  const extraDayPay = payslip.totalAdditions - payslip.bonus - (payslip.anniversaryBonus || 0) - adjustmentAdditions
-
   const basicComponent = payslip.basicComponent ?? 0
   const hraComponent = payslip.hraComponent ?? 0
   const convComponent = payslip.convComponent ?? 0
   const specialAllowanceComponent = payslip.specialAllowanceComponent ?? 0
+  const performanceComponent = payslip.performanceComponent ?? 0
   const actualMonthlyIncome = payslip.actualMonthlyIncome ?? (payslip.monthlyIncome ?? payslip.basicSalary)
   const actualBasicComponent = payslip.actualBasicComponent ?? basicComponent
   const actualHraComponent = payslip.actualHraComponent ?? hraComponent
   const actualConvComponent = payslip.actualConvComponent ?? convComponent
   const actualSpecialAllowanceComponent = payslip.actualSpecialAllowanceComponent ?? specialAllowanceComponent
+  const actualPerformanceComponent = payslip.actualPerformanceComponent ?? performanceComponent
   const actualGrossEarnings = payslip.actualGrossIncome
-    || (actualBasicComponent + actualHraComponent + actualConvComponent + actualSpecialAllowanceComponent)
-  const grossEarnings = payslip.grossIncome || (basicComponent + hraComponent + convComponent + specialAllowanceComponent)
+    || (actualBasicComponent + actualHraComponent + actualConvComponent + actualSpecialAllowanceComponent + actualPerformanceComponent)
+  const grossEarnings = payslip.grossIncome || (basicComponent + hraComponent + convComponent + specialAllowanceComponent + performanceComponent)
   const monthlyIncome = payslip.monthlyIncome ?? payslip.basicSalary
   const pfDeduction = payslip.pfDeduction ?? 0
   const ptDeduction = payslip.ptDeduction ?? 0
@@ -208,6 +206,7 @@ function generatePayslipHTML(payslip: PayslipData): string {
     { label: 'HRA', actual: actualHraComponent, payable: hraComponent },
     { label: 'Conveyance', actual: actualConvComponent, payable: convComponent },
     { label: 'Special Allowance', actual: actualSpecialAllowanceComponent, payable: specialAllowanceComponent },
+    { label: 'Performance', actual: actualPerformanceComponent, payable: performanceComponent },
   ]
 
   // Read and encode logo as base64
@@ -361,13 +360,6 @@ function generatePayslipHTML(payslip: PayslipData): string {
               <span>Anniversary Bonus</span>
               <span class="amount-col">${formatMoney(payslip.anniversaryBonus || 0)}</span>
               <span class="amount-col">${formatMoney(payslip.anniversaryBonus || 0)}</span>
-            </div>
-            ` : ''}
-            ${extraDayPay > 0 ? `
-            <div class="earnings-three-row">
-              <span>Extra Day Pay</span>
-              <span class="amount-col">${formatMoney(extraDayPay)}</span>
-              <span class="amount-col">${formatMoney(extraDayPay)}</span>
             </div>
             ` : ''}
             ${payslip.adjustments?.filter(a => a.adjustmentType === 'Addition').map(adj => `

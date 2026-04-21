@@ -56,6 +56,11 @@ export function GeneratePayrollModal({ open, onClose, onGenerate, onSavingChange
     return `₹${rounded.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   }
 
+  const formatDays = (value?: number | null) => {
+    const normalized = Math.round((Number(value) || 0) * 10) / 10
+    return Number.isInteger(normalized) ? `${normalized}` : normalized.toFixed(1)
+  }
+
   const sumAdjustments = (adjustments: PayrollAdjustment[] | undefined, type: "Addition" | "Deduction") => {
     return adjustments
       ?.filter((adjustment) => adjustment.adjustmentType === type)
@@ -319,6 +324,28 @@ export function GeneratePayrollModal({ open, onClose, onGenerate, onSavingChange
     message.success("Bonus deleted successfully")
   }
 
+  const confirmDeleteAdjustment = (employeeId: string, employeeName: string) => {
+    Modal.confirm({
+      title: "Delete Adjustment?",
+      content: `Are you sure you want to delete adjustment for ${employeeName}?`,
+      okText: "Delete",
+      cancelText: "Cancel",
+      okButtonProps: { danger: true },
+      onOk: () => handleDeleteAdjustment(employeeId),
+    })
+  }
+
+  const confirmDeleteBonus = (employeeId: string, employeeName: string) => {
+    Modal.confirm({
+      title: "Delete Bonus?",
+      content: `Are you sure you want to delete bonus for ${employeeName}?`,
+      okText: "Delete",
+      cancelText: "Cancel",
+      okButtonProps: { danger: true },
+      onOk: () => handleDeleteBonus(employeeId),
+    })
+  }
+
   const columns: ColumnsType<PayrollEmployeeDetail> = [
     {
       title: "Employee Name",
@@ -378,6 +405,15 @@ export function GeneratePayrollModal({ open, onClose, onGenerate, onSavingChange
       render: (amount: number) => formatCurrency(amount),
     },
     {
+      title: "Gross Income",
+      dataIndex: "grossIncome",
+      key: "grossIncome",
+      width: 100,
+      render: (amount: number) => (
+        <span className="font-semibold text-blue-600">{formatCurrency(amount)}</span>
+      ),
+    },
+    {
       title: "PF",
       dataIndex: "pfDeduction",
       key: "pfDeduction",
@@ -399,15 +435,6 @@ export function GeneratePayrollModal({ open, onClose, onGenerate, onSavingChange
       render: (amount: number) => formatCurrency(amount),
     },
     {
-      title: "Gross Income",
-      dataIndex: "grossIncome",
-      key: "grossIncome",
-      width: 100,
-      render: (amount: number) => (
-        <span className="font-semibold text-blue-600">{formatCurrency(amount)}</span>
-      ),
-    },
-    {
       title: "Gross Deduction",
       dataIndex: "salaryStructureDeductions",
       key: "salaryStructureDeductions",
@@ -418,12 +445,19 @@ export function GeneratePayrollModal({ open, onClose, onGenerate, onSavingChange
     },
     {
       title: "Leave Days",
-      dataIndex: "totalLeaveDays",
+      dataIndex: "totalLeaveDaysAfterRule",
       key: "totalLeaveDays",
       width: 85,
-      render: (days: number) => (
-        <Tag color={days > 0 ? "orange" : "green"}>{days || 0} days</Tag>
-      ),
+      render: (_: number, record: PayrollEmployeeDetail) => {
+        const beforeRule = Number(record.totalLeaveDays || 0)
+        const afterRule = Number(record.totalLeaveDaysAfterRule ?? beforeRule)
+        const hasRuleDelta = Math.abs(afterRule - beforeRule) > 0.001
+        return (
+          <Tag color={afterRule > 0 ? "orange" : "green"}>
+            {hasRuleDelta ? `${formatDays(beforeRule)} → ${formatDays(afterRule)} days` : `${formatDays(afterRule)} days`}
+          </Tag>
+        )
+      },
     },
     {
       title: "Net Salary",
@@ -460,7 +494,7 @@ export function GeneratePayrollModal({ open, onClose, onGenerate, onSavingChange
             key: 'delete-adjustment',
             label: 'Delete Adjustment',
             danger: true,
-            onClick: () => handleDeleteAdjustment(record.employeeId),
+            onClick: () => confirmDeleteAdjustment(record.employeeId, record.employeeName),
           } : null,
           {
             key: 'bonus',
@@ -477,7 +511,7 @@ export function GeneratePayrollModal({ open, onClose, onGenerate, onSavingChange
             key: 'delete-bonus',
             label: 'Delete Bonus',
             danger: true,
-            onClick: () => handleDeleteBonus(record.employeeId),
+            onClick: () => confirmDeleteBonus(record.employeeId, record.employeeName),
           } : null,
         ].filter(Boolean)
 
@@ -499,7 +533,7 @@ export function GeneratePayrollModal({ open, onClose, onGenerate, onSavingChange
   const expandedRowRender = (record: PayrollEmployeeDetail) => {
     const hasLeaves = record.leaves && record.leaves.length > 0
     const hasAdjustments = record.adjustments && record.adjustments.length > 0
-    const hasBonus = record.bonus && record.bonus > 0
+    const hasBonus = !!(record.bonus && record.bonus > 0)
 
     if (!hasLeaves && !hasAdjustments && !hasBonus) {
       return <p className="text-gray-500 px-2 py-1 text-[11px]">No leaves, adjustments, or bonus for this month</p>
@@ -539,7 +573,15 @@ export function GeneratePayrollModal({ open, onClose, onGenerate, onSavingChange
                   render: (days: number, record: any) => {
                     const daysInMonth = days || 0
                     const totalDays = record.totalDays || 0
-                    return daysInMonth < totalDays ? `${daysInMonth} (of ${totalDays})` : daysInMonth
+                    const daysAfterRuleInMonth = Number(record.daysAfterRuleInMonth ?? daysInMonth)
+                    const hasRuleDelta = Math.abs(daysAfterRuleInMonth - Number(daysInMonth)) > 0.001
+                    const baseText = daysInMonth < totalDays
+                      ? `${formatDays(daysInMonth)} (of ${formatDays(totalDays)})`
+                      : `${formatDays(daysInMonth)}`
+
+                    return hasRuleDelta
+                      ? `${baseText} → ${formatDays(daysAfterRuleInMonth)}`
+                      : baseText
                   },
                 },
                 {

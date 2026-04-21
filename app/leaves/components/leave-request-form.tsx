@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Modal, Form, Input, Select, DatePicker, message , Button, Tooltip } from "antd"
+import { Modal, Form, Input, Select, DatePicker, message, Button, Tooltip } from "antd"
 import dayjs from "dayjs"
 import { toast } from "sonner"
 import type { LeaveRequest } from "@/types"
@@ -25,6 +25,11 @@ interface Holiday {
 const { Option } = Select
 const { TextArea } = Input
 
+const sessionOptions = [
+  { value: "Session-1", label: "Session-1 (1st Half)" },
+  { value: "Session-2", label: "Session-2 (2nd Half)" },
+]
+
 export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName }: LeaveRequestFormProps) {
   const [form] = Form.useForm()
   const [duration, setDuration] = useState(0)
@@ -32,6 +37,46 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
   const [selectedLeaveType, setSelectedLeaveType] = useState<string>("")
   const [holidays, setHolidays] = useState<Holiday[]>([])
   const [holidayMap, setHolidayMap] = useState<Map<string, string>>(new Map())
+
+  const calculateDuration = (start?: Dayjs, end?: Dayjs, startSession?: string, endSession?: string) => {
+    if (!start || !end) {
+      return 0
+    }
+
+    if (end.isBefore(start, "day")) {
+      return 0
+    }
+
+    const sameDay = start.isSame(end, "day")
+
+    if (sameDay) {
+      if (startSession === "Session-2" && endSession === "Session-1") {
+        return 0
+      }
+
+      if (startSession === endSession && (startSession === "Session-1" || startSession === "Session-2")) {
+        return 0.5
+      }
+
+      if (startSession === "Session-1" && endSession === "Session-2") {
+        return 1
+      }
+
+      return 1
+    }
+
+    let days = end.diff(start, "day") + 1
+
+    if (startSession === "Session-2") {
+      days -= 0.5
+    }
+
+    if (endSession === "Session-1") {
+      days -= 0.5
+    }
+
+    return days > 0 ? days : 0
+  }
 
   // Fetch holidays on component mount
   useEffect(() => {
@@ -41,7 +86,7 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
         if (response.ok) {
           const data = await response.json()
           setHolidays(data.holidays || [])
-          
+
           // Create a map for quick lookup: date -> holiday name
           const map = new Map<string, string>()
           data.holidays?.forEach((holiday: Holiday) => {
@@ -53,51 +98,45 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
         console.error('Error fetching holidays:', error)
       }
     }
-    
+
     fetchHolidays()
   }, [])
 
   // Recalculate duration when dates change
   const onValuesChange = (changedValues: any, allValues: any) => {
-      if (Object.prototype.hasOwnProperty.call(changedValues, 'leaveCategory')) {
-          setLeaveCategory(changedValues.leaveCategory)
-          setSelectedLeaveType("")
-          setDuration(0)
-          // Reset fields when category changes
-          form.setFieldsValue({
-            leaveType: undefined,
-            session: undefined,
-            reason: undefined,
-          })
-      }
+    if (Object.prototype.hasOwnProperty.call(changedValues, 'leaveCategory')) {
+      setLeaveCategory(changedValues.leaveCategory)
+      setSelectedLeaveType("")
+      setDuration(0)
+      // Reset fields when category changes
+      form.setFieldsValue({
+        leaveType: undefined,
+        sessionStart: undefined,
+        sessionEnd: undefined,
+        reason: undefined,
+      })
+    }
 
-      if (Object.prototype.hasOwnProperty.call(changedValues, 'leaveType')) {
-        setSelectedLeaveType(changedValues.leaveType || "")
-      }
-      
-      // Always recalculate duration when dates change or session changes
-      const start = allValues.startDate
-      const end = allValues.endDate
-      const session = allValues.session
-      
-      if (start && end) {
-           let diff = end.diff(start, 'day') + 1
-           diff = diff > 0 ? diff : 0
-           
-           // If session is Session-1 or Session-2, count as half day
-           if ((session === 'Session-1' || session === 'Session-2') && diff === 1) {
-               setDuration(0.5)
-           } else {
-               setDuration(diff)
-           }
-      }
+    if (Object.prototype.hasOwnProperty.call(changedValues, 'leaveType')) {
+      setSelectedLeaveType(changedValues.leaveType || "")
+    }
+
+    // Always recalculate duration when dates or sessions change
+    const start = allValues.startDate
+    const end = allValues.endDate
+    const sessionStart = allValues.sessionStart
+    const sessionEnd = allValues.sessionEnd
+
+    if (start && end) {
+      setDuration(calculateDuration(start, end, sessionStart, sessionEnd))
+    }
   }
 
   // Custom date cell render to highlight holidays
   const dateFullCellRender = (current: Dayjs) => {
     const dateStr = current.format('YYYY-MM-DD')
     const holidayName = holidayMap.get(dateStr)
-    
+
     if (holidayName) {
       return (
         <Tooltip title={holidayName} placement="top">
@@ -112,7 +151,7 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
         </Tooltip>
       )
     }
-    
+
     return (
       <div className="ant-picker-cell-inner">
         {current.date()}
@@ -162,11 +201,11 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
 
     // Check if it's a weekend (Saturday or Sunday)
     const isWeekend = current.day() === 0 || current.day() === 6
-    
+
     // Check if it's a holiday
     const dateStr = current.format('YYYY-MM-DD')
     const isHoliday = holidayMap.has(dateStr)
-    
+
     // Disable if it's a weekend or holiday for loss-of-pay
     return isWeekend || isHoliday
   }
@@ -201,50 +240,63 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
       return
     }
 
+    if (!values.sessionStart || !values.sessionEnd) {
+      toast.error("Please select both start and end sessions")
+      return
+    }
+
+    if (values.startDate.isSame(values.endDate, 'day') && values.sessionStart === 'Session-2' && values.sessionEnd === 'Session-1') {
+      toast.error("For the same day, the start session must be before the end session")
+      return
+    }
+
     const startDate = values.startDate
     const endDate = values.endDate
     const leaveType = values.leaveType
+    const sessionStart = values.sessionStart
+    const sessionEnd = values.sessionEnd
     const today = dayjs()
-    let totalDeduction = duration
+    const computedDuration = calculateDuration(startDate, endDate, sessionStart, sessionEnd)
+    let totalDeduction = computedDuration
     let penaltyDays = 0
-    
+
     // Check if it's a planned leave and calculate penalties day by day
     if (leaveType === 'Planned Leave' && startDate && endDate) {
-      
+
       let daysWithPenalty = 0
-      
+
       // Helper to check if a day is a weekend
       const isWeekend = (date: dayjs.Dayjs) => {
         const day = date.day()
         return day === 0 || day === 6 // Sunday or Saturday
       }
-      
+
       // Helper to check if a day is a holiday
       const isHoliday = (date: dayjs.Dayjs) => {
         const dateStr = date.format('YYYY-MM-DD')
         return holidayMap.has(dateStr)
       }
-      
+
       // Helper to check if a day is a non-working day
       const isNonWorkingDay = (date: dayjs.Dayjs) => {
         return isWeekend(date) || isHoliday(date)
       }
-      
+
       // Count working days between two dates
       const countWorkingDaysBetween = (fromDate: dayjs.Dayjs, toDate: dayjs.Dayjs) => {
         let workingDaysCount = 0
         let checkDate = fromDate.clone()
-        
+
         while (checkDate.isBefore(toDate)) {
           if (!isNonWorkingDay(checkDate)) {
             workingDaysCount++
           }
           checkDate = checkDate.add(1, 'day')
         }
-        
+
         return workingDaysCount
       }
-      
+
       // Calculate penalty ONLY for WORKING days in leave range
       let currentDate = startDate.clone()
       while (currentDate.isBefore(endDate) || currentDate.isSame(endDate, 'day')) {
@@ -252,30 +304,33 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
         if (!isNonWorkingDay(currentDate)) {
           // Count only working days between today and this leave day
           const workingDaysInAdvance = countWorkingDaysBetween(today, currentDate)
-          
+
           if (workingDaysInAdvance < 5) {
             penaltyDays += 2 // Add 2 penalty days for this working day
             daysWithPenalty++
           }
         }
-        
+
         currentDate = currentDate.add(1, 'day')
       }
-      
+
       if (penaltyDays > 0) {
-        totalDeduction = duration + penaltyDays
+        totalDeduction = computedDuration + penaltyDays
       }
     }
 
-    console.log("Submitting leave request:", { ...values, duration, totalDeduction, penaltyDays })
-    
+    console.log("Submitting leave request:", { ...values, duration: computedDuration, totalDeduction, penaltyDays })
+
     onSubmit({
       ...values,
       startDate: values.startDate ? values.startDate.format("YYYY-MM-DD") : undefined,
       endDate: values.endDate ? values.endDate.format("YYYY-MM-DD") : undefined,
-      duration,
+      duration: computedDuration,
       totalDeduction,
       status: "pending",
+      session: undefined,
+      sessionStart: values.sessionStart,
+      sessionEnd: values.sessionEnd,
       onePlusTwoApplied: penaltyDays > 0 ? true : false,
     })
   }
@@ -295,146 +350,165 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
         onFinish={handleFinish}
         onValuesChange={onValuesChange}
         initialValues={{
-            leaveCategory: '',
+          leaveCategory: '',
           leaveType: undefined,
-          session: undefined,
-            startDate: undefined,
-            endDate: undefined
+          sessionStart: undefined,
+          sessionEnd: undefined,
+          startDate: undefined,
+          endDate: undefined
         }}
         className="mt-4"
       >
 
-          {/* {employeeName && (
+        {/* {employeeName && (
             <div className="mb-4 p-3 bg-blue-50 rounded-lg text-blue-900 border border-blue-100">
                <span className="font-semibold">Requesting for:</span> {employeeName}
             </div>
           )} */}
 
-          {/* Leave Category Selection */}
-          <Form.Item name="leaveCategory" label="Leave Category" rules={[{ required: true }]}>
-              <Select placeholder="Select leave category">
-                <Option value="" disabled>Select leave category</Option>
-                  <Option value="loss-of-pay">Loss of Pay</Option>
-                  <Option value="extra-day-pay">Extra Day Pay</Option>
-              </Select>
-          </Form.Item>
+        {/* Leave Category Selection */}
+        <Form.Item name="leaveCategory" label="Leave Category" rules={[{ required: true }]}>
+          <Select placeholder="Select leave category">
+            <Option value="" disabled>Select leave category</Option>
+            <Option value="loss-of-pay">Loss of Pay</Option>
+            <Option value="extra-day-pay">Extra Day Pay</Option>
+          </Select>
+        </Form.Item>
 
-          {/* Conditional Fields based on Leave Category */}
-          {leaveCategory === "loss-of-pay" && (
-            <>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Form.Item name="leaveType" label="Leave Type" rules={[{ required: true }]}>
-                  <Select placeholder="Select leave type">
-                    <Option value="" disabled>Select leave type</Option>
-                        <Option value="Planned Leave">Planned Leave</Option>
-                        <Option value="Sick Leave">Sick Leave</Option>
-                        <Option value="Emergency Leave">Emergency Leave</Option>
-                    </Select>
-                </Form.Item>
-                
-                <Form.Item label="Duration">
-                    <Input value={`${duration} days`} disabled className="bg-gray-50 text-gray-600 font-medium" />
-                </Form.Item>
-                
-                <Form.Item name="startDate" label="Start Date" rules={[{ required: true }]}>
-                     <DatePicker className="w-full" placeholder="DD-MM-YYYY" format="DD-MM-YYYY" dateRender={dateFullCellRender} disabledDate={disabledDate} />
-                </Form.Item>
-                
-                <Form.Item name="endDate" label="End Date" rules={[{ required: true }]}>
-                     <DatePicker className="w-full" placeholder="DD-MM-YYYY" format="DD-MM-YYYY" dateRender={dateFullCellRender} disabledDate={disabledDate} />
-                </Form.Item>
-                
-                <Form.Item name="session" label="Session" rules={[{ required: true }]}>
-                  <Select placeholder="Select session">
-                    
-                    <Option value="" disabled>Please select session</Option>
-                  <Option value="Full Day">Full Day</Option>
-                        <Option value="Session-1">Session-1 (1st Half)</Option>
-                        <Option value="Session-2">Session-2 (2nd Half)</Option>
-                        
-                    </Select>
-                </Form.Item>
-              </div>
-              
-              <Form.Item 
-                name="reason" 
-                label="Leave Reason" 
-                rules={[
-                  { required: true, message: 'Please provide reason for leave' },
-                  { 
+        {/* Conditional Fields based on Leave Category */}
+        {leaveCategory === "loss-of-pay" && (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Form.Item name="leaveType" label="Leave Type" rules={[{ required: true }]}>
+                <Select placeholder="Select leave type">
+                  <Option value="" disabled>Select leave type</Option>
+                  <Option value="Planned Leave">Planned Leave</Option>
+                  <Option value="Sick Leave">Sick Leave</Option>
+                  <Option value="Emergency Leave">Emergency Leave</Option>
+                </Select>
+              </Form.Item>
+
+              <Form.Item label="Duration">
+                <Input value={`${duration} days`} disabled className="bg-gray-50 text-gray-600 font-medium" />
+              </Form.Item>
+
+              <Form.Item name="startDate" label="Start Date" rules={[{ required: true }]}>
+                <DatePicker className="w-full" placeholder="DD-MM-YYYY" format="DD-MM-YYYY" dateRender={dateFullCellRender} disabledDate={disabledDate} />
+              </Form.Item>
+
+              <Form.Item name="sessionStart" label="Start Session" rules={[{ required: true }]}>
+                <Select placeholder="Select start session">
+                  <Option value="" disabled>Please select session</Option>
+                  {sessionOptions.map((option) => (
+                    <Option key={option.value} value={option.value}>{option.label}</Option>
+                  ))}
+                </Select>
+              </Form.Item>
+
+              <Form.Item name="endDate" label="End Date" rules={[{ required: true }]}>
+                <DatePicker className="w-full" placeholder="DD-MM-YYYY" format="DD-MM-YYYY" dateRender={dateFullCellRender} disabledDate={disabledDate} />
+              </Form.Item>
+
+
+
+              <Form.Item name="sessionEnd" label="End Session" rules={[{ required: true }]}>
+                <Select placeholder="Select end session">
+                  <Option value="" disabled>Please select session</Option>
+                  {sessionOptions.map((option) => (
+                    <Option key={option.value} value={option.value}>{option.label}</Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            </div>
+
+            <Form.Item
+              name="reason"
+              label="Leave Reason"
+              rules={[
+                { required: true, message: 'Please provide reason for leave' },
+                {
                   validator: (_, value) => {
                     if (!value) return Promise.resolve()
                     const trimmedValue = value.trim()
                     if (trimmedValue.length === 0) {
-                    return Promise.reject('Reason cannot be only spaces')
+                      return Promise.reject('Reason cannot be only spaces')
                     }
                     if (trimmedValue.length < 10) {
-                    return Promise.reject('Reason must be at least 10 characters')
+                      return Promise.reject('Reason must be at least 10 characters')
                     }
                     return Promise.resolve()
                   }
-                  }
-                ]}
-                >
-                  <TextArea rows={3} placeholder="Explain the reason for your leave (minimum 10 characters)..." />
-                </Form.Item>
-            </>
-          )}
+                }
+              ]}
+            >
+              <TextArea rows={3} placeholder="Explain the reason for your leave (minimum 10 characters)..." />
+            </Form.Item>
+          </>
+        )}
 
-          {leaveCategory === "extra-day-pay" && (
-            <>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Form.Item name="startDate" label="Start Date" rules={[{ required: true }]}>
-                   <DatePicker className="w-full" placeholder="DD-MM-YYYY" format="DD-MM-YYYY" dateRender={dateFullCellRender} disabledDate={disabledDateForExtraDayPay} />
-                </Form.Item>
-                
-                <Form.Item name="endDate" label="End Date" rules={[{ required: true }]}>
-                   <DatePicker className="w-full" placeholder="DD-MM-YYYY" format="DD-MM-YYYY" dateRender={dateFullCellRender} disabledDate={disabledDateForExtraDayPay} />
-                </Form.Item>
-                
-                <Form.Item label="Duration">
-                    <Input value={`${duration} days`} disabled className="bg-gray-50 text-gray-600 font-medium" />
-                </Form.Item>
-                
-                <Form.Item name="session" label="Session" rules={[{ required: true }]}>
-                  <Select placeholder="Select session">
-                    <Option value="" disabled>Please select session</Option>
-                        <Option value="Session-1">Session-1</Option>
-                        <Option value="Session-2">Session-2</Option>
-                        <Option value="Full Day">Full Day</Option>
-                    </Select>
-                </Form.Item>
-              </div>
-              
-                <Form.Item 
-                name="reason" 
-                label="Reason" 
-                rules={[
-                  { required: true, message: 'Please provide reason for extra day pay' },
-                  { 
+        {leaveCategory === "extra-day-pay" && (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Form.Item name="startDate" label="Start Date" rules={[{ required: true }]}>
+                <DatePicker className="w-full" placeholder="DD-MM-YYYY" format="DD-MM-YYYY" dateRender={dateFullCellRender} disabledDate={disabledDateForExtraDayPay} />
+              </Form.Item>
+
+              <Form.Item name="endDate" label="End Date" rules={[{ required: true }]}>
+                <DatePicker className="w-full" placeholder="DD-MM-YYYY" format="DD-MM-YYYY" dateRender={dateFullCellRender} disabledDate={disabledDateForExtraDayPay} />
+              </Form.Item>
+
+              <Form.Item label="Duration">
+                <Input value={`${duration} days`} disabled className="bg-gray-50 text-gray-600 font-medium" />
+              </Form.Item>
+
+              <Form.Item name="sessionStart" label="Start Session" rules={[{ required: true }]}>
+                <Select placeholder="Select start session">
+                  <Option value="" disabled>Please select session</Option>
+                  {sessionOptions.map((option) => (
+                    <Option key={option.value} value={option.value}>{option.label}</Option>
+                  ))}
+                </Select>
+              </Form.Item>
+
+              <Form.Item name="sessionEnd" label="End Session" rules={[{ required: true }]}>
+                <Select placeholder="Select end session">
+                  <Option value="" disabled>Please select session</Option>
+                  {sessionOptions.map((option) => (
+                    <Option key={option.value} value={option.value}>{option.label}</Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            </div>
+
+            <Form.Item
+              name="reason"
+              label="Reason"
+              rules={[
+                { required: true, message: 'Please provide reason for extra day pay' },
+                {
                   validator: (_, value) => {
                     if (!value) return Promise.resolve()
                     const trimmedValue = value.trim()
                     if (trimmedValue.length === 0) {
-                    return Promise.reject('Reason cannot be only spaces')
+                      return Promise.reject('Reason cannot be only spaces')
                     }
                     if (trimmedValue.length < 10) {
-                    return Promise.reject('Reason must be at least 10 characters')
+                      return Promise.reject('Reason must be at least 10 characters')
                     }
                     return Promise.resolve()
                   }
-                  }
-                ]}
-                >
-                  <TextArea rows={3} placeholder="Explain why you need extra day pay (minimum 10 characters)..." />
-                </Form.Item>
-            </>
-          )}
+                }
+              ]}
+            >
+              <TextArea rows={3} placeholder="Explain why you need extra day pay (minimum 10 characters)..." />
+            </Form.Item>
+          </>
+        )}
 
-          <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
-             <Button onClick={onCancel}>Cancel</Button>
-             <Button type="primary" htmlType="submit">Submit Request</Button>
-          </div>
+        <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+          <Button onClick={onCancel}>Cancel</Button>
+          <Button type="primary" htmlType="submit">Submit Request</Button>
+        </div>
       </Form>
     </Modal>
   )

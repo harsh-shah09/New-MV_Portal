@@ -194,6 +194,44 @@ function getCanonicalLeaveCategory(leaveCategory: string): "loss-of-pay" | "extr
   return normalized === "extra-day-pay" ? "extra-day-pay" : "loss-of-pay";
 }
 
+function normalizeSessionValue(session?: string): "Session-1" | "Session-2" | undefined {
+  if (session === "Session-1" || session === "Session-2") {
+    return session;
+  }
+
+  return undefined;
+}
+
+function getSessionDisplayLabel(startSession?: string, endSession?: string): string | undefined {
+  if (!startSession && !endSession) {
+    return undefined;
+  }
+
+  const startLabel = startSession === "Session-1" ? "Session 1" : startSession === "Session-2" ? "Session 2" : startSession;
+  const endLabel = endSession === "Session-1" ? "Session 1" : endSession === "Session-2" ? "Session 2" : endSession;
+
+  if (startSession && endSession) {
+    if (startSession === endSession) {
+      return startLabel;
+    }
+
+    return `${startLabel} → ${endLabel}`;
+  }
+
+  return startLabel || endLabel;
+}
+
+function isHalfDaySessionRange(
+  startSession: string | undefined,
+  endSession: string | undefined,
+  startDate: dayjs.Dayjs,
+  endDate: dayjs.Dayjs
+): boolean {
+  return startDate.isSame(endDate, "day")
+    && startSession === endSession
+    && (startSession === "Session-1" || startSession === "Session-2");
+}
+
 function logLeaveEmailDispatch(stage: string, to: string, cc?: string | string[], subject?: string): void {
   const ccList = Array.isArray(cc) ? cc.filter(Boolean) : cc ? [cc] : [];
   console.log('📧 [Leave Email Debug]', {
@@ -210,7 +248,8 @@ function createRuleCalculationDetails(
   role: string | undefined,
   leaveType: string | undefined,
   leaveCategory: string,
-  sessionValue: string | undefined,
+  sessionStartValue: string | undefined,
+  sessionEndValue: string | undefined,
   leaveConfig: LeaveConfig,
   holidaySet: Set<string>,
   createdReferenceDate: dayjs.Dayjs,
@@ -230,7 +269,31 @@ function createRuleCalculationDetails(
   const requestedStartDate = startDate.format("YYYY-MM-DD");
   const requestedEndDate = endDate.format("YYYY-MM-DD");
   const baseCalendarDays = endDate.diff(startDate, "day") + 1;
-  const isHalfDay = sessionValue === "Session-1" || sessionValue === "Session-2";
+  const isHalfDay = isHalfDaySessionRange(sessionStartValue, sessionEndValue, startDate, endDate);
+  
+  // First, calculate working days in range
+  let workingDaysInRange = 0;
+  let nonWorkingDaysInRange = 0;
+  let cursor = startDate.clone();
+
+  while (cursor.isSame(endDate) || cursor.isBefore(endDate)) {
+    if (isNonWorking(cursor)) {
+      nonWorkingDaysInRange++;
+    } else {
+      workingDaysInRange++;
+    }
+    cursor = cursor.add(1, "day");
+  }
+  
+  // Check if start day is partial (doesn't start with Session-1) or end day is partial (doesn't end with Session-2)
+  const startDayIsPartial = sessionStartValue && sessionStartValue !== "Session-1";
+  const endDayIsPartial = sessionEndValue && sessionEndValue !== "Session-2";
+  
+  // Calculate the number of full working days (excluding partial days at start/end)
+  let fullWorkingDaysInRange = workingDaysInRange;
+  if (startDayIsPartial && !startDate.isSame(endDate, "day")) fullWorkingDaysInRange--;
+  if (endDayIsPartial && !startDate.isSame(endDate, "day")) fullWorkingDaysInRange--;
+  
   const applyPolicyRules = typeof ruleSelection === "boolean" ? ruleSelection : true;
   const selectedSandwichRule =
     typeof ruleSelection === "object" && ruleSelection !== null
@@ -251,21 +314,9 @@ function createRuleCalculationDetails(
     applyRules &&
     selectedSandwichRule &&
     !isHalfDay &&
+    fullWorkingDaysInRange > 0 &&
     leaveConfig.SandwichRule &&
     sandwichRuleAppliesToUser;
-
-  let workingDaysInRange = 0;
-  let nonWorkingDaysInRange = 0;
-  let cursor = startDate.clone();
-
-  while (cursor.isSame(endDate) || cursor.isBefore(endDate)) {
-    if (isNonWorking(cursor)) {
-      nonWorkingDaysInRange++;
-    } else {
-      workingDaysInRange++;
-    }
-    cursor = cursor.add(1, "day");
-  }
 
   const sandwichDateList: LeaveDateInput[] = [];
   if (applySandwichRule && workingDaysInRange > 0) {
@@ -318,11 +369,18 @@ function createRuleCalculationDetails(
   if (isHalfDay) {
     rangeLeaveDays = rangeLeaveDays * 0.5;
   }
+  
+  // Account for partial session days in multi-day leaves
+  // Subtract 0.5 for each partial day at start and end
+  if (!startDate.isSame(endDate, "day")) {
+    if (startDayIsPartial) rangeLeaveDays -= 0.5;
+    if (endDayIsPartial) rangeLeaveDays -= 0.5;
+  }
 
   const sandwichExtra = sandwichApplied ? sandwichDates.length : 0;
 
   let onePlusTwoExtra = 0;
-  if (applyRules && selectedOnePlusTwoRule && !isHalfDay && leaveConfig.OnePlusTwoRule && penaltyAppliesToUser) {
+  if (applyRules && selectedOnePlusTwoRule && !isHalfDay && fullWorkingDaysInRange > 0 && leaveConfig.OnePlusTwoRule && penaltyAppliesToUser) {
     const countWorkingDaysBetween = (fromDate: dayjs.Dayjs, toDate: dayjs.Dayjs): number => {
       let workingDays = 0;
       let current = fromDate.clone();
@@ -338,8 +396,24 @@ function createRuleCalculationDetails(
     };
 
     const penaltyMultiplier = leaveConfig.penaltyDaysPerDay;
-    let cursorPenalty = startDate.startOf("day");
-    const endPenalty = endDate.startOf("day");
+    
+    // Only apply penalty to full working days, not to partial days
+    let penaltyStartDate = startDate.clone();
+    let penaltyEndDate = endDate.clone();
+    
+    // Skip the first day if it's a partial day (doesn't start with Session-1)
+    if (startDayIsPartial && !startDate.isSame(endDate, "day")) {
+      penaltyStartDate = penaltyStartDate.add(1, "day");
+    }
+    
+    // If last day is partial (doesn't end with Session-2), don't apply penalty to it
+    if (endDayIsPartial && !startDate.isSame(endDate, "day")) {
+      penaltyEndDate = penaltyEndDate.subtract(1, "day");
+    }
+    
+    // Apply penalty only to full working days
+    let cursorPenalty = penaltyStartDate.startOf("day");
+    const endPenalty = penaltyEndDate.startOf("day");
 
     while (cursorPenalty.isSame(endPenalty) || cursorPenalty.isBefore(endPenalty)) {
       if (!isNonWorking(cursorPenalty)) {
@@ -506,7 +580,8 @@ export async function GET(request: NextRequest) {
           Leave_Category__c,
           Start_Date__c,
           End_Date__c,
-          Session__c,
+          Session_Start__c,
+          Session_End__c,
           Total_Days__c,
           Status__c,
           Approved_Date__c,
@@ -539,7 +614,9 @@ export async function GET(request: NextRequest) {
           leaveCategory: record.Leave_Category__c,
           startDate: record.Start_Date__c || "",
           endDate: record.End_Date__c || "",
-          session: record.Session__c || undefined,
+          sessionStart: normalizeSessionValue(record.Session_Start__c),
+          sessionEnd: normalizeSessionValue(record.Session_End__c),
+          session: getSessionDisplayLabel(record.Session_Start__c, record.Session_End__c),
           duration: record.Total_Days__c || 0,
           status: record.Status__c?.toLowerCase() || "pending",
           isWithdrawalRequest: record.Status__c === 'Withdrawal Pending',
@@ -570,7 +647,8 @@ export async function GET(request: NextRequest) {
           Leave_Category__c,
           Start_Date__c,
           End_Date__c,
-          Session__c,
+          Session_Start__c,
+          Session_End__c,
           Total_Days__c,
           Status__c,
           Approved_Date__c,
@@ -603,7 +681,9 @@ export async function GET(request: NextRequest) {
           leaveCategory: record.Leave_Category__c,
           startDate: record.Start_Date__c || "",
           endDate: record.End_Date__c || "",
-          session: record.Session__c || undefined,
+          sessionStart: normalizeSessionValue(record.Session_Start__c),
+          sessionEnd: normalizeSessionValue(record.Session_End__c),
+          session: getSessionDisplayLabel(record.Session_Start__c, record.Session_End__c),
           duration: record.Total_Days__c || 0,
           status: record.Status__c?.toLowerCase() || "pending",
           isWithdrawalRequest: record.Status__c === 'Withdrawal Pending',
@@ -631,7 +711,8 @@ export async function GET(request: NextRequest) {
           Leave_Category__c,
           Start_Date__c,
           End_Date__c,
-          Session__c,
+          Session_Start__c,
+          Session_End__c,
           Total_Days__c,
           Status__c,
           Approved_Date__c,
@@ -664,7 +745,9 @@ export async function GET(request: NextRequest) {
           leaveCategory: record.Leave_Category__c,
           startDate: record.Start_Date__c || "",
           endDate: record.End_Date__c || "",
-          session: record.Session__c || undefined,
+          sessionStart: normalizeSessionValue(record.Session_Start__c),
+          sessionEnd: normalizeSessionValue(record.Session_End__c),
+          session: getSessionDisplayLabel(record.Session_Start__c, record.Session_End__c),
           duration: record.Total_Days__c || 0,
           status: record.Status__c?.toLowerCase() || "pending",
           isWithdrawalRequest: record.Status__c === 'Withdrawal Pending',
@@ -733,7 +816,9 @@ export async function POST(request: NextRequest) {
       endDate,
       duration,
       totalDeduction,
-      session: sessionValue,
+      session: legacySession,
+      sessionStart: rawSessionStart,
+      sessionEnd: rawSessionEnd,
       reason: rawReason,
       onePlusTwoApplied,
       confirmedRules,
@@ -747,6 +832,10 @@ export async function POST(request: NextRequest) {
     const confirmMergeWithExisting = confirmMerge === true;
     const requestedStartDateStr = startDate;
     const requestedEndDateStr = endDate;
+    const sessionStartValue = normalizeSessionValue(rawSessionStart)
+      ?? (legacySession === 'Full Day' ? 'Session-1' : normalizeSessionValue(legacySession));
+    const sessionEndValue = normalizeSessionValue(rawSessionEnd)
+      ?? (legacySession === 'Full Day' ? 'Session-2' : normalizeSessionValue(legacySession));
     let requestStartDate = dayjs(startDate);
     let requestEndDate = dayjs(endDate);
     let finalStartDateStr = startDate;
@@ -863,7 +952,8 @@ export async function POST(request: NextRequest) {
         Leave_Type__c: leaveType,
         Start_Date__c: parsedStart.format('YYYY-MM-DD'),
         End_Date__c: parsedEnd.format('YYYY-MM-DD'),
-        Session__c: 'Full Day',
+        Session_Start__c: 'Session-1',
+        Session_End__c: 'Session-2',
         Reason__c: reason || `Applied by ${approverTitle}`,
         Status__c: 'Approved',
         HR_Approval__c: 'Approved',
@@ -1002,7 +1092,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate required fields
-    if (!leaveCategory || !startDate || !endDate || !sessionValue) {
+    if (!leaveCategory || !startDate || !endDate || !sessionStartValue || !sessionEndValue) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
@@ -1096,7 +1186,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check for consecutive dates with the same leave category
-    const isRequestHalfDay = sessionValue === "Session-1" || sessionValue === "Session-2";
+    const isRequestHalfDay = isHalfDaySessionRange(sessionStartValue, sessionEndValue, requestStartDate, requestEndDate);
 
     // Query for leaves that are consecutive (one day before or after the requested dates)
     const consecutiveLeavesQuery = await conn.query<any>(`
@@ -1107,7 +1197,8 @@ export async function POST(request: NextRequest) {
         Status__c,
         Leave_Type__c,
         Leave_Category__c,
-        Session__c
+        Session_Start__c,
+        Session_End__c
       FROM Leave__c
       WHERE Employee__c = '${employeeId}'
       AND Status__c IN ('Applied', 'Approved')
@@ -1120,13 +1211,15 @@ export async function POST(request: NextRequest) {
       for (const existingLeave of consecutiveLeavesQuery.records) {
         const existingStart = dayjs(existingLeave.Start_Date__c);
         const existingEnd = dayjs(existingLeave.End_Date__c);
-        const existingSession = existingLeave.Session__c;
-        const isExistingHalfDay = existingSession === "Session-1" || existingSession === "Session-2";
+        const existingSessionStart = normalizeSessionValue(existingLeave.Session_Start__c);
+        const existingSessionEnd = normalizeSessionValue(existingLeave.Session_End__c);
+        const existingSession = getSessionDisplayLabel(existingSessionStart, existingSessionEnd);
+        const isExistingHalfDay = isHalfDaySessionRange(existingSessionStart, existingSessionEnd, existingStart, existingEnd);
 
         // Check if applying for the same date with same session (not allowed)
         if (requestStartDate.isSame(existingStart, 'day') && requestEndDate.isSame(existingEnd, 'day')) {
           // Same day - only allow if both are half-day and different sessions
-          if (isRequestHalfDay && isExistingHalfDay && sessionValue !== existingSession) {
+          if (isRequestHalfDay && isExistingHalfDay && (sessionStartValue !== existingSessionStart || sessionEndValue !== existingSessionEnd)) {
             // Different sessions on the same day - allowed
             continue;
           } else {
@@ -1202,8 +1295,10 @@ export async function POST(request: NextRequest) {
       for (const existingLeave of consecutiveLeavesQuery.records) {
         const existingStart = dayjs(existingLeave.Start_Date__c);
         const existingEnd = dayjs(existingLeave.End_Date__c);
-        const existingSession = existingLeave.Session__c;
-        const isExistingHalfDay = existingSession === "Session-1" || existingSession === "Session-2";
+        const existingSessionStart = normalizeSessionValue(existingLeave.Session_Start__c);
+        const existingSessionEnd = normalizeSessionValue(existingLeave.Session_End__c);
+        const existingSession = getSessionDisplayLabel(existingSessionStart, existingSessionEnd);
+        const isExistingHalfDay = isHalfDaySessionRange(existingSessionStart, existingSessionEnd, existingStart, existingEnd);
 
         // Skip half-day leaves for sandwich check
         if (isRequestHalfDay || isExistingHalfDay) {
@@ -1310,7 +1405,7 @@ export async function POST(request: NextRequest) {
     const isNonWorking = (d: dayjs.Dayjs) => isWeekend(d) || isHoliday(d);
 
     const baseCalendarDays = end.diff(start, "day") + 1;
-    const isHalfDay = (sessionValue === "Session-1" || sessionValue === "Session-2");
+    const isHalfDay = isHalfDaySessionRange(sessionStartValue, sessionEndValue, start, end);
     const applyRules = leaveCategory === 'loss-of-pay' && leaveType === 'Planned Leave';
 
     // Block leaves that fall entirely on weekends/holidays (ONLY for Loss of Pay)
@@ -1430,7 +1525,8 @@ export async function POST(request: NextRequest) {
       role,
       leaveType,
       leaveCategory,
-      sessionValue,
+      sessionStartValue,
+      sessionEndValue,
       leaveConfig,
       holidaySet,
       today,
@@ -1502,7 +1598,8 @@ export async function POST(request: NextRequest) {
       End_Date__c: saveEndDate,
       Total_Days__c: rangeLeaveDays,
       Total_Days_After_Rule__c: finalTotalAfterRules,
-      Session__c: sessionValue,
+      Session_Start__c: sessionStartValue,
+      Session_End__c: sessionEndValue,
       Status__c: isAdminAutoApprove ? 'Approved' : 'Applied',
       OnePlusTwo_Rule__c: onePlusTwoRuleApplied,
       Sandwich_Rule__c: anySandwichApplied,
@@ -1879,7 +1976,7 @@ export async function PATCH(request: NextRequest) {
       // Verify the leave belongs to the current user
       const leaveRecordQuery = await conn.query<any>(`
         SELECT Id, Employee__c, Status__c, Leave_Category__c, Leave_Type__c, Total_Days__c, Total_Days_After_Rule__c, 
-               Start_Date__c, End_Date__c, Session__c, Sandwich_Rule__c, Rule_Calculation_Details__c
+               Start_Date__c, End_Date__c, Session_Start__c, Session_End__c, Sandwich_Rule__c, Rule_Calculation_Details__c
         FROM Leave__c
         WHERE Id = '${leaveId}'
         LIMIT 1
@@ -1904,7 +2001,7 @@ export async function PATCH(request: NextRequest) {
 
       const leaveStart = dayjs(leave.Start_Date__c).startOf("day");
       const leaveEnd = dayjs(leave.End_Date__c).startOf("day");
-      const isHalfDayLeave = leave.Session__c === "Session-1" || leave.Session__c === "Session-2";
+      const isHalfDayLeave = isHalfDaySessionRange(leave.Session_Start__c, leave.Session_End__c, leaveStart, leaveEnd);
       const today = dayjs().startOf("day");
 
       if (today.isAfter(leaveEnd, "day")) {
@@ -2093,8 +2190,8 @@ export async function PATCH(request: NextRequest) {
       }
 
       const leaveRecordQuery = await conn.query<any>(`
-        SELECT Id, Employee__c, Status__c, Leave_Category__c, Leave_Type__c, Total_Days__c, Total_Days_After_Rule__c, 
-               Start_Date__c, End_Date__c, Session__c, Reason__c, CreatedDate, Employee__r.Role__c,
+         SELECT Id, Employee__c, Status__c, Leave_Category__c, Leave_Type__c, Total_Days__c, Total_Days_After_Rule__c, 
+           Start_Date__c, End_Date__c, Session_Start__c, Session_End__c, Reason__c, CreatedDate, Employee__r.Role__c,
            Sandwich_Rule__c, Rule_Calculation_Details__c, Event_ID__c
         FROM Leave__c
         WHERE Id = '${leaveId}'
@@ -2166,7 +2263,7 @@ export async function PATCH(request: NextRequest) {
       } else {
         const canonicalCategory = getCanonicalLeaveCategory(leave.Leave_Category__c || "");
         const sfLeaveCategory = canonicalCategory === "loss-of-pay" ? "Loss of Pay" : "Extra Day Pay";
-        const isHalfDayLeave = leave.Session__c === "Session-1" || leave.Session__c === "Session-2";
+        const isHalfDayLeave = isHalfDaySessionRange(leave.Session_Start__c, leave.Session_End__c, leaveStart, leaveEnd);
 
         if (isHalfDayLeave) {
           return NextResponse.json({ error: "Partial withdrawal is not supported for half-day leave" }, { status: 400 });
@@ -2196,7 +2293,8 @@ export async function PATCH(request: NextRequest) {
             employeeRole,
             leave.Leave_Type__c,
             sfLeaveCategory,
-            leave.Session__c,
+            leave.Session_Start__c,
+            leave.Session_End__c,
             leaveConfig,
             holidaySet,
             createdReferenceDate
@@ -2245,7 +2343,8 @@ export async function PATCH(request: NextRequest) {
             employeeRole,
             leave.Leave_Type__c,
             sfLeaveCategory,
-            leave.Session__c,
+            leave.Session_Start__c,
+            leave.Session_End__c,
             leaveConfig,
             holidaySet,
             createdReferenceDate
@@ -2257,7 +2356,8 @@ export async function PATCH(request: NextRequest) {
             employeeRole,
             leave.Leave_Type__c,
             sfLeaveCategory,
-            leave.Session__c,
+            leave.Session_Start__c,
+            leave.Session_End__c,
             leaveConfig,
             holidaySet,
             createdReferenceDate
@@ -2289,7 +2389,8 @@ export async function PATCH(request: NextRequest) {
             Leave_Category__c: leave.Leave_Category__c,
             Start_Date__c: rightStart.format("YYYY-MM-DD"),
             End_Date__c: rightEnd.format("YYYY-MM-DD"),
-            Session__c: leave.Session__c,
+            Session_Start__c: leave.Session_Start__c,
+            Session_End__c: leave.Session_End__c,
             Reason__c: leave.Reason__c || '',
             Status__c: 'Approved',
             Total_Days__c: rightRecalculated.totalDays,
@@ -2655,7 +2756,7 @@ export async function PATCH(request: NextRequest) {
       }
 
       const leaveRecordQuery = await conn.query<any>(`
-        SELECT Id, Status__c, Employee__c, Employee__r.Role__c,Employee__r.Salary_CTC__c, Leave_Category__c, Leave_Type__c, Total_Days__c, Total_Days_After_Rule__c, HR_Approval__c, TL_Approval__c, Start_Date__c, End_Date__c, Session__c, CreatedDate, Rule_Calculation_Details__c, Actual_Deduction__c, After_Rule_Deduction__c, Event_ID__c
+        SELECT Id, Status__c, Employee__c, Employee__r.Role__c,Employee__r.Salary_CTC__c, Leave_Category__c, Leave_Type__c, Total_Days__c, Total_Days_After_Rule__c, HR_Approval__c, TL_Approval__c, Start_Date__c, End_Date__c, Session_Start__c, Session_End__c, CreatedDate, Rule_Calculation_Details__c, Actual_Deduction__c, After_Rule_Deduction__c, Event_ID__c
         FROM Leave__c
         WHERE Id = '${leaveId}'
         LIMIT 1
@@ -2682,7 +2783,8 @@ export async function PATCH(request: NextRequest) {
           employeeRole,
           oldLeave.Leave_Type__c,
           oldLeave.Leave_Category__c,
-          oldLeave.Session__c,
+          oldLeave.Session_Start__c,
+          oldLeave.Session_End__c,
           leaveConfig,
           holidaySet,
           dayjs(oldLeave.CreatedDate || new Date().toISOString()).startOf("day"),

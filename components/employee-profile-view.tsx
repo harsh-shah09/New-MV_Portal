@@ -152,6 +152,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
         { fieldKey: "HRA__c", label: "HRA", kind: "percentage" as const },
         { fieldKey: "CONV__c", label: "Conveyance", kind: "percentage" as const },
         { fieldKey: "S_All__c", label: "Special Allowance", kind: "percentage" as const },
+        { fieldKey: "PF_Basic__c", label: "PF Basic", kind: "number" as const },
         { fieldKey: "PF__c", label: "PF", kind: "percentage" as const },
         { fieldKey: "PT__c", label: "PT", kind: "number" as const },
         { fieldKey: "ESI__c", label: "ESI", kind: "percentage" as const },
@@ -530,6 +531,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                 HRA__c: employee.HRA__c,
                 CONV__c: employee.CONV__c,
                 S_All__c: employee.S_All__c,
+                PF_Basic__c: employee.PF_Basic__c,
                 PF__c: employee.PF__c,
                 PT__c: employee.PT__c,
                 ESI__c: employee.ESI__c,
@@ -580,6 +582,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                 "HRA__c",
                 "CONV__c",
                 "S_All__c",
+                "PF_Basic__c",
                 "PF__c",
                 "PT__c",
                 "ESI__c"
@@ -1729,7 +1732,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                     <CreditCard className="w-5 h-5 text-green-500" /> Compensation
                                                 </h2>
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-                                                    <Field label="CTC" value={employee.Salary_CTC__c} fieldKey="Salary_CTC__c" type="number" isEditing={isEditing && currentUserRole === 'Admin'} formData={formData} setFormData={setFormData} />
+                                                    <Field label="CTC(Monthly)" value={employee.Salary_CTC__c} fieldKey="Salary_CTC__c" type="number" isEditing={isEditing && currentUserRole === 'Admin'} formData={formData} setFormData={setFormData} />
                                                 </div>
                                             </div>
                                         )}

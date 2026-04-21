@@ -55,7 +55,8 @@ export async function GET(request: NextRequest) {
         Cancellation_Reason_HR__c,
         OnePlusTwo_Rule__c,
         Sandwich_Rule__c,
-        Session__c
+        Session_Start__c,
+        Session_End__c
       FROM Leave__c
       WHERE Id = '${leaveId}'
       LIMIT 1
@@ -97,7 +98,13 @@ export async function GET(request: NextRequest) {
       hrRejectionReason: record.Cancellation_Reason_HR__c || undefined,
       onePlusTwoRuleApplicable: record.OnePlusTwo_Rule__c === true,
       sandwichRuleApplicable: record.Sandwich_Rule__c === true,
-      session: record.Session__c || undefined,
+      sessionStart: record.Session_Start__c || undefined,
+      sessionEnd: record.Session_End__c || undefined,
+      session: record.Session_Start__c && record.Session_End__c
+        ? record.Session_Start__c === record.Session_End__c
+          ? record.Session_Start__c
+          : `${record.Session_Start__c} → ${record.Session_End__c}`
+        : undefined,
     }
 
     return NextResponse.json({ leave })
