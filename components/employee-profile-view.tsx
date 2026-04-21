@@ -1777,7 +1777,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                 {salaryCalculationFields.map(renderSalaryField)}
                                             </div>
 
-                                            <div className="mt-8 p-4 rounded-2xl border border-slate-200 bg-slate-50">
+                                            {/* <div className="mt-8 p-4 rounded-2xl border border-slate-200 bg-slate-50">
                                                 <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Quick Summary</p>
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-slate-700">
                                                     <div>
@@ -1796,7 +1796,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                         </span>
                                                     </div>
                                                 </div>
-                                            </div>
+                                            </div> */}
                                         </div>
                                     </div>
                                 )}

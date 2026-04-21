@@ -531,12 +531,28 @@ export function GeneratePayrollModal({ open, onClose, onGenerate, onSavingChange
 
   // Expandable row to show leave details, adjustments, and bonus
   const expandedRowRender = (record: PayrollEmployeeDetail) => {
-    const hasLeaves = record.leaves && record.leaves.length > 0
+    const allLeaves = record.leaves || []
+    const extraDayPayLeaves = allLeaves.filter((leave) => {
+      const normalizedCategory = leave.leaveCategory?.toLowerCase().replace(/\s+/g, '-') || ""
+      return normalizedCategory === "extra-day-pay"
+    })
+    const regularLeaves = allLeaves.filter((leave) => {
+      const normalizedCategory = leave.leaveCategory?.toLowerCase().replace(/\s+/g, '-') || ""
+      return normalizedCategory !== "extra-day-pay"
+    })
+
+    const hasLeaves = regularLeaves.length > 0
+    const hasExtraDayPay = extraDayPayLeaves.length > 0
     const hasAdjustments = record.adjustments && record.adjustments.length > 0
     const hasBonus = !!(record.bonus && record.bonus > 0)
 
-    if (!hasLeaves && !hasAdjustments && !hasBonus) {
-      return <p className="text-gray-500 px-2 py-1 text-[11px]">No leaves, adjustments, or bonus for this month</p>
+    const totalExtraDayPay = extraDayPayLeaves.reduce(
+      (sum, leave) => sum + Math.abs(Number(leave.afterRuleDeduction || leave.actualDeduction || 0)),
+      0
+    )
+
+    if (!hasLeaves && !hasExtraDayPay && !hasAdjustments && !hasBonus) {
+      return <p className="text-gray-500 px-2 py-1 text-[11px]">No leaves, extra day pay, adjustments, or bonus for this month</p>
     }
 
     return (
@@ -588,7 +604,10 @@ export function GeneratePayrollModal({ open, onClose, onGenerate, onSavingChange
                   title: "Deduction",
                   dataIndex: "afterRuleDeduction",
                   key: "afterRuleDeduction",
-                  render: (amount: number, record: any) => formatCurrency(amount || record.actualDeduction || 0),
+                  render: (amount: number, row: any) => {
+                    const deductionAmount = Number(amount || row.actualDeduction || 0)
+                    return deductionAmount > 0 ? formatCurrency(deductionAmount) : "-"
+                  },
                 },
                 {
                   title: "Status",
@@ -599,12 +618,63 @@ export function GeneratePayrollModal({ open, onClose, onGenerate, onSavingChange
                   ),
                 },
               ]}
-              dataSource={record.leaves}
+              dataSource={regularLeaves}
               pagination={false}
               rowKey="id"
               size="small"
               scroll={{ x: 720 }}
             />
+          </div>
+        )}
+
+        {hasExtraDayPay && (
+          <div>
+            <h4 className="font-semibold mb-1 text-[11px]">Extra Day Pay</h4>
+            <div className="px-2 py-1 bg-green-50 border border-green-200 rounded text-[11px] space-y-1">
+              <div>
+                {/* <p className="text-[11px] text-gray-600">Total Extra Day Pay</p>
+                <p className="text-xs font-semibold text-green-600">+{formatCurrency(totalExtraDayPay)}</p> */}
+              </div>
+              <Table
+                columns={[
+                  {
+                    title: "Leave Type",
+                    dataIndex: "leaveType",
+                    key: "leaveType",
+                  },
+                  {
+                    title: "Start Date",
+                    dataIndex: "startDate",
+                    key: "startDate",
+                  },
+                  {
+                    title: "End Date",
+                    dataIndex: "endDate",
+                    key: "endDate",
+                  },
+                  {
+                    title: "Days",
+                    dataIndex: "daysInSelectedMonth",
+                    key: "daysInSelectedMonth",
+                    render: (days: number) => formatDays(Number(days || 0)),
+                  },
+                  {
+                    title: "Amount",
+                    dataIndex: "afterRuleDeduction",
+                    key: "amount",
+                    render: (amount: number, row: any) => {
+                      const extraAmount = Math.abs(Number(amount || row.actualDeduction || 0))
+                      return <span className="text-green-600 font-semibold">+{formatCurrency(extraAmount)}</span>
+                    },
+                  },
+                ]}
+                dataSource={extraDayPayLeaves}
+                pagination={false}
+                rowKey="id"
+                size="small"
+                scroll={{ x: 680 }}
+              />
+            </div>
           </div>
         )}
 
