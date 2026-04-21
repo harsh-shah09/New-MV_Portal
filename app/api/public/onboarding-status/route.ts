@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getIsFirstTimeLogin, getOnboardingStep, setOnboardingStep, clearOnboardingData, setFirstTimeLogin } from '@/lib/dynamodb';
-import { updateEmployee, createBankDetail, createDocumentRecord, getEmployeeById } from '@/lib/salesforce';
+import { getIsFirstTimeLogin, getOnboardingStep, setOnboardingStep, clearOnboardingData, setFirstTimeLogin, getOnboardingCompleted } from '@/lib/dynamodb';
+import { updateEmployee, upsertBankDetail, upsertDocumentRecord, getEmployeeById } from '@/lib/salesforce';
 import { uploadFileToS3 } from '@/lib/s3';
 import { getHREmail, sendEmail } from '@/lib/email';
 import { getSpecificConfigurations } from '@/lib/admin-config';
@@ -31,16 +31,29 @@ async function verifyRequiredDocuments(employeeData: any): Promise<string[]> {
     return requiredDocs.filter((docName) => !uploadedDocTypes.has(docName.toLowerCase()));
 }
 
+const TOTAL_STEPS = 4; // Profile, Personal, Bank, Documents
+
 export async function GET(req: Request) {
    const { searchParams } = new URL(req.url);
    const employeeId = searchParams.get('id');
-   const firsttime = searchParams.get('firsttime')
+   const firsttime = searchParams.get('firsttime');
    if (!employeeId) return NextResponse.json({ error: 'Missing employee ID' }, { status: 400 });
-   
+
+   // Priority 1: completed flag – never re-show the wizard once finished
+   const isCompleted = await getOnboardingCompleted(employeeId);
+   if (isCompleted) return NextResponse.json({ showOnboarding: false });
+
+   // Priority 2: first-time login flag (or ?firsttime=true override)
    const isFirstTime = await getIsFirstTimeLogin(employeeId);
    if (!isFirstTime && !firsttime) return NextResponse.json({ showOnboarding: false });
-   
-   const currentStep = await getOnboardingStep(employeeId);
+
+   // Priority 3: resolve step from DynamoDB
+   const rawStep = await getOnboardingStep(employeeId);
+   // Step beyond total → all saved, treat as completed
+   if (rawStep > TOTAL_STEPS) {
+       return NextResponse.json({ showOnboarding: false });
+   }
+   const currentStep = rawStep > 0 ? rawStep : 1;
 
    let employeeData = null;
    try {
@@ -48,7 +61,7 @@ export async function GET(req: Request) {
    } catch(e) {
        console.error("Error fetching employee details for prefill", e);
    }
-   
+
    return NextResponse.json({ showOnboarding: true, currentStep, employeeData });
 }
 
@@ -67,6 +80,9 @@ export async function POST(req: Request) {
                 // Profile Photo
                 const file = formData.get('file') as File;
                 if(file) {
+                     if (file.size > 5 * 1024 * 1024) {
+                         return NextResponse.json({ error: 'File size exceeds 5MB limit' }, { status: 400 });
+                     }
                      const buffer = Buffer.from(await file.arrayBuffer());
                      const url = await uploadFileToS3(buffer, `profile-photos/${employeeId}-${file.name}`, file.type);
                      await updateEmployee(employeeId, { Profile_Photo__c: url });
@@ -78,9 +94,12 @@ export async function POST(req: Request) {
                  const file = formData.get('file') as File;
                  const type = formData.get('type') as string; // 'Passbook'
                  if(file) {
+                     if (file.size > 5 * 1024 * 1024) {
+                         return NextResponse.json({ error: 'File size exceeds 5MB limit' }, { status: 400 });
+                     }
                      const buffer = Buffer.from(await file.arrayBuffer());
                      const url = await uploadFileToS3(buffer, `documents/${employeeId}-${file.name}`, file.type);
-                     await createDocumentRecord({
+                     await upsertDocumentRecord({
                          Name: file.name,
                          Document_Type__c: type || 'Passbook',
                          File_URL__c: url,
@@ -95,9 +114,12 @@ export async function POST(req: Request) {
                  const type = formData.get('type') as string;
                  
                  if(file) {
+                     if (file.size > 5 * 1024 * 1024) {
+                         return NextResponse.json({ error: 'File size exceeds 5MB limit' }, { status: 400 });
+                     }
                      const buffer = Buffer.from(await file.arrayBuffer());
                      const url = await uploadFileToS3(buffer, file.name, file.type);
-                     await createDocumentRecord({
+                     await upsertDocumentRecord({
                          Name: file.name,
                          Document_Type__c: type,
                          File_URL__c: url,
@@ -198,8 +220,8 @@ export async function POST(req: Request) {
                 }
                await updateEmployee(employeeId, payload );
            } else if (step === 3) {
-               // Bank Details
-               await createBankDetail({
+               // Bank Details – upsert to prevent duplicates on re-submission
+               await upsertBankDetail({
                    Name: data.bankName,
                    Bank_Branch_Name__c: data.bankbranch,
                    Bank_Account_Number__c: data.accountNumber,

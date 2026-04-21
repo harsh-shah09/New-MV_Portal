@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect, useMemo } from "react"
+import { useState, useRef, useEffect, useMemo, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import Image from "next/image"
 import {
@@ -70,6 +70,83 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
     const [currentPage, setCurrentPage] = useState(1);
     const [sendingEmail, setSendingEmail] = useState(false);
     const itemsPerPage = 6;
+
+    // ── Staged verification changes (bank & documents) ──────────────────────
+    type PendingVerification = {
+        type: 'bank' | 'document';
+        id: string;
+        action: 'approve' | 'reject';
+        bankName?: string;
+        bankAccountNumber?: string;
+        documentName?: string;
+    };
+    const [pendingVerifications, setPendingVerifications] = useState<PendingVerification[]>([]);
+    const [isSavingVerifications, setIsSavingVerifications] = useState(false);
+
+    // Warn on browser refresh/close when there are unsaved changes
+    useEffect(() => {
+        const handler = (e: BeforeUnloadEvent) => {
+            if (pendingVerifications.length > 0) {
+                e.preventDefault();
+                e.returnValue = '';
+            }
+        };
+        window.addEventListener('beforeunload', handler);
+        return () => window.removeEventListener('beforeunload', handler);
+    }, [pendingVerifications.length]);
+
+    /** Stage a bank verification without immediately calling the API */
+    const stageBankVerification = (bank: any, action: 'approve' | 'reject') => {
+        setPendingVerifications(prev => {
+            const filtered = prev.filter(p => !(p.type === 'bank' && p.id === bank.Id));
+            return [...filtered, {
+                type: 'bank',
+                id: bank.Id,
+                action,
+                bankName: bank.Name,
+                bankAccountNumber: bank.Bank_Account_Number__c,
+            }];
+        });
+    };
+
+    /** Stage a document verification without immediately calling the API */
+    const stageDocVerification = (doc: any, action: 'approve' | 'reject') => {
+        setPendingVerifications(prev => {
+            const filtered = prev.filter(p => !(p.type === 'document' && p.id === doc.Id));
+            return [...filtered, {
+                type: 'document',
+                id: doc.Id,
+                action,
+                documentName: doc.Document_Type__c,
+            }];
+        });
+    };
+
+    /** Get staged action for a given item (undefined = not staged) */
+    const getStagedAction = (type: 'bank' | 'document', id: string): 'approve' | 'reject' | undefined =>
+        pendingVerifications.find(p => p.type === type && p.id === id)?.action;
+
+    /** Save all pending verifications via the batch endpoint */
+    const saveVerifications = async () => {
+        if (pendingVerifications.length === 0) return;
+        setIsSavingVerifications(true);
+        try {
+            const res = await fetch(`/api/employees/${employeeId}/verify-batch`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ items: pendingVerifications }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Failed');
+            message.success(`${pendingVerifications.length} verification(s) saved successfully`);
+            setPendingVerifications([]);
+            queryClient.invalidateQueries({ queryKey: ['employee', employeeId] });
+        } catch (e: any) {
+            message.error(e.message || 'Failed to save verifications');
+        } finally {
+            setIsSavingVerifications(false);
+        }
+    };
     const salaryCalculationFields = [
         { fieldKey: "Basic_Console__c", label: "Basic Console", kind: "percentage" as const },
         { fieldKey: "HRA__c", label: "HRA", kind: "percentage" as const },
@@ -83,36 +160,66 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
         getEmployeeTitles().then(setTitles).catch(console.error)
     }, [])
 
+    // The Bank ↔ Documents tabs are "verification tabs"; staged changes accumulate
+    // across both and are submitted together in one batch (one consolidated email).
+    // Only warn when the user tries to navigate AWAY to an unrelated tab.
+    const VERIFICATION_TABS: TabId[] = ['bank', 'documents'];
+
+    const handleTabChange = (tab: TabId) => {
+        const leavingVerificationArea =
+            pendingVerifications.length > 0 &&
+            !(VERIFICATION_TABS.includes(activeTab) && VERIFICATION_TABS.includes(tab));
+
+        if (leavingVerificationArea) {
+            Modal.confirm({
+                title: 'Unsaved verification changes',
+                content:
+                    'You have staged approve/reject decisions that haven\'t been saved yet. ' +
+                    'Leaving now will discard them.',
+                okText: 'Discard & leave',
+                okType: 'danger',
+                cancelText: 'Stay & Save',
+                onOk: () => {
+                    setPendingVerifications([]);
+                    setActiveTab(tab);
+                },
+            });
+        } else {
+            setActiveTab(tab);
+        }
+    };
+
+    // Keep a stable ref to the latest handleTabChange so the popstate listener
+    // doesn't need to be re-registered every time pendingVerifications changes.
+    const handleTabChangeRef = useRef(handleTabChange);
+    useEffect(() => { handleTabChangeRef.current = handleTabChange; });
+
     // --- Sync query param → tab on browser back/forward ---
     useEffect(() => {
-        const onPopState = () => setActiveTab(getTabFromQuery())
-        window.addEventListener("popstate", onPopState)
-        return () => window.removeEventListener("popstate", onPopState)
-    }, [])
+        const onPopState = () => handleTabChangeRef.current(getTabFromQuery());
+        window.addEventListener('popstate', onPopState);
+        return () => window.removeEventListener('popstate', onPopState);
+    }, []); // register once; always calls the latest handler via the ref
 
     // --- Sync tab → query param whenever activeTab changes ---
     useEffect(() => {
-        if (typeof window !== "undefined") {
-            const params = new URLSearchParams(window.location.search)
-            const currentTab = params.get("tab")
+        if (typeof window !== 'undefined') {
+            const params = new URLSearchParams(window.location.search);
+            const currentTab = params.get('tab');
             if (currentTab !== activeTab) {
-                const newParams = new URLSearchParams(window.location.search)
-                newParams.set("tab", activeTab)
-                window.history.replaceState(null, "", `?${newParams.toString()}`)
+                const newParams = new URLSearchParams(window.location.search);
+                newParams.set('tab', activeTab);
+                window.history.replaceState(null, '', `?${newParams.toString()}`);
             }
         }
-    }, [activeTab])
+    }, [activeTab]);
 
+    // Guard: non-Admin users must not land on salary-calculation
     useEffect(() => {
-        if ((currentUserRole || "").trim().toLowerCase() !== "admin" && activeTab === "salary-calculation") {
-            setActiveTab("personal")
+        if ((currentUserRole || '').trim().toLowerCase() !== 'admin' && activeTab === 'salary-calculation') {
+            setActiveTab('personal');
         }
-    }, [activeTab, currentUserRole])
-
-    // --- Tab change handler ---
-    const handleTabChange = (tab: TabId) => {
-        setActiveTab(tab)
-    }
+    }, [activeTab, currentUserRole]);
 
     // --- Data Fetching ---
     const { data: employee, isLoading } = useQuery({
@@ -889,8 +996,8 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
 
     // --- Passbook upload handler ---
     const handlePassbookFileSelected = (file: File) => {
-        if (file.size > 10 * 1024 * 1024) {
-            message.error("File size exceeds 10MB limit.")
+        if (file.size > 5 * 1024 * 1024) {
+            message.error("File size exceeds 5MB limit.")
             return
         }
         setPassbookFile(file)
@@ -914,8 +1021,8 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
             message.error("Please select a file")
             return
         }
-        if (customDocFile.size > 10 * 1024 * 1024) {
-            message.error("File size exceeds 10MB limit.")
+        if (customDocFile.size > 5 * 1024 * 1024) {
+            message.error("File size exceeds 5MB limit.")
             return
         }
 
@@ -934,7 +1041,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
     // --- Tile-based document upload handler ---
     const handleTileFileSelected = (file: File, docName: string) => {
         if (file.size > 10 * 1024 * 1024) {
-            message.error("File size exceeds 10MB limit.")
+            message.error("File size exceeds 5MB limit.")
             return
         }
         setTileUploadFile(file)
@@ -1135,14 +1242,18 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                     try {
                                         const res = await sendWelcomeEmailAction(employeeId, employee.Employee_Email__c, employee.Employee_Name__c, employee.Employee_Id__c);
                                         if (res.error) throw new Error(res.error);
-                                        message.success("Welcome Email sent successfully.");
+                                        if (res.emailType === 'rejected') {
+                                            message.warning("Employee had rejected items. Rejection email sent and items deleted for re-upload.");
+                                        } else {
+                                            message.success("Welcome Email sent successfully.");
+                                        }
                                     } catch (e) {
                                         message.error("Failed to send Welcome Email.");
                                     } finally {
                                         setSendingEmail(false);
                                     }
                                 }}
-                                disabled={sendingEmail || !employee.Employee_Email__c}
+                                disabled={sendingEmail || !employee.Employee_Email__c || employee.Company_Email__c}
                                 className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all border shadow-lg bg-white border-gray-200 text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 <Mail className="w-4 h-4" />
@@ -1203,6 +1314,45 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                     <button onClick={() => setWarningMsg(null)} className="ml-auto text-orange-400 hover:text-orange-600">
                         <X className="w-4 h-4" />
                     </button>
+                </div>
+            )}
+
+            {/* ── Staged Verifications: Save Changes Bar ── */}
+            {pendingVerifications.length > 0 && (
+                <div className="sticky top-2 z-50 flex items-center justify-between gap-4 px-5 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-2xl shadow-xl shadow-emerald-500/30 animate-in slide-in-from-top-2">
+                    <div className="flex items-center gap-2">
+                        <span className="w-6 h-6 flex items-center justify-center bg-white/20 rounded-full text-xs font-bold">
+                            {pendingVerifications.length}
+                        </span>
+                        <span className="text-sm font-semibold">
+                            Unsaved verification change{pendingVerifications.length !== 1 ? 's' : ''} — click Save to apply
+                        </span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                        <button
+                            onClick={() => {
+                                Modal.confirm({
+                                    title: 'Discard changes?',
+                                    content: 'All staged verification decisions will be lost.',
+                                    okText: 'Discard',
+                                    okType: 'danger',
+                                    cancelText: 'Keep',
+                                    onOk: () => setPendingVerifications([]),
+                                });
+                            }}
+                            className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-semibold border border-white/20 transition"
+                        >
+                            Discard
+                        </button>
+                        <button
+                            onClick={saveVerifications}
+                            disabled={isSavingVerifications}
+                            className="px-4 py-1.5 rounded-lg bg-white text-emerald-700 text-xs font-bold hover:bg-emerald-50 transition shadow flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                        >
+                            {isSavingVerifications ? <Spin size="small" /> : <Save className="w-3.5 h-3.5" />}
+                            {isSavingVerifications ? 'Saving…' : 'Save Changes'}
+                        </button>
+                    </div>
                 </div>
             )}
 
@@ -1703,7 +1853,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                                 <Upload className="w-5 h-5 text-blue-600" />
                                                                 <div className="text-center">
                                                                     <p className="text-xs font-medium text-slate-700">Click to upload</p>
-                                                                    <p className="text-[11px] text-slate-500 mt-0.5">PDF, JPG, PNG (max 10MB)</p>
+                                                                    <p className="text-[11px] text-slate-500 mt-0.5">PDF, JPG, PNG (max 5MB)</p>
                                                                 </div>
                                                             </>
                                                         )}
@@ -1755,26 +1905,39 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                                     } border whitespace-nowrap`}>
                                                                     {bank.Status__c || 'Pending'}
                                                                 </span>
-                                                                {isHrUser && (!bank.Status__c || bank.Status__c === 'Pending') && (
-                                                                    <>
-                                                                        <button
-                                                                            onClick={() => verifyBankMutation.mutate({ bankId: bank.Id, action: 'approve' })}
-                                                                            disabled={verifyBankMutation.isPending}
-                                                                            className="text-xs px-2 py-1 rounded-md border border-green-200 text-green-600 hover:bg-green-50 disabled:opacity-50"
-                                                                            title="Verify Account"
+                                                                {(() => {
+                                                                    const staged = getStagedAction('bank', bank.Id);
+                                                                    const canVerify = isHrUser && (!bank.Status__c || bank.Status__c === 'Pending');
+                                                                    if (!canVerify) return null;
+                                                                    return staged ? (
+                                                                        <span
+                                                                            className={`text-xs px-2 py-0.5 rounded-full font-semibold border animate-pulse ${
+                                                                                staged === 'approve'
+                                                                                    ? 'bg-green-50 text-green-700 border-green-300'
+                                                                                    : 'bg-red-50 text-red-700 border-red-300'
+                                                                            }`}
                                                                         >
-                                                                            Verify
-                                                                        </button>
-                                                                        <button
-                                                                            onClick={() => verifyBankMutation.mutate({ bankId: bank.Id, action: 'reject' })}
-                                                                            disabled={verifyBankMutation.isPending}
-                                                                            className="text-xs px-2 py-1 rounded-md border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50"
-                                                                            title="Reject Account"
-                                                                        >
-                                                                            Reject
-                                                                        </button>
-                                                                    </>
-                                                                )}
+                                                                            ⏳ Staged: {staged === 'approve' ? 'Approve' : 'Reject'}
+                                                                        </span>
+                                                                    ) : (
+                                                                        <>
+                                                                            <button
+                                                                                onClick={() => stageBankVerification(bank, 'approve')}
+                                                                                className="text-xs px-2 py-1 rounded-md border border-green-200 text-green-600 hover:bg-green-50"
+                                                                                title="Stage Approve"
+                                                                            >
+                                                                                Verify
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={() => stageBankVerification(bank, 'reject')}
+                                                                                className="text-xs px-2 py-1 rounded-md border border-red-200 text-red-600 hover:bg-red-50"
+                                                                                title="Stage Reject"
+                                                                            >
+                                                                                Reject
+                                                                            </button>
+                                                                        </>
+                                                                    );
+                                                                })()}
                                                                 {bank.Primary_Account__c && <span className="bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded-full font-medium">Primary</span>}
                                                                 {/* {!bank.Primary_Account__c && (
                                                                     <button
@@ -2014,27 +2177,39 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                                             <h4 className="font-semibold text-slate-800 truncate" title={doc.Document_Type__c}>{doc.Document_Type__c}</h4>
                                                                             <p className="text-xs text-slate-500">{doc.Document_Category__c} • {doc.Status__c}</p>
                                                                         </div>
-                                                                        {/* Approve / Reject — top right */}
-                                                                        {doc.Status__c === 'Uploaded' &&
-                                                                            ((currentUserRole === 'HR' && employee.Role__c !== 'HR') || (currentUserRole === 'Admin' && employee.Role__c === 'HR')) && (
-                                                                                <div className="flex items-center gap-1.5 shrink-0">
-                                                                                    <button
-                                                                                        onClick={() => verifyDocumentMutation.mutate({ docId: doc.Id, action: 'approve' })}
-                                                                                        disabled={verifyDocumentMutation.isPending}
-                                                                                        className="bg-white border border-green-200 text-green-600 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-green-50 transition disabled:opacity-50"
+                                                                        {/* Approve / Reject — top right (STAGED) */}
+                                                                        {((doc.Status__c === 'Uploaded') &&
+                                                                            ((currentUserRole === 'HR' && employee.Role__c !== 'HR') || (currentUserRole === 'Admin' && employee.Role__c === 'HR'))) && (
+                                                                            (() => {
+                                                                                const staged = getStagedAction('document', doc.Id);
+                                                                                return staged ? (
+                                                                                    <span
+                                                                                        className={`text-xs font-semibold px-2 py-1 rounded-lg border shrink-0 animate-pulse ${
+                                                                                            staged === 'approve'
+                                                                                                ? 'bg-green-50 text-green-700 border-green-300'
+                                                                                                : 'bg-red-50 text-red-700 border-red-300'
+                                                                                        }`}
                                                                                     >
-                                                                                        Approve
-                                                                                    </button>
-                                                                                    <button
-                                                                                        onClick={() => verifyDocumentMutation.mutate({ docId: doc.Id, action: 'reject' })}
-                                                                                        disabled={verifyDocumentMutation.isPending}
-                                                                                        className="bg-white border border-amber-200 text-amber-600 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-amber-50 transition disabled:opacity-50"
-                                                                                    >
-                                                                                        Reject
-                                                                                    </button>
-                                                                                </div>
-                                                                            )
-                                                                        }
+                                                                                        ⏳ {staged === 'approve' ? 'Approve' : 'Reject'}
+                                                                                    </span>
+                                                                                ) : (
+                                                                                    <div className="flex items-center gap-1.5 shrink-0">
+                                                                                        <button
+                                                                                            onClick={() => stageDocVerification(doc, 'approve')}
+                                                                                            className="bg-white border border-green-200 text-green-600 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-green-50 transition"
+                                                                                        >
+                                                                                            Approve
+                                                                                        </button>
+                                                                                        <button
+                                                                                            onClick={() => stageDocVerification(doc, 'reject')}
+                                                                                            className="bg-white border border-amber-200 text-amber-600 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-amber-50 transition"
+                                                                                        >
+                                                                                            Reject
+                                                                                        </button>
+                                                                                    </div>
+                                                                                );
+                                                                            })()
+                                                                        )}
                                                                     </div>
                                                                     {/* Bottom row: View / Download / Delete */}
                                                                     <div className="mt-4 flex gap-2">
@@ -2196,7 +2371,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                             <p className="text-sm font-medium text-slate-700">
                                                                 {customDocFile ? customDocFile.name : "Click to upload or drag and drop"}
                                                             </p>
-                                                            <p className="text-xs text-slate-500 mt-1">PDF, DOC, DOCX, JPG, PNG (max 10MB)</p>
+                                                            <p className="text-xs text-slate-500 mt-1">PDF, DOC, DOCX, JPG, PNG (max 5MB)</p>
                                                         </div>
                                                     </label>
                                                 </div>

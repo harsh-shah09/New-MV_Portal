@@ -1,7 +1,7 @@
 
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Modal, Steps, Form, Grid, Input, Button, Upload, message, Collapse, Checkbox, Divider, Card, Spin, Select } from "antd"
 import { UploadOutlined, BankOutlined, UserOutlined, FileTextOutlined, CheckCircleOutlined, CameraOutlined, GoogleOutlined, CheckCircleFilled } from "@ant-design/icons"
 import { useQueryClient } from "@tanstack/react-query"
@@ -43,6 +43,8 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
     const [existingProfilePhoto, setExistingProfilePhoto] = useState<string | null>(null)
     const [existingDocuments, setExistingDocuments] = useState<any[]>([])
     const [isExpired, setIsExpired] = useState(false)
+    // Track last successfully saved personal-info payload to skip unchanged API calls
+    const lastSavedPersonalData = useRef<string | null>(null)
     const countryOptions = [
         'Afghanistan',
         'Albania',
@@ -250,14 +252,14 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
 
         if (match) {
             return {
-                countryCode: match[1],
-                phoneNumber: match[2],
+                emergencyCountryCode: match[1],
+                emergencyPhoneNumber: match[2],
             }
         }
 
         return {
-            countryCode: '+91',
-            phoneNumber: normalized.replace(/\D/g, '').slice(0, 10),
+            emergencyCountryCode: '+91',
+            emergencyPhoneNumber: normalized.replace(/\D/g, '').slice(0, 10),
         }
     }
 
@@ -295,6 +297,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                 if (data.showOnboarding) {
                     if (!publicMode) setOpen(true)
                     setCurrentStep(data.currentStep || 1)
+                    console.log("currentStep", data.currentStep);
                     if (data.employeeData) {
                         const emp = data.employeeData || {};
 
@@ -371,31 +374,38 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
 
     useEffect(() => {
         // Fetch documents configuration
-        if (publicMode && publicEmpId) {
-            setDocumentsLoading(false)
-            setDocuments([
-                'Aadhaar Card',
-                'PAN Card',
-                'Driving Licence',
-                'Degree/Marksheet(Latest)'
-            ])
-            return;
-        }
         setDocumentsLoading(true)
-        fetch('/api/admin/configurations?types=documents')
-            .then(res => res.json())
-            .then(data => {
-                if (data.documents && Array.isArray(data.documents)) {
-                    const docNames = data.documents.map((doc: any) => ({
-                        value: doc.Value__c,
-                        label: doc.MasterLabel
-                    }));
-                    const common = docNames[0].value?.split(',');
-                    setDocuments(common)
+        const fetchDocs = async () => {
+            try {
+                // For public mode, use the public documents endpoint; for internal use the admin endpoint
+                const endpoint = publicMode && publicEmpId
+                    ? `/api/public/onboarding-documents?id=${publicEmpId}`
+                    : '/api/admin/configurations?types=documents';
+
+                const res = await fetch(endpoint);
+                const data = await res.json();
+
+                if (data.documents && Array.isArray(data.documents) && data.documents.length > 0) {
+                    const firstDoc = data.documents[0];
+                    // Admin config returns objects; public endpoint returns string[]
+                    if (typeof firstDoc === 'string') {
+                        setDocuments(data.documents);
+                    } else {
+                        const common = firstDoc.Value__c?.split(',').map((s: string) => s.trim()).filter(Boolean) || [];
+                        setDocuments(common);
+                    }
+                } else {
+                    // Fallback if no config found
+                    setDocuments(['Aadhaar Card', 'PAN Card', 'Driving Licence', 'Degree/Marksheet(Latest)']);
                 }
-            })
-            .catch(err => console.error('Failed to fetch documents:', err))
-            .finally(() => setDocumentsLoading(false))
+            } catch (err) {
+                console.error('Failed to fetch documents:', err);
+                setDocuments(['Aadhaar Card', 'PAN Card', 'Driving Licence', 'Degree/Marksheet(Latest)']);
+            } finally {
+                setDocumentsLoading(false);
+            }
+        };
+        fetchDocs();
     }, [])
 
     useEffect(() => {
@@ -457,8 +467,8 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
 
     const handlePassbookUpload = async (file: File) => {
         if (!file) return
-        if (file.size > 10 * 1024 * 1024) {
-            message.error("File size exceeds 10MB limit.")
+        if (file.size > 5 * 1024 * 1024) {
+            message.error("File size exceeds 5MB limit.")
             return
         }
         setPassbookUploading(true)
@@ -548,19 +558,22 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
 
                 setFormErrors({})
 
-                const res = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        step: currentStep,
-                        data: {
-                            ...values,
-                            emergencyPhone: mergedEmergencyPhone,
-                        },
-                        employeeId: publicMode ? publicEmpId : undefined
+                // Only call the API if the data has actually changed
+                const personalPayload = {
+                    step: currentStep,
+                    data: { ...values, emergencyPhone: mergedEmergencyPhone },
+                    employeeId: publicMode ? publicEmpId : undefined,
+                };
+                const personalKey = JSON.stringify(personalPayload);
+                if (personalKey !== lastSavedPersonalData.current) {
+                    const res = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: personalKey,
                     })
-                })
-                if (!res.ok) throw new Error('Failed')
+                    if (!res.ok) throw new Error('Failed')
+                    lastSavedPersonalData.current = personalKey;
+                }
             } else {
                 if (currentStep === 3) {
                     const values = await form.validateFields()
@@ -613,6 +626,12 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
 
     const handleDocumentUpload = async (options: any, doc: any) => {
         const { file, onSuccess, onError } = options
+         // 5 MB client-side limit
+        if (file.size > 5 * 1024 * 1024) {
+            message.error(`File size exceeds 5MB limit.`)
+            onError({ event: new Error('File too large') })
+            return
+        }
         setdocumentsUploading(true)
         const formData = new FormData()
         formData.append('file', file)
