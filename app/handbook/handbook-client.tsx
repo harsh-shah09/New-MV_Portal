@@ -140,8 +140,14 @@ export default function HandbookClient({ role, userId }: HandbookClientProps) {
   }
 
   return (
-    <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-        <div className="p-3 bg-white rounded-xl">
+    <>
+        {deleteMutation.status === 'pending' && (
+            <div className="fixed inset-0 z-[99999] bg-slate-50/40 backdrop-blur-[2px] flex items-center justify-center">
+                <Spin size="large" tip={<span className="mt-2 block font-medium text-slate-600">Deleting...</span>} />
+            </div>
+        )}
+        <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+            <div className="p-3 bg-white rounded-xl">
         <PageHeader 
         title="Handbook & Policies"
         subtitle="Access company policies, manuals, and guidelines."
@@ -191,9 +197,9 @@ export default function HandbookClient({ role, userId }: HandbookClientProps) {
                                    <Tooltip title="Preview">
                                         <Button shape="circle" icon={<Eye size={18} />} onClick={() => setPreviewDoc(doc)} className="border-0 shadow-lg hover:scale-110 transition-transform" />
                                    </Tooltip>
-                                   <Tooltip title="Download">
+                                   {/* <Tooltip title="Download">
                                         <Button shape="circle" icon={<Download size={18} />} href={doc.File_URL__c} target="_blank" className="border-0 shadow-lg hover:scale-110 transition-transform"/>
-                                   </Tooltip>
+                                   </Tooltip> */}
                                    {isHR && (
                                        <Tooltip title="Delete">
                                             <Button shape="circle" danger icon={<Trash2 size={18} />} onClick={() => handleDelete(doc.Id)} className="border-0 shadow-lg hover:scale-110 transition-transform text-red-500 hover:text-red-700"/>
@@ -232,39 +238,42 @@ export default function HandbookClient({ role, userId }: HandbookClientProps) {
             footer={null}
             destroyOnHidden
         >
-            <Form onFinish={handleUpload} layout="vertical" className="pt-4">
-                <Form.Item name="name" label="Document Name" rules={[{ required: true, message: 'Please enter a name' }]}>
-                    <Input placeholder="e.g. Employee Handbook 2024" size="large" />
-                </Form.Item>
-                <Form.Item name="type" label="Category / Type" rules={[{ required: true, message: 'Please select a type' }]}>
-                    <Select size="large" placeholder="Select Type">
-                        <Select.Option value="Policy">Policy</Select.Option>
-                        <Select.Option value="Manual">Manual</Select.Option>
-                        <Select.Option value="Form">Form</Select.Option>
-                        <Select.Option value="Guideline">Guideline</Select.Option>
-                        <Select.Option value="Other">Other</Select.Option>
-                    </Select>
-                </Form.Item>
-                <Form.Item name="file" label="File" rules={[{ required: true, message: 'Please upload a file' }]}>
-                     <Upload.Dragger maxCount={1} beforeUpload={() => false} accept=".pdf,.doc,.docx,.jpg,.png">
-                          <p className="ant-upload-drag-icon text-blue-500">
-                              <InboxOutlined />
-                          </p>
-                          <p className="ant-upload-text">Click or drag file to this area to upload</p>
-                          <p className="ant-upload-hint">Supported formats: PDF, DOCX, JPG, PNG</p>
-                     </Upload.Dragger>
-                </Form.Item>
-                <div className="flex justify-end gap-3 mt-8">
-                    <Button onClick={() => setUploadModalOpen(false)} size="large">Cancel</Button>
-                    <Button type="primary" htmlType="submit" loading={uploadMutation.status === 'pending'} size="large" className="bg-blue-600">
-                        Upload Document
-                    </Button>
-                </div>
-            </Form>
+            <Spin spinning={uploadMutation.status === 'pending'} tip="Uploading Handbook..." size="large">
+                <Form onFinish={handleUpload} layout="vertical" className="pt-4">
+                    <Form.Item name="name" label="Document Name" rules={[{ required: true, message: 'Please enter a name' }]}>
+                        <Input placeholder="e.g. Employee Handbook 2024" size="large" disabled={uploadMutation.status === 'pending'} />
+                    </Form.Item>
+                    <Form.Item name="type" label="Category / Type" rules={[{ required: true, message: 'Please select a type' }]}>
+                        <Select size="large" placeholder="Select Type" disabled={uploadMutation.status === 'pending'}>
+                            <Select.Option value="Policy">Policy</Select.Option>
+                            <Select.Option value="Manual">Manual</Select.Option>
+                            <Select.Option value="Form">Form</Select.Option>
+                            <Select.Option value="Guideline">Guideline</Select.Option>
+                            <Select.Option value="Other">Other</Select.Option>
+                        </Select>
+                    </Form.Item>
+                    <Form.Item name="file" label="File" rules={[{ required: true, message: 'Please upload a file' }]}>
+                         <Upload.Dragger maxCount={1} beforeUpload={() => false} accept=".pdf,.doc,.docx,.jpg,.png" disabled={uploadMutation.status === 'pending'}>
+                              <p className="ant-upload-drag-icon text-blue-500">
+                                  <InboxOutlined />
+                              </p>
+                              <p className="ant-upload-text">Click or drag file to this area to upload</p>
+                              <p className="ant-upload-hint">Supported formats: PDF, DOCX, JPG, PNG</p>
+                         </Upload.Dragger>
+                    </Form.Item>
+                    <div className="flex justify-end gap-3 mt-8">
+                        <Button onClick={() => setUploadModalOpen(false)} size="large" disabled={uploadMutation.status === 'pending'}>Cancel</Button>
+                        <Button type="primary" htmlType="submit" loading={uploadMutation.status === 'pending'} size="large" className="bg-blue-600">
+                            Upload Document
+                        </Button>
+                    </div>
+                </Form>
+            </Spin>
         </Modal>
 
         {renderPreview()}
         </div>
     </div>
+    </>
   )
 }
