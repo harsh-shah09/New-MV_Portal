@@ -399,6 +399,17 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                 newErrors.Employee_Email__c = "Email address is required"
             } else if (!emailPattern.test(email)) {
                 newErrors.Employee_Email__c = "Please enter a valid email address"
+            } else if (companyEmail && email.toLowerCase() === companyEmail.toLowerCase()) {
+                newErrors.Employee_Email__c = "Personal Email cannot be the same as Company Email"
+            } else if (employeesList) {
+                const isDuplicate = employeesList.some((emp: any) =>
+                    emp.Id !== employeeId &&
+                    emp.Status__c === 'Active' &&
+                    emp.Employee_Email__c?.trim().toLowerCase() === email.toLowerCase()
+                );
+                if (isDuplicate) {
+                    newErrors.Employee_Email__c = "This Personal Email is already used by another active employee";
+                }
             }
 
 
@@ -444,10 +455,13 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                 if (!formData.Department__c) newErrors.Department__c = "Department is required"
             }
 
-            const companyEmail = formData.Company_Email__c?.trim()
+            const companyEmail = formData.Company_Email__c?.trim();
+            const personalEmail = formData.Employee_Email__c?.trim();
             if (companyEmail) {
                 if (!emailPattern.test(companyEmail)) {
                     newErrors.Company_Email__c = "Please enter a valid company email address";
+                } else if (personalEmail && companyEmail.toLowerCase() === personalEmail.toLowerCase()) {
+                    newErrors.Company_Email__c = "Company Email cannot be the same as Personal Email";
                 } else if (employeesList) {
                     const isDuplicate = employeesList.some((emp: any) =>
                         emp.Id !== employeeId &&

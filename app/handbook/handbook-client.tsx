@@ -111,7 +111,7 @@ export default function HandbookClient({ role, userId }: HandbookClientProps) {
              title={previewDoc.Name}
              open={!!previewDoc}
              onCancel={() => setPreviewDoc(null)}
-             width={900}
+             width="100vw"
              footer={[
                  <Button key="download" icon={<Download size={14}/>} href={previewDoc.File_URL__c} target="_blank">
                      Download
@@ -120,7 +120,7 @@ export default function HandbookClient({ role, userId }: HandbookClientProps) {
              ]}
              centered
           >
-              <div className="h-[70vh] w-full bg-gray-50 flex items-center justify-center overflow-auto rounded-md border border-gray-200">
+              <div className="h-[85vh] w-full bg-gray-50 flex items-center justify-center overflow-auto rounded-md border border-gray-200">
                    {isPdf ? (
                        <iframe src={previewDoc.File_URL__c} className="w-full h-full" title="Preview" />
                    ) : isImage ? (

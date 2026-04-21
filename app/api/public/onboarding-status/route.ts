@@ -227,7 +227,8 @@ export async function POST(req: Request) {
                    Bank_Account_Number__c: data.accountNumber,
                    IFSC__c: data.ifscCode,
                    Primary_Account__c: true,
-                   Employee__c: employeeId
+                   Employee__c: employeeId,
+                   Status__c : 'Pending'
                });
            }
            

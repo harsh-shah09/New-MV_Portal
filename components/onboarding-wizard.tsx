@@ -347,19 +347,23 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                         });
 
                         if (emp.bankDetails && emp.bankDetails.length > 0) {
-                            const bank = emp.bankDetails[0];
-                            form.setFieldsValue({
-                                bankName: bank.Name || '',
-                                bankbranch: bank.Bank_Branch_Name__c || '',
-                                accountNumber: bank.Bank_Account_Number__c || '',
-                                accountHolder: emp.Employee_Name__c || '',
-                                ifscCode: bank.IFSC__c || '',
-                            });
+                            const activeBanks = emp.bankDetails.filter((b: any) => b.Status__c !== 'Rejected');
+                            if (activeBanks.length > 0) {
+                                const bank = activeBanks[0];
+                                form.setFieldsValue({
+                                    bankName: bank.Name || '',
+                                    bankbranch: bank.Bank_Branch_Name__c || '',
+                                    accountNumber: bank.Bank_Account_Number__c || '',
+                                    accountHolder: emp.Employee_Name__c || '',
+                                    ifscCode: bank.IFSC__c || '',
+                                });
+                            }
                         }
                         if (emp.documents && emp.documents.length > 0) {
-                            const passbook = emp.documents.find((d: any) => d.Document_Type__c === 'Passbook');
+                            const activeDocs = emp.documents.filter((d: any) => d.Status__c !== 'Rejected');
+                            const passbook = activeDocs.find((d: any) => d.Document_Type__c === 'Passbook');
                             if (passbook) setPassbookUploaded(true);
-                            setExistingDocuments(emp.documents);
+                            setExistingDocuments(activeDocs);
                         }
                     }
                 } else {

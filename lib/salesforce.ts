@@ -470,6 +470,7 @@ export const upsertBankDetail = async (bankData: any) => {
             Bank_Account_Number__c: bankData.Bank_Account_Number__c,
             IFSC__c: bankData.IFSC__c,
             Primary_Account__c: bankData.Primary_Account__c,
+            Status__c : bankData.Status__c
         });
     } else {
         // No record yet – create new

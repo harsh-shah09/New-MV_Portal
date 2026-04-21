@@ -25,7 +25,7 @@ import {
     ChevronRight
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { message, Modal, Select, Spin } from "antd";
+import { message, Modal, Select, Spin, Collapse } from "antd";
 import EmailEditor from "@/components/admin/email-editor";
 import SafeHTMLPreview from "@/components/safe-html-preview";
 import { RoleGuard } from "@/components/role-guard";
@@ -977,13 +977,27 @@ export default function AdminConsole() {
                                             </div>
                                         )}
 
-                                        {activeTab === "email" && (
-                                            <div>
-                                                <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
-                                                    <Mail className="w-5 h-5 text-purple-500" /> Email Templates
-                                                </h2>
-                                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                                    {configs.emailTemplates?.map((record: any) => (
+                                        {activeTab === "email" && (() => {
+                                            const onboarding = configs.emailTemplates?.filter((r: any) => {
+                                                const lowered = (r.DeveloperName || '').toLowerCase();
+                                                return lowered.includes('welcome') || lowered.includes('onboarding') || narrowedDocumentCheck(lowered);
+                                            }) || [];
+                                            const leave = configs.emailTemplates?.filter((r: any) => {
+                                                const lowered = (r.DeveloperName || '').toLowerCase();
+                                                return lowered.includes('leave') || lowered.includes('sandwich');
+                                            }) || [];
+                                            const other = configs.emailTemplates?.filter((r: any) => {
+                                                const lowered = (r.DeveloperName || '').toLowerCase();
+                                                return !(lowered.includes('welcome') || lowered.includes('onboarding') || narrowedDocumentCheck(lowered) || lowered.includes('leave') || lowered.includes('sandwich'));
+                                            }) || [];
+
+                                            function narrowedDocumentCheck(name: string) {
+                                              return name.includes('document');
+                                            }
+
+                                            const renderTemplateGrid = (items: any[]) => (
+                                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-4 bg-slate-50/50 rounded-xl">
+                                                    {items.map((record: any) => (
                                                         <motion.div
                                                             key={record.Id}
                                                             whileHover={{ scale: 1.02 }}
@@ -995,21 +1009,40 @@ export default function AdminConsole() {
                                                                 <p className="text-xs text-slate-400 font-mono mt-1">{record.DeveloperName}</p>
                                                             </div>
                                                             <div className="p-4 flex-1 bg-slate-50/20 relative overflow-hidden">
-                                                                {/* Mini Preview Mockup */}
                                                                 <div className="opacity-40 text-[10px] leading-relaxed scale-90 origin-top-left pointer-events-none select-none h-full w-full">
                                                                     <SafeHTMLPreview html={record.Value__c} className="w-full h-full border-none" />
                                                                 </div>
                                                                 <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-white to-transparent"></div>
-
                                                                 <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-white/60 backdrop-blur-sm">
                                                                     <span className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold shadow-lg">Edit Template</span>
                                                                 </div>
                                                             </div>
                                                         </motion.div>
                                                     ))}
+                                                    {items.length === 0 && (
+                                                        <div className="col-span-full p-8 text-center text-slate-400 font-medium italic">No templates available.</div>
+                                                    )}
                                                 </div>
-                                            </div>
-                                        )}
+                                            );
+
+                                            return (
+                                                <div>
+                                                    <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+                                                        <Mail className="w-5 h-5 text-purple-500" /> Email Templates
+                                                    </h2>
+                                                    <Collapse
+                                                        defaultActiveKey={['onboarding', 'leave', 'other']}
+                                                        className="bg-white"
+                                                        bordered={false}
+                                                        items={[
+                                                            { key: 'onboarding', label: <span className="font-bold text-slate-800">Onboarding & Verification</span>, children: renderTemplateGrid(onboarding) },
+                                                            { key: 'leave', label: <span className="font-bold text-slate-800">Leave Approvals</span>, children: renderTemplateGrid(leave) },
+                                                            { key: 'other', label: <span className="font-bold text-slate-800">Other Configurations</span>, children: renderTemplateGrid(other) }
+                                                        ]}
+                                                    />
+                                                </div>
+                                            );
+                                        })()}
                                     </motion.div>
                                 </AnimatePresence>
                             </div>
