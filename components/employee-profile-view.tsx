@@ -41,6 +41,7 @@ import dayjs from "dayjs"
 import { cn } from "@/lib/utils"
 import { Field } from "./field-component"
 import { EmployeeSalaryHistoryTab } from "./employee-salary-history-tab"
+import { GoogleIntegration } from "@/app/dashboard/components/employee/google-integration"
 
 interface ViewProps {
     employeeId: string;
@@ -1388,7 +1389,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                             { id: "bank", label: "Bank Details", icon: CreditCard },
                             { id: "documents", label: "Documents", icon: FileText },
                             //  { id: "leaves", label: "Leaves", icon: Leaf },
-                            { id: "security", label: "Security", icon: Lock },
+                            { id: "security", label: "Security & Auth.", icon: Lock },
                         ].map((tab) => (
                             <button
                                 key={tab.id}
@@ -2445,6 +2446,8 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                 </div>
                                             </div>
                                         </div>
+
+                                        <GoogleIntegration />
 
                                         {/* 2FA Setup Modal */}
                                         {show2FAModal && (
