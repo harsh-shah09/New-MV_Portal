@@ -19,7 +19,6 @@ import {
     Workflow,
     Check,
     Trash2,
-    DollarSign,
     Package,
     ChevronLeft,
     ChevronRight
@@ -35,9 +34,9 @@ const formatLabel = (str: string) => {
     return str.replace(/_/g, ' ').replace(/([A-Z])/g, ' $1').trim();
 };
 
-type AdminTab = "admin" | "documents" | "email" | "leave" | "payroll" | "users" | "integration" | "assets";
+type AdminTab = "admin" | "documents" | "email" | "leave" | "users" | "integration" | "assets";
 
-const VALID_TABS: AdminTab[] = ["admin", "documents", "leave", "payroll", "users", "integration", "email", "assets"];
+const VALID_TABS: AdminTab[] = ["admin", "documents", "leave", "users", "integration", "email", "assets"];
 
 function getTabFromQuery(): AdminTab {
     if (typeof window === "undefined") return "admin";
@@ -50,7 +49,6 @@ export default function AdminConsole() {
     const [activeTab, setActiveTab] = useState<AdminTab>("admin");
     const [configs, setConfigs] = useState<any>(null);
     const [roleOptions, setRoleOptions] = useState<string[]>([]);
-    const [payrollCalculationTypeOptions, setPayrollCalculationTypeOptions] = useState<string[]>([]);
     const [users, setUsers] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [loadingUsers, setLoadingUsers] = useState(false);
@@ -182,10 +180,9 @@ export default function AdminConsole() {
             if (!res.ok) throw new Error("Failed to fetch configurations");
             const data = await res.json();
             setRoleOptions(data.roleOptions || []);
-            setPayrollCalculationTypeOptions(data.payrollCalculationTypeOptions || []);
             const {
                 roleOptions: _roleOptions,
-                payrollCalculationTypeOptions: _payrollCalculationTypeOptions,
+                payroll: _payroll,
                 ...configData
             } = data;
             setConfigs(configData);
@@ -208,8 +205,7 @@ export default function AdminConsole() {
             metadataType === 'Admin_Configurations__mdt' ? 'admin' :
                 metadataType === 'Documents_Configurations__mdt' ? 'documents' :
                     metadataType === 'Email_Templates__mdt' ? 'emailTemplates' :
-                        metadataType === 'Payroll_Configurations__mdt' ? 'payroll' :
-                            metadataType === 'Asset_Configuration__mdt' ? 'assets' : 'leave';
+                        metadataType === 'Asset_Configuration__mdt' ? 'assets' : 'leave';
 
         setConfigs((prev: any) => ({
             ...prev,
@@ -380,7 +376,6 @@ export default function AdminConsole() {
                                 <TabButton id="admin" label="General Settings" icon={Settings} />
                                 <TabButton id="documents" label="Documents Config" icon={FileText} />
                                 <TabButton id="leave" label="Leave Rules" icon={Calendar} />
-                                <TabButton id="payroll" label="Payroll Config" icon={DollarSign} />
                                 <TabButton id="users" label="User Access" icon={Users} />
                                 <TabButton id="integration" label="Connected Users" icon={Workflow} />
                                 <TabButton id="email" label="Email Templates" icon={Mail} />
@@ -571,64 +566,6 @@ export default function AdminConsole() {
                                                                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition group-hover:bg-white"
                                                             />
                                                         )}
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-
-                                        {activeTab === "payroll" && (
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                                {configs.payroll?.map((record: any) => (
-                                                    <div key={record.Id} className="group bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-4">
-                                                        <div>
-                                                            <label className="block text-xs font-semibold text-slate-500 mb-1">Configuration</label>
-                                                            <div className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-700">
-                                                                {record.MasterLabel || record.DeveloperName}
-                                                            </div>
-                                                        </div>
-
-                                                        <div>
-                                                            <label className="block text-xs font-semibold text-slate-500 mb-1">Value</label>
-                                                            <input
-                                                                type="text"
-                                                                value={record.Value__c || ''}
-                                                                onChange={(e) => handleInputChange('Payroll_Configurations__mdt', record, e.target.value, 'Value__c')}
-                                                                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition"
-                                                            />
-                                                        </div>
-
-                                                        <div>
-                                                            <label className="block text-xs font-semibold text-slate-500 mb-1">Calculation Type</label>
-                                                            {payrollCalculationTypeOptions.length > 0 ? (
-                                                                <Select
-                                                                    value={record.Calculation_Type__c || undefined}
-                                                                    onChange={(value) => handleInputChange('Payroll_Configurations__mdt', record, value, 'Calculation_Type__c')}
-                                                                    className="w-full"
-                                                                    options={payrollCalculationTypeOptions.map((option) => ({ value: option, label: option }))}
-                                                                    placeholder="Select calculation type"
-                                                                />
-                                                            ) : (
-                                                                <input
-                                                                    type="text"
-                                                                    value={record.Calculation_Type__c || ''}
-                                                                    onChange={(e) => handleInputChange('Payroll_Configurations__mdt', record, e.target.value, 'Calculation_Type__c')}
-                                                                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition"
-                                                                />
-                                                            )}
-                                                        </div>
-
-                                                        <div>
-                                                            <label className="block text-xs font-semibold text-slate-500 mb-1">Is Active</label>
-                                                            <Select
-                                                                value={record.Is_Active__c ? 'true' : 'false'}
-                                                                onChange={(value) => handleInputChange('Payroll_Configurations__mdt', record, value === 'true', 'Is_Active__c')}
-                                                                className="w-full"
-                                                                options={[
-                                                                    { value: 'true', label: 'Enabled' },
-                                                                    { value: 'false', label: 'Disabled' }
-                                                                ]}
-                                                            />
-                                                        </div>
                                                     </div>
                                                 ))}
                                             </div>
