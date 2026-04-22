@@ -130,7 +130,10 @@ export function PayrollSummaryList({ summaries, onSelectSummary, onDeleteSummary
       title: "Actions",
       key: "actions",
       width: 100,
-      render: (_: any, record: PayrollSummary) => (
+      render: (_: any, record: PayrollSummary) => {
+        const disableActions = isBusy || record.status !== "draft"
+
+        return (
         <Popconfirm
           title="Delete Payroll Summary"
           description={
@@ -150,6 +153,7 @@ export function PayrollSummaryList({ summaries, onSelectSummary, onDeleteSummary
           onConfirm={(e) => handleDelete(record.id, e as any)}
           okText="Yes, Delete"
           cancelText="Cancel"
+          disabled={disableActions}
           okButtonProps={{ danger: true, loading: isBusy, disabled: isBusy }}
           cancelButtonProps={{ disabled: isBusy }}
         >
@@ -157,13 +161,14 @@ export function PayrollSummaryList({ summaries, onSelectSummary, onDeleteSummary
             danger 
             icon={<DeleteOutlined />} 
             size="small"
-            disabled={isBusy}
+            disabled={disableActions}
             onClick={(e) => e.stopPropagation()}
           >
             Delete
           </Button>
         </Popconfirm>
-      ),
+        )
+      },
     },
   ]
 

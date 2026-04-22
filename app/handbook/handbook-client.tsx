@@ -253,7 +253,11 @@ export default function HandbookClient({ role, userId }: HandbookClientProps) {
                         </Select>
                     </Form.Item>
                     <Form.Item name="file" label="File" rules={[{ required: true, message: 'Please upload a file' }]}>
-                         <Upload.Dragger maxCount={1} beforeUpload={() => false} accept=".pdf,.doc,.docx,.jpg,.png" disabled={uploadMutation.status === 'pending'}>
+                         <Upload.Dragger maxCount={1} beforeUpload={(file) => {
+                                const isSmall = file.size < 5 * 1024 * 1024;
+                                if (!isSmall) message.error("File too large");
+                                return isSmall || Upload.LIST_IGNORE;
+                            }} accept=".pdf,.doc,.docx,.jpg,.png" disabled={uploadMutation.status === 'pending'}>
                               <p className="ant-upload-drag-icon text-blue-500">
                                   <InboxOutlined />
                               </p>

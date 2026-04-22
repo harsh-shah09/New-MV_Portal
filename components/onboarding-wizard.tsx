@@ -9,6 +9,18 @@ import Confetti from "react-confetti"
 import { motion, AnimatePresence } from "framer-motion"
 import { Check, AlertCircle, Loader2, Trash2 } from "lucide-react"
 import ImgCrop from "antd-img-crop"
+import { getCountries, getCountryCallingCode, parsePhoneNumberFromString, AsYouType, CountryCode, getExampleNumber } from 'libphonenumber-js'
+import examples from 'libphonenumber-js/examples.mobile.json'
+
+const regionNames = new Intl.DisplayNames(['en'], { type: 'region' });
+const dynamicCountryOptions = getCountries().map((country) => {
+    return {
+        value: country,
+        label: `${regionNames.of(country)} (+${getCountryCallingCode(country)})`,
+        dialCode: `+${getCountryCallingCode(country)}`,
+        name: regionNames.of(country) || '',
+    };
+}).sort((a, b) => a.name.localeCompare(b.name));
 
 export interface OnboardingWizardProps {
     publicMode?: boolean;
@@ -44,239 +56,52 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
     const [existingDocuments, setExistingDocuments] = useState<any[]>([])
     const [isExpired, setIsExpired] = useState(false)
     // Track last successfully saved personal-info payload to skip unchanged API calls
+    const [disabledsteps , setDisabledSteps] = useState<number[]>([])
     const lastSavedPersonalData = useRef<string | null>(null)
-    const countryOptions = [
-        'Afghanistan',
-        'Albania',
-        'Algeria',
-        'Andorra',
-        'Angola',
-        'Antigua and Barbuda',
-        'Argentina',
-        'Armenia',
-        'Australia',
-        'Austria',
-        'Azerbaijan',
-        'Bahamas',
-        'Bahrain',
-        'Bangladesh',
-        'Barbados',
-        'Belarus',
-        'Belgium',
-        'Belize',
-        'Benin',
-        'Bhutan',
-        'Bolivia',
-        'Bosnia and Herzegovina',
-        'Botswana',
-        'Brazil',
-        'Brunei',
-        'Bulgaria',
-        'Burkina Faso',
-        'Burundi',
-        'Cabo Verde',
-        'Cambodia',
-        'Cameroon',
-        'Canada',
-        'Central African Republic',
-        'Chad',
-        'Chile',
-        'China',
-        'Colombia',
-        'Comoros',
-        'Congo',
-        'Costa Rica',
-        'Cote d’Ivoire',
-        'Croatia',
-        'Cuba',
-        'Cyprus',
-        'Czech Republic',
-        'Denmark',
-        'Djibouti',
-        'Dominica',
-        'Dominican Republic',
-        'DR Congo',
-        'Ecuador',
-        'Egypt',
-        'El Salvador',
-        'Equatorial Guinea',
-        'Eritrea',
-        'Estonia',
-        'Eswatini',
-        'Ethiopia',
-        'Fiji',
-        'Finland',
-        'France',
-        'Gabon',
-        'Gambia',
-        'Georgia',
-        'Germany',
-        'Ghana',
-        'Greece',
-        'Grenada',
-        'Guatemala',
-        'Guinea',
-        'Guinea-Bissau',
-        'Guyana',
-        'Haiti',
-        'Honduras',
-        'Hungary',
-        'Iceland',
-        'India',
-        'Indonesia',
-        'Iran',
-        'Iraq',
-        'Ireland',
-        'Israel',
-        'Italy',
-        'Jamaica',
-        'Japan',
-        'Jordan',
-        'Kazakhstan',
-        'Kenya',
-        'Kiribati',
-        'Kuwait',
-        'Kyrgyzstan',
-        'Laos',
-        'Latvia',
-        'Lebanon',
-        'Lesotho',
-        'Liberia',
-        'Libya',
-        'Liechtenstein',
-        'Lithuania',
-        'Luxembourg',
-        'Madagascar',
-        'Malawi',
-        'Malaysia',
-        'Maldives',
-        'Mali',
-        'Malta',
-        'Marshall Islands',
-        'Mauritania',
-        'Mauritius',
-        'Mexico',
-        'Micronesia',
-        'Moldova',
-        'Monaco',
-        'Mongolia',
-        'Montenegro',
-        'Morocco',
-        'Mozambique',
-        'Myanmar',
-        'Namibia',
-        'Nauru',
-        'Nepal',
-        'Netherlands',
-        'New Zealand',
-        'Nicaragua',
-        'Niger',
-        'Nigeria',
-        'North Korea',
-        'North Macedonia',
-        'Norway',
-        'Oman',
-        'Pakistan',
-        'Palau',
-        'Palestine',
-        'Panama',
-        'Papua New Guinea',
-        'Paraguay',
-        'Peru',
-        'Philippines',
-        'Poland',
-        'Portugal',
-        'Qatar',
-        'Romania',
-        'Russia',
-        'Rwanda',
-        'Saint Kitts and Nevis',
-        'Saint Lucia',
-        'Saint Vincent and the Grenadines',
-        'Samoa',
-        'San Marino',
-        'Sao Tome and Principe',
-        'Saudi Arabia',
-        'Senegal',
-        'Serbia',
-        'Seychelles',
-        'Sierra Leone',
-        'Singapore',
-        'Slovakia',
-        'Slovenia',
-        'Solomon Islands',
-        'Somalia',
-        'South Africa',
-        'South Korea',
-        'South Sudan',
-        'Spain',
-        'Sri Lanka',
-        'Sudan',
-        'Suriname',
-        'Sweden',
-        'Switzerland',
-        'Syria',
-        'Taiwan',
-        'Tajikistan',
-        'Tanzania',
-        'Thailand',
-        'Timor-Leste',
-        'Togo',
-        'Tonga',
-        'Trinidad and Tobago',
-        'Tunisia',
-        'Turkey',
-        'Turkmenistan',
-        'Tuvalu',
-        'Uganda',
-        'Ukraine',
-        'United Arab Emirates',
-        'United Kingdom',
-        'United States',
-        'Uruguay',
-        'Uzbekistan',
-        'Vanuatu',
-        'Vatican City',
-        'Venezuela',
-        'Vietnam',
-        'Yemen',
-        'Zambia',
-        'Zimbabwe',
-    ]
     const { useBreakpoint } = Grid;
     const screens = useBreakpoint();
 
     const splitEmergencyContact = (value?: string) => {
         const normalized = value?.trim() || ''
-        const match = normalized.match(/^(\+\d{1,4})\s*(\d+)$/)
+        const phoneNumber = parsePhoneNumberFromString(normalized)
 
+        if (phoneNumber) {
+            return {
+                emergencyCountryCode: phoneNumber.country || 'IN',
+                emergencyPhoneNumber: phoneNumber.formatNational(),
+            }
+        }
+
+        const match = normalized.match(/^(\+\d{1,2})\s*(\d+)$/)
         if (match) {
             return {
-                emergencyCountryCode: match[1],
+                emergencyCountryCode: 'IN',
                 emergencyPhoneNumber: match[2],
             }
         }
 
         return {
-            emergencyCountryCode: '+91',
+            emergencyCountryCode: 'IN',
             emergencyPhoneNumber: normalized.replace(/\D/g, '').slice(0, 10),
         }
     }
 
     const mergeEmergencyContact = (countryCode?: string, phoneNumber?: string) => {
-        const code = countryCode?.trim() || '+91'
+        const isoCode = (countryCode || 'IN') as CountryCode
         const number = phoneNumber?.trim() || ''
-        return `${code}${number}`.replace(/\s+/g, '')
+        if (!number) return ''
+        const parsed = parsePhoneNumberFromString(number, isoCode)
+        return parsed ? parsed.number : `+${getCountryCallingCode(isoCode)}${number.replace(/\D/g, '')}`
     }
 
-    const validateEmergencyPhone = (value: string) => {
+    const validateEmergencyPhone = (isoCode: string, value: string) => {
         if (!value) return true
-        return /^\d{10}$/.test(value.replace(/\s+/g, ''))
+        const parsed = parsePhoneNumberFromString(value, isoCode as CountryCode)
+        return parsed ? parsed.isValid() : false
     }
 
     const validateEmergencyCountryCode = (value: string) => {
-        if (!value) return true
-        return /^\+\d+$/.test(value.trim())
+        return true
     }
 
     useEffect(() => {
@@ -373,7 +198,23 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                 }
             })
             .catch(err => console.error(err))
-            .finally(() => setPageLoading(false))
+            .finally(() => {
+                setPageLoading(false)
+                if(!firsttime){
+                    if(step === 1){
+                        setDisabledSteps([])
+                    }
+                    if(step === 2){
+                        setDisabledSteps([1])
+                    }
+                    if(step === 3){
+                        setDisabledSteps([1,2])
+                    }
+                    if(step === 4){
+                        setDisabledSteps([1,2,3])
+                    }
+                }
+            })
     }, [])
 
     useEffect(() => {
@@ -512,6 +353,11 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                     return;
                 }
                 if (profileFile) {
+                    if(profileFile.size > 1 * 1024 * 1024) {
+                        message.error("File size exceeds 1MB limit.")
+                        setLoading(false)
+                        return
+                    }
                     const formData = new FormData()
                     formData.append('file', profileFile)
                     formData.append('step', '1')
@@ -548,19 +394,11 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                     }
                 }
 
-                if (values.emergencyCountryCode && !validateEmergencyCountryCode(values.emergencyCountryCode)) {
-                    setFormErrors({ emergencyCountryCode: 'Country code must start with + and contain digits only (example: +91)' })
+                if (values.emergencyPhoneNumber && !validateEmergencyPhone(values.emergencyCountryCode, values.emergencyPhoneNumber)) {
+                    setFormErrors({ emergencyPhoneNumber: 'Please enter a valid phone number for the selected country' })
                     setLoading(false)
                     return
                 }
-
-                if (values.emergencyPhoneNumber && !validateEmergencyPhone(values.emergencyPhoneNumber)) {
-                    setFormErrors({ emergencyPhoneNumber: 'Emergency contact number must be exactly 10 digits' })
-                    setLoading(false)
-                    return
-                }
-
-                setFormErrors({})
 
                 // Only call the API if the data has actually changed
                 const personalPayload = {
@@ -732,6 +570,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                     setProfileFile(file)
                                     return false
                                 }}
+                                disabled = {documentsUploading || disabledsteps.includes(1)}
                                 className="avatar-uploader group border-dashed"
                             >
                                 {profileFile ? (
@@ -766,26 +605,32 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                     <div className="py-4">
                         <p className="mb-4 text-gray-500">Current Address</p>
                         <Form.Item name="street" label="Street Address" rules={[{ required: true }]}>
-                            <Input placeholder="123 Main St" />
+                            <Input placeholder="123 Main St" disabled={disabledsteps.includes(2)} />
                         </Form.Item>
                         <div className="grid grid-cols-2 gap-4">
                             <Form.Item name="city" label="City" rules={[{ required: true }]}>
-                                <Input />
+                                <Input disabled={disabledsteps.includes(2)} />
                             </Form.Item>
                             <Form.Item name="state" label="State" rules={[{ required: true }]}>
-                                <Input />
+                                <Input disabled={disabledsteps.includes(2)} />
                             </Form.Item>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             <Form.Item name="postalCode" label="Postal Code" rules={[{ required: true }]}>
-                                <Input />
+                                <Input disabled={disabledsteps.includes(2)} />
                             </Form.Item>
                             <Form.Item name="country" label="Country" rules={[{ required: true }]}>
                                 <Select
                                     showSearch
                                     placeholder="Select country"
-                                    options={countryOptions.map(country => ({ label: country, value: country }))}
+                                    options={dynamicCountryOptions.map(country => ({ label: country.name, value: country.name }))}
                                     optionFilterProp="label"
+                                    disabled={disabledsteps.includes(2)}
+                                    onChange={(val) => {
+                                        const code = dynamicCountryOptions.find(c => c.name === val)?.value;
+                                        if (code) form.setFieldValue('emergencyCountryCode', code);
+                                        form.setFieldValue('emergencyPhoneNumber', ''); // clear mismatch
+                                    }}
                                 />
                             </Form.Item>
                         </div>
@@ -796,7 +641,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                             valuePropName="checked"
                             className="mb-3"
                         >
-                            <Checkbox>
+                            <Checkbox disabled={disabledsteps.includes(2)}>
                                 Same as Current Address
                             </Checkbox>
                         </Form.Item>
@@ -809,28 +654,29 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                 return (
                                     <>
                                         <Form.Item name="permanentstreet" label="Street Address" rules={[{ required: true }]}>
-                                            <Input placeholder="123 Main St" />
+                                            <Input placeholder="123 Main St" disabled={disabledsteps.includes(2)} />
                                         </Form.Item>
 
                                         <div className="grid grid-cols-2 gap-4">
                                             <Form.Item name="permanentcity" label="City" rules={[{ required: true }]}>
-                                                <Input />
+                                                <Input disabled={disabledsteps.includes(2)} />
                                             </Form.Item>
                                             <Form.Item name="permanentstate" label="State" rules={[{ required: true }]}>
-                                                <Input />
+                                                <Input disabled={disabledsteps.includes(2)} />
                                             </Form.Item>
                                         </div>
 
                                         <div className="grid grid-cols-2 gap-4">
                                             <Form.Item name="permanentpostalCode" label="Postal Code" rules={[{ required: true }]}>
-                                                <Input />
+                                                <Input disabled={disabledsteps.includes(2)} />
                                             </Form.Item>
                                             <Form.Item name="permanentcountry" label="Country" rules={[{ required: true }]}>
                                                 <Select
                                                     showSearch
                                                     placeholder="Select country"
-                                                    options={countryOptions.map(country => ({ label: country, value: country }))}
+                                                    options={dynamicCountryOptions.map(country => ({ label: country.name, value: country.name }))}
                                                     optionFilterProp="label"
+                                                    disabled={disabledsteps.includes(2)}
                                                 />
                                             </Form.Item>
                                         </div>
@@ -841,51 +687,86 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                         </Form.Item>
                         <Divider />
                         <Form.Item name="emergencyContact" label="Emergency Contact Name" rules={[{ required: true }]}>
-                            <Input />
+                            <Input disabled={disabledsteps.includes(2)} />
                         </Form.Item>
-                        <div className="grid grid-cols-1 sm:grid-cols-[140px_1fr] gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-[300px_minmax(500px,_1fr)] sm:gap-4">
                             <Form.Item
                                 name="emergencyCountryCode"
                                 label="Country Code"
                                 rules={[
                                     { required: true, message: 'Country code is required' },
-                                    { pattern: /^\+\d+$/, message: 'Country code must start with + and contain digits only' },
                                 ]}
-                            > 
-                                <Input
-                                    placeholder="+91"
-                                    status={formErrors.emergencyCountryCode ? 'error' : ''}
-                                    className={formErrors.emergencyCountryCode ? 'border-red-500' : ''}
-                                    maxLength={5}
-                                    onChange={(event) => {
-                                        const value = event.target.value || ''
-                                        if (!value) {
-                                            form.setFieldValue('emergencyCountryCode', '')
-                                            return
-                                        }
-                                        const digitsOnly = value.replace(/\D/g, '')
-                                        form.setFieldValue('emergencyCountryCode', `+${digitsOnly}`)
-                                    }}
-                                />
+                            >
+                                <Select
+                                                    showSearch
+                                                    disabled={disabledsteps.includes(2)}
+                                                    placeholder="Select country code"
+                                                    options={dynamicCountryOptions.map(c => ({
+                                                        value: c.value,
+                                                        label: c.label
+                                                    }))}
+                                                    optionFilterProp="label"
+                                                    status={formErrors.emergencyCountryCode ? 'error' : ''}
+                                                    onChange={(value) => {
+                                                        const phone = form.getFieldValue('emergencyPhoneNumber')
+                                                    
+                                                        if (phone) {
+                                                          const isValid = validateEmergencyPhone(value, phone)
+                                                    
+                                                          if (!isValid) {
+                                                            setFormErrors({
+                                                              emergencyPhoneNumber: 'Please enter a valid phone number for the selected country'
+                                                            })
+                                                          } else {
+                                                            setFormErrors({})
+                                                          }
+                                                        } else {
+                                                          setFormErrors({})
+                                                        }
+                                                      }}
+                                                />
                             </Form.Item>
-                            <Form.Item
-                                name="emergencyPhoneNumber"
-                                label="Emergency Contact Number"
-                                rules={[
-                                    { required: true, message: 'Emergency contact number is required' },
-                                    { pattern: /^\d{10}$/, message: 'Emergency contact number must be exactly 10 digits' },
-                                ]}
-                            > 
-                                <Input
-                                    placeholder="9876543210"
-                                    status={formErrors.emergencyPhoneNumber ? 'error' : ''}
-                                    className={formErrors.emergencyPhoneNumber ? 'border-red-500' : ''}
-                                    maxLength={10}
-                                    inputMode="numeric"
-                                    onChange={(event) => {
-                                        form.setFieldValue('emergencyPhoneNumber', (event.target.value || '').replace(/\D/g, '').slice(0, 10))
-                                    }}
-                                />
+                            <Form.Item noStyle shouldUpdate={(prev, current) => prev.emergencyCountryCode !== current.emergencyCountryCode}>
+                                {({ getFieldValue }) => {
+                                    const selectedCountry = (getFieldValue('emergencyCountryCode') || 'IN') as CountryCode;
+                                    const exampleNumber = getExampleNumber(selectedCountry, examples);
+                                    const formatString = exampleNumber ? exampleNumber.formatNational() : '98765 43210';
+                                    const phoneMaxLength = formatString.length;
+                                    
+                                    return (
+                                        <Form.Item
+                                            name="emergencyPhoneNumber"
+                                            label="Emergency Contact Number"
+                                            dependencies={['emergencyCountryCode']}
+                                            rules={[
+                                                { required: true, message: 'Emergency contact number is required' },
+                                                () => ({
+                                                    validator(_, value) {
+                                                        if (!value) return Promise.resolve();
+                                                        const parsed = parsePhoneNumberFromString(value, selectedCountry);
+                                                        if (parsed && parsed.isValid()) {
+                                                            return Promise.resolve();
+                                                        }
+                                                        return Promise.reject(new Error('Invalid phone number for selected country'));
+                                                    }
+                                                }),
+                                            ]}
+                                            getValueFromEvent={(e) => {
+                                                const value = e.target.value;
+                                                const formatter = new AsYouType(selectedCountry);
+                                                return formatter.input(value);
+                                            }}
+                                        > 
+                                            <Input
+                                                placeholder={formatString}
+                                                maxLength={phoneMaxLength}
+                                                status={formErrors.emergencyPhoneNumber ? 'error' : ''}
+                                                className={formErrors.emergencyPhoneNumber ? 'border-red-500' : ''}
+                                                disabled={disabledsteps.includes(2)}
+                                            />
+                                        </Form.Item>
+                                    );
+                                }}
                             </Form.Item>
                         </div>
                         {formErrors.emergencyCountryCode && (
@@ -907,19 +788,19 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                     <div className="py-4">
                         <p className="mb-4 text-gray-500">We need your bank details for payroll processing.</p>
                         <Form.Item name="bankName" label="Bank Name" rules={[{ required: true }]}>
-                            <Input prefix={<BankOutlined />} />
+                            <Input prefix={<BankOutlined />} disabled={disabledsteps.includes(3)} />
                         </Form.Item>
                         <Form.Item name="bankbranch" label="Bank Branch Name" rules={[{ required: true }]}>
-                            <Input />
+                            <Input disabled={disabledsteps.includes(3)} />
                         </Form.Item>
                         <Form.Item name="accountNumber" label="Account Number" rules={[{ required: true }]}>
-                            <Input type='number' />
+                            <Input type='number' disabled={disabledsteps.includes(3)} />
                         </Form.Item>
                         <Form.Item name="accountHolder" label="Account Holder Name" rules={[{ required: true }]}>
-                            <Input />
+                            <Input disabled={disabledsteps.includes(3)} />
                         </Form.Item>
                         <Form.Item name="ifscCode" label="IFSC / Routing Code" rules={[{ required: true }]}>
-                            <Input />
+                            <Input disabled={disabledsteps.includes(3)} />
                         </Form.Item>
 
                         {/* Passbook Upload */}
@@ -935,7 +816,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                     return false
                                 }}
                                 className="!bg-gray-50 hover:!bg-blue-50 transition rounded-lg"
-                                disabled={passbookUploading}
+                                disabled={passbookUploading || disabledsteps.includes(3)}
                                 accept=".pdf,.jpg,.jpeg,.png"
                             >
                                 <p className="ant-upload-drag-icon">
@@ -989,6 +870,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                                 showUploadList={!isUploaded}
                                                 className="!bg-gray-50 hover:!bg-blue-50 transition rounded-lg"
                                                 accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                                disabled={disabledsteps.includes(4)}
                                             >
                                                 <p className="ant-upload-drag-icon">
                                                     {isUploaded ? <CheckCircleFilled className="text-xl text-green-500" /> : <UploadOutlined className="text-xl text-blue-500" />}

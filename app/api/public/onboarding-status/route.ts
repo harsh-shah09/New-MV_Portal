@@ -221,6 +221,14 @@ export async function POST(req: Request) {
                await updateEmployee(employeeId, payload );
            } else if (step === 3) {
                // Bank Details – upsert to prevent duplicates on re-submission
+                let nowStatus;
+                if(data.Status__c === 'Approved'){
+                    nowStatus = 'Approved';
+                }else if(data.Status__c === 'Rejected'){
+                    nowStatus = 'Rejected';
+                }else{
+                    nowStatus = 'Pending';
+                }
                await upsertBankDetail({
                    Name: data.bankName,
                    Bank_Branch_Name__c: data.bankbranch,
@@ -228,7 +236,7 @@ export async function POST(req: Request) {
                    IFSC__c: data.ifscCode,
                    Primary_Account__c: true,
                    Employee__c: employeeId,
-                   Status__c : 'Pending'
+                   Status__c : nowStatus
                });
            }
            

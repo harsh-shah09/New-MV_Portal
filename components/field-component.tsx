@@ -43,9 +43,9 @@ export const Field = ({
   const isPasswordType = type === "password" || type === "confidential"
   const isNumberType = type === "number"
   const inputType = isPasswordType ? (showPassword ? "text" : "password") : type
-
+  const isTelType = type === 'tel';
   const currentValue = formData[fieldKey] !== undefined ? formData[fieldKey] : (value || "")
-
+  console.log(currentValue , fieldKey)
   const handleChange = (val: any) => {
       setFormData({ ...formData, [fieldKey]: val })
   }
@@ -61,6 +61,38 @@ export const Field = ({
       </label>
       
       {isEditing && !locked ? (
+        isTelType ? (
+          <div className="flex gap-2">
+            {/* Country Code */}
+            <input
+              type="text"
+              value={formData[`${fieldKey}`].split(" ")[0] || ""}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  [`${fieldKey}`]: e.target.value + " " + formData[fieldKey].split(" ")[1],
+                })
+              }
+              placeholder="+91"
+              className={cn(
+                "w-1/3 bg-slate-50 border rounded-lg px-3 py-2.5 text-sm",
+                error ? "border-red-300" : "border-slate-200"
+              )}
+            />
+        
+            {/* Phone Number */}
+            <input
+              type="tel"
+              value={formData[fieldKey].split(" ")[1] || ""}
+              onChange={(e) => handleChange(e.target.value)}
+              placeholder={placeholder || "Enter phone number"}
+              className={cn(
+                "w-2/3 bg-slate-50 border rounded-lg px-3 py-2.5 text-sm",
+                error ? "border-red-300" : "border-slate-200"
+              )}
+            />
+          </div>
+        ) : 
         type === "select" ? (
           <div className="relative">
              <select

@@ -143,7 +143,7 @@ export async function POST(
 
                     const tokenData = {
                         expirationtime: Date.now() + 48 * 60 * 60 * 1000,
-                        firsttime: true,
+                        firsttime: false,
                         step: targetStep
                     };
                     const encodedToken = btoa(JSON.stringify(tokenData));

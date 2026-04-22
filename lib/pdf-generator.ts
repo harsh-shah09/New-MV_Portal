@@ -72,6 +72,15 @@ interface PayslipData {
   leaves: Leave[]
   adjustments: Adjustment[]
   daysInMonth: number
+  WD?: number
+  WO?: number
+  PH?: number
+  PD?: number
+  CL?: number
+  PL?: number
+  SL?: number
+  LWP?: number
+  holidayDates?: string[]
 }
 
 let browserInstance: Browser | null = null
@@ -102,7 +111,7 @@ const launchBrowser = async (): Promise<Browser> => {
     } catch (error) {
       lastError = error
       console.error('[PDF] Browser launch failed', { attempt, error })
-      if (attempt < maxAttempts) {  
+      if (attempt < maxAttempts) {
         await new Promise((resolve) => setTimeout(resolve, attempt * 1000))
       }
     }
@@ -156,6 +165,11 @@ function generatePayslipHTML(payslip: PayslipData): string {
     return `₹${rounded.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   }
 
+  const formatDayCount = (value: number) => {
+    const safeValue = Number.isFinite(value) ? value : 0
+    return Number.isInteger(safeValue) ? `${safeValue}` : safeValue.toFixed(1)
+  }
+
   const basicComponent = payslip.basicComponent ?? 0
   const hraComponent = payslip.hraComponent ?? 0
   const convComponent = payslip.convComponent ?? 0
@@ -188,11 +202,101 @@ function generatePayslipHTML(payslip: PayslipData): string {
     return parsedDate.toLocaleDateString('en-GB')
   }
 
+  const normalizeLabel = (value?: string) => (value || '').toLowerCase().trim().replace(/\s+/g, ' ')
+  const normalizeCategory = (value?: string) => (value || '').toLowerCase().trim().replace(/\s+/g, '-')
+  const leaves = Array.isArray(payslip.leaves) ? payslip.leaves : []
+  const leaveDays = (leave: Leave) => Number(leave.daysAfterRuleInMonth ?? leave.daysInSelectedMonth ?? 0) || 0
+
+  const sumLeaveDays = (predicate: (leave: Leave) => boolean) =>
+    Math.round(
+      leaves
+        .filter(predicate)
+        .reduce((sum, leave) => sum + leaveDays(leave), 0) * 10
+    ) / 10
+
+  const isLossOfPay = (leave: Leave) => normalizeCategory(leave.leaveCategory) === 'loss-of-pay'
+
+  const monthNames = [
+    'january', 'february', 'march', 'april', 'may', 'june',
+    'july', 'august', 'september', 'october', 'november', 'december',
+  ]
+  const monthIndex = monthNames.indexOf((payslip.payrollMonth || '').toLowerCase())
+  const payrollYear = Number(payslip.payrollYear)
+  const hasValidPeriod = monthIndex >= 0 && Number.isFinite(payrollYear)
+
+  const monthStart = hasValidPeriod ? new Date(payrollYear, monthIndex, 1) : null
+  const monthEnd = hasValidPeriod ? new Date(payrollYear, monthIndex + 1, 0) : null
+
+  const toISODate = (date: Date) => {
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+
+  const holidayDateSet = new Set(
+    (payslip.holidayDates || [])
+      .map((item) => String(item || '').slice(0, 10))
+      .filter(Boolean)
+  )
+
+  let weekendCount = 0
+  const weekendDateSet = new Set<string>()
+  if (monthStart && monthEnd) {
+    for (let day = 1; day <= monthEnd.getDate(); day++) {
+      const currentDate = new Date(payrollYear, monthIndex, day)
+      const dayOfWeek = currentDate.getDay()
+      if (dayOfWeek === 0 || dayOfWeek === 6) {
+        weekendCount += 1
+        weekendDateSet.add(toISODate(currentDate))
+      }
+    }
+  }
+
+  const publicHolidayCount = monthStart && monthEnd
+    ? Array.from(holidayDateSet).filter((dateKey) => {
+        const currentDate = new Date(dateKey)
+        if (Number.isNaN(currentDate.getTime())) return false
+        const currentMonth = currentDate.getMonth()
+        const currentYear = currentDate.getFullYear()
+        return currentMonth === monthIndex && currentYear === payrollYear
+      }).length
+    : holidayDateSet.size
+
+  const nonWorkingDateSet = new Set<string>([...weekendDateSet, ...holidayDateSet])
+
+  const countLeaves = (predicate: (leave: Leave) => boolean) => leaves.filter(predicate).length
+  const calculatedPL = sumLeaveDays((leave) => normalizeLabel(leave.leaveType) === 'planned leave')
+  const calculatedSL = countLeaves((leave) => {
+    const type = normalizeLabel(leave.leaveType)
+    return type === 'sick leave' || type === 'emergency leave'
+  })
+  const calculatedLWP = calculatedPL + calculatedSL
+  const calculatedExtraDayPay = sumLeaveDays((leave) => normalizeCategory(leave.leaveCategory) === 'extra-day-pay')
+  const calculatedWO = weekendCount
+  const calculatedPH = publicHolidayCount
+  const calculatedWD = Math.max(0, (Number(payslip.daysInMonth) || 0) - nonWorkingDateSet.size)
+
+  const wd = Number.isFinite(Number(payslip.WD)) ? Number(payslip.WD) : calculatedWD
+  const wo = Number.isFinite(Number(payslip.WO)) ? Number(payslip.WO) : calculatedWO
+  const ph = Number.isFinite(Number(payslip.PH)) ? Number(payslip.PH) : calculatedPH
+  const pl = Number.isFinite(Number(payslip.PL)) ? Number(payslip.PL) : calculatedPL
+  const sl = Number.isFinite(Number(payslip.SL)) ? Number(payslip.SL) : calculatedSL
+  const lwp = Number.isFinite(Number(payslip.LWP)) ? Number(payslip.LWP) : calculatedLWP
+
+  const workingDetailsRows = [
+    { label: 'WD', value: formatDayCount(wd) },
+    { label: 'WO', value: formatDayCount(wo) },
+    { label: 'PH', value: formatDayCount(ph) },
+    { label: 'PL', value: formatDayCount(pl) },
+    { label: 'SL', value: formatDayCount(sl) },
+    { label: 'LWP', value: formatDayCount(lwp) },
+  ]
+
   const employeeDetails = [
     { label: 'Emp. Id', value: payslip.Employee_Id__c || payslip.employeeId },
     { label: 'Emp Name', value: payslip.employeeName },
     { label: 'Department', value: payslip.department || 'N/A' },
-    { label: 'Designation', value: '' },
     { label: 'P.F. No', value: payslip.pfNumber || 'N/A' },
     { label: 'UAN No', value: payslip.uanNumber || 'N/A' },
     { label: 'ESI No', value: payslip.esiNumber || 'N/A' },
@@ -254,10 +358,14 @@ function generatePayslipHTML(payslip: PayslipData): string {
     .net-pay-details { border-top: 1px solid #22c55e40; padding-top: 9px; }
     .net-pay-details .detail-row { display: flex; justify-content: space-between; font-size: 10px; margin-bottom: 4px; }
     .earnings-deductions { border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; margin-bottom: 10px; }
-    .ed-header { display: grid; grid-template-columns: 1fr 1fr; background: #f9fafb; border-bottom: 1px solid #e5e7eb; }
+    .ed-header { display: grid; grid-template-columns: 0.8fr 1.1fr 1fr; background: #f9fafb; border-bottom: 1px solid #e5e7eb; }
     .ed-header > div { padding: 8px 10px; font-weight: bold; font-size: 11px; color: #111827; }
-    .ed-header > div:first-child { border-right: 1px solid #e5e7eb; }
-    .ed-content { display: grid; grid-template-columns: 1fr 1fr; }
+    .ed-header > div { border-right: 1px solid #e5e7eb; }
+    .ed-header > div:last-child { border-right: none; }
+    .ed-content { display: grid; grid-template-columns: 0.8fr 1.1fr 1fr; }
+    .ed-totals { display: grid; grid-template-columns: 0.8fr 1.1fr 1fr; border-top: 1px solid #e5e7eb; background: #f9fafb; }
+    .ed-total-cell { border-right: 1px solid #e5e7eb; }
+    .ed-total-cell:last-child { border-right: none; }
     .ed-column { border-right: 1px solid #e5e7eb; }
     .ed-column:last-child { border-right: none; }
     .ed-row { display: grid; grid-template-columns: 1fr auto; padding: 7px 10px; border-bottom: 1px solid #e5e7eb; }
@@ -318,12 +426,8 @@ function generatePayslipHTML(payslip: PayslipData): string {
           <div class="label">Total Net Pay</div>
           <div class="net-pay-details">
             <div class="detail-row">
-              <span>Paid Days</span>
-              <span>: ${payslip.daysInMonth}</span>
-            </div>
-            <div class="detail-row">
               <span>LOP Days</span>
-              <span>: ${payslip.totalLeaveDaysAfterRule?.toFixed(1) || payslip.totalLeaveDays || 0}</span>
+              <span>: ${formatDayCount(lwp)}</span>
             </div>
           </div>
         </div>
@@ -331,16 +435,25 @@ function generatePayslipHTML(payslip: PayslipData): string {
 
       <div class="earnings-deductions">
         <div class="ed-header">
-          <div>EARNINGS</div>
-          <div>DEDUCTIONS</div>
+        <div>WORKING DETAILS</div>
+        <div class="earnings-three-head">
+            <span>Earning</span>
+            <span style="text-align:right;">Actual</span>
+            <span style="text-align:right;">Payable</span>
+        </div>          
+        <div>DEDUCTIONS</div>
         </div>
         <div class="ed-content">
           <div class="ed-column">
-            <div class="earnings-three-head">
-              <span>Earning</span>
-              <span style="text-align:right;">Actual</span>
-              <span style="text-align:right;">Payable</span>
+            ${workingDetailsRows.map((row) => `
+            <div class="ed-row">
+              <span class="ed-label">${row.label}</span>
+              <span class="ed-amount">${row.value}</span>
             </div>
+            `).join('')}
+          </div>
+          <div class="ed-column">
+            
             ${earningRows.map((row) => `
             <div class="earnings-three-row">
               <span>${row.label}</span>
@@ -364,16 +477,11 @@ function generatePayslipHTML(payslip: PayslipData): string {
             ` : ''}
             ${payslip.adjustments?.filter(a => a.adjustmentType === 'Addition').map(adj => `
             <div class="earnings-three-row">
-              <span>${adj.adjustmentDescription || 'Allowance'}</span>
+              <span>Other</span>
               <span class="amount-col">${formatMoney(adj.adjustmentAmount)}</span>
               <span class="amount-col">${formatMoney(adj.adjustmentAmount)}</span>
             </div>
             `).join('') || ''}
-            <div class="earnings-three-row total">
-              <span>Gross Earnings</span>
-              <span class="amount-col">${formatMoney(actualGrossEarnings)}</span>
-              <span class="amount-col">${formatMoney(grossEarnings)}</span>
-            </div>
           </div>
           <div class="ed-column">
             <div class="ed-row">
@@ -388,12 +496,6 @@ function generatePayslipHTML(payslip: PayslipData): string {
               <span class="ed-label">ESI Deduction</span>
               <span class="ed-amount">${formatMoney(esiDeduction)}</span>
             </div>
-            ${payslip.totalLeaveDeductions > 0 ? `
-            <div class="ed-row">
-              <span class="ed-label">Leave Deduction</span>
-              <span class="ed-amount">${formatMoney(payslip.totalLeaveDeductions)}</span>
-            </div>
-            ` : ''}
             ${(payslip.companySecurityDeduction || 0) > 0 ? `
             <div class="ed-row">
               <span class="ed-label">Company Security Deduction</span>
@@ -402,12 +504,29 @@ function generatePayslipHTML(payslip: PayslipData): string {
             ` : ''}
             ${payslip.adjustments?.filter(a => a.adjustmentType === 'Deduction').map(adj => `
             <div class="ed-row">
-              <span class="ed-label">${adj.adjustmentDescription || 'Deduction'}</span>
+              <span class="ed-label">Other</span>
               <span class="ed-amount">${formatMoney(adj.adjustmentAmount)}</span>
             </div>
             `).join('') || ''}
+          </div>
+        </div>
+        <div class="ed-totals">
+          <div class="ed-total-cell">
             <div class="ed-row total">
-              <span class="ed-label">Total Deductions</span>
+              <span class="ed-label">Days In Month</span>
+              <span class="ed-amount">${formatDayCount(Number(payslip.daysInMonth) || 0)}</span>
+            </div>
+          </div>
+          <div class="ed-total-cell">
+            <div class="earnings-three-row total">
+              <span>Gross Earnings</span>
+              <span class="amount-col">${formatMoney(actualGrossEarnings)}</span>
+              <span class="amount-col">${formatMoney(grossEarnings)}</span>
+            </div>
+          </div>
+          <div class="ed-total-cell">
+            <div class="ed-row total">
+              <span class="ed-label">Gross Deductions</span>
               <span class="ed-amount">${formatMoney(payslip.totalDeductions)}</span>
             </div>
           </div>

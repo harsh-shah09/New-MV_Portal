@@ -92,6 +92,31 @@ export async function POST(request: NextRequest) {
     const summaryId = summary.id
     console.log("Payroll Summary created with ID:", summaryId)
 
+    const selectedMonthNumber = monthIndex + 1
+    const periodStartDate = `${year}-${String(selectedMonthNumber).padStart(2, '0')}-01`
+    const nextPeriodStart = selectedMonthNumber === 12
+      ? `${Number(year) + 1}-01-01`
+      : `${year}-${String(selectedMonthNumber + 1).padStart(2, '0')}-01`
+
+    let holidayDates: string[] = []
+    try {
+      const holidayQuery = await conn.query<any>(`
+        SELECT Date__c
+        FROM Holidays_List__c
+        WHERE Date__c >= ${periodStartDate}
+          AND Date__c < ${nextPeriodStart}
+      `)
+
+      holidayDates = (holidayQuery.records || [])
+        .map((record: any) => record?.Date__c)
+        .filter(Boolean)
+
+      console.log(`Fetched ${holidayDates.length} holiday(s) for payroll period ${month} ${year}`)
+    } catch (holidayError) {
+      console.error('Failed to fetch holidays for payslip working details:', holidayError)
+      holidayDates = []
+    }
+
     // 2) Create Payroll__c records for each employee
     const payrollRecords = employees.map((emp: any) => {
       // Extract adjustment details (only 1 adjustment allowed per employee)
@@ -235,6 +260,7 @@ export async function POST(request: NextRequest) {
           leaves: emp.leaves || [],
           adjustments: emp.adjustments || [],
           daysInMonth,
+          holidayDates,
         }
 
         // Generate PDF

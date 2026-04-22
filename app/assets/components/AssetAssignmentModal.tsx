@@ -96,7 +96,19 @@ export function AssetAssignmentModal({ visible, onCancel, onSuccess, asset, curr
         setLoading(false);
     }
   };
-
+  const formatDate = (dateString?: string | null) => {
+    if (!dateString) return "—"; // fallback UI
+  
+    const date = new Date(dateString);
+  
+    if (isNaN(date.getTime())) return "—"; // invalid date safeguard
+  
+    return date.toLocaleDateString('en-IN', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric'
+    });
+  };
   return (
     <Modal
       title={`Manage Assignment: ${asset?.Name}`}
@@ -124,7 +136,7 @@ export function AssetAssignmentModal({ visible, onCancel, onSuccess, asset, curr
         onFinish={handleFinish}
         initialValues={{
             assignedDate: dayjs(),
-            conditionOnAssignment: 'Good',
+            conditionOnAssignment: 'New',
             conditionOnReturn: 'Good' // Default
         }}
       >
@@ -133,7 +145,7 @@ export function AssetAssignmentModal({ visible, onCancel, onSuccess, asset, curr
             <div className="bg-gray-50 p-4 rounded-lg mb-4 border border-gray-200">
                 <h4 className="font-semibold text-gray-700 mb-2">Return Current Assignment</h4>
                 <p className="text-xs text-gray-500 mb-3">
-                    Assigned to: {asset?.AMS_Assigned_To__r?.Employee_Name__c} since {currentAssignment.AMS_Assigned_Date__c}
+                    Assigned to: {asset?.AMS_Assigned_To__r?.Employee_Name__c} since {formatDate(currentAssignment.AMS_Assigned_Date__c)}
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <Form.Item 
@@ -203,6 +215,7 @@ export function AssetAssignmentModal({ visible, onCancel, onSuccess, asset, curr
                         label="Condition" 
                     >
                          <Select size='large'>
+
                             <Select.Option value="New">New</Select.Option>
                             <Select.Option value="Second-hand">Second hand</Select.Option>
                         </Select>

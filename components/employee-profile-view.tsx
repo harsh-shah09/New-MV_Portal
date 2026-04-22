@@ -41,6 +41,7 @@ import dayjs from "dayjs"
 import { cn } from "@/lib/utils"
 import { Field } from "./field-component"
 import { EmployeeSalaryHistoryTab } from "./employee-salary-history-tab"
+import { GoogleIntegration } from "@/app/dashboard/components/employee/google-integration"
 
 interface ViewProps {
     employeeId: string;
@@ -152,7 +153,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
         { fieldKey: "HRA__c", label: "HRA", kind: "percentage" as const },
         { fieldKey: "CONV__c", label: "Conveyance", kind: "percentage" as const },
         { fieldKey: "S_All__c", label: "Special Allowance", kind: "percentage" as const },
-        { fieldKey: "PF_Basic__c", label: "PF Basic", kind: "number" as const },
+        { fieldKey: "PF_Basic__c", label: "PF Base", kind: "number" as const, format: (v: any) => typeof v === 'number' ? v.toLocaleString('en-IN', { maximumFractionDigits: 2 }) : v },
         { fieldKey: "PF__c", label: "PF", kind: "percentage" as const },
         { fieldKey: "PT__c", label: "PT", kind: "number" as const },
         { fieldKey: "ESI__c", label: "ESI", kind: "percentage" as const },
@@ -231,7 +232,11 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
             return res.json()
         }
     })
-
+    const nonPayslipDocs = (employee?.documents || []).filter(
+        (doc: any) => doc.Document_Type__c?.trim().toLowerCase() !== 'payslip'
+    )
+    const isAllDocumentsVerified = nonPayslipDocs.every((doc: any) => doc.Status__c === 'Verified');
+    console.log(isAllDocumentsVerified, nonPayslipDocs)
     // Fetch all employees for Team Lead dropdown
     const { data: employeesList, isLoading: loadingEmployeesList } = useQuery({
         queryKey: ['employeesList'],
@@ -257,7 +262,10 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(data)
             })
-            if (!res.ok) throw new Error("Update failed")
+            if (!res.ok) {
+                const errorData = await res.json().catch(() => null)
+                throw new Error(errorData?.error || "Update failed")
+            }
             return res.json()
         },
         onSuccess: () => {
@@ -265,7 +273,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
             setIsEditing(false)
             queryClient.invalidateQueries({ queryKey: ["employee", employeeId] })
         },
-        onError: () => message.error("Failed to update profile")
+        onError: (error: any) => message.error(error?.message || "Failed to update profile")
     })
 
 
@@ -350,11 +358,11 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                         <input
                             type="number"
                             min="0"
-                            step={field.kind === "percentage" ? "0.01" : "1"}
+                            step="any"
                             value={currentValue}
                             onChange={(e) => setFormData({ ...formData, [field.fieldKey]: e.target.value })}
                             className={cn(
-                                "w-full bg-slate-50 border rounded-lg px-3 py-2.5 text-sm text-slate-800 focus:ring-2 outline-none transition placeholder:text-slate-400",
+                                "salary-number-input w-full bg-slate-50 border rounded-lg px-3 py-2.5 text-sm text-slate-800 focus:ring-2 outline-none transition placeholder:text-slate-400",
                                 errors[field.fieldKey] ? "border-red-300 focus:ring-red-200" : "border-slate-200 focus:ring-blue-500/20 focus:border-blue-400"
                             )}
                             placeholder="0"
@@ -368,7 +376,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                 ) : (
                     <p className="font-medium text-slate-800 text-sm break-words py-1">
                         {currentValue !== "" && currentValue !== null && currentValue !== undefined
-                            ? `${currentValue}${suffix}`
+                            ? `${field.format ? field.format(currentValue) : currentValue}${suffix}`
                             : <span className="text-slate-400 italic">Not set</span>}
                     </p>
                 )}
@@ -443,6 +451,20 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
         }
 
         if (activeTab === 'employment') {
+            const employeeCode = formData.Employee_Id__c?.trim()
+
+            if (employeeCode && employeesList) {
+                const normalizedEmployeeCode = employeeCode.toLowerCase()
+                const isDuplicateEmployeeCode = employeesList.some((emp: any) => {
+                    const existingCode = (emp.Employee_Id__c || emp.Employee_ID__c || '').trim().toLowerCase()
+                    return emp.Id !== employeeId && existingCode === normalizedEmployeeCode
+                })
+
+                if (isDuplicateEmployeeCode) {
+                    newErrors.Employee_Id__c = "This Employee ID is already assigned to another employee"
+                }
+            }
+
             if (formData.Joining_Date__c && formData.Birthdate__c) {
                 if (new Date(formData.Joining_Date__c) < new Date(formData.Birthdate__c)) {
                     newErrors.Joining_Date__c = "Joining date cannot be before birth date"
@@ -1174,6 +1196,11 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
     const selectedDepartment = `${formData.Department__c ?? employee.Department__c ?? ''}`.trim().toLowerCase()
     const selectedRole = `${formData.Role__c ?? employee.Role__c ?? ''}`.trim().toLowerCase()
     const currentEmployeeCode = `${formData.Employee_Id__c ?? employee.Employee_Id__c ?? ''}`.trim()
+    const monthlyCtcRaw = formData.Salary_CTC__c ?? employee.Salary_CTC__c
+    const monthlyCtc = Number(monthlyCtcRaw)
+    const yearlyCtcValue = Number.isFinite(monthlyCtc) && monthlyCtcRaw !== "" && monthlyCtcRaw !== null && monthlyCtcRaw !== undefined
+        ? monthlyCtc * 12
+        : ""
     const canViewCompensation = isAdminUser || (!isHrUser && isOwnProfile) || (isHrUser && isOwnProfile)
     const canViewSalaryHistory = isAdminUser || (!isHrUser && isOwnProfile) || (isHrUser && isOwnProfile)
     const canToggleUserActive =
@@ -1271,10 +1298,10 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                     }
                                 }}
                                 disabled={sendingEmail || !employee.Employee_Email__c || employee.Company_Email__c}
-                                className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all border shadow-lg bg-white border-gray-200 text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all border shadow-lg bg-white border-gray-200 text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-gray-200 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
                             >
                                 <Mail className="w-4 h-4" />
-                                {sendingEmail ? 'Sending...' : 'Send Welcome Email'}
+                                {sendingEmail ? 'Sending...' : 'Send Email'}
                             </button>
                             <button
                                 onClick={() => {
@@ -1303,10 +1330,10 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                         }
                                     });
                                 }}
-                                disabled={!employee.Active__c && (!currentEmployeeCode || !employee.Company_Email__c || !employee.Role__c || !employee.Title__c || !employee.Department__c)}
+                                disabled={!employee.Active__c && (!currentEmployeeCode || !employee.Company_Email__c || !employee.Role__c || !employee.Title__c || !employee.Department__c || !isAllDocumentsVerified)}
                                 className={cn(
                                     'flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all border shadow-lg',
-                                    (!employee.Active__c && (!currentEmployeeCode || !employee.Company_Email__c || !employee.Role__c || !employee.Title__c || !employee.Department__c)) && 'opacity-50 cursor-not-allowed',
+                                    (!employee.Active__c && (!currentEmployeeCode || !employee.Company_Email__c || !employee.Role__c || !employee.Title__c || !employee.Department__c || !isAllDocumentsVerified)) && 'opacity-50 cursor-not-allowed',
                                     employee.Active__c
                                         ? 'bg-red-600/90 text-white border-red-500/50 hover:bg-red-700'
                                         : 'bg-green-600/90 text-white border-green-500/50 hover:bg-green-700'
@@ -1341,8 +1368,11 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                         <span className="w-6 h-6 flex items-center justify-center bg-white/20 rounded-full text-xs font-bold">
                             {pendingVerifications.length}
                         </span>
-                        <span className="text-sm font-semibold">
-                            Unsaved verification change{pendingVerifications.length !== 1 ? 's' : ''} — click Save to apply
+                        <span className="text-sm font-semibold hidden sm:block">
+                            Unsaved verification change{pendingVerifications.length !== 1 ? 's' : ''} - Click to Save
+                        </span>
+                        <span className="text-sm font-semibold block sm:hidden">
+                            Modified
                         </span>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
@@ -1367,7 +1397,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                             className="px-4 py-1.5 rounded-lg bg-white text-emerald-700 text-xs font-bold hover:bg-emerald-50 transition shadow flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
                         >
                             {isSavingVerifications ? <Spin size="small" /> : <Save className="w-3.5 h-3.5" />}
-                            {isSavingVerifications ? 'Saving…' : 'Save Changes'}
+                            {isSavingVerifications ? 'Saving…' : 'Save'}
                         </button>
                     </div>
                 </div>
@@ -1388,7 +1418,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                             { id: "bank", label: "Bank Details", icon: CreditCard },
                             { id: "documents", label: "Documents", icon: FileText },
                             //  { id: "leaves", label: "Leaves", icon: Leaf },
-                            { id: "security", label: "Security", icon: Lock },
+                            { id: "security", label: "Security & Auth.", icon: Lock },
                         ].map((tab) => (
                             <button
                                 key={tab.id}
@@ -1566,6 +1596,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                     isEditing={isEditing && ['HR', 'Admin'].includes(currentUserRole)}
                                                     formData={formData}
                                                     setFormData={setFormData}
+                                                    error={errors.Employee_Id__c}
                                                     placeholder="e.g. MV001"
                                                 />
                                                 <Field
@@ -1746,7 +1777,25 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                     <CreditCard className="w-5 h-5 text-green-500" /> Compensation
                                                 </h2>
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-                                                    <Field label="CTC(Monthly)" value={employee.Salary_CTC__c} fieldKey="Salary_CTC__c" type="number" isEditing={isEditing && currentUserRole === 'Admin'} formData={formData} setFormData={setFormData} />
+                                                    <Field
+                                                        label="CTC(Monthly)"
+                                                        value={typeof employee.Salary_CTC__c === 'number' ? employee.Salary_CTC__c.toLocaleString('en-IN', { maximumFractionDigits: 2 }) : employee.Salary_CTC__c}
+                                                        fieldKey="Salary_CTC__c"
+                                                        type="number"
+                                                        isEditing={isEditing && currentUserRole === 'Admin'}
+                                                        formData={formData}
+                                                        setFormData={setFormData}
+                                                    />
+                                                    <Field
+                                                        label="CTC(Yearly)"
+                                                        value={typeof yearlyCtcValue === 'number' ? yearlyCtcValue.toLocaleString('en-IN', { maximumFractionDigits: 2 }) : yearlyCtcValue}
+                                                        fieldKey="Salary_CTC_Yearly__computed"
+                                                        type="number"
+                                                        isEditing={false}
+                                                        formData={formData}
+                                                        setFormData={setFormData}
+                                                        locked
+                                                    />
                                                 </div>
                                             </div>
                                         )}
@@ -1917,8 +1966,8 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                             </div>
                                                             <div className="flex items-center gap-2">
                                                                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${bank.Status__c === 'Verified' ? 'bg-green-50 text-green-700 border-green-200' :
-                                                                        bank.Status__c === 'Rejected' ? 'bg-red-50 text-red-700 border-red-200' :
-                                                                            'bg-amber-50 text-amber-700 border-amber-200'
+                                                                    bank.Status__c === 'Rejected' ? 'bg-red-50 text-red-700 border-red-200' :
+                                                                        'bg-amber-50 text-amber-700 border-amber-200'
                                                                     } border whitespace-nowrap`}>
                                                                     {bank.Status__c || 'Pending'}
                                                                 </span>
@@ -1928,11 +1977,10 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                                     if (!canVerify) return null;
                                                                     return staged ? (
                                                                         <span
-                                                                            className={`text-xs px-2 py-0.5 rounded-full font-semibold border animate-pulse ${
-                                                                                staged === 'approve'
+                                                                            className={`text-xs px-2 py-0.5 rounded-full font-semibold border animate-pulse ${staged === 'approve'
                                                                                     ? 'bg-green-50 text-green-700 border-green-300'
                                                                                     : 'bg-red-50 text-red-700 border-red-300'
-                                                                            }`}
+                                                                                }`}
                                                                         >
                                                                             ⏳ Staged: {staged === 'approve' ? 'Approve' : 'Reject'}
                                                                         </span>
@@ -2130,7 +2178,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                                         <Upload className="w-5 h-5 text-orange-500" />
                                                                     </div>
                                                                 )}
-                                                                <span className="text-xs font-semibold text-center text-slate-700 leading-tight">{docName}</span>
+                                                                <span className="text-xs font-semibold text-center text-slate-700 leading-tight break-all">{docName}</span>
                                                                 {uploaded && (
                                                                     <span className={`text-[10px] font-medium ${tileStatusClass}`}>{tileStatus}</span>
                                                                 )}
@@ -2160,16 +2208,16 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                         {/* ── All Uploaded Documents ── */}
                                         <div className="border-t border-slate-100 pt-6">
                                             <div className="flex justify-between items-center mb-4">
-                                                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                                                    <Download className="w-4 h-4 text-slate-500" /> Uploaded Documents
+                                                <h3 className="sm:text-lg text-lg font-bold text-slate-800 flex items-center gap-2">
+                                                    <Download className="sm:w-4 sm:h-4 w-3 h-3 text-slate-500 shrink-0" /> Uploaded Documents
                                                 </h3>
                                                 {['HR', 'Admin'].includes(currentUserRole) && (
                                                     <Button
                                                         type="primary"
                                                         onClick={() => setShowCustomDocModal(true)}
-                                                        className="inline-flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition"
+                                                        className="inline-flex items-center gap-2 px-2 sm:px-3 py-1 sm:py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition"
                                                     >
-                                                        <Upload className="w-4 h-4" /> Upload Document
+                                                        <Upload size={15} /> <span className="sm:block hidden">Upload Document</span>
                                                     </Button>
                                                 )}
                                             </div>
@@ -2186,7 +2234,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                             {paginatedDocs.map((doc: any) => (
                                                                 <div key={doc.Id} className="group p-4 border border-slate-200 rounded-xl hover:border-blue-300 hover:bg-blue-50/10 transition relative">
                                                                     {/* Top row: icon + name + approve/reject */}
-                                                                    <div className="flex items-start gap-3">
+                                                                    <div className="flex flex-col sm:flex-row justify-center items-center sm:items-start gap-3">
                                                                         <div className="w-10 h-10 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center shrink-0">
                                                                             <FileText className="w-5 h-5" />
                                                                         </div>
@@ -2197,36 +2245,35 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                                         {/* Approve / Reject — top right (STAGED) */}
                                                                         {((doc.Status__c === 'Uploaded') &&
                                                                             ((currentUserRole === 'HR' && employee.Role__c !== 'HR') || (currentUserRole === 'Admin' && employee.Role__c === 'HR'))) && (
-                                                                            (() => {
-                                                                                const staged = getStagedAction('document', doc.Id);
-                                                                                return staged ? (
-                                                                                    <span
-                                                                                        className={`text-xs font-semibold px-2 py-1 rounded-lg border shrink-0 animate-pulse ${
-                                                                                            staged === 'approve'
-                                                                                                ? 'bg-green-50 text-green-700 border-green-300'
-                                                                                                : 'bg-red-50 text-red-700 border-red-300'
-                                                                                        }`}
-                                                                                    >
-                                                                                        ⏳ {staged === 'approve' ? 'Approve' : 'Reject'}
-                                                                                    </span>
-                                                                                ) : (
-                                                                                    <div className="flex items-center gap-1.5 shrink-0">
-                                                                                        <button
-                                                                                            onClick={() => stageDocVerification(doc, 'approve')}
-                                                                                            className="bg-white border border-green-200 text-green-600 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-green-50 transition"
+                                                                                (() => {
+                                                                                    const staged = getStagedAction('document', doc.Id);
+                                                                                    return staged ? (
+                                                                                        <span
+                                                                                            className={`text-xs font-semibold px-2 py-1 rounded-lg border shrink-0 animate-pulse ${staged === 'approve'
+                                                                                                    ? 'bg-green-50 text-green-700 border-green-300'
+                                                                                                    : 'bg-red-50 text-red-700 border-red-300'
+                                                                                                }`}
                                                                                         >
-                                                                                            Approve
-                                                                                        </button>
-                                                                                        <button
-                                                                                            onClick={() => stageDocVerification(doc, 'reject')}
-                                                                                            className="bg-white border border-amber-200 text-amber-600 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-amber-50 transition"
-                                                                                        >
-                                                                                            Reject
-                                                                                        </button>
-                                                                                    </div>
-                                                                                );
-                                                                            })()
-                                                                        )}
+                                                                                            ⏳ {staged === 'approve' ? 'Approve' : 'Reject'}
+                                                                                        </span>
+                                                                                    ) : (
+                                                                                        <div className="flex items-center gap-1.5 shrink-0">
+                                                                                            <button
+                                                                                                onClick={() => stageDocVerification(doc, 'approve')}
+                                                                                                className="bg-white border border-green-200 text-green-600 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-green-50 transition"
+                                                                                            >
+                                                                                                Approve
+                                                                                            </button>
+                                                                                            <button
+                                                                                                onClick={() => stageDocVerification(doc, 'reject')}
+                                                                                                className="bg-white border border-amber-200 text-amber-600 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-amber-50 transition"
+                                                                                            >
+                                                                                                Reject
+                                                                                            </button>
+                                                                                        </div>
+                                                                                    );
+                                                                                })()
+                                                                            )}
                                                                     </div>
                                                                     {/* Bottom row: View / Download / Delete */}
                                                                     <div className="mt-4 flex gap-2">
@@ -2445,6 +2492,8 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                 </div>
                                             </div>
                                         </div>
+
+                                        <GoogleIntegration />
 
                                         {/* 2FA Setup Modal */}
                                         {show2FAModal && (
@@ -2915,6 +2964,17 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
         .input-std {
             @apply w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none transition;
         }
+
+            .salary-number-input {
+                appearance: textfield;
+                -moz-appearance: textfield;
+            }
+
+            .salary-number-input::-webkit-outer-spin-button,
+            .salary-number-input::-webkit-inner-spin-button {
+                -webkit-appearance: none;
+                margin: 0;
+            }
       `}</style>
         </div>
     )

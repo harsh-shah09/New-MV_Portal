@@ -136,6 +136,13 @@ export function EmployeeTable({ employees, onEdit, onDelete, onView, loading, is
                 pagination={{ pageSize: 10 }}
                 loading={loading}
                 scroll={{x : 'max-content'}}
+                onRow={(record) => ({
+                  onClick: () => {
+                    if (onView) {
+                      onView(record);
+                    }
+                  },
+                })}
             />
         </div>
 

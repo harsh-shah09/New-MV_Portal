@@ -769,6 +769,7 @@ export async function POST(request: NextRequest) {
       const totalDaysInPayrollMonth = endDate.getDate()
       const configuredPfBase = toNumber(emp.PF_Basic__c)
       const pfBase = configuredPfBase > 0 ? configuredPfBase : basicComponent
+      const pfThreshold = 15000
       const lossOfPayLeaveDaysAfterRule = round2(
         leavesWithDeductions
           .filter((leave) => {
@@ -785,9 +786,10 @@ export async function POST(request: NextRequest) {
       const proratedPfBase = totalDaysInPayrollMonth > 0
         ? (payableDaysForPf * pfBase) / totalDaysInPayrollMonth
         : 0
-      const pfDeduction = round2(
-        (hasLeaveInMonth ? proratedPfBase : pfBase) * (pfPercentage / 100)
-      )
+      const pfDeductionBase = pfBase >= pfThreshold
+        ? pfBase
+        : (hasLeaveInMonth ? proratedPfBase : pfBase)
+      const pfDeduction = round2(pfDeductionBase * (pfPercentage / 100))
       const esiDeduction = round2(esiEligibleGrossIncome * (esiPercentage / 100))
       const salaryStructureDeductions = round2(pfDeduction + ptAmount + esiDeduction)
       
@@ -811,9 +813,10 @@ export async function POST(request: NextRequest) {
         console.log(`   Salary Structure Deductions (PF/PT/ESI): ₹${salaryStructureDeductions.toLocaleString()}`)
       }
       console.log(
-        `   PF Debug: base=₹${pfBase.toLocaleString()}, totalDays=${totalDaysInPayrollMonth}, ` +
+        `   PF Debug: base=₹${pfBase.toLocaleString()}, threshold=₹${pfThreshold.toLocaleString()}, totalDays=${totalDaysInPayrollMonth}, ` +
         `lopLeaveAfterRule=${lossOfPayLeaveDaysAfterRule}, payableDays=${payableDaysForPf}, ` +
-        `proratedBase=₹${round2(proratedPfBase).toLocaleString()}, PF%=${pfPercentage}, PF=₹${pfDeduction.toLocaleString()}`
+        `proratedBase=₹${round2(proratedPfBase).toLocaleString()}, ` +
+        `pfDeductionBase=₹${round2(pfDeductionBase).toLocaleString()}, PF%=${pfPercentage}, PF=₹${pfDeduction.toLocaleString()}`
       )
       console.log(
         `   ESI Debug: eligibleGross=₹${esiEligibleGrossIncome.toLocaleString()}, ESI%=${esiPercentage}, ESI=₹${esiDeduction.toLocaleString()}`
