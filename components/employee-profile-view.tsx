@@ -71,7 +71,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
     const [currentPage, setCurrentPage] = useState(1);
     const [sendingEmail, setSendingEmail] = useState(false);
     const itemsPerPage = 6;
-    
+
     // ── Staged verification changes (bank & documents) ──────────────────────
     type PendingVerification = {
         type: 'bank' | 'document';
@@ -153,7 +153,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
         { fieldKey: "HRA__c", label: "HRA", kind: "percentage" as const },
         { fieldKey: "CONV__c", label: "Conveyance", kind: "percentage" as const },
         { fieldKey: "S_All__c", label: "Special Allowance", kind: "percentage" as const },
-        { fieldKey: "PF_Basic__c", label: "PF Basic", kind: "number" as const },
+        { fieldKey: "PF_Basic__c", label: "PF Base", kind: "number" as const, format: (v: any) => typeof v === 'number' ? v.toLocaleString('en-IN', { maximumFractionDigits: 2 }) : v },
         { fieldKey: "PF__c", label: "PF", kind: "percentage" as const },
         { fieldKey: "PT__c", label: "PT", kind: "number" as const },
         { fieldKey: "ESI__c", label: "ESI", kind: "percentage" as const },
@@ -376,7 +376,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                 ) : (
                     <p className="font-medium text-slate-800 text-sm break-words py-1">
                         {currentValue !== "" && currentValue !== null && currentValue !== undefined
-                            ? `${currentValue}${suffix}`
+                            ? `${field.format ? field.format(currentValue) : currentValue}${suffix}`
                             : <span className="text-slate-400 italic">Not set</span>}
                     </p>
                 )}
@@ -1372,7 +1372,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                             Unsaved verification change{pendingVerifications.length !== 1 ? 's' : ''} - Click to Save
                         </span>
                         <span className="text-sm font-semibold block sm:hidden">
-                        Modified
+                            Modified
                         </span>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
@@ -1777,10 +1777,18 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                     <CreditCard className="w-5 h-5 text-green-500" /> Compensation
                                                 </h2>
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-                                                    <Field label="CTC(Monthly)" value={employee.Salary_CTC__c} fieldKey="Salary_CTC__c" type="number" isEditing={isEditing && currentUserRole === 'Admin'} formData={formData} setFormData={setFormData} />
+                                                    <Field
+                                                        label="CTC(Monthly)"
+                                                        value={typeof employee.Salary_CTC__c === 'number' ? employee.Salary_CTC__c.toLocaleString('en-IN', { maximumFractionDigits: 2 }) : employee.Salary_CTC__c}
+                                                        fieldKey="Salary_CTC__c"
+                                                        type="number"
+                                                        isEditing={isEditing && currentUserRole === 'Admin'}
+                                                        formData={formData}
+                                                        setFormData={setFormData}
+                                                    />
                                                     <Field
                                                         label="CTC(Yearly)"
-                                                        value={yearlyCtcValue}
+                                                        value={typeof yearlyCtcValue === 'number' ? yearlyCtcValue.toLocaleString('en-IN', { maximumFractionDigits: 2 }) : yearlyCtcValue}
                                                         fieldKey="Salary_CTC_Yearly__computed"
                                                         type="number"
                                                         isEditing={false}
@@ -1958,8 +1966,8 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                             </div>
                                                             <div className="flex items-center gap-2">
                                                                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${bank.Status__c === 'Verified' ? 'bg-green-50 text-green-700 border-green-200' :
-                                                                        bank.Status__c === 'Rejected' ? 'bg-red-50 text-red-700 border-red-200' :
-                                                                            'bg-amber-50 text-amber-700 border-amber-200'
+                                                                    bank.Status__c === 'Rejected' ? 'bg-red-50 text-red-700 border-red-200' :
+                                                                        'bg-amber-50 text-amber-700 border-amber-200'
                                                                     } border whitespace-nowrap`}>
                                                                     {bank.Status__c || 'Pending'}
                                                                 </span>
@@ -1969,11 +1977,10 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                                     if (!canVerify) return null;
                                                                     return staged ? (
                                                                         <span
-                                                                            className={`text-xs px-2 py-0.5 rounded-full font-semibold border animate-pulse ${
-                                                                                staged === 'approve'
+                                                                            className={`text-xs px-2 py-0.5 rounded-full font-semibold border animate-pulse ${staged === 'approve'
                                                                                     ? 'bg-green-50 text-green-700 border-green-300'
                                                                                     : 'bg-red-50 text-red-700 border-red-300'
-                                                                            }`}
+                                                                                }`}
                                                                         >
                                                                             ⏳ Staged: {staged === 'approve' ? 'Approve' : 'Reject'}
                                                                         </span>
@@ -2238,36 +2245,35 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                                         {/* Approve / Reject — top right (STAGED) */}
                                                                         {((doc.Status__c === 'Uploaded') &&
                                                                             ((currentUserRole === 'HR' && employee.Role__c !== 'HR') || (currentUserRole === 'Admin' && employee.Role__c === 'HR'))) && (
-                                                                            (() => {
-                                                                                const staged = getStagedAction('document', doc.Id);
-                                                                                return staged ? (
-                                                                                    <span
-                                                                                        className={`text-xs font-semibold px-2 py-1 rounded-lg border shrink-0 animate-pulse ${
-                                                                                            staged === 'approve'
-                                                                                                ? 'bg-green-50 text-green-700 border-green-300'
-                                                                                                : 'bg-red-50 text-red-700 border-red-300'
-                                                                                        }`}
-                                                                                    >
-                                                                                        ⏳ {staged === 'approve' ? 'Approve' : 'Reject'}
-                                                                                    </span>
-                                                                                ) : (
-                                                                                    <div className="flex items-center gap-1.5 shrink-0">
-                                                                                        <button
-                                                                                            onClick={() => stageDocVerification(doc, 'approve')}
-                                                                                            className="bg-white border border-green-200 text-green-600 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-green-50 transition"
+                                                                                (() => {
+                                                                                    const staged = getStagedAction('document', doc.Id);
+                                                                                    return staged ? (
+                                                                                        <span
+                                                                                            className={`text-xs font-semibold px-2 py-1 rounded-lg border shrink-0 animate-pulse ${staged === 'approve'
+                                                                                                    ? 'bg-green-50 text-green-700 border-green-300'
+                                                                                                    : 'bg-red-50 text-red-700 border-red-300'
+                                                                                                }`}
                                                                                         >
-                                                                                            Approve
-                                                                                        </button>
-                                                                                        <button
-                                                                                            onClick={() => stageDocVerification(doc, 'reject')}
-                                                                                            className="bg-white border border-amber-200 text-amber-600 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-amber-50 transition"
-                                                                                        >
-                                                                                            Reject
-                                                                                        </button>
-                                                                                    </div>
-                                                                                );
-                                                                            })()
-                                                                        )}
+                                                                                            ⏳ {staged === 'approve' ? 'Approve' : 'Reject'}
+                                                                                        </span>
+                                                                                    ) : (
+                                                                                        <div className="flex items-center gap-1.5 shrink-0">
+                                                                                            <button
+                                                                                                onClick={() => stageDocVerification(doc, 'approve')}
+                                                                                                className="bg-white border border-green-200 text-green-600 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-green-50 transition"
+                                                                                            >
+                                                                                                Approve
+                                                                                            </button>
+                                                                                            <button
+                                                                                                onClick={() => stageDocVerification(doc, 'reject')}
+                                                                                                className="bg-white border border-amber-200 text-amber-600 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-amber-50 transition"
+                                                                                            >
+                                                                                                Reject
+                                                                                            </button>
+                                                                                        </div>
+                                                                                    );
+                                                                                })()
+                                                                            )}
                                                                     </div>
                                                                     {/* Bottom row: View / Download / Delete */}
                                                                     <div className="mt-4 flex gap-2">

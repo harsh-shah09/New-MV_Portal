@@ -76,6 +76,16 @@ export function EmployeeSalaryHistoryTab({ employeeId, employeeName, employeeDis
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
   const [selectedRecord, setSelectedRecord] = useState<SalaryHistoryRecord | null>(null)
   const [form] = Form.useForm<SalaryHistoryFormValues>()
+
+  // Set default values for PT and PF when opening the modal for a new record
+  useEffect(() => {
+    if (isModalOpen && !selectedRecord) {
+      form.setFieldsValue({
+        PT__c: 200,
+        PF__c: 12,
+      })
+    }
+  }, [isModalOpen, selectedRecord, form])
   const queryClient = useQueryClient()
   const selectedEmployeeName = employeeName?.trim() || "Not set"
   const selectedEmployeeId = employeeDisplayId?.trim() || employeeCode?.trim() || "Not set"
@@ -162,6 +172,13 @@ export function EmployeeSalaryHistoryTab({ employeeId, employeeName, employeeDis
       message.success("Salary history record added")
       setIsModalOpen(false)
       form.resetFields()
+      // Set default values after reset for new record
+      if (!selectedRecord) {
+        form.setFieldsValue({
+          PT__c: 200,
+          PF__c: 12,
+        })
+      }
       queryClient.invalidateQueries({ queryKey: ["salary-history", employeeId] })
     },
     onError: (error: Error) => {
