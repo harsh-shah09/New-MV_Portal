@@ -474,6 +474,7 @@ export function GeneratePayrollModal({ open, onClose, onGenerate, onSavingChange
       width: 150,
       fixed: useFixedColumns ? "right" : undefined,
       render: (_, record) => {
+        const actionsDisabled = saving
         const hasAdjustment = !!(record.adjustments && record.adjustments.length > 0)
         const hasBonus = !!(record.bonus && record.bonus > 0)
         const allActionsUsed = hasAdjustment && hasBonus
@@ -482,7 +483,9 @@ export function GeneratePayrollModal({ open, onClose, onGenerate, onSavingChange
           {
             key: 'adjustment',
             label: hasAdjustment ? 'Edit Adjustment' : 'Add Adjustment',
+            disabled: actionsDisabled,
             onClick: () => {
+              if (actionsDisabled) return
               if (hasAdjustment) {
                 handleEditAdjustment(record.employeeId, record.employeeName)
               } else {
@@ -494,12 +497,15 @@ export function GeneratePayrollModal({ open, onClose, onGenerate, onSavingChange
             key: 'delete-adjustment',
             label: 'Delete Adjustment',
             danger: true,
+            disabled: actionsDisabled,
             onClick: () => confirmDeleteAdjustment(record.employeeId, record.employeeName),
           } : null,
           {
             key: 'bonus',
             label: hasBonus ? 'Edit Bonus' : 'Add Bonus',
+            disabled: actionsDisabled,
             onClick: () => {
+              if (actionsDisabled) return
               if (hasBonus) {
                 handleEditBonus(record.employeeId, record.employeeName)
               } else {
@@ -511,15 +517,17 @@ export function GeneratePayrollModal({ open, onClose, onGenerate, onSavingChange
             key: 'delete-bonus',
             label: 'Delete Bonus',
             danger: true,
+            disabled: actionsDisabled,
             onClick: () => confirmDeleteBonus(record.employeeId, record.employeeName),
           } : null,
         ].filter(Boolean)
 
         return (
-          <Dropdown menu={{ items: menuItems }} trigger={['click']}>
+          <Dropdown menu={{ items: menuItems }} trigger={['click']} disabled={actionsDisabled}>
             <Button
               type="link"
               onClick={(e) => e.stopPropagation()}
+              disabled={actionsDisabled}
             >
               {allActionsUsed ? 'Edit' : hasAdjustment || hasBonus ? 'Manage' : 'Add'} <DownOutlined />
             </Button>

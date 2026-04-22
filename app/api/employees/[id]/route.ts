@@ -1,6 +1,6 @@
 
 import { NextResponse } from 'next/server';
-import { getEmployeeById, updateEmployee } from '@/lib/salesforce';
+import { getAllEmployees, getEmployeeById, updateEmployee } from '@/lib/salesforce';
 
 export async function GET(
   request: Request,
@@ -61,6 +61,24 @@ export async function PUT(
     const body = await request.json();
     const data = body;
     delete data.contactId; // Cleanup if sent
+
+    const incomingEmployeeCode = typeof data.Employee_Id__c === 'string' ? data.Employee_Id__c.trim() : '';
+    if (incomingEmployeeCode) {
+      const allEmployees = await getAllEmployees();
+      const normalizedIncomingCode = incomingEmployeeCode.toLowerCase();
+      const duplicateEmployee = allEmployees.find((emp: any) => {
+        const existingCode = String(emp.Employee_Id__c || emp.Employee_ID__c || '').trim().toLowerCase();
+        return emp.Id !== id && existingCode === normalizedIncomingCode;
+      });
+
+      if (duplicateEmployee) {
+        return NextResponse.json(
+          { error: 'Employee ID already exists' },
+          { status: 409 }
+        );
+      }
+      data.Employee_Id__c = incomingEmployeeCode;
+    }
 
     // Aggregate Address into JSON String for storage reliability
     if (data.Employee_Current_Address__c && typeof data.Employee_Current_Address__c === 'object') {

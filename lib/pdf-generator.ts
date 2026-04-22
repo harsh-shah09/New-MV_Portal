@@ -364,7 +364,7 @@ function generatePayslipHTML(payslip: PayslipData): string {
             ` : ''}
             ${payslip.adjustments?.filter(a => a.adjustmentType === 'Addition').map(adj => `
             <div class="earnings-three-row">
-              <span>${adj.adjustmentDescription || 'Allowance'}</span>
+              <span>Other</span>
               <span class="amount-col">${formatMoney(adj.adjustmentAmount)}</span>
               <span class="amount-col">${formatMoney(adj.adjustmentAmount)}</span>
             </div>
@@ -402,7 +402,7 @@ function generatePayslipHTML(payslip: PayslipData): string {
             ` : ''}
             ${payslip.adjustments?.filter(a => a.adjustmentType === 'Deduction').map(adj => `
             <div class="ed-row">
-              <span class="ed-label">${adj.adjustmentDescription || 'Deduction'}</span>
+              <span class="ed-label">Other</span>
               <span class="ed-amount">${formatMoney(adj.adjustmentAmount)}</span>
             </div>
             `).join('') || ''}

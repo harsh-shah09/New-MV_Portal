@@ -258,7 +258,10 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(data)
             })
-            if (!res.ok) throw new Error("Update failed")
+            if (!res.ok) {
+                const errorData = await res.json().catch(() => null)
+                throw new Error(errorData?.error || "Update failed")
+            }
             return res.json()
         },
         onSuccess: () => {
@@ -266,7 +269,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
             setIsEditing(false)
             queryClient.invalidateQueries({ queryKey: ["employee", employeeId] })
         },
-        onError: () => message.error("Failed to update profile")
+        onError: (error: any) => message.error(error?.message || "Failed to update profile")
     })
 
 
@@ -351,11 +354,11 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                         <input
                             type="number"
                             min="0"
-                            step={field.kind === "percentage" ? "0.01" : "1"}
+                            step="any"
                             value={currentValue}
                             onChange={(e) => setFormData({ ...formData, [field.fieldKey]: e.target.value })}
                             className={cn(
-                                "w-full bg-slate-50 border rounded-lg px-3 py-2.5 text-sm text-slate-800 focus:ring-2 outline-none transition placeholder:text-slate-400",
+                                "salary-number-input w-full bg-slate-50 border rounded-lg px-3 py-2.5 text-sm text-slate-800 focus:ring-2 outline-none transition placeholder:text-slate-400",
                                 errors[field.fieldKey] ? "border-red-300 focus:ring-red-200" : "border-slate-200 focus:ring-blue-500/20 focus:border-blue-400"
                             )}
                             placeholder="0"
@@ -444,6 +447,20 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
         }
 
         if (activeTab === 'employment') {
+            const employeeCode = formData.Employee_Id__c?.trim()
+
+            if (employeeCode && employeesList) {
+                const normalizedEmployeeCode = employeeCode.toLowerCase()
+                const isDuplicateEmployeeCode = employeesList.some((emp: any) => {
+                    const existingCode = (emp.Employee_Id__c || emp.Employee_ID__c || '').trim().toLowerCase()
+                    return emp.Id !== employeeId && existingCode === normalizedEmployeeCode
+                })
+
+                if (isDuplicateEmployeeCode) {
+                    newErrors.Employee_Id__c = "This Employee ID is already assigned to another employee"
+                }
+            }
+
             if (formData.Joining_Date__c && formData.Birthdate__c) {
                 if (new Date(formData.Joining_Date__c) < new Date(formData.Birthdate__c)) {
                     newErrors.Joining_Date__c = "Joining date cannot be before birth date"
@@ -1175,6 +1192,11 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
     const selectedDepartment = `${formData.Department__c ?? employee.Department__c ?? ''}`.trim().toLowerCase()
     const selectedRole = `${formData.Role__c ?? employee.Role__c ?? ''}`.trim().toLowerCase()
     const currentEmployeeCode = `${formData.Employee_Id__c ?? employee.Employee_Id__c ?? ''}`.trim()
+    const monthlyCtcRaw = formData.Salary_CTC__c ?? employee.Salary_CTC__c
+    const monthlyCtc = Number(monthlyCtcRaw)
+    const yearlyCtcValue = Number.isFinite(monthlyCtc) && monthlyCtcRaw !== "" && monthlyCtcRaw !== null && monthlyCtcRaw !== undefined
+        ? monthlyCtc * 12
+        : ""
     const canViewCompensation = isAdminUser || (!isHrUser && isOwnProfile) || (isHrUser && isOwnProfile)
     const canViewSalaryHistory = isAdminUser || (!isHrUser && isOwnProfile) || (isHrUser && isOwnProfile)
     const canToggleUserActive =
@@ -1567,6 +1589,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                     isEditing={isEditing && ['HR', 'Admin'].includes(currentUserRole)}
                                                     formData={formData}
                                                     setFormData={setFormData}
+                                                    error={errors.Employee_Id__c}
                                                     placeholder="e.g. MV001"
                                                 />
                                                 <Field
@@ -1748,6 +1771,16 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                 </h2>
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                                                     <Field label="CTC(Monthly)" value={employee.Salary_CTC__c} fieldKey="Salary_CTC__c" type="number" isEditing={isEditing && currentUserRole === 'Admin'} formData={formData} setFormData={setFormData} />
+                                                    <Field
+                                                        label="CTC(Yearly)"
+                                                        value={yearlyCtcValue}
+                                                        fieldKey="Salary_CTC_Yearly__computed"
+                                                        type="number"
+                                                        isEditing={false}
+                                                        formData={formData}
+                                                        setFormData={setFormData}
+                                                        locked
+                                                    />
                                                 </div>
                                             </div>
                                         )}
@@ -2918,6 +2951,17 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
         .input-std {
             @apply w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none transition;
         }
+
+            .salary-number-input {
+                appearance: textfield;
+                -moz-appearance: textfield;
+            }
+
+            .salary-number-input::-webkit-outer-spin-button,
+            .salary-number-input::-webkit-inner-spin-button {
+                -webkit-appearance: none;
+                margin: 0;
+            }
       `}</style>
         </div>
     )
