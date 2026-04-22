@@ -380,8 +380,8 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
         {/* Conditional Fields based on Leave Category */}
         {leaveCategory === "loss-of-pay" && (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Form.Item name="leaveType" label="Leave Type" rules={[{ required: true }]}>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-3 gap-y-0">
+              <Form.Item name="leaveType" label="Leave Type" rules={[{ required: true }]} className="mb-0"> 
                 <Select size={controlSize} placeholder="Select leave type">
                   <Option value="" disabled>Select leave type</Option>
                   <Option value="Planned Leave">Planned Leave</Option>
@@ -390,15 +390,15 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
                 </Select>
               </Form.Item>
 
-              <Form.Item label="Duration">
-                <Input value={`${duration} days`} disabled className="bg-gray-50 text-gray-600 font-medium" />
+              <Form.Item label="Duration" className="md:col-span-2 mb-0">
+                <Input value={`${duration} days`} disabled className="w-full bg-gray-50 text-gray-600 font-medium" />
               </Form.Item>
 
-              <Form.Item name="startDate" label="Start Date" rules={[{ required: true }]}>
+              <Form.Item name="startDate" label="Start Date" rules={[{ required: true }]} className="mb-0"> 
                 <DatePicker size={controlSize} className="w-full" placeholder="DD-MM-YYYY" format="DD-MM-YYYY" dateRender={dateFullCellRender} disabledDate={disabledDate} />
               </Form.Item>
 
-              <Form.Item name="sessionStart" label="Start Session" rules={[{ required: true }]}>
+              <Form.Item name="sessionStart" label="Start Session" rules={[{ required: true }]} className="mb-0"> 
                 <Select size={controlSize} placeholder="Select start session">
                   <Option value="" disabled>Please select session</Option>
                   {sessionOptions.map((option) => (
@@ -407,13 +407,11 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
                 </Select>
               </Form.Item>
 
-              <Form.Item name="endDate" label="End Date" rules={[{ required: true }]}>
+              <Form.Item name="endDate" label="End Date" rules={[{ required: true }]} className="mb-0"> 
                 <DatePicker size={controlSize} className="w-full" placeholder="DD-MM-YYYY" format="DD-MM-YYYY" dateRender={dateFullCellRender} disabledDate={disabledDate} />
               </Form.Item>
 
-
-
-              <Form.Item name="sessionEnd" label="End Session" rules={[{ required: true }]}>
+              <Form.Item name="sessionEnd" label="End Session" rules={[{ required: true }]} className="mb-0"> 
                 <Select size={controlSize} placeholder="Select end session">
                   <Option value="" disabled>Please select session</Option>
                   {sessionOptions.map((option) => (
@@ -450,20 +448,20 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
 
         {leaveCategory === "extra-day-pay" && (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Form.Item name="startDate" label="Start Date" rules={[{ required: true }]}>
+            <Form.Item label="Duration" className="md:col-span-2 mb-0">
+              <Input value={`${duration} days`} disabled className="w-full bg-gray-50 text-gray-600 font-medium" />
+            </Form.Item>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-3 gap-y-0">
+              <Form.Item name="startDate" label="Start Date" rules={[{ required: true }]} className="mb-0"> 
                 <DatePicker size={controlSize} className="w-full" placeholder="DD-MM-YYYY" format="DD-MM-YYYY" dateRender={dateFullCellRender} disabledDate={disabledDateForExtraDayPay} />
               </Form.Item>
 
-              <Form.Item name="endDate" label="End Date" rules={[{ required: true }]}>
+              <Form.Item name="endDate" label="End Date" rules={[{ required: true }]} className="mb-0"> 
                 <DatePicker size={controlSize} className="w-full" placeholder="DD-MM-YYYY" format="DD-MM-YYYY" dateRender={dateFullCellRender} disabledDate={disabledDateForExtraDayPay} />
               </Form.Item>
 
-              <Form.Item label="Duration">
-                <Input value={`${duration} days`} disabled className="bg-gray-50 text-gray-600 font-medium" />
-              </Form.Item>
-
-              <Form.Item name="sessionStart" label="Start Session" rules={[{ required: true }]}>
+              <Form.Item name="sessionStart" label="Start Session" rules={[{ required: true }]} className="mb-0"> 
                 <Select size={controlSize} placeholder="Select start session">
                   <Option value="" disabled>Please select session</Option>
                   {sessionOptions.map((option) => (
@@ -472,7 +470,7 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
                 </Select>
               </Form.Item>
 
-              <Form.Item name="sessionEnd" label="End Session" rules={[{ required: true }]}>
+              <Form.Item name="sessionEnd" label="End Session" rules={[{ required: true }]} className="mb-0"> 
                 <Select size={controlSize} placeholder="Select end session">
                   <Option value="" disabled>Please select session</Option>
                   {sessionOptions.map((option) => (
