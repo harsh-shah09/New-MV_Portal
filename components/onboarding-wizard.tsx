@@ -512,6 +512,11 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                     return;
                 }
                 if (profileFile) {
+                    if(profileFile.size > 1 * 1024 * 1024) {
+                        message.error("File size exceeds 1MB limit.")
+                        setLoading(false)
+                        return
+                    }
                     const formData = new FormData()
                     formData.append('file', profileFile)
                     formData.append('step', '1')

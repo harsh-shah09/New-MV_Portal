@@ -38,8 +38,7 @@ export async function POST(request: NextRequest) {
         Document_Category__c: 'Handbook',
         Document_Type__c: type,
         File_URL__c: fileUrl,
-        Status__c: 'Uploaded',
-        Employee__c: session.employeeId // Linked to uploader
+        Status__c: 'Uploaded'
     });
 
     return NextResponse.json({ success: true });
