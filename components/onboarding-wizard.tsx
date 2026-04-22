@@ -44,6 +44,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
     const [existingDocuments, setExistingDocuments] = useState<any[]>([])
     const [isExpired, setIsExpired] = useState(false)
     // Track last successfully saved personal-info payload to skip unchanged API calls
+    const [disabledsteps , setDisabledSteps] = useState<number[]>([])
     const lastSavedPersonalData = useRef<string | null>(null)
     const countryOptions = [
         'Afghanistan',
@@ -248,7 +249,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
 
     const splitEmergencyContact = (value?: string) => {
         const normalized = value?.trim() || ''
-        const match = normalized.match(/^(\+\d{1,4})\s*(\d+)$/)
+        const match = normalized.match(/^(\+\d{1,2})\s*(\d+)$/)
 
         if (match) {
             return {
@@ -373,7 +374,23 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                 }
             })
             .catch(err => console.error(err))
-            .finally(() => setPageLoading(false))
+            .finally(() => {
+                setPageLoading(false)
+                if(!firsttime){
+                    if(step === 1){
+                        setDisabledSteps([])
+                    }
+                    if(step === 2){
+                        setDisabledSteps([1])
+                    }
+                    if(step === 3){
+                        setDisabledSteps([1,2])
+                    }
+                    if(step === 4){
+                        setDisabledSteps([1,2,3])
+                    }
+                }
+            })
     }, [])
 
     useEffect(() => {
@@ -737,6 +754,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                     setProfileFile(file)
                                     return false
                                 }}
+                                disabled = {documentsUploading || disabledsteps.includes(1)}
                                 className="avatar-uploader group border-dashed"
                             >
                                 {profileFile ? (
@@ -771,19 +789,19 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                     <div className="py-4">
                         <p className="mb-4 text-gray-500">Current Address</p>
                         <Form.Item name="street" label="Street Address" rules={[{ required: true }]}>
-                            <Input placeholder="123 Main St" />
+                            <Input placeholder="123 Main St" disabled={disabledsteps.includes(2)} />
                         </Form.Item>
                         <div className="grid grid-cols-2 gap-4">
                             <Form.Item name="city" label="City" rules={[{ required: true }]}>
-                                <Input />
+                                <Input disabled={disabledsteps.includes(2)} />
                             </Form.Item>
                             <Form.Item name="state" label="State" rules={[{ required: true }]}>
-                                <Input />
+                                <Input disabled={disabledsteps.includes(2)} />
                             </Form.Item>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             <Form.Item name="postalCode" label="Postal Code" rules={[{ required: true }]}>
-                                <Input />
+                                <Input disabled={disabledsteps.includes(2)} />
                             </Form.Item>
                             <Form.Item name="country" label="Country" rules={[{ required: true }]}>
                                 <Select
@@ -791,6 +809,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                     placeholder="Select country"
                                     options={countryOptions.map(country => ({ label: country, value: country }))}
                                     optionFilterProp="label"
+                                    disabled={disabledsteps.includes(2)}
                                 />
                             </Form.Item>
                         </div>
@@ -801,7 +820,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                             valuePropName="checked"
                             className="mb-3"
                         >
-                            <Checkbox>
+                            <Checkbox disabled={disabledsteps.includes(2)}>
                                 Same as Current Address
                             </Checkbox>
                         </Form.Item>
@@ -814,21 +833,21 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                 return (
                                     <>
                                         <Form.Item name="permanentstreet" label="Street Address" rules={[{ required: true }]}>
-                                            <Input placeholder="123 Main St" />
+                                            <Input placeholder="123 Main St" disabled={disabledsteps.includes(2)} />
                                         </Form.Item>
 
                                         <div className="grid grid-cols-2 gap-4">
                                             <Form.Item name="permanentcity" label="City" rules={[{ required: true }]}>
-                                                <Input />
+                                                <Input disabled={disabledsteps.includes(2)} />
                                             </Form.Item>
                                             <Form.Item name="permanentstate" label="State" rules={[{ required: true }]}>
-                                                <Input />
+                                                <Input disabled={disabledsteps.includes(2)} />
                                             </Form.Item>
                                         </div>
 
                                         <div className="grid grid-cols-2 gap-4">
                                             <Form.Item name="permanentpostalCode" label="Postal Code" rules={[{ required: true }]}>
-                                                <Input />
+                                                <Input disabled={disabledsteps.includes(2)} />
                                             </Form.Item>
                                             <Form.Item name="permanentcountry" label="Country" rules={[{ required: true }]}>
                                                 <Select
@@ -836,6 +855,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                                     placeholder="Select country"
                                                     options={countryOptions.map(country => ({ label: country, value: country }))}
                                                     optionFilterProp="label"
+                                                    disabled={disabledsteps.includes(2)}
                                                 />
                                             </Form.Item>
                                         </div>
@@ -846,7 +866,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                         </Form.Item>
                         <Divider />
                         <Form.Item name="emergencyContact" label="Emergency Contact Name" rules={[{ required: true }]}>
-                            <Input />
+                            <Input disabled={disabledsteps.includes(2)} />
                         </Form.Item>
                         <div className="grid grid-cols-1 sm:grid-cols-[140px_1fr] gap-4">
                             <Form.Item
@@ -858,6 +878,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                 ]}
                             > 
                                 <Input
+                                    disabled={disabledsteps.includes(2)}
                                     placeholder="+91"
                                     status={formErrors.emergencyCountryCode ? 'error' : ''}
                                     className={formErrors.emergencyCountryCode ? 'border-red-500' : ''}
@@ -890,6 +911,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                     onChange={(event) => {
                                         form.setFieldValue('emergencyPhoneNumber', (event.target.value || '').replace(/\D/g, '').slice(0, 10))
                                     }}
+                                    disabled={disabledsteps.includes(2)}
                                 />
                             </Form.Item>
                         </div>
@@ -912,19 +934,19 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                     <div className="py-4">
                         <p className="mb-4 text-gray-500">We need your bank details for payroll processing.</p>
                         <Form.Item name="bankName" label="Bank Name" rules={[{ required: true }]}>
-                            <Input prefix={<BankOutlined />} />
+                            <Input prefix={<BankOutlined />} disabled={disabledsteps.includes(3)} />
                         </Form.Item>
                         <Form.Item name="bankbranch" label="Bank Branch Name" rules={[{ required: true }]}>
-                            <Input />
+                            <Input disabled={disabledsteps.includes(3)} />
                         </Form.Item>
                         <Form.Item name="accountNumber" label="Account Number" rules={[{ required: true }]}>
-                            <Input type='number' />
+                            <Input type='number' disabled={disabledsteps.includes(3)} />
                         </Form.Item>
                         <Form.Item name="accountHolder" label="Account Holder Name" rules={[{ required: true }]}>
-                            <Input />
+                            <Input disabled={disabledsteps.includes(3)} />
                         </Form.Item>
                         <Form.Item name="ifscCode" label="IFSC / Routing Code" rules={[{ required: true }]}>
-                            <Input />
+                            <Input disabled={disabledsteps.includes(3)} />
                         </Form.Item>
 
                         {/* Passbook Upload */}
@@ -940,7 +962,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                     return false
                                 }}
                                 className="!bg-gray-50 hover:!bg-blue-50 transition rounded-lg"
-                                disabled={passbookUploading}
+                                disabled={passbookUploading || disabledsteps.includes(3)}
                                 accept=".pdf,.jpg,.jpeg,.png"
                             >
                                 <p className="ant-upload-drag-icon">
@@ -994,6 +1016,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                                 showUploadList={!isUploaded}
                                                 className="!bg-gray-50 hover:!bg-blue-50 transition rounded-lg"
                                                 accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                                disabled={disabledsteps.includes(4)}
                                             >
                                                 <p className="ant-upload-drag-icon">
                                                     {isUploaded ? <CheckCircleFilled className="text-xl text-green-500" /> : <UploadOutlined className="text-xl text-blue-500" />}

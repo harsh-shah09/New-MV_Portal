@@ -61,7 +61,7 @@ export async function PATCH(req: Request) {
     // Token carries step=4 so the re-opened wizard lands on Documents
     const data = {
       expirationtime: Date.now() + 48 * 60 * 60 * 1000,
-      firsttime: true,
+      firsttime: false,
       step: doc.Document_Type__c === 'Passbook' ? 3 : 4
     };
     const encoded = btoa(JSON.stringify(data));
