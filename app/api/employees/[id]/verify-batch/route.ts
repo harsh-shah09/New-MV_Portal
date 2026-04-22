@@ -89,12 +89,6 @@ export async function POST(
             (d: any) => d.Document_Type__c?.toLowerCase() !== 'payslip'
         );
 
-        // Delete rejected Passbook documents (so user has to re-upload)
-        const rejectedPassbooks = allDocs.filter((d: any) => d.Document_Type__c === 'Passbook' && d.Status__c === 'Rejected');
-        for (const doc of rejectedPassbooks) {
-            await deleteDocument(doc.Id);
-        }
-
         // ── 3. Check if anything is still Pending / Uploaded (not decided) ─
         const hasPendingBank = allBanks.some(
             (b: any) => !b.Status__c || b.Status__c === 'Pending'
