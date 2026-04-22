@@ -943,7 +943,7 @@ export default function AdminConsole() {
                                                         >
                                                             <div className="p-4 border-b border-slate-50 bg-slate-50/50 group-hover:bg-blue-50 transition-colors">
                                                                 <h3 className="font-bold text-slate-800 line-clamp-1 group-hover:text-blue-600 transition-colors">{record.MasterLabel}</h3>
-                                                                <p className="text-xs text-slate-400 font-mono mt-1">{record.DeveloperName}</p>
+                                                                {/* <p className="text-xs text-slate-400 font-mono mt-1">{record.DeveloperName}</p> */}
                                                             </div>
                                                             <div className="p-4 flex-1 bg-slate-50/20 relative overflow-hidden">
                                                                 <div className="opacity-40 text-[10px] leading-relaxed scale-90 origin-top-left pointer-events-none select-none h-full w-full">

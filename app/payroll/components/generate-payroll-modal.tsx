@@ -443,22 +443,22 @@ export function GeneratePayrollModal({ open, onClose, onGenerate, onSavingChange
         <span className="font-semibold text-orange-600">{formatCurrency(amount)}</span>
       ),
     },
-    {
-      title: "Leave Days",
-      dataIndex: "totalLeaveDaysAfterRule",
-      key: "totalLeaveDays",
-      width: 85,
-      render: (_: number, record: PayrollEmployeeDetail) => {
-        const beforeRule = Number(record.totalLeaveDays || 0)
-        const afterRule = Number(record.totalLeaveDaysAfterRule ?? beforeRule)
-        const hasRuleDelta = Math.abs(afterRule - beforeRule) > 0.001
-        return (
-          <Tag color={afterRule > 0 ? "orange" : "green"}>
-            {hasRuleDelta ? `${formatDays(beforeRule)} → ${formatDays(afterRule)} days` : `${formatDays(afterRule)} days`}
-          </Tag>
-        )
-      },
-    },
+    // {
+    //   title: "Leave Days",
+    //   dataIndex: "totalLeaveDaysAfterRule",
+    //   key: "totalLeaveDays",
+    //   width: 85,
+    //   render: (_: number, record: PayrollEmployeeDetail) => {
+    //     const beforeRule = Number(record.totalLeaveDays || 0)
+    //     const afterRule = Number(record.totalLeaveDaysAfterRule ?? beforeRule)
+    //     const hasRuleDelta = Math.abs(afterRule - beforeRule) > 0.001
+    //     return (
+    //       <Tag color={afterRule > 0 ? "orange" : "green"}>
+    //         {hasRuleDelta ? `${formatDays(beforeRule)} → ${formatDays(afterRule)} days` : `${formatDays(afterRule)} days`}
+    //       </Tag>
+    //     )
+    //   },
+    // },
     {
       title: "Net Salary",
       dataIndex: "netSalary",
