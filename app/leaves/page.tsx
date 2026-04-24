@@ -281,6 +281,8 @@ export default function LeavesPage() {
     fetchAllLeaves()
   }, [currentUser])
 
+  const isAdminUser = currentUser?.role === 'Admin'
+  const canRequestLeave = !isAdminUser
   const canApplyForOthers = currentUser?.role === 'HR' || currentUser?.role === 'Admin'
 
   const fetchEmployeeOptions = async () => {
@@ -1031,14 +1033,16 @@ export default function LeavesPage() {
           subtitle="Manage leave requests and approvals"
         >
           <div className="flex items-center gap-2">
-            <Button
-              type='primary'
-              size="large"
-              onClick={() => setShowForm(true)}
-              icon={<Plus size={16} />}
-            >
-              Request Leave
-            </Button>
+            {canRequestLeave && (
+              <Button
+                type='primary'
+                size="large"
+                onClick={() => setShowForm(true)}
+                icon={<Plus size={16} />}
+              >
+                Request Leave
+              </Button>
+            )}
             {canApplyForOthers && (
               <Button
                 size="large"
