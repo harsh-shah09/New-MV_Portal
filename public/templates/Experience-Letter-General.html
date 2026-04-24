@@ -1,154 +1,155 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Experience Certificate - {{Name}}</title>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Experience Certificate - {{Name}}</title>
 
-    <style>
-        .ec-wrapper {
-            font-family: Tahoma, Verdana, Segoe, sans-serif;
-            background-color: #f4f4f7;
-            color: #1a1a1a;
-            margin: 0;
-            padding: 40px 0;
-            display: flex;
-            justify-content: center;
-        }
-
-        .ec-page {
-            background: #ffffff;
-            width: 210mm;
-            min-height: 297mm;
-            padding: 30mm 25mm;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-            box-sizing: border-box;
-            position: relative;
-        }
-
-        .ec-header-row {
-            display: flex;
-            justify-content: space-between;
-            font-weight: bold;
-            font-size: 12pt;
-            margin-bottom: 60px;
-        }
-
-        .ec-title {
-            text-align: center;
-            font-size: 16pt;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 50px;
-            font-weight: bold;
-        }
-
-        .ec-body {
-            font-size: 12pt;
-            line-height: 1.8;
-            text-align: justify;
-        }
-
-        .ec-paragraph {
-            margin-bottom: 24px;
-        }
-
-        .ec-highlight {
-            font-weight: bold;
-        }
-
-        .ec-signature-section {
-            margin-top: 40px;
-            line-height: 1.2;
-        }
-
-        .ec-signature-line {
-            margin-top: 60px;
-            font-weight: bold;
-            font-size: 12pt;
-        }
-
-        .ec-signature-company {
-            font-weight: normal;
-            font-size: 11pt;
-        }
-
-        /* Responsive */
-        @media (max-width: 768px) {
-            .ec-page {
-                width: 100%;
-                padding: 48px;
-            }
-        }
-
-        /* Print */
-        @media print {
+        <style>
             .ec-wrapper {
-                background: none;
-                padding: 0;
+                font-family: Tahoma, Verdana, Segoe, sans-serif;
+                background-color: #f4f4f7;
+                color: #1a1a1a;
+                margin: 0;
+                padding: 20px;
+                display: flex;
+                justify-content: center;
             }
 
             .ec-page {
-                box-shadow: none;
+                background: #ffffff;
                 width: 100%;
-                min-height: auto;
+                max-width: 794px;
+                min-height: 1123px;
+                padding: 70px;
+                box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+                box-sizing: border-box;
             }
-        }
-    </style>
-</head>
 
-<div class="ec-wrapper">
-    <div class="ec-page">
+            .ec-header-row {
+                display: flex;
+                justify-content: space-between;
+                font-weight: 600;
+                font-size: 13px;
+                margin-bottom: 50px;
+                gap: 16px;
+            }
 
-        <div class="ec-header-row">
-            <div>Date: {{Date}}</div>
-            <div>Register Number: {{Register_No}}</div>
-        </div>
+            .ec-title {
+                text-align: center;
+                font-size: 22px;
+                text-transform: uppercase;
+                letter-spacing: 0.6px;
+                margin-bottom: 44px;
+                font-weight: 700;
+            }
 
-        <div class="ec-title">
-            To whomsoever it may concern
-        </div>
+            .ec-body {
+                font-size: 14px;
+                line-height: 1.8;
+                text-align: justify;
+            }
 
-        <div class="ec-body">
+            .ec-paragraph {
+                margin-bottom: 22px;
+            }
 
-            <div class="ec-paragraph">
-                This is to certify that
-                <span class="ec-highlight">{{Name}}</span>
-                was associated with
-                <span class="ec-highlight">MV Clouds Private Limited</span>
-                as a
-                <span class="ec-highlight">{{Employee_Role__c}}</span>
-                from
-                <span class="ec-highlight">{{Joining_Date__c}}</span>
-                to
-                <span class="ec-highlight">{{Seperation_Date__c}}</span>.
+            .ec-highlight {
+                font-weight: 700;
+            }
+
+            .ec-signature-section {
+                margin-top: 70px;
+                line-height: 1.6;
+                font-size: 14px;
+            }
+
+            .ec-signature-line {
+                margin-top: 34px;
+                font-weight: 700;
+            }
+
+            .ec-signature-company {
+                font-weight: 500;
+                font-size: 13px;
+            }
+
+            @media (max-width: 768px) {
+                .ec-wrapper {
+                    padding: 12px;
+                }
+
+                .ec-page {
+                    padding: 36px;
+                    min-height: auto;
+                }
+
+                .ec-header-row {
+                    flex-direction: column;
+                    align-items: flex-start;
+                    margin-bottom: 30px;
+                }
+
+                .ec-title {
+                    font-size: 18px;
+                    margin-bottom: 30px;
+                }
+            }
+
+            @media print {
+                .ec-wrapper {
+                    background: none;
+                    padding: 0;
+                }
+
+                .ec-page {
+                    box-shadow: none;
+                    max-width: 100%;
+                    min-height: auto;
+                    padding: 48px;
+                }
+            }
+        </style>
+    </head>
+
+    <body>
+        <div class="ec-wrapper">
+            <div class="ec-page">
+                <div class="ec-header-row">
+                    <div>Date: {{Date}}</div>
+                    <div>Register Number: {{Register_No}}</div>
+                </div>
+
+                <div class="ec-title">To Whomsoever It May Concern</div>
+
+                <div class="ec-body">
+                    <p class="ec-paragraph">
+                        This is to certify that <span class="ec-highlight">{{Name}}</span>
+                        was associated with
+                        <span class="ec-highlight">MV Clouds Private Limited</span> as a
+                        <span class="ec-highlight">{{Employee_Role__c}}</span> from
+                        <span class="ec-highlight">{{Joining_Date__c}}</span> to
+                        <span class="ec-highlight">{{Seperation_Date__c}}</span>.
+                    </p>
+
+                    <p class="ec-paragraph">
+                        He/she has proven his/her abilities during the tenure by delivering what was asked of him/her and being punctual. He/she effectively managed responsibilities throughout the association period.
+                    </p>
+
+                    <p class="ec-paragraph">
+                        We wish <span class="ec-highlight">{{Name}}</span> all the best for his/her future.
+                    </p>
+                </div>
+
+                <div class="ec-signature-section">
+                    Sincerely,
+
+                    <div class="ec-signature-line">
+                        Dharmik Shah<br />
+                        <span class="ec-signature-company">MV Clouds Private Limited</span>
+                    </div>
+                </div>
             </div>
-
-            <div class="ec-paragraph">
-                He/she has proven his/her abilities during their tenure by delivering
-                what was asked of him/her and being punctual.
-                He/She effectively managed their responsibilities during their tenure.
-            </div>
-
-            <div class="ec-paragraph">
-                We wish
-                <span class="ec-highlight">{{Name}}</span>
-                all the best for his/her future.
-            </div>
-
         </div>
-
-        <div class="ec-signature-section">
-            Sincerely,
-
-            <div class="ec-signature-line">
-                Dharmik Shah<br>
-                <span class="ec-signature-company">
-                    MV Clouds Private Limited
-                </span>
-            </div>
-        </div>
-
-    </div>
-</div>
+    </body>
 </html>
