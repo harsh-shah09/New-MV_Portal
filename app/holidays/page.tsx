@@ -302,7 +302,34 @@ export default function HolidaysPage() {
         return
       }
 
-      refetch()
+      const refreshed = await refetch()
+      const latestHolidays: Holiday[] = refreshed.data?.holidays || []
+      const selectedYearHasRemaining = latestHolidays.some(
+        (holiday) => String(holiday.year) === String(selectedYear)
+      )
+
+      if (!selectedYearHasRemaining) {
+        const presentYear = new Date().getFullYear().toString()
+        const previousYear = (new Date().getFullYear() - 1).toString()
+
+        const hasPresentYearHolidays = latestHolidays.some(
+          (holiday) => String(holiday.year) === presentYear
+        )
+        const hasPreviousYearHolidays = latestHolidays.some(
+          (holiday) => String(holiday.year) === previousYear
+        )
+
+        if (hasPresentYearHolidays) {
+          setSelectedYear(presentYear)
+        } else if (hasPreviousYearHolidays) {
+          setSelectedYear(previousYear)
+        } else {
+          const availableFallbackYears = [...new Set(latestHolidays.map((holiday) => String(holiday.year)))]
+            .sort((a, b) => parseInt(b) - parseInt(a))
+          setSelectedYear(availableFallbackYears[0] || presentYear)
+        }
+      }
+
       setShowDeleteConfirm(false)
       setDeletingHolidayId(null)
       toast.success("Holiday deleted successfully!")
