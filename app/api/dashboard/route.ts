@@ -76,27 +76,27 @@ export async function GET(req: NextRequest) {
                 pendingApprovalsQueryPromise = conn.query(`
                     SELECT Id, Name, Employee__c, Employee__r.Employee_Name__c, 
                            Leave_Type__c, Leave_Category__c, Start_Date__c, 
-                           End_Date__c, Total_Days__c, TL_Approval__c, Sandwich_Rule__c, OnePlusTwo_Rule__c, Doubtfull_Case__c
+                           End_Date__c, Total_Days__c, Status__c, TL_Approval__c, Sandwich_Rule__c, OnePlusTwo_Rule__c, Doubtfull_Case__c
                     FROM Leave__c
-                    WHERE Status__c = 'Applied'
+                    WHERE Status__c IN ('Applied', 'Withdrawal Pending')
                     ORDER BY Start_Date__c ASC
                 `);
             } else if (isHR) {
                 pendingApprovalsQueryPromise = conn.query(`
                     SELECT Id, Name, Employee__c, Employee__r.Employee_Name__c, 
                            Leave_Type__c, Leave_Category__c, Start_Date__c, 
-                           End_Date__c, Total_Days__c, TL_Approval__c, Sandwich_Rule__c, OnePlusTwo_Rule__c, Doubtfull_Case__c
+                           End_Date__c, Total_Days__c, Status__c, TL_Approval__c, Sandwich_Rule__c, OnePlusTwo_Rule__c, Doubtfull_Case__c
                     FROM Leave__c
-                    WHERE Status__c = 'Applied' ${hrDashboardLeaveFilter}
+                    WHERE Status__c IN ('Applied', 'Withdrawal Pending') ${hrDashboardLeaveFilter}
                     ORDER BY Start_Date__c ASC
                 `);
             } else {
                 pendingApprovalsQueryPromise = conn.query(`
                     SELECT Id,Name, Employee__c, Employee__r.Employee_Name__c, 
                            Leave_Type__c, Leave_Category__c, Start_Date__c, 
-                           End_Date__c, Total_Days__c, TL_Approval__c, Sandwich_Rule__c, OnePlusTwo_Rule__c, Doubtfull_Case__c
+                           End_Date__c, Total_Days__c, Status__c, TL_Approval__c, Sandwich_Rule__c, OnePlusTwo_Rule__c, Doubtfull_Case__c
                     FROM Leave__c
-                    WHERE Status__c = 'Applied' AND Employee__r.Role__c != 'HR'
+                    WHERE Status__c IN ('Applied', 'Withdrawal Pending') AND Employee__r.Role__c != 'HR'
                     ORDER BY Start_Date__c ASC
                 `);
             }
@@ -189,6 +189,8 @@ export async function GET(req: NextRequest) {
                     startDate: record.Start_Date__c,
                     endDate: record.End_Date__c,
                     duration: record.Total_Days__c,
+                    status: record.Status__c,
+                    isWithdrawalRequest: record.Status__c === 'Withdrawal Pending',
                     tlApproved: record.TL_Approval__c,
                     sandwichRuleApplicable,
                     onePlusTwoRuleApplicable,
@@ -288,9 +290,9 @@ export async function GET(req: NextRequest) {
             ? conn.query(`
                 SELECT Id, Name, Employee__c, Employee__r.Employee_Name__c,
                        Leave_Type__c, Leave_Category__c, Start_Date__c,
-                       End_Date__c, Total_Days__c, TL_Approval__c
+                       End_Date__c, Total_Days__c, Status__c, TL_Approval__c
                 FROM Leave__c
-                WHERE Status__c = 'Applied'
+                WHERE Status__c IN ('Applied', 'Withdrawal Pending')
                 AND Employee__r.Team_Lead__c = '${currentEmployeeId}'
                 AND (TL_Approval__c = null OR TL_Approval__c = '')
                 ORDER BY Start_Date__c ASC
@@ -390,6 +392,8 @@ export async function GET(req: NextRequest) {
                 startDate: record.Start_Date__c,
                 endDate: record.End_Date__c,
                 duration: record.Total_Days__c,
+                status: record.Status__c,
+                isWithdrawalRequest: record.Status__c === 'Withdrawal Pending',
                 tlApproved: record.TL_Approval__c
             }));
         }

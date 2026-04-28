@@ -1215,6 +1215,7 @@ export async function POST(request: NextRequest) {
         const existingSessionEnd = normalizeSessionValue(existingLeave.Session_End__c);
         const existingSession = getSessionDisplayLabel(existingSessionStart, existingSessionEnd);
         const isExistingHalfDay = isHalfDaySessionRange(existingSessionStart, existingSessionEnd, existingStart, existingEnd);
+        const isSameLeaveType = (existingLeave.Leave_Type__c || '') === (leaveType || '');
 
         // Check if applying for the same date with same session (not allowed)
         if (requestStartDate.isSame(existingStart, 'day') && requestEndDate.isSame(existingEnd, 'day')) {
@@ -1242,6 +1243,10 @@ export async function POST(request: NextRequest) {
 
         // For full-day leaves, check if consecutive days should be combined
         // Skip this check if either leave is half-day (sessions can be on consecutive days)
+        if (!isSameLeaveType) {
+          continue;
+        }
+
         if (!isRequestHalfDay && !isExistingHalfDay) {
           // Check if the new leave is exactly one day before or after an existing leave
           const isOneDayBefore = requestEndDate.add(1, 'day').isSame(existingStart, 'day');
@@ -1315,8 +1320,13 @@ export async function POST(request: NextRequest) {
         const existingSessionEnd = normalizeSessionValue(existingLeave.Session_End__c);
         const existingSession = getSessionDisplayLabel(existingSessionStart, existingSessionEnd);
         const isExistingHalfDay = isHalfDaySessionRange(existingSessionStart, existingSessionEnd, existingStart, existingEnd);
+        const isSameLeaveType = (existingLeave.Leave_Type__c || '') === (leaveType || '');
 
         // Skip half-day leaves for sandwich check
+        if (!isSameLeaveType) {
+          continue;
+        }
+
         if (isRequestHalfDay || isExistingHalfDay) {
           continue;
         }

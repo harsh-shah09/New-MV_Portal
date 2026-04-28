@@ -10,6 +10,8 @@ import type { Dayjs } from "dayjs"
 interface LeaveRequestFormProps {
   onSubmit: (data: Partial<LeaveRequest>) => void
   onCancel: () => void
+  isSubmitting: boolean
+  setIsSubmitting: (value: boolean) => void
   employeeId?: string
   employeeName?: string
 }
@@ -32,7 +34,7 @@ const sessionOptions = [
   { value: "Session-2", label: "Session-2 (2nd Half)" },
 ]
 
-export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName }: LeaveRequestFormProps) {
+export function LeaveRequestForm({ onSubmit, onCancel, isSubmitting, setIsSubmitting, employeeId, employeeName }: LeaveRequestFormProps) {
   const [form] = Form.useForm()
   const [duration, setDuration] = useState(0)
   const [leaveCategory, setLeaveCategory] = useState<string>("")
@@ -121,6 +123,21 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
 
     if (Object.prototype.hasOwnProperty.call(changedValues, 'leaveType')) {
       setSelectedLeaveType(changedValues.leaveType || "")
+      // Validate start date when leave type changes (for Planned Leave validation)
+      form.validateFields(['startDate']).catch(() => {})
+    }
+
+    // Trigger validation for date-related fields to show errors immediately
+    if (Object.prototype.hasOwnProperty.call(changedValues, 'startDate')) {
+      form.validateFields(['startDate', 'endDate', 'sessionStart', 'sessionEnd']).catch(() => {})
+    }
+    
+    if (Object.prototype.hasOwnProperty.call(changedValues, 'endDate')) {
+      form.validateFields(['startDate', 'endDate', 'sessionStart', 'sessionEnd']).catch(() => {})
+    }
+    
+    if (Object.prototype.hasOwnProperty.call(changedValues, 'sessionStart') || Object.prototype.hasOwnProperty.call(changedValues, 'sessionEnd')) {
+      form.validateFields(['sessionStart', 'sessionEnd']).catch(() => {})
     }
 
     // Always recalculate duration when dates or sessions change
@@ -218,6 +235,78 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
     }
 
     return isOutsideAllowedBackdateWindow(current)
+  }
+
+  // Validator for End Date - checks if end date is before start date
+  const validateEndDate = async (_: any, value: Dayjs) => {
+    if (!value) return Promise.resolve()
+    
+    const startDate = form.getFieldValue('startDate')
+    
+    if (startDate && value.isBefore(startDate, 'day')) {
+      return Promise.reject(new Error('End date cannot be before start date'))
+    }
+    
+    return Promise.resolve()
+  }
+
+  // Validator for Start Date - checks if start date is after end date and if planned leave is in past
+  const validateStartDate = async (_: any, value: Dayjs) => {
+    if (!value) return Promise.resolve()
+    
+    const endDate = form.getFieldValue('endDate')
+    const leaveType = form.getFieldValue('leaveType')
+    
+    if (endDate && value.isAfter(endDate, 'day')) {
+      return Promise.reject(new Error('Start date cannot be after end date'))
+    }
+    
+    // For Planned Leave, start date must be >= today
+    if (leaveType === 'Planned Leave') {
+      const today = dayjs().startOf('day')
+      if (value.isBefore(today, 'day')) {
+        return Promise.reject(new Error('For Planned Leave, start date must be today or in the future'))
+      }
+    }
+    
+    return Promise.resolve()
+  }
+
+  // Validator for session combination on same day
+  const validateSessionCombination = async (_: any, value: string) => {
+    if (!value) return Promise.resolve()
+    
+    const startDate = form.getFieldValue('startDate')
+    const endDate = form.getFieldValue('endDate')
+    const sessionStart = form.getFieldValue('sessionStart')
+    const fieldName = form.getFieldInstance('sessionEnd')?.props?.name || 'sessionEnd'
+    
+    // Only validate if we're on sessionEnd field and dates are same day
+    if (startDate && endDate && startDate.isSame(endDate, 'day') && sessionStart) {
+      if (sessionStart === 'Session-2' && value === 'Session-1') {
+        return Promise.reject(new Error('End session cannot be before start session'))
+      }
+    }
+    
+    return Promise.resolve()
+  }
+
+  // Validator for session start on same day
+  const validateSessionStart = async (_: any, value: string) => {
+    if (!value) return Promise.resolve()
+    
+    const startDate = form.getFieldValue('startDate')
+    const endDate = form.getFieldValue('endDate')
+    const sessionEnd = form.getFieldValue('sessionEnd')
+    
+    // Only validate if dates are same day and end session is selected
+    if (startDate && endDate && startDate.isSame(endDate, 'day') && sessionEnd) {
+      if (value === 'Session-2' && sessionEnd === 'Session-1') {
+        return Promise.reject(new Error('Start session cannot be after end session'))
+      }
+    }
+    
+    return Promise.resolve()
   }
 
   const handleFinish = (values: any) => {
@@ -323,6 +412,8 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
 
     console.log("Submitting leave request:", { ...values, duration: computedDuration, totalDeduction, penaltyDays })
 
+    setIsSubmitting(true)
+
     onSubmit({
       ...values,
       startDate: values.startDate ? values.startDate.format("YYYY-MM-DD") : undefined,
@@ -337,11 +428,16 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
     })
   }
 
+  const handleCancel = () => {
+    setIsSubmitting(false)
+    onCancel()
+  }
+
   return (
     <Modal
       title="Request Leave"
       open={true}
-      onCancel={onCancel}
+      onCancel={handleCancel}
       footer={null}
       centered
       width={600}
@@ -390,15 +486,15 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
                 </Select>
               </Form.Item>
 
-              <Form.Item label="Duration" className="md:col-span-2 mb-0">
+              <Form.Item label="Duration" className="md:grid-span-2 mb-0">
                 <Input value={`${duration} days`} disabled className="w-full bg-gray-50 text-gray-600 font-medium" />
               </Form.Item>
 
-              <Form.Item name="startDate" label="Start Date" rules={[{ required: true }]} className="mb-0"> 
+              <Form.Item name="startDate" label="Start Date" rules={[{ required: true }, { validator: validateStartDate }]} className="mb-0"> 
                 <DatePicker size={controlSize} className="w-full" placeholder="DD-MM-YYYY" format="DD-MM-YYYY" dateRender={dateFullCellRender} disabledDate={disabledDate} />
               </Form.Item>
 
-              <Form.Item name="sessionStart" label="Start Session" rules={[{ required: true }]} className="mb-0"> 
+              <Form.Item name="sessionStart" label="Start Session" rules={[{ required: true }, { validator: validateSessionStart }]} className="mb-0"> 
                 <Select size={controlSize} placeholder="Select start session">
                   <Option value="" disabled>Please select session</Option>
                   {sessionOptions.map((option) => (
@@ -407,11 +503,11 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
                 </Select>
               </Form.Item>
 
-              <Form.Item name="endDate" label="End Date" rules={[{ required: true }]} className="mb-0"> 
+              <Form.Item name="endDate" label="End Date" rules={[{ required: true }, { validator: validateEndDate }]} className="mb-0"> 
                 <DatePicker size={controlSize} className="w-full" placeholder="DD-MM-YYYY" format="DD-MM-YYYY" dateRender={dateFullCellRender} disabledDate={disabledDate} />
               </Form.Item>
 
-              <Form.Item name="sessionEnd" label="End Session" rules={[{ required: true }]} className="mb-0"> 
+              <Form.Item name="sessionEnd" label="End Session" rules={[{ required: true }, { validator: validateSessionCombination }]} className="mb-0"> 
                 <Select size={controlSize} placeholder="Select end session">
                   <Option value="" disabled>Please select session</Option>
                   {sessionOptions.map((option) => (
@@ -453,15 +549,15 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
             </Form.Item>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-3 gap-y-0">
-              <Form.Item name="startDate" label="Start Date" rules={[{ required: true }]} className="mb-0"> 
+              <Form.Item name="startDate" label="Start Date" rules={[{ required: true }, { validator: validateStartDate }]} className="mb-0"> 
                 <DatePicker size={controlSize} className="w-full" placeholder="DD-MM-YYYY" format="DD-MM-YYYY" dateRender={dateFullCellRender} disabledDate={disabledDateForExtraDayPay} />
               </Form.Item>
 
-              <Form.Item name="endDate" label="End Date" rules={[{ required: true }]} className="mb-0"> 
+              <Form.Item name="endDate" label="End Date" rules={[{ required: true }, { validator: validateEndDate }]} className="mb-0"> 
                 <DatePicker size={controlSize} className="w-full" placeholder="DD-MM-YYYY" format="DD-MM-YYYY" dateRender={dateFullCellRender} disabledDate={disabledDateForExtraDayPay} />
               </Form.Item>
 
-              <Form.Item name="sessionStart" label="Start Session" rules={[{ required: true }]} className="mb-0"> 
+              <Form.Item name="sessionStart" label="Start Session" rules={[{ required: true }, { validator: validateSessionStart }]} className="mb-0"> 
                 <Select size={controlSize} placeholder="Select start session">
                   <Option value="" disabled>Please select session</Option>
                   {sessionOptions.map((option) => (
@@ -470,7 +566,7 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
                 </Select>
               </Form.Item>
 
-              <Form.Item name="sessionEnd" label="End Session" rules={[{ required: true }]} className="mb-0"> 
+              <Form.Item name="sessionEnd" label="End Session" rules={[{ required: true }, { validator: validateSessionCombination }]} className="mb-0"> 
                 <Select size={controlSize} placeholder="Select end session">
                   <Option value="" disabled>Please select session</Option>
                   {sessionOptions.map((option) => (
@@ -506,8 +602,8 @@ export function LeaveRequestForm({ onSubmit, onCancel, employeeId, employeeName 
         )}
 
         <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
-          <Button onClick={onCancel}>Cancel</Button>
-          <Button type="primary" htmlType="submit">Submit Request</Button>
+          <Button onClick={handleCancel}>Cancel</Button>
+          <Button type="primary" htmlType="submit" disabled={isSubmitting} loading={isSubmitting}>Submit Request</Button>
         </div>
       </Form>
     </Modal>

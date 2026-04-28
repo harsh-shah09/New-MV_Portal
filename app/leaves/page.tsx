@@ -73,6 +73,7 @@ export default function LeavesPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [showForm, setShowForm] = useState(false)
+  const [isSubmittingLeaveRequest, setIsSubmittingLeaveRequest] = useState(false)
   const [selectedTab, setSelectedTab] = useState<LeaveTab>("my-requests")
   const [currentUser, setCurrentUser] = useState<{ employeeId: string; email?: string; recordId: string; role?: string; title?: string } | null>(null)
   const [rejectModalVisible, setRejectModalVisible] = useState(false)
@@ -500,6 +501,9 @@ export default function LeavesPage() {
             onOk: async () => {
               await submit({ ...payload, confirmMerge: true, mergeExistingLeaveId: details.existingLeaveId }, confirmedRules)
             },
+            onCancel: () => {
+              setIsSubmittingLeaveRequest(false)
+            },
           })
           return
         }
@@ -584,6 +588,9 @@ export default function LeavesPage() {
             onOk: async () => {
               await submit(payload, true)
             },
+            onCancel: () => {
+              setIsSubmittingLeaveRequest(false)
+            },
           })
           return
         }
@@ -592,17 +599,20 @@ export default function LeavesPage() {
           if (result?.code === 'GOOGLE_AUTH_REQUIRED') {
             toast.error(result?.error || 'Please connect Google Workspace to continue.', { id: toastId, duration: 6000 })
             promptGoogleWorkspaceAuthentication()
+            setIsSubmittingLeaveRequest(false)
             return
           }
           // Check if there's a detailed message from the backend (e.g., duplicate leave)
           const errorMessage = result?.details?.message || result?.error || "Failed to submit leave request"
           toast.error(errorMessage, { id: toastId, duration: 6000 })
+          setIsSubmittingLeaveRequest(false)
           return
         }
 
         // Refetch the leaves to get the updated list
         refetch()
         setShowForm(false)
+        setIsSubmittingLeaveRequest(false)
 
         if (result?.totals) {
           const t = result.totals
@@ -621,6 +631,7 @@ export default function LeavesPage() {
       } catch (error) {
         console.error("Error submitting leave request:", error)
         toast.error("Failed to submit leave request. Please try again.", { id: toastId })
+        setIsSubmittingLeaveRequest(false)
       }
     }
 
@@ -673,7 +684,7 @@ export default function LeavesPage() {
         </div>
       ),
       okText: 'Yes, Withdraw',
-      cancelText: 'No, Keep Leave',
+      cancelText: 'Cancel',
       okButtonProps: { danger: true },
       onOk: async () => {
         const toastId = toast.loading("Withdrawing leave...")
@@ -1525,7 +1536,12 @@ export default function LeavesPage() {
         {showForm && (
           <LeaveRequestForm
             onSubmit={handleSubmitRequest}
-            onCancel={() => setShowForm(false)}
+            onCancel={() => {
+              setIsSubmittingLeaveRequest(false)
+              setShowForm(false)
+            }}
+            isSubmitting={isSubmittingLeaveRequest}
+            setIsSubmitting={setIsSubmittingLeaveRequest}
             employeeName={currentUser?.email || "Current Employee"}
           />
         )}
