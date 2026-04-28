@@ -41,6 +41,16 @@ export async function GET(req: Request) {
         const oauth2Client = await getOAuth2Client();
         const { tokens } = await oauth2Client.getToken(code);
 
+        oauth2Client.setCredentials(tokens);
+        let accountEmail: string | null = null;
+        try {
+            const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
+            const { data } = await oauth2.userinfo.get();
+            accountEmail = data?.email || null;
+        } catch (error) {
+            console.warn('Failed to fetch Google account email on callback:', error);
+        }
+
         // Store tokens in DynamoDB
         await db.send(new PutCommand({
             TableName: 'MV_Portal',
@@ -52,6 +62,7 @@ export async function GET(req: Request) {
                 scope: tokens.scope,
                 token_type: tokens.token_type,
                 expiry_date: tokens.expiry_date,
+                account_email: accountEmail,
                 updated_at: new Date().toISOString()
             }
         }));

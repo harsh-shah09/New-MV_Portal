@@ -16,11 +16,12 @@ export async function GET() {
     }
     
     return NextResponse.json({ 
-        id: employee.Id,
-        name: employee.Employee_Name__c,
-        email: employee.Employee_Email__c,
-        role: employee.Role__c,
-        profilePhoto: employee.Profile_Photo__c
+      id: employee.Id,
+      name: employee.Employee_Name__c,
+      email: employee.Employee_Email__c,
+      companyEmail: employee.Company_Email__c,
+      role: employee.Role__c,
+      profilePhoto: employee.Profile_Photo__c
     });
 
   } catch (error) {

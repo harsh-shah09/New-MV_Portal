@@ -7,16 +7,30 @@ import { motion, AnimatePresence } from "framer-motion"
 import { Modal } from "antd"
 import { updateFirstTimeLoginAction } from "@/app/actions/session"
 
-export function GoogleIntegration() {
+export function GoogleIntegration({ employeeId }: { employeeId?: string } ) {
     const [connected, setConnected] = useState(false)
     const [loading, setLoading] = useState(true)
     const [actionLoading, setActionLoading] = useState(false)
     const [notification, setNotification] = useState<{ type: 'success' | 'error', message: string } | null>(null)
     const [showFirstTimeModal, setShowFirstTimeModal] = useState(false)
+    const [me, setMe] = useState<any>(null)
+    const [googleEmail, setGoogleEmail] = useState<string | null>(null)
 
     useEffect(() => {
-        // 1. Check Google connection status
-        checkStatus();
+        // 1. Fetch session (to know whether we are viewing another profile)
+        (async () => {
+            try {
+                const res = await fetch('/api/me');
+                if (res.ok) {
+                    const data = await res.json();
+                    setMe(data);
+                }
+            } catch (e) {
+                // ignore
+            }
+            // 2. Check Google connection status (for target employee)
+            checkStatus();
+        })();
 
         // 2. Handle OAuth callback query params (success / error)
         const params = new URLSearchParams(window.location.search);
@@ -94,10 +108,12 @@ export function GoogleIntegration() {
     const checkStatus = async () => {
         try {
             setLoading(true);
-            const res = await fetch('/api/integrations/google?action=status');
+            const employeeParam = employeeId ? `&employeeId=${encodeURIComponent(employeeId)}` : '';
+            const res = await fetch(`/api/integrations/google?action=status${employeeParam}`);
             if (res.ok) {
                 const data = await res.json();
                 setConnected(data.connected);
+                setGoogleEmail(data.googleEmail || null);
             }
         } catch (e) {
             console.error(e);
@@ -107,6 +123,11 @@ export function GoogleIntegration() {
     }
 
     const handleConnect = async () => {
+        // Prevent connecting for other users
+        if (employeeId && me && employeeId !== me.employeeId) {
+            showNotification('error', 'You cannot connect Google for another user. Ask the user to connect from their account.');
+            return;
+        }
         try {
             setActionLoading(true);
             const res = await fetch('/api/integrations/google');
@@ -120,11 +141,17 @@ export function GoogleIntegration() {
     }
 
     const handleDisconnect = async () => {
+        // Prevent disconnecting for other users
+        if (employeeId && me && employeeId !== me.employeeId) {
+            showNotification('error', 'You cannot disconnect Google for another user.');
+            return;
+        }
         try {
             setActionLoading(true);
             const res = await fetch('/api/integrations/google?action=disconnect');
             if (!res.ok) throw new Error("Failed");
             setConnected(false);
+            setGoogleEmail(null);
             showNotification('success', "Successfully disconnected from Google Workspace");
         } catch (e) {
             showNotification('error', "Failed to disconnect. Please try again.");
@@ -210,11 +237,17 @@ export function GoogleIntegration() {
                 Seamlessly integrate with your Google account to enable automatic leave notifications via Gmail and sync approved leaves directly to your calendar.
             </p>
 
+            {connected && googleEmail && (
+                <p className="text-xs text-slate-500 mb-6">
+                    Connected as <span className="font-medium text-slate-700 break-all">{googleEmail}</span>
+                </p>
+            )}
+
             <div className="flex gap-3">
                 {!connected ? (
                     <button 
                         onClick={handleConnect}
-                        disabled={actionLoading}
+                        disabled={actionLoading || (!!employeeId && me && employeeId !== me.employeeId)}
                         className="w-full bg-white border border-slate-200 hover:border-blue-400 hover:bg-blue-50/50 text-slate-700 hover:text-blue-600 font-semibold py-3 rounded-xl transition-all flex items-center justify-center gap-2 group disabled:opacity-70 disabled:cursor-not-allowed shadow-sm hover:shadow"
                     >
                         {actionLoading ? (
@@ -229,7 +262,7 @@ export function GoogleIntegration() {
                 ) : (
                     <button 
                         onClick={handleDisconnect}
-                        disabled={actionLoading}
+                        disabled={actionLoading || (!!employeeId && me && employeeId !== me.employeeId)}
                         className="w-full bg-slate-50 border border-slate-200 hover:bg-red-50 hover:border-red-200 text-slate-600 hover:text-red-600 font-semibold py-3 rounded-xl transition-all flex items-center justify-center gap-2 group disabled:opacity-70 disabled:cursor-not-allowed"
                     >
                         {actionLoading ? (

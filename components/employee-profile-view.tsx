@@ -2552,7 +2552,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                             </div>
                                         </div>
 
-                                        <GoogleIntegration />
+                                        <GoogleIntegration employeeId={employeeId} />
 
                                         {/* 2FA Setup Modal */}
                                         {show2FAModal && (

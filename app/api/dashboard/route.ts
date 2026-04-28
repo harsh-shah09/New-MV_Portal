@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
 
         const { employeeId, email, recordId, name, role, title } = payload;
         const currentEmployeeId = employeeId || name || recordId;
-        const isTeamLead = role === 'Developer' && title === 'Team Lead';
+        const isTeamLead = title === 'Team Lead';
         
         const conn = await getSalesforceConnection();
         const isHR = role === 'HR';
@@ -403,15 +403,15 @@ export async function GET(req: NextRequest) {
         let teamMembers: any[] = [];
         if (currentEmployeeQuery.records.length > 0) {
             const currentEmployee = currentEmployeeQuery.records[0];
-            const teamLeadId = currentEmployee.Team_Lead__c;
+            const currentId = currentEmployeeId;
 
-            if (teamLeadId) {
-                // Fetch all employees under the same team lead, excluding the current employee
+            if (isTeamLead) {
+                // If the current user is a Team Lead, fetch their direct reports
                 const teamQuery = await conn.query(`
                     SELECT Id, Employee_Name__c, Employee_Email__c, Title__c
                     FROM Employee__c
-                    WHERE Team_Lead__c = '${teamLeadId}'
-                    AND Id != '${currentEmployeeId}'
+                    WHERE Team_Lead__c = '${currentId}'
+                    AND Id != '${currentId}'
                     AND Status__c = 'Active'
                     ORDER BY Employee_Name__c ASC
                 `);
@@ -422,6 +422,27 @@ export async function GET(req: NextRequest) {
                     email: record.Employee_Email__c || "",
                     title: record.Title__c || ""
                 }));
+            } else {
+                // Non team-leads see colleagues under the same team lead (existing behavior)
+                const teamLeadId = currentEmployee.Team_Lead__c;
+
+                if (teamLeadId) {
+                    const teamQuery = await conn.query(`
+                        SELECT Id, Employee_Name__c, Employee_Email__c, Title__c
+                        FROM Employee__c
+                        WHERE Team_Lead__c = '${teamLeadId}'
+                        AND Id != '${currentId}'
+                        AND Status__c = 'Active'
+                        ORDER BY Employee_Name__c ASC
+                    `);
+
+                    teamMembers = teamQuery.records.map((record: any) => ({
+                        id: record.Id,
+                        name: record.Employee_Name__c || "Unknown",
+                        email: record.Employee_Email__c || "",
+                        title: record.Title__c || ""
+                    }));
+                }
             }
         }
         const employeeName = currentEmployeeQuery.records[0]?.Employee_Name__c || email || name;
