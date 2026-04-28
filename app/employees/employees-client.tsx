@@ -123,6 +123,14 @@ export default function EmployeesClient({ role }: EmployeesClientProps) {
     return matchesSearch && matchesDepartment && matchesStatus && matchesAccountStatus
   })
 
+  const handleRefresh = async () => {
+    setSearchTerm("")
+    setDepartment("")
+    setStatus("")
+    setAccountStatus("")
+    await refetch()
+  }
+
   const handleAddEmployee = (data: Employee) => {
     setShowForm(false)
   }
@@ -153,20 +161,24 @@ export default function EmployeesClient({ role }: EmployeesClientProps) {
         };
 
         const res = await fetch(`/api/employees/${data.id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(salesforceData),
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(salesforceData),
         });
 
-        if (!res.ok) throw new Error('Failed to update');
+        if (!res.ok) {
+          const errBody = await res.json().catch(() => ({}));
+          throw new Error(errBody?.error || 'Failed to update');
+        }
 
         message.success({ content: 'Employee updated successfully!', key: 'update' });
         await refetch();
         setEditingEmployee(undefined)
         setShowForm(false)
-     } catch (error) {
-         console.error("Update failed", error);
-         message.error({ content: 'Failed to update employee', key: 'update' });
+     } catch (error: any) {
+       console.error("Update failed", error);
+       const errMsg = error?.message || 'Failed to update employee';
+       message.error({ content: errMsg, key: 'update' });
      }
   }
 
@@ -209,7 +221,7 @@ export default function EmployeesClient({ role }: EmployeesClientProps) {
     <PageContainer>
       <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 bg-white p-3 rounded-xl flex flex-col gap-4">
         <PageHeader title="Employees" subtitle="Manage your workforce">
-            <RefreshButton onClick={refetch} label="" size="large" loading={isFetching}/>
+          <RefreshButton onClick={handleRefresh} label="" size="large" loading={isFetching}/>
 
             {/* <div>
               <Button type="primary" onClick={() => setShowForm(true)} size="large" icon={<Plus size={16}/>}>

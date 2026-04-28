@@ -32,6 +32,13 @@ interface EmployeeLeaveKpi {
   plannedLeaveCount: number
 }
 
+const DEFAULT_LEAVE_FILTERS = {
+  status: "",
+  leaveType: "",
+  employeeName: "",
+  dateRange: [null, null] as [any, any],
+}
+
 type LeaveTab = "my-requests" | "approvals" | "all-leaves"
 
 const LEAVE_TAB_QUERY_MAP: Record<LeaveTab, string> = {
@@ -89,12 +96,7 @@ export default function LeavesPage() {
   const [selectedLeaveForDetails, setSelectedLeaveForDetails] = useState<LeaveRequest | null>(null)
   const [detailsModalVisible, setDetailsModalVisible] = useState(false)
   const [isLoadingLeaveDetails, setIsLoadingLeaveDetails] = useState(false)
-  const [filters, setFilters] = useState({
-    status: "",
-    leaveType: "",
-    employeeName: "",
-    dateRange: [null, null] as [any, any],
-  })
+  const [filters, setFilters] = useState(DEFAULT_LEAVE_FILTERS)
 
   const normalizedEmployeeSearch = filters.employeeName.trim().toLowerCase()
   const searchedEmployeeLeaves = normalizedEmployeeSearch
@@ -280,6 +282,16 @@ export default function LeavesPage() {
   useEffect(() => {
     fetchAllLeaves()
   }, [currentUser])
+
+  const handleMyRequestsRefresh = async () => {
+    setFilters(DEFAULT_LEAVE_FILTERS)
+    await refetch()
+  }
+
+  const handleAllLeavesRefresh = async () => {
+    setFilters(DEFAULT_LEAVE_FILTERS)
+    await fetchAllLeaves()
+  }
 
   const isAdminUser = currentUser?.role === 'Admin'
   const canRequestLeave = !isAdminUser
@@ -1107,7 +1119,7 @@ export default function LeavesPage() {
                   {/* Filters & Refresh - Stacks nicely on mobile */}
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                     <RefreshButton
-                      onClick={refetch}
+                      onClick={handleMyRequestsRefresh}
                       loading={isLoading}
                       size="large"
                       label=""
@@ -1363,7 +1375,7 @@ export default function LeavesPage() {
               <div>
                 <div className="flex items-center justify-between gap-2 mb-4">
                   <h2 className="text-lg font-semibold text-gray-900">All Leave Records</h2>
-                  <RefreshButton onClick={fetchAllLeaves} loading={isRefreshingAllLeaves} size="large" label="" className="h-10 w-10 p-0" />
+                  <RefreshButton onClick={handleAllLeavesRefresh} loading={isRefreshingAllLeaves} size="large" label="" className="h-10 w-10 p-0" />
                 </div>
 
                 {/* Filters */}

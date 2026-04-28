@@ -148,7 +148,14 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
             setIsSavingVerifications(false);
         }
     };
-    const salaryCalculationFields = [
+    type SalaryCalculationField = {
+        fieldKey: string
+        label: string
+        kind: "percentage" | "number"
+        format?: (value: any) => any
+    }
+
+    const salaryCalculationFields: SalaryCalculationField[] = [
         { fieldKey: "Basic_Console__c", label: "Basic Console", kind: "percentage" as const },
         { fieldKey: "HRA__c", label: "HRA", kind: "percentage" as const },
         { fieldKey: "CONV__c", label: "Conveyance", kind: "percentage" as const },
@@ -271,9 +278,13 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
         onSuccess: () => {
             message.success("Profile updated successfully")
             setIsEditing(false)
+            // Refetch data after successful save
             queryClient.invalidateQueries({ queryKey: ["employee", employeeId] })
         },
-        onError: (error: any) => message.error(error?.message || "Failed to update profile")
+        onError: (error: any) => {
+            // Show error immediately without waiting for refetch
+            message.error(error?.message || "Failed to update profile")
+        }
     })
 
 
@@ -340,7 +351,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
         return formData[fieldKey] !== undefined ? formData[fieldKey] : employee?.[fieldKey] ?? ""
     }
 
-    const renderSalaryField = (field: { fieldKey: string; label: string; kind: "percentage" | "number" }) => {
+    const renderSalaryField = (field: SalaryCalculationField) => {
         const currentValue = getSalaryFieldValue(field.fieldKey)
         const suffix = field.kind === "percentage" ? "%" : ""
 
@@ -384,7 +395,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
         )
     }
 
-    const validateForm = () => {
+    const getValidationErrors = () => {
         const newErrors: Record<string, string> = {}
 
         // Always validate based on the activeTab
@@ -465,9 +476,26 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                 }
             }
 
+            if(employeeCode) {
+                // employee code should start with MV and followed by maximum of 5 digits
+                const employeeCodePattern = /^MV\d{0,5}$/i
+                if (!employeeCodePattern.test(employeeCode)) {
+                    newErrors.Employee_Id__c = "Employee ID must start with 'MV' followed by up to 5 digits (e.g., MV12345)"
+                }
+            }
+
             if (formData.Joining_Date__c && formData.Birthdate__c) {
                 if (new Date(formData.Joining_Date__c) < new Date(formData.Birthdate__c)) {
                     newErrors.Joining_Date__c = "Joining date cannot be before birth date"
+                }
+            }
+
+            if (formData.Joining_Date__c && formData.Onboarding_Date__c) {
+                const joiningDate = dayjs(formData.Joining_Date__c)
+                const onboardingDate = dayjs(formData.Onboarding_Date__c)
+
+                if (joiningDate.isValid() && onboardingDate.isValid() && onboardingDate.isBefore(joiningDate, 'day')) {
+                    newErrors.Onboarding_Date__c = "Onboarding date must be on or after joining date"
                 }
             }
 
@@ -523,9 +551,32 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
             })
         }
 
+        return newErrors
+    }
+
+    const validateForm = () => {
+        const newErrors = getValidationErrors()
         setErrors(newErrors)
         return Object.keys(newErrors).length === 0
     }
+
+    useEffect(() => {
+        if (!isEditing) return
+
+        const nextErrors = getValidationErrors()
+
+        setErrors((prev) => {
+            const prevKeys = Object.keys(prev)
+            const nextKeys = Object.keys(nextErrors)
+
+            if (prevKeys.length !== nextKeys.length) {
+                return nextErrors
+            }
+
+            const hasDifference = nextKeys.some((key) => prev[key] !== nextErrors[key])
+            return hasDifference ? nextErrors : prev
+        })
+    }, [isEditing, activeTab, formData, employeesList, currentUserRole, employeeId])
 
     const handleEditToggle = () => {
         if (isEditing) {
@@ -1193,6 +1244,11 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
     const isOwnProfile =
         normalizeSfId(currentUserEmployeeId) !== '' &&
         normalizeSfId(currentUserEmployeeId) === normalizeSfId(employee?.Id || employeeId)
+    const viewedEmployeeRoleNormalized = viewedEmployeeRole.toLowerCase()
+    const currentUserTitleNormalized = (
+        employeesList?.find((emp: any) => normalizeSfId(emp.Id) === normalizeSfId(currentUserEmployeeId))?.Title__c || ''
+    ).trim().toLowerCase()
+    const isHrTeamLead = isHrUser && currentUserTitleNormalized === 'team lead'
     const selectedDepartment = `${formData.Department__c ?? employee.Department__c ?? ''}`.trim().toLowerCase()
     const selectedRole = `${formData.Role__c ?? employee.Role__c ?? ''}`.trim().toLowerCase()
     const currentEmployeeCode = `${formData.Employee_Id__c ?? employee.Employee_Id__c ?? ''}`.trim()
@@ -1204,10 +1260,12 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
     const canViewCompensation = isAdminUser || (!isHrUser && isOwnProfile) || (isHrUser && isOwnProfile)
     const canViewSalaryHistory = isAdminUser || (!isHrUser && isOwnProfile) || (isHrUser && isOwnProfile)
     const canToggleUserActive =
-        currentUserRole === 'Admin'
+        isAdminUser
             ? true
-            : currentUserRole === 'HR'
-                ? !['HR', 'Admin'].includes(viewedEmployeeRole)
+            : isHrUser
+                ? viewedEmployeeRoleNormalized !== 'admin' && (
+                    viewedEmployeeRoleNormalized !== 'hr' || (isHrTeamLead && !isOwnProfile)
+                )
                 : false
     if (isScreenActionLoading) {
         return (
@@ -1672,16 +1730,17 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                                 <input
                                                                     type="number"
                                                                     min="0"
+                                                                    max="50"
                                                                     value={formData.exp_years ?? 0}
                                                                     onChange={(e) => {
-                                                                        const y = Math.max(0, parseInt(e.target.value, 10) || 0)
+                                                                        const y = Math.min(50,Math.max(0, parseInt(e.target.value, 10) || 0))
                                                                         setFormData({ ...formData, exp_years: y })
                                                                     }}
-                                                                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none transition"
+                                                                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none transition [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                                     placeholder="0"
                                                                 />
                                                                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 pointer-events-none">
-                                                                    yr
+                                                                    year
                                                                 </span>
                                                             </div>
                                                             <span className="text-slate-400 text-sm font-medium shrink-0">:</span>
@@ -1696,11 +1755,11 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                                         const m = Math.min(11, Math.max(0, parseInt(e.target.value, 10) || 0))
                                                                         setFormData({ ...formData, exp_months: m })
                                                                     }}
-                                                                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none transition"
+                                                                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none transition [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                                     placeholder="0"
                                                                 />
                                                                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 pointer-events-none">
-                                                                    mo
+                                                                    month
                                                                 </span>
                                                             </div>
                                                         </div>
@@ -1722,7 +1781,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                     )}
                                                 </div>
                                                 <Field label="Joining Date" value={employee.Joining_Date__c} fieldKey="Joining_Date__c" type="date" isEditing={isEditing && ['HR', 'Admin'].includes(currentUserRole)} formData={formData} setFormData={setFormData} error={errors.Joining_Date__c} />
-                                                <Field label="Onboarding Date" value={employee.Onboarding_Date__c} fieldKey="Onboarding_Date__c" type="date" isEditing={isEditing && ['HR', 'Admin'].includes(currentUserRole)} formData={formData} setFormData={setFormData} />
+                                                <Field label="Onboarding Date" value={employee.Onboarding_Date__c} fieldKey="Onboarding_Date__c" type="date" isEditing={isEditing && ['HR', 'Admin'].includes(currentUserRole)} formData={formData} setFormData={setFormData} error={errors.Onboarding_Date__c} />
 
                                                 <Field
                                                     label="Employment Status"
@@ -2254,7 +2313,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                                                                     : 'bg-red-50 text-red-700 border-red-300'
                                                                                                 }`}
                                                                                         >
-                                                                                            ⏳ {staged === 'approve' ? 'Approve' : 'Reject'}
+                                                                                            ⏳ {staged === 'approve' ? 'Approved' : 'Rejected'}
                                                                                         </span>
                                                                                     ) : (
                                                                                         <div className="flex items-center gap-1.5 shrink-0">

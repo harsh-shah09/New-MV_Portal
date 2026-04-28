@@ -793,8 +793,24 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                         <Form.Item name="bankbranch" label="Bank Branch Name" rules={[{ required: true }]}>
                             <Input disabled={disabledsteps.includes(3)} />
                         </Form.Item>
-                        <Form.Item name="accountNumber" label="Account Number" rules={[{ required: true }]}>
-                            <Input type='number' disabled={disabledsteps.includes(3)} />
+                        <Form.Item
+                            name="accountNumber"
+                            label="Account Number"
+                            rules={[
+                                { required: true, message: 'Account number is required' },
+                                { pattern: /^\d{8,17}$/, message: 'Account number must be 8 to 17 digits and contain numbers only' }
+                            ]}
+                        >
+                            <Input
+                                type="text"
+                                inputMode="numeric"
+                                maxLength={17}
+                                disabled={disabledsteps.includes(3)}
+                                onChange={(e) => {
+                                    const onlyDigits = e.target.value.replace(/\D/g, '').slice(0, 17)
+                                    form.setFieldValue('accountNumber', onlyDigits)
+                                }}
+                            />
                         </Form.Item>
                         <Form.Item name="accountHolder" label="Account Holder Name" rules={[{ required: true }]}>
                             <Input disabled={disabledsteps.includes(3)} />

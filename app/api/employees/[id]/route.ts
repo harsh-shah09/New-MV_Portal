@@ -1,6 +1,6 @@
 
 import { NextResponse } from 'next/server';
-import { getAllEmployees, getEmployeeById, updateEmployee } from '@/lib/salesforce';
+import { getAllEmployees, getEmployeeById, updateEmployee, getEmployeesByTeamLead } from '@/lib/salesforce';
 
 export async function GET(
   request: Request,
@@ -83,6 +83,30 @@ export async function PUT(
     // Aggregate Address into JSON String for storage reliability
     if (data.Employee_Current_Address__c && typeof data.Employee_Current_Address__c === 'object') {
         data.Employee_Current_Address__c = JSON.stringify(data.Employee_Current_Address__c);
+    }
+
+    // Validation: if Title__c is being changed, check if it's changing away from "Team Lead"
+    // and if so, ensure this employee is not assigned as Team Lead for any other employee.
+    if (data.Title__c !== undefined) {
+      try {
+        const currentEmp = await getEmployeeById(id);
+        const currentTitle = (currentEmp?.Title__c || '').toString().trim().toLowerCase();
+        const incomingTitle = (data.Title__c || '').toString().trim().toLowerCase();
+
+        // Only validate if title is actually changing and moving away from "Team Lead"
+        if (currentTitle === 'team lead' && incomingTitle !== 'team lead') {
+          const reports = await getEmployeesByTeamLead(id);
+          if (reports && reports.length > 0) {
+            return NextResponse.json(
+              { error: `Cannot change title: employee is Team Lead for ${reports.length} employee(s). Reassign their Team Lead first.` },
+              { status: 400 }
+            );
+          }
+        }
+      } catch (err) {
+        console.error('Error validating team lead reassignment:', err);
+        // Non-fatal — proceed to update (but log the issue)
+      }
     }
 
     await updateEmployee(id, data);
