@@ -195,7 +195,7 @@ export default function HandbookClient({ role, userId }: HandbookClientProps) {
                              <FileText size={40} className="text-blue-500 z-10 drop-shadow-sm" />
                              
                              {/* Overlay Actions */}
-                             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center gap-3 backdrop-blur-[2px] z-20">
+                             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center gap-3 backdrop-blur-[2px] z-20 hidden md:flex">
                                    <Tooltip title="Preview">
                                         <Button shape="circle" icon={<Eye size={18} />} onClick={() => setPreviewDoc(doc)} className="border-0 shadow-lg hover:scale-110 transition-transform" />
                                    </Tooltip>
@@ -210,10 +210,20 @@ export default function HandbookClient({ role, userId }: HandbookClientProps) {
                              </div>
                          </div>
                          <div className="p-5 flex-1 flex flex-col">
-                             <div className="mb-2">
+                             <div className="mb-2 flex items-center justify-between gap-2">
                                 <Tag color="blue" className="px-2 py-0.5 rounded-full text-xs font-medium border-0 bg-blue-50 text-blue-600">
                                     {doc.Document_Type__c || 'Document'}
                                 </Tag>
+                                <div className="flex gap-2 md:hidden">
+                                    <Tooltip title="Preview">
+                                        <Button size="small" type="text" icon={<Eye size={16} />} onClick={() => setPreviewDoc(doc)} />
+                                    </Tooltip>
+                                    {isHR && (
+                                        <Tooltip title="Delete">
+                                            <Button size="small" type="text" danger icon={<Trash2 size={16} />} onClick={() => handleDelete(doc.Id)} />
+                                        </Tooltip>
+                                    )}
+                                </div>
                              </div>
                              <h3 className="font-semibold text-gray-800 mb-1 line-clamp-2 text-base" title={doc.Name}>
                                  {doc.Name}
