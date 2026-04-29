@@ -3,6 +3,94 @@ import { cookies } from "next/headers";
 import { verifyToken } from "@/lib/auth-utils";
 import { getSalesforceConnection } from "@/lib/salesforce";
 
+const MAX_HOLIDAYS_PER_BATCH = 12;
+
+const isValidDateString = (date: unknown): date is string => {
+  return typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date);
+};
+
+const normalizeDate = (date: string) => date.slice(0, 10);
+
+const findDuplicateDate = (dates: string[]) => {
+  const seen = new Set<string>();
+
+  for (const date of dates) {
+    if (seen.has(date)) {
+      return date;
+    }
+
+    seen.add(date);
+  }
+
+  return null;
+};
+
+const fetchExistingHolidayDates = async (conn: any, excludeHolidayId?: string) => {
+  const query = excludeHolidayId
+    ? `SELECT Id, Date__c FROM Holidays_List__c WHERE Id != '${excludeHolidayId}'`
+    : `SELECT Id, Date__c FROM Holidays_List__c`;
+
+  const holidayRecords = await conn.query<any>(query);
+
+  return new Set(
+    holidayRecords.records
+      .map((record: any) => record.Date__c)
+      .filter(Boolean)
+      .map((date: string) => normalizeDate(date))
+  );
+};
+
+const fetchExistingHolidayNames = async (conn: any, year: string, excludeHolidayId?: string) => {
+  const yearNum = parseInt(year, 10);
+  const query = excludeHolidayId
+    ? `SELECT Id, Name, Year__c FROM Holidays_List__c WHERE Year__c = ${yearNum} AND Id != '${excludeHolidayId}'`
+    : `SELECT Id, Name, Year__c FROM Holidays_List__c WHERE Year__c = ${yearNum}`;
+
+  const holidayRecords = await conn.query<any>(query);
+
+  return new Set(
+    holidayRecords.records
+      .map((record: any) => record.Name)
+      .filter(Boolean)
+      .map((name: string) => name.toLowerCase().trim())
+  );
+};
+
+const findDuplicateName = (names: string[]) => {
+  const seen = new Set<string>();
+
+  for (const name of names) {
+    const normalized = name.toLowerCase().trim();
+    if (seen.has(normalized)) {
+      return name;
+    }
+    seen.add(normalized);
+  }
+
+  return null;
+};
+
+const isValidHolidayName = (name: string): { valid: boolean; error?: string } => {
+  if (!name || typeof name !== 'string') {
+    return { valid: false, error: 'Holiday name is required' };
+  }
+
+  const trimmed = name.trim();
+  if (trimmed.length === 0) {
+    return { valid: false, error: 'Holiday name cannot be empty' };
+  }
+
+  if (trimmed.length > 30) {
+    return { valid: false, error: 'Holiday name cannot exceed 30 characters' };
+  }
+
+  if (/\d/.test(trimmed)) {
+    return { valid: false, error: 'Holiday name cannot contain numbers' };
+  }
+
+  return { valid: true };
+};
+
 export async function GET(request: NextRequest) {
   try {
     // Get session from cookies
@@ -91,13 +179,80 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "No holidays provided" }, { status: 400 });
       }
 
+      if (holidays.length > MAX_HOLIDAYS_PER_BATCH) {
+        return NextResponse.json(
+          { error: `You can add up to ${MAX_HOLIDAYS_PER_BATCH} holidays at a time` },
+          { status: 400 }
+        );
+      }
+
       // Validate all holidays have required fields (year can be auto-derived from date)
       const invalidHolidays = holidays.filter(h => !h.name || !h.date || !h.day);
       if (invalidHolidays.length > 0) {
         return NextResponse.json({ error: "Some holidays are missing required fields" }, { status: 400 });
       }
 
+      // Validate holiday names (no numbers, max 30 characters)
+      for (let i = 0; i < holidays.length; i++) {
+        const nameValidation = isValidHolidayName(holidays[i].name);
+        if (!nameValidation.valid) {
+          return NextResponse.json(
+            { error: `Holiday ${i + 1}: ${nameValidation.error}` },
+            { status: 400 }
+          );
+        }
+      }
+
+      const invalidDates = holidays.filter((holiday) => !isValidDateString(holiday.date));
+      if (invalidDates.length > 0) {
+        return NextResponse.json({ error: "One or more holiday dates are invalid" }, { status: 400 });
+      }
+
+      const duplicateDate = findDuplicateDate(holidays.map((holiday) => normalizeDate(holiday.date)));
+      if (duplicateDate) {
+        return NextResponse.json(
+          { error: "Duplicate holidays are not allowed on the same date" },
+          { status: 400 }
+        );
+      }
+
       const conn = await getSalesforceConnection();
+
+      const existingHolidayDates = await fetchExistingHolidayDates(conn);
+      const conflictingDate = holidays
+        .map((holiday) => normalizeDate(holiday.date))
+        .find((date) => existingHolidayDates.has(date));
+
+      if (conflictingDate) {
+        return NextResponse.json(
+          { error: `A holiday already exists on ${conflictingDate}` },
+          { status: 400 }
+        );
+      }
+
+      const years = new Set(holidays.map((h) => h.year || new Date(h.date).getFullYear().toString()));
+      for (const year of years) {
+        const existingNames = await fetchExistingHolidayNames(conn, year);
+        const conflictingName = holidays
+          .filter((h) => (h.year || new Date(h.date).getFullYear().toString()) === year)
+          .map((h) => h.name)
+          .find((name) => existingNames.has(name.toLowerCase().trim()));
+
+        if (conflictingName) {
+          return NextResponse.json(
+            { error: `Holiday "${conflictingName}" already exists for ${year}` },
+            { status: 400 }
+          );
+        }
+      }
+
+      const duplicateName = findDuplicateName(holidays.map((h) => h.name));
+      if (duplicateName) {
+        return NextResponse.json(
+          { error: `Duplicate holiday name in this list: "${duplicateName}"` },
+          { status: 400 }
+        );
+      }
 
       // Prepare bulk insert data
       const holidayRecords = holidays.map(h => ({
@@ -135,7 +290,39 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
       }
 
+      // Validate holiday name format
+      const nameValidation = isValidHolidayName(name);
+      if (!nameValidation.valid) {
+        return NextResponse.json(
+          { error: nameValidation.error },
+          { status: 400 }
+        );
+      }
+
+      if (!isValidDateString(date)) {
+        return NextResponse.json({ error: "Invalid holiday date" }, { status: 400 });
+      }
+
       const conn = await getSalesforceConnection();
+
+      const existingHolidayDates = await fetchExistingHolidayDates(conn);
+      const normalizedDate = normalizeDate(date);
+
+      if (existingHolidayDates.has(normalizedDate)) {
+        return NextResponse.json(
+          { error: `A holiday already exists on ${normalizedDate}` },
+          { status: 400 }
+        );
+      }
+
+      const yearStr = year || new Date(date).getFullYear().toString();
+      const existingNames = await fetchExistingHolidayNames(conn, yearStr);
+      if (existingNames.has(name.toLowerCase().trim())) {
+        return NextResponse.json(
+          { error: `Holiday "${name}" already exists for ${yearStr}` },
+          { status: 400 }
+        );
+      }
 
       // Create holiday record
       const result = await conn.sobject('Holidays_List__c').create({
@@ -197,6 +384,43 @@ export async function PATCH(request: NextRequest) {
     }
 
     const conn = await getSalesforceConnection();
+
+    if (date && !isValidDateString(date)) {
+      return NextResponse.json({ error: "Invalid holiday date" }, { status: 400 });
+    }
+
+    if (name) {
+      const nameValidation = isValidHolidayName(name);
+      if (!nameValidation.valid) {
+        return NextResponse.json(
+          { error: nameValidation.error },
+          { status: 400 }
+        );
+      }
+    }
+
+    if (date) {
+      const existingHolidayDates = await fetchExistingHolidayDates(conn, holidayId);
+      const normalizedDate = normalizeDate(date);
+
+      if (existingHolidayDates.has(normalizedDate)) {
+        return NextResponse.json(
+          { error: `A holiday already exists on ${normalizedDate}` },
+          { status: 400 }
+        );
+      }
+    }
+
+    if (name) {
+      const yearStr = year || (date ? new Date(date).getFullYear().toString() : new Date().getFullYear().toString());
+      const existingNames = await fetchExistingHolidayNames(conn, yearStr, holidayId);
+      if (existingNames.has(name.toLowerCase().trim())) {
+        return NextResponse.json(
+          { error: `Holiday "${name}" already exists for ${yearStr}` },
+          { status: 400 }
+        );
+      }
+    }
 
     // Update holiday record
     const updateData: any = {
