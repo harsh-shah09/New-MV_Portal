@@ -4,12 +4,43 @@ import { google } from 'googleapis';
 import { verifySession } from '@/lib/auth';
 import { getEmployeeById, updateEmployee } from '@/lib/salesforce';
 import { db } from '@/lib/dynamodb';
-import { PutCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
+import { PutCommand, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 
 const SCOPES = [
   'https://www.googleapis.com/auth/gmail.send',
-  'https://www.googleapis.com/auth/calendar'
+  'https://www.googleapis.com/auth/calendar',
+  'https://www.googleapis.com/auth/userinfo.email',
+  'openid'
 ];
+
+function isAuthError(error: unknown): boolean {
+    if (!error || typeof error !== 'object') {
+        return false;
+    }
+
+    const maybe = error as { code?: string | number; status?: number; response?: { status?: number } };
+    const status = maybe.status || maybe.response?.status;
+
+    if (status === 401 || status === 403) {
+        return true;
+    }
+
+    if (typeof maybe.code === 'string') {
+        return ['invalid_grant', 'unauthorized_client', 'invalid_client'].includes(maybe.code);
+    }
+
+    return false;
+}
+
+async function fetchGoogleAccountEmail(oauth2Client: any): Promise<string | null> {
+    try {
+        const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
+        const { data } = await oauth2.userinfo.get();
+        return data?.email || null;
+    } catch (error) {
+        return null;
+    }
+}
 
 async function getOAuth2Client() {
     const clientId = process.env.GOOGLE_CLIENT_ID;
@@ -35,15 +66,70 @@ export async function GET(req: Request) {
         const action = searchParams.get('action');
 
         if (action === 'status') {
+            // Allow HR/Admin to fetch status for another employee via ?employeeId=<id>
+            const { searchParams } = new URL(req.url);
+            const targetEmployeeId = searchParams.get('employeeId') || session.employeeId;
+
+            // If asking for someone else's status, enforce HR/Admin role
+            if (targetEmployeeId !== session.employeeId) {
+                const allowedRoles = ['HR', 'Admin'];
+                if (!allowedRoles.includes(session.role || '')) {
+                    return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+                }
+            }
+
             const getCmd = new GetCommand({
                 TableName: 'MV_Portal',
                 Key: {
-                    Employee_Id: session.employeeId,
+                    Employee_Id: targetEmployeeId,
                     SortKey: 'GOOGLE_INTEGRATION'
                 }
             });
             const data = await db.send(getCmd);
-            return NextResponse.json({ connected: !!data.Item });
+            if (!data.Item) {
+                return NextResponse.json({ connected: false });
+            }
+
+            const existingEmail = (data.Item as { account_email?: string }).account_email || null;
+            if (existingEmail) {
+                return NextResponse.json({ connected: true, googleEmail: existingEmail });
+            }
+
+            const oauth2Client = await getOAuth2Client();
+            oauth2Client.setCredentials({
+                access_token: (data.Item as any).access_token,
+                refresh_token: (data.Item as any).refresh_token,
+                expiry_date: (data.Item as any).expiry_date,
+                token_type: (data.Item as any).token_type,
+                scope: (data.Item as any).scope,
+            });
+
+            let googleEmail: string | null = null;
+            try {
+                await oauth2Client.getAccessToken();
+                googleEmail = await fetchGoogleAccountEmail(oauth2Client);
+            } catch (error) {
+                if (!isAuthError(error)) {
+                    console.warn('Google email fetch failed:', error);
+                }
+            }
+
+            if (googleEmail) {
+                await db.send(new UpdateCommand({
+                    TableName: 'MV_Portal',
+                    Key: {
+                        Employee_Id: targetEmployeeId,
+                        SortKey: 'GOOGLE_INTEGRATION'
+                    },
+                    UpdateExpression: 'SET account_email = :accountEmail, updated_at = :updatedAt',
+                    ExpressionAttributeValues: {
+                        ':accountEmail': googleEmail,
+                        ':updatedAt': new Date().toISOString()
+                    }
+                }));
+            }
+
+            return NextResponse.json({ connected: true, googleEmail });
         }
 
         if (action === 'disconnect') {

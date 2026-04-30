@@ -859,7 +859,6 @@ export async function POST(request: NextRequest) {
         esiDeduction,
         salaryStructureDeductions,
         totalLeaveDays,
-        totalLeaveDaysAfterRule,
         totalAdditions: Math.round(totalAdditionsWithBonus * 100) / 100,
         totalDeductions: Math.round(totalDeductionsWithSecurity * 100) / 100,
         leaves: leavesWithDeductions,

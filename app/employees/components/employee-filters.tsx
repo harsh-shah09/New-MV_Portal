@@ -32,7 +32,7 @@ export function EmployeeFilters({
       <Row gutter={[16, 16]}>
         <Col xs={24} md={8}>
           <label className="block text-sm font-medium text-muted-foreground mb-1.5">
-            Name
+            Search
           </label>
           <Input
             prefix={<SearchOutlined className="text-muted-foreground" />}

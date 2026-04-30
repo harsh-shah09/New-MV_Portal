@@ -931,8 +931,8 @@ export async function POST(request: NextRequest) {
       }
 
       const targetEmployeeQuery = await conn.query<any>(`
-        SELECT Id, Employee_Name__c, Employee_Email__c, Salary_CTC__c,
-               Team_Lead__c, Team_Lead__r.Employee_Name__c, Team_Lead__r.Employee_Email__c
+        SELECT Id, Employee_Name__c, Company_Email__c, Salary_CTC__c,
+               Team_Lead__c, Team_Lead__r.Employee_Name__c, Team_Lead__r.Company_Email__c
         FROM Employee__c
         WHERE Id = '${targetEmployeeId}'
         LIMIT 1
@@ -1009,10 +1009,10 @@ export async function POST(request: NextRequest) {
 
       try {
         const employeeName = targetEmployee.Employee_Name__c || 'Employee';
-        const employeeEmail = targetEmployee.Employee_Email__c;
-        const teamLeadEmail = targetEmployee.Team_Lead__r?.Employee_Email__c;
+        const employeeEmail = targetEmployee.Company_Email__c;
+        const teamLeadEmail = targetEmployee.Team_Lead__r?.Company_Email__c;
         const adminQuery = await conn.query<any>(`
-          SELECT Id, Employee_Name__c, Employee_Email__c
+          SELECT Id, Employee_Name__c, Company_Email__c
           FROM Employee__c
           WHERE Role__c = 'Admin' AND Active__c = true
         `);
@@ -1021,7 +1021,7 @@ export async function POST(request: NextRequest) {
           .map((admin: any) => ({
             id: admin.Id,
             name: admin.Employee_Name__c || 'Admin',
-            email: admin.Employee_Email__c,
+            email: admin.Company_Email__c,
           }))
           .filter((admin: { id: string; name: string; email?: string }) => Boolean(admin.email));
 
@@ -1215,6 +1215,7 @@ export async function POST(request: NextRequest) {
         const existingSessionEnd = normalizeSessionValue(existingLeave.Session_End__c);
         const existingSession = getSessionDisplayLabel(existingSessionStart, existingSessionEnd);
         const isExistingHalfDay = isHalfDaySessionRange(existingSessionStart, existingSessionEnd, existingStart, existingEnd);
+        const isSameLeaveType = (existingLeave.Leave_Type__c || '') === (leaveType || '');
 
         // Check if applying for the same date with same session (not allowed)
         if (requestStartDate.isSame(existingStart, 'day') && requestEndDate.isSame(existingEnd, 'day')) {
@@ -1242,6 +1243,10 @@ export async function POST(request: NextRequest) {
 
         // For full-day leaves, check if consecutive days should be combined
         // Skip this check if either leave is half-day (sessions can be on consecutive days)
+        if (!isSameLeaveType) {
+          continue;
+        }
+
         if (!isRequestHalfDay && !isExistingHalfDay) {
           // Check if the new leave is exactly one day before or after an existing leave
           const isOneDayBefore = requestEndDate.add(1, 'day').isSame(existingStart, 'day');
@@ -1251,22 +1256,38 @@ export async function POST(request: NextRequest) {
             const combinedStart = isOneDayBefore ? requestStartDate : existingStart;
             const combinedEnd = isOneDayAfter ? requestEndDate : existingEnd;
 
-            return NextResponse.json({
-              error: "Consecutive leave dates detected",
-              details: {
-                message: `You have an existing ${existingLeave.Leave_Category__c} leave from ${existingStart.format('DD MMM YYYY')} to ${existingEnd.format('DD MMM YYYY')}. Please apply a single leave for consecutive dates from ${combinedStart.format('DD MMM YYYY')} to ${combinedEnd.format('DD MMM YYYY')} instead of multiple separate requests.`,
-                existingLeave: {
-                  startDate: existingLeave.Start_Date__c,
-                  endDate: existingLeave.End_Date__c,
-                  status: existingLeave.Status__c,
-                  leaveCategory: existingLeave.Leave_Category__c
-                },
-                suggestedDates: {
-                  startDate: combinedStart.format('YYYY-MM-DD'),
-                  endDate: combinedEnd.format('YYYY-MM-DD')
+            if (!confirmMergeWithExisting || mergeExistingLeaveId !== existingLeave.Id) {
+              return NextResponse.json({
+                requiresMerge: true,
+                details: {
+                  message: `We found an existing leave that will be merged with this request and re-submitted for approval.`,
+                  existingLeaveId: existingLeave.Id,
+                  existingLeave: {
+                    startDate: existingLeave.Start_Date__c,
+                    endDate: existingLeave.End_Date__c,
+                    status: existingLeave.Status__c,
+                    leaveCategory: existingLeave.Leave_Category__c,
+                    session: existingSession,
+                  },
+                  suggestedDates: {
+                    startDate: combinedStart.format('YYYY-MM-DD'),
+                    endDate: combinedEnd.format('YYYY-MM-DD')
+                  }
                 }
-              }
-            }, { status: 400 });
+              }, { status: 409 });
+            }
+
+            mergeContext = {
+              existingLeaveId: existingLeave.Id,
+              previousStartDate: existingLeave.Start_Date__c,
+              previousEndDate: existingLeave.End_Date__c,
+              gapDates: [],
+            };
+            requestStartDate = combinedStart;
+            requestEndDate = combinedEnd;
+            finalStartDateStr = combinedStart.format('YYYY-MM-DD');
+            finalEndDateStr = combinedEnd.format('YYYY-MM-DD');
+            break;
           }
         }
       }
@@ -1299,8 +1320,13 @@ export async function POST(request: NextRequest) {
         const existingSessionEnd = normalizeSessionValue(existingLeave.Session_End__c);
         const existingSession = getSessionDisplayLabel(existingSessionStart, existingSessionEnd);
         const isExistingHalfDay = isHalfDaySessionRange(existingSessionStart, existingSessionEnd, existingStart, existingEnd);
+        const isSameLeaveType = (existingLeave.Leave_Type__c || '') === (leaveType || '');
 
         // Skip half-day leaves for sandwich check
+        if (!isSameLeaveType) {
+          continue;
+        }
+
         if (isRequestHalfDay || isExistingHalfDay) {
           continue;
         }
@@ -1733,7 +1759,7 @@ export async function POST(request: NextRequest) {
     try {
       const empData = await conn.query<any>(`
         SELECT Id, Employee_Name__c, Role__c, Title__c, Team_Lead__c, 
-               Team_Lead__r.Employee_Name__c, Team_Lead__r.Employee_Email__c
+               Team_Lead__r.Employee_Name__c, Team_Lead__r.Company_Email__c
         FROM Employee__c
         WHERE Id = '${employeeId}'
         LIMIT 1
@@ -1762,7 +1788,7 @@ export async function POST(request: NextRequest) {
         else if (employeeRole === 'HR') {
           // Find Admin employee
           const adminQuery = await conn.query<any>(`
-            SELECT Id, Employee_Name__c, Employee_Email__c
+            SELECT Id, Employee_Name__c, Company_Email__c
             FROM Employee__c
             WHERE Role__c = 'Admin'
             LIMIT 1
@@ -1770,7 +1796,7 @@ export async function POST(request: NextRequest) {
 
           if (adminQuery.records && adminQuery.records.length > 0) {
             const admin = adminQuery.records[0];
-            const adminEmail = admin.Employee_Email__c;
+            const adminEmail = admin.Company_Email__c;
             const adminName = admin.Employee_Name__c;
 
             // Add admin to in-app notification recipients
@@ -1802,7 +1828,7 @@ export async function POST(request: NextRequest) {
         else if (employeeRole === 'Developer' && employeeTitle === 'Team Lead') {
           // Find HR employee(s)
           const hrQuery = await conn.query<any>(`
-            SELECT Id, Employee_Name__c, Employee_Email__c
+            SELECT Id, Employee_Name__c, Company_Email__c
             FROM Employee__c
             WHERE Role__c = 'HR' AND Active__c = true
             LIMIT 1
@@ -1814,12 +1840,12 @@ export async function POST(request: NextRequest) {
           }
 
           const adminQuery = await conn.query<any>(`
-            SELECT Employee_Email__c
+            SELECT Company_Email__c
             FROM Employee__c
             WHERE Role__c = 'Admin'
             LIMIT 1
           `);
-          const adminEmail = adminQuery.records?.[0]?.Employee_Email__c;
+          const adminEmail = adminQuery.records?.[0]?.Company_Email__c;
 
           const emailTemplate = await teamLeadLeaveRequestToHRWithAdminCC({
             recipientName: 'HR Team',
@@ -1841,7 +1867,7 @@ export async function POST(request: NextRequest) {
         }
         // Case 3: Regular employee - send to their Team Lead and HR
         else {
-          const teamLeadEmail = emp.Team_Lead__r?.Employee_Email__c;
+          const teamLeadEmail = emp.Team_Lead__r?.Company_Email__c;
           const teamLeadName = emp.Team_Lead__r?.Employee_Name__c;
           const teamLeadId = emp.Team_Lead__c;
 
@@ -1852,7 +1878,7 @@ export async function POST(request: NextRequest) {
 
           // Add HR to notification recipients
           const hrQuery = await conn.query<any>(`
-            SELECT Id, Employee_Name__c, Employee_Email__c
+            SELECT Id, Employee_Name__c, Company_Email__c
             FROM Employee__c
             WHERE Role__c = 'HR' AND Active__c = true
             LIMIT 1
@@ -1865,12 +1891,12 @@ export async function POST(request: NextRequest) {
 
           if (!leaveRecord.TL_Approval__c) {
             const adminQuery = await conn.query<any>(`
-              SELECT Employee_Email__c
+              SELECT Company_Email__c
               FROM Employee__c
               WHERE Role__c = 'Admin'
               LIMIT 1
             `);
-            const adminEmail = adminQuery.records?.[0]?.Employee_Email__c;
+            const adminEmail = adminQuery.records?.[0]?.Company_Email__c;
 
             const emailTemplate = await employeeLeaveRequestToHR({
               recipientName: 'HR Team',
@@ -1913,10 +1939,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       message: isAdminAutoApprove
-        ? (mergeContext ? "Existing leave merged and auto-approved successfully" : "Leave request auto-approved successfully")
-        : (mergeContext ? "Existing leave updated and resubmitted for approval" : "Leave request submitted successfully"),
+        ? (mergeContext ? "Leave merged and auto-approved successfully" : "Leave request auto-approved successfully")
+        : (mergeContext ? "Leave merged and resubmitted for approval" : "Leave request submitted successfully"),
       leaveId: savedLeaveId,
       mergedExistingLeave,
+      mergeStatus: mergedExistingLeave ? "merged" : "created",
       totals: {
         baseCalendarDays,
         rangeLeaveDays,
@@ -2056,8 +2083,8 @@ export async function PATCH(request: NextRequest) {
       // Send notifications to HR for withdrawal approval
       try {
         const empData = await conn.query<any>(`
-          SELECT Id, Name,, Employee_Email__c, Employee_Name__c, Role__c, Title__c,
-                 Team_Lead__c, Team_Lead__r.Employee_Name__c, Team_Lead__r.Employee_Email__c
+           SELECT Id, Name,, Company_Email__c, Employee_Name__c, Role__c, Title__c,
+             Team_Lead__c, Team_Lead__r.Employee_Name__c, Team_Lead__r.Company_Email__c
           FROM Employee__c
           WHERE Id = '${leave.Employee__c}'
           LIMIT 1
@@ -2074,7 +2101,7 @@ export async function PATCH(request: NextRequest) {
           // Send notification to HR for all employees except Admin
           if (employeeRole !== 'Admin') {
             const hrQuery = await conn.query<any>(`
-              SELECT Id, Employee_Email__c
+              SELECT Id, Company_Email__c
               FROM Employee__c
               WHERE Role__c = 'HR' AND Active__c = true AND Title__c = 'Senior'
               LIMIT 1
@@ -2084,7 +2111,7 @@ export async function PATCH(request: NextRequest) {
               notificationRecipients.push(hr.Id);
 
               // Send email to HR
-              if (hr.Employee_Email__c) {
+              if (hr.Company_Email__c) {
                 const emailData = await withdrawalRequestToHR({
                   recipientName: 'HR Team',
                   employeeName: employeeName,
@@ -2094,7 +2121,7 @@ export async function PATCH(request: NextRequest) {
                   duration: leave.Total_Days__c
                 });
                 sendEmailAsync({
-                  to: hr.Employee_Email__c,
+                  to: hr.Company_Email__c,
                   subject: emailData.subject,
                   body: emailData.html,
                   senderEmployeeId: employeeId,
@@ -2106,7 +2133,7 @@ export async function PATCH(request: NextRequest) {
           // Send notification to Admin if employee is HR
           if (employeeRole === 'HR') {
             const adminQuery = await conn.query<any>(`
-              SELECT Id, Employee_Email__c
+              SELECT Id, Company_Email__c
               FROM Employee__c
               WHERE Role__c = 'Admin'
               LIMIT 1
@@ -2116,7 +2143,7 @@ export async function PATCH(request: NextRequest) {
               notificationRecipients.push(admin.Id);
 
               // Send email to Admin
-              if (admin.Employee_Email__c) {
+              if (admin.Company_Email__c) {
                 const emailData = await withdrawalRequestToHR({
                   recipientName: 'Admin',
                   employeeName: employeeName,
@@ -2126,7 +2153,7 @@ export async function PATCH(request: NextRequest) {
                   duration: leave.Total_Days__c
                 });
                 sendEmailAsync({
-                  to: admin.Employee_Email__c,
+                  to: admin.Company_Email__c,
                   subject: emailData.subject,
                   body: emailData.html,
                   senderEmployeeId: employeeId,
@@ -2148,7 +2175,7 @@ export async function PATCH(request: NextRequest) {
           }
 
           // Notify employee that withdrawal request is pending
-          if (emp.Employee_Email__c) {
+          if (emp.Company_Email__c) {
             const emailData = await withdrawalRequestSubmitted({
               recipientName: employeeName,
               leaveType: leave.Leave_Type__c || leave.Leave_Category__c,
@@ -2157,7 +2184,7 @@ export async function PATCH(request: NextRequest) {
               duration: leave.Total_Days__c
             });
             sendEmailAsync({
-              to: emp.Employee_Email__c,
+              to: emp.Company_Email__c,
               subject: emailData.subject,
               body: emailData.html,
               senderEmployeeId: employeeId,
@@ -2457,8 +2484,8 @@ export async function PATCH(request: NextRequest) {
       // Send notification emails
       try {
         const empData = await conn.query<any>(`
-          SELECT Id, Name, Employee_Id__c, Employee_Email__c, Employee_Name__c, Role__c, Title__c,
-                 Team_Lead__c, Team_Lead__r.Employee_Name__c, Team_Lead__r.Employee_Email__c
+           SELECT Id, Name, Employee_Id__c, Company_Email__c, Employee_Name__c, Role__c, Title__c,
+             Team_Lead__c, Team_Lead__r.Employee_Name__c, Team_Lead__r.Company_Email__c
           FROM Employee__c
           WHERE Id = '${leave.Employee__c}'
           LIMIT 1
@@ -2476,7 +2503,7 @@ export async function PATCH(request: NextRequest) {
           const notificationRecipients: string[] = [];
 
           // Send email to employee
-          if (emp.Employee_Email__c) {
+          if (emp.Company_Email__c) {
             const approverTitle = isAdmin ? 'Admin' : 'HR';
             const emailLeaveType = getDisplayLeaveType(leave.Leave_Type__c, leave.Leave_Category__c || "");
             const emailData = await withdrawalApproved({
@@ -2488,7 +2515,7 @@ export async function PATCH(request: NextRequest) {
               approverTitle: approverTitle
             });
             sendEmailAsync({
-              to: emp.Employee_Email__c,
+              to: emp.Company_Email__c,
               subject: emailData.subject,
               body: emailData.html,
               senderEmployeeId: employeeId,
@@ -2508,7 +2535,7 @@ export async function PATCH(request: NextRequest) {
             if (emp.Team_Lead__c) {
               notificationRecipients.push(emp.Team_Lead__c);
 
-              if (emp.Team_Lead__r?.Employee_Email__c) {
+              if (emp.Team_Lead__r?.Company_Email__c) {
                 const emailData = await withdrawalApproved({
                   recipientName: emp.Team_Lead__r.Employee_Name__c,
                   employeeName: employeeName,
@@ -2519,7 +2546,7 @@ export async function PATCH(request: NextRequest) {
                   approverTitle: 'HR'
                 });
                 sendEmailAsync({
-                  to: emp.Team_Lead__r.Employee_Email__c,
+                  to: emp.Team_Lead__r.Company_Email__c,
                   subject: `Withdrawal Approved: ${employeeName} - Leave from ${dayjs(leave.Start_Date__c).format('DD MMM YYYY')} to ${dayjs(leave.End_Date__c).format('DD MMM YYYY')}`,
                   body: emailData.html,
                   senderEmployeeId: employeeId,
@@ -2587,7 +2614,7 @@ export async function PATCH(request: NextRequest) {
       // Send notification emails
       try {
         const empData = await conn.query<any>(`
-          SELECT Id, Name, Employee_Id__c, Employee_Email__c, Employee_Name__c, Role__c, Title__c,
+          SELECT Id, Name, Employee_Id__c, Company_Email__c, Employee_Name__c, Role__c, Title__c,
                  Team_Lead__c, Team_Lead__r.Employee_Name__c
           FROM Employee__c
           WHERE Id = '${leave.Employee__c}'
@@ -2599,7 +2626,7 @@ export async function PATCH(request: NextRequest) {
           const employeeName = emp.Employee_Name__c || emp.Name || 'Employee';
 
           // Send email to employee
-          if (emp.Employee_Email__c) {
+          if (emp.Company_Email__c) {
             const approverTitle = isAdmin ? 'Admin' : 'HR';
             const emailData = await withdrawalRejected({
               recipientName: employeeName,
@@ -2611,7 +2638,7 @@ export async function PATCH(request: NextRequest) {
               reason: reason || 'No reason provided'
             });
             sendEmailAsync({
-              to: emp.Employee_Email__c,
+              to: emp.Company_Email__c,
               subject: emailData.subject,
               body: emailData.html,
               senderEmployeeId: employeeId,
@@ -2676,7 +2703,7 @@ export async function PATCH(request: NextRequest) {
 
         if (leaveRecord) {
           const adminQuery = await conn.query<any>(`
-            SELECT Id, Employee_Name__c, Employee_Email__c
+            SELECT Id, Employee_Name__c, Company_Email__c
             FROM Employee__c
             WHERE Role__c = 'Admin' AND Active__c = true
           `);
@@ -2697,7 +2724,7 @@ export async function PATCH(request: NextRequest) {
             );
 
             for (const admin of admins) {
-              if (!admin.Employee_Email__c) continue;
+              if (!admin.Company_Email__c) continue;
 
               const emailTemplate = await doubtfulLeaveMarkedToAdmin({
                 recipientName: admin.Employee_Name__c || 'Admin',
@@ -2711,9 +2738,9 @@ export async function PATCH(request: NextRequest) {
                 approverTitle: isAdmin ? 'Admin' : 'HR',
               });
 
-              logLeaveEmailDispatch('doubtful-leave-to-admin', admin.Employee_Email__c, undefined, emailTemplate.subject);
+              logLeaveEmailDispatch('doubtful-leave-to-admin', admin.Company_Email__c, undefined, emailTemplate.subject);
               sendEmailAsync({
-                to: admin.Employee_Email__c,
+                to: admin.Company_Email__c,
                 subject: emailTemplate.subject,
                 body: emailTemplate.html,
                 senderEmployeeId: employeeId,
@@ -2826,7 +2853,7 @@ export async function PATCH(request: NextRequest) {
       // afterUpdate: Send email notifications based on approval type
       try {
         const empData = await conn.query<any>(`
-          SELECT Id, Employee_Name__c, Employee_Email__c, Role__c, Title__c, Team_Lead__r.Employee_Name__c, Team_Lead__r.Employee_Email__c
+          SELECT Id, Employee_Name__c, Company_Email__c, Role__c, Title__c, Team_Lead__r.Employee_Name__c, Team_Lead__r.Company_Email__c
           FROM Employee__c
           WHERE Id = '${oldLeave.Employee__c}'
           LIMIT 1
@@ -2834,20 +2861,20 @@ export async function PATCH(request: NextRequest) {
 
         if (empData.records && empData.records.length > 0) {
           const emp = empData.records[0];
-          const employeeEmail = emp.Employee_Email__c;
+          const employeeEmail = emp.Company_Email__c;
           const employeeName = emp.Employee_Name__c;
           const employeeRole = emp.Role__c;
           const employeeTitle = emp.Title__c;
           const teamLeadName = emp.Team_Lead__r?.Employee_Name__c;
-          const teamLeadEmail = emp.Team_Lead__r?.Employee_Email__c;
+          const teamLeadEmail = emp.Team_Lead__r?.Company_Email__c;
 
           const adminQuery = await conn.query<any>(`
-            SELECT Employee_Email__c
+            SELECT Company_Email__c
             FROM Employee__c
             WHERE Role__c = 'Admin'
             LIMIT 1
           `);
-          const adminEmail = adminQuery.records?.[0]?.Employee_Email__c;
+          const adminEmail = adminQuery.records?.[0]?.Company_Email__c;
 
           if (isTeamLead && !oldLeave.TL_Approval__c) {
             // Send in-app notification to employee
@@ -3063,7 +3090,7 @@ export async function PATCH(request: NextRequest) {
       // afterUpdate: Send email notifications
       try {
         const empData = await conn.query<any>(`
-          SELECT Id, Employee_Name__c, Employee_Email__c, Role__c, Title__c, Team_Lead__r.Employee_Email__c
+          SELECT Id, Employee_Name__c, Company_Email__c, Role__c, Title__c, Team_Lead__r.Company_Email__c
           FROM Employee__c
           WHERE Id = '${oldLeave.Employee__c}'
           LIMIT 1
@@ -3071,19 +3098,19 @@ export async function PATCH(request: NextRequest) {
 
         if (empData.records && empData.records.length > 0) {
           const emp = empData.records[0];
-          const employeeEmail = emp.Employee_Email__c;
+          const employeeEmail = emp.Company_Email__c;
           const employeeName = emp.Employee_Name__c;
           const employeeRole = emp.Role__c;
           const employeeTitle = emp.Title__c;
-          const teamLeadEmail = emp.Team_Lead__r?.Employee_Email__c;
+          const teamLeadEmail = emp.Team_Lead__r?.Company_Email__c;
 
           const adminQuery = await conn.query<any>(`
-            SELECT Employee_Email__c
+            SELECT Company_Email__c
             FROM Employee__c
             WHERE Role__c = 'Admin'
             LIMIT 1
           `);
-          const adminEmail = adminQuery.records?.[0]?.Employee_Email__c;
+          const adminEmail = adminQuery.records?.[0]?.Company_Email__c;
 
           if (isTeamLead && !oldLeave.TL_Approval__c) {
             // TL just rejected

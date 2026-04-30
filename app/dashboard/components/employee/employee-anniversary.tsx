@@ -26,7 +26,7 @@ const EmployeeAnniversary: React.FC<AnniversaryKpiCardProps> = ({ data }) => {
     <div className="bg-white rounded-2xl shadow-md p-5 hover:shadow-lg transition-all duration-300 w-full h-full">
       <div className="flex justify-between items-center mb-4">
         <div>
-          <h2 className="text-lg font-semibold text-gray-700">Today’s {data?.length > 1 ? 'Anniversaries' : 'Anniversary'}</h2>
+          <h2 className="text-lg font-semibold text-gray-700">Today’s Work {data?.length > 1 ? 'Anniversaries' : 'Anniversary'}</h2>
           <p className="text-sm text-gray-400">Celebrate milestones</p>
         </div>
 

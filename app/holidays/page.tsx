@@ -30,6 +30,8 @@ interface BulkHolidayRowError {
   row?: string
 }
 
+const MAX_HOLIDAYS_PER_BATCH = 12
+
 export default function HolidaysPage() {
   const router = useRouter()
   const [isMounted, setIsMounted] = useState(false)
@@ -119,6 +121,11 @@ export default function HolidaysPage() {
 
   // Add a new row
   const addNewRow = () => {
+    if (bulkRows.length >= MAX_HOLIDAYS_PER_BATCH) {
+      toast.error(`You can add up to ${MAX_HOLIDAYS_PER_BATCH} holidays at a time`)
+      return
+    }
+
     setBulkRows([...bulkRows, { name: "", date: "", day: "" }])
     setBulkRowErrors([...bulkRowErrors, {}])
   }
@@ -150,6 +157,19 @@ export default function HolidaysPage() {
       }))
     }
   }, [editFormData.date])
+
+  // Disable background scrolling when modals are open
+  useEffect(() => {
+    if (showBulkModal || showEditModal || showDeleteConfirm) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = 'unset'
+    }
+
+    return () => {
+      document.body.style.overflow = 'unset'
+    }
+  }, [showBulkModal, showEditModal, showDeleteConfirm])
 
   const handleBulkSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -206,6 +226,80 @@ export default function HolidaysPage() {
       return
     }
 
+    if (bulkRows.length > MAX_HOLIDAYS_PER_BATCH) {
+      setBulkRowErrors(rowErrors)
+      toast.error(`You can add up to ${MAX_HOLIDAYS_PER_BATCH} holidays at a time`)
+      return
+    }
+
+    const existingHolidayDates = new Set(holidays.map((holiday) => holiday.date))
+    const existingHolidayNames = new Map<string, string>()
+    holidays.forEach((holiday) => {
+      existingHolidayNames.set(holiday.name.toLowerCase().trim(), holiday.year)
+    })
+
+    const seenDates = new Map<string, number>()
+    const seenNames = new Map<string, number>()
+    let hasDuplicateDates = false
+    let hasDuplicateNames = false
+
+    bulkRows.forEach((row, index) => {
+      if (!row.date) {
+        return
+      }
+
+      const rowDate = row.date
+      const rowYear = new Date(rowDate).getFullYear().toString()
+      const normalizedName = row.name.toLowerCase().trim()
+
+      if (existingHolidayDates.has(rowDate)) {
+        rowErrors[index].date = "A holiday already exists on this date"
+        hasDuplicateDates = true
+        return
+      }
+
+      const existingIndex = seenDates.get(rowDate)
+      if (existingIndex !== undefined) {
+        rowErrors[index].date = "Duplicate holiday date in this list"
+        rowErrors[existingIndex].date = rowErrors[existingIndex].date || "Duplicate holiday date in this list"
+        hasDuplicateDates = true
+        return
+      }
+
+      seenDates.set(rowDate, index)
+
+      if (row.name) {
+        const existingYear = existingHolidayNames.get(normalizedName)
+        if (existingYear && existingYear === rowYear) {
+          rowErrors[index].name = `"${row.name}" already exists for ${rowYear}`
+          hasDuplicateNames = true
+          return
+        }
+
+        const existingNameIndex = seenNames.get(normalizedName)
+        if (existingNameIndex !== undefined && new Date(bulkRows[existingNameIndex].date).getFullYear().toString() === rowYear) {
+          rowErrors[index].name = `Duplicate holiday name for ${rowYear}`
+          rowErrors[existingNameIndex].name = rowErrors[existingNameIndex].name || `Duplicate holiday name for ${rowYear}`
+          hasDuplicateNames = true
+          return
+        }
+
+        seenNames.set(normalizedName, index)
+      }
+    })
+
+    if (hasDuplicateDates) {
+      setBulkRowErrors(rowErrors)
+      toast.error("Please remove duplicate holiday dates")
+      return
+    }
+
+    if (hasDuplicateNames) {
+      setBulkRowErrors(rowErrors)
+      toast.error("Please remove duplicate holiday names for the same year")
+      return
+    }
+
     setBulkRowErrors([])
 
     try {
@@ -259,6 +353,28 @@ export default function HolidaysPage() {
     e.preventDefault()
     if (!editingHoliday) return
 
+    const duplicateHoliday = holidays.find(
+      (holiday) => holiday.id !== editingHoliday.id && holiday.date === editFormData.date
+    )
+
+    if (duplicateHoliday) {
+      toast.error("A holiday already exists on this date")
+      return
+    }
+
+    const editYear = editFormData.date ? new Date(editFormData.date).getFullYear().toString() : editFormData.year
+    const normalizedEditName = editFormData.name.toLowerCase().trim()
+    const duplicateNameHoliday = holidays.find(
+      (holiday) => holiday.id !== editingHoliday.id && 
+                    holiday.year === editYear && 
+                    holiday.name.toLowerCase().trim() === normalizedEditName
+    )
+
+    if (duplicateNameHoliday) {
+      toast.error(`Holiday "${editFormData.name}" already exists for ${editYear}`)
+      return
+    }
+
     try {
       const response = await fetch("/api/holidays", {
         method: "PATCH",
@@ -302,7 +418,34 @@ export default function HolidaysPage() {
         return
       }
 
-      refetch()
+      const refreshed = await refetch()
+      const latestHolidays: Holiday[] = refreshed.data?.holidays || []
+      const selectedYearHasRemaining = latestHolidays.some(
+        (holiday) => String(holiday.year) === String(selectedYear)
+      )
+
+      if (!selectedYearHasRemaining) {
+        const presentYear = new Date().getFullYear().toString()
+        const previousYear = (new Date().getFullYear() - 1).toString()
+
+        const hasPresentYearHolidays = latestHolidays.some(
+          (holiday) => String(holiday.year) === presentYear
+        )
+        const hasPreviousYearHolidays = latestHolidays.some(
+          (holiday) => String(holiday.year) === previousYear
+        )
+
+        if (hasPresentYearHolidays) {
+          setSelectedYear(presentYear)
+        } else if (hasPreviousYearHolidays) {
+          setSelectedYear(previousYear)
+        } else {
+          const availableFallbackYears = [...new Set(latestHolidays.map((holiday) => String(holiday.year)))]
+            .sort((a, b) => parseInt(b) - parseInt(a))
+          setSelectedYear(availableFallbackYears[0] || presentYear)
+        }
+      }
+
       setShowDeleteConfirm(false)
       setDeletingHolidayId(null)
       toast.success("Holiday deleted successfully!")
@@ -550,8 +693,11 @@ export default function HolidaysPage() {
                               type="text"
                               value={row.name}
                               onChange={(e) => {
+                                let newValue = e.target.value;
+                                // Remove numbers and enforce 30 char limit
+                                newValue = newValue.replace(/\d/g, '').slice(0, 30);
                                 const newRows = [...bulkRows]
-                                newRows[index] = { ...newRows[index], name: e.target.value }
+                                newRows[index] = { ...newRows[index], name: newValue }
                                 setBulkRows(newRows)
 
                                 if (bulkRowErrors[index]?.name || bulkRowErrors[index]?.row) {
@@ -564,6 +710,7 @@ export default function HolidaysPage() {
                                   setBulkRowErrors(newErrors)
                                 }
                               }}
+                              maxLength={30}
                               placeholder="e.g., New Year's Day"
                               className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm ${bulkRowErrors[index]?.name ? "border-red-400" : "border-gray-300"}`}
                             />
@@ -619,10 +766,11 @@ export default function HolidaysPage() {
                 <button
                   type="button"
                   onClick={addNewRow}
-                  className="mt-4 w-full py-3 border-2 border-dashed border-gray-300 rounded-xl text-gray-600 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-all flex items-center justify-center gap-2 font-medium"
+                  disabled={bulkRows.length >= MAX_HOLIDAYS_PER_BATCH}
+                  className={`mt-4 w-full py-3 border-2 border-dashed rounded-xl transition-all flex items-center justify-center gap-2 font-medium ${bulkRows.length >= MAX_HOLIDAYS_PER_BATCH ? "border-gray-200 text-gray-400 cursor-not-allowed bg-gray-50" : "border-gray-300 text-gray-600 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50"}`}
                 >
                   <Plus className="w-5 h-5" />
-                  Add Another Holiday
+                  Add Another Holiday {bulkRows.length >= MAX_HOLIDAYS_PER_BATCH ? `(Max ${MAX_HOLIDAYS_PER_BATCH})` : `(${bulkRows.length}/${MAX_HOLIDAYS_PER_BATCH})`}
                 </button>
               </div>
 
@@ -680,7 +828,13 @@ export default function HolidaysPage() {
                     type="text"
                     required
                     value={editFormData.name}
-                    onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                    onChange={(e) => {
+                      let newValue = e.target.value;
+                      // Remove numbers and enforce 30 char limit
+                      newValue = newValue.replace(/\d/g, '').slice(0, 30);
+                      setEditFormData({ ...editFormData, name: newValue })
+                    }}
+                    maxLength={30}
                     placeholder="e.g., New Year's Day"
                     className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-gray-900 transition-colors"
                   />

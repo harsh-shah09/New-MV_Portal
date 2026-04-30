@@ -181,6 +181,21 @@ export const getAllEmployees = async (): Promise<any[]> => {
   return result.records;
 };
 
+export const getEmployeesByTeamLead = async (teamLeadId: string): Promise<any[]> => {
+  const conn = await getSalesforceConnection();
+  if (!conn) return [];
+
+  const escapedId = teamLeadId.replace(/'/g, "\\'");
+  const query = `
+    SELECT Id, Employee_Name__c, Team_Lead__c, Employee_Email__c
+    FROM Employee__c
+    WHERE Team_Lead__c = '${escapedId}'
+  `;
+
+  const result = await conn.query(query);
+  return result.records;
+};
+
 export const getDashboardData = async (): Promise<DashboardData> => {
   const conn = await getSalesforceConnection();
 

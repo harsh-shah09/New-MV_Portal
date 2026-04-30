@@ -774,6 +774,7 @@ export default function AdminConsole() {
                                                                     <thead className="bg-slate-50 border-b border-slate-200">
                                                                         <tr>
                                                                             <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Employee</th>
+                                                                            <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Google Email</th>
                                                                             <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Connected Since</th>
                                                                             <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
                                                                             <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">Actions</th>
@@ -789,7 +790,8 @@ export default function AdminConsole() {
 
                                                                                 return (
                                                                                     employee?.Name?.toLowerCase().includes(query) ||
-                                                                                    employee?.Email?.toLowerCase().includes(query)
+                                                                                    employee?.Email?.toLowerCase().includes(query) ||
+                                                                                    item.account_email?.toLowerCase().includes(query)
                                                                                 );
                                                                             });
                                                                             const startIndex = (currentPageIntegrations - 1) * itemsPerPage;
@@ -808,6 +810,9 @@ export default function AdminConsole() {
                                                                                                     <div className="text-xs text-slate-400">{employee?.Email || 'No Email'}</div>
                                                                                                 </div>
                                                                                             </div>
+                                                                                        </td>
+                                                                                        <td className="px-6 py-4 text-sm text-slate-600">
+                                                                                            {item.account_email || 'Not available'}
                                                                                         </td>
                                                                                         <td className="px-6 py-4 text-sm text-slate-600">
                                                                                             {item.updated_at ? new Date(item.updated_at).toLocaleDateString() : 'N/A'}
@@ -840,7 +845,8 @@ export default function AdminConsole() {
 
                                                                                 return (
                                                                                     employee?.Name?.toLowerCase().includes(query) ||
-                                                                                    employee?.Email?.toLowerCase().includes(query)
+                                                                                    employee?.Email?.toLowerCase().includes(query) ||
+                                                                                    item.account_email?.toLowerCase().includes(query)
                                                                                 );
                                                                             });
 
@@ -850,7 +856,7 @@ export default function AdminConsole() {
 
                                                                             return (
                                                                             <tr>
-                                                                                <td colSpan={4} className="px-6 py-12 text-center text-slate-400 italic">
+                                                                                <td colSpan={5} className="px-6 py-12 text-center text-slate-400 italic">
                                                                                     {integrationSearch
                                                                                         ? `No connected users match "${integrationSearch}".`
                                                                                         : 'No users have connected their Google Workspace account yet.'}
@@ -870,7 +876,8 @@ export default function AdminConsole() {
 
                                                                     return (
                                                                         employee?.Name?.toLowerCase().includes(query) ||
-                                                                        employee?.Email?.toLowerCase().includes(query)
+                                                                        employee?.Email?.toLowerCase().includes(query) ||
+                                                                        item.account_email?.toLowerCase().includes(query)
                                                                     );
                                                                 });
                                                                 const totalPages = Math.ceil(filteredIntegrations.length / itemsPerPage);

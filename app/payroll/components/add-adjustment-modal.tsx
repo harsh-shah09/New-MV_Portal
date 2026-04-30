@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Modal, Select, InputNumber, Input, Button, message, Form } from "antd"
+import { Modal, Select, Input, Button, message, Form } from "antd"
 import type { PayrollAdjustment } from "@/types"
 
 interface AddAdjustmentModalProps {
@@ -16,11 +16,37 @@ export function AddAdjustmentModal({ open, onClose, employeeName, onAdd, initial
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
 
+  const sanitizeDigits = (value: string) => value.replace(/\D/g, "").slice(0, 6)
+
+  const handleDigitKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    const allowedKeys = [
+      "Backspace",
+      "Delete",
+      "Tab",
+      "Enter",
+      "Escape",
+      "ArrowLeft",
+      "ArrowRight",
+      "Home",
+      "End",
+    ]
+
+    if (
+      allowedKeys.includes(event.key) ||
+      (event.ctrlKey || event.metaKey) ||
+      /^[0-9]$/.test(event.key)
+    ) {
+      return
+    }
+
+    event.preventDefault()
+  }
+
   useEffect(() => {
     if (open && initialAdjustment) {
       form.setFieldsValue({
         adjustmentType: initialAdjustment.adjustmentType,
-        adjustmentAmount: initialAdjustment.adjustmentAmount,
+        adjustmentAmount: String(initialAdjustment.adjustmentAmount),
         adjustmentDescription: initialAdjustment.adjustmentDescription,
       })
     } else if (open) {
@@ -91,15 +117,32 @@ export function AddAdjustmentModal({ open, onClose, employeeName, onAdd, initial
           label="Adjustment Amount"
           rules={[
             { required: true, message: "Please enter adjustment amount" },
-            { type: "number", min: 0.01, message: "Amount must be greater than 0" },
+            {
+              validator: (_, value) => {
+                const normalizedValue = String(value || "")
+                if (!/^\d{1,6}$/.test(normalizedValue)) {
+                  return Promise.reject(new Error("Enter up to 6 digits only"))
+                }
+                return Promise.resolve()
+              },
+            },
           ]}
         >
-          <InputNumber
+          <Input
             className="w-full"
             placeholder="Enter amount"
             prefix="₹"
-            min={0}
-            precision={2}
+            inputMode="numeric"
+            maxLength={6}
+            onKeyDown={handleDigitKeyDown}
+            onPaste={(event) => {
+              event.preventDefault()
+              const pastedValue = event.clipboardData.getData("text")
+              form.setFieldsValue({ adjustmentAmount: sanitizeDigits(pastedValue) })
+            }}
+            onChange={(event) => {
+              form.setFieldsValue({ adjustmentAmount: sanitizeDigits(event.target.value) })
+            }}
           />
         </Form.Item>
 

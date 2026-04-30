@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
 
         const { employeeId, email, recordId, name, role, title } = payload;
         const currentEmployeeId = employeeId || name || recordId;
-        const isTeamLead = role === 'Developer' && title === 'Team Lead';
+        const isTeamLead = title === 'Team Lead';
         
         const conn = await getSalesforceConnection();
         const isHR = role === 'HR';
@@ -76,27 +76,27 @@ export async function GET(req: NextRequest) {
                 pendingApprovalsQueryPromise = conn.query(`
                     SELECT Id, Name, Employee__c, Employee__r.Employee_Name__c, 
                            Leave_Type__c, Leave_Category__c, Start_Date__c, 
-                           End_Date__c, Total_Days__c, TL_Approval__c, Sandwich_Rule__c, OnePlusTwo_Rule__c, Doubtfull_Case__c
+                           End_Date__c, Total_Days__c, Status__c, TL_Approval__c, Sandwich_Rule__c, OnePlusTwo_Rule__c, Doubtfull_Case__c
                     FROM Leave__c
-                    WHERE Status__c = 'Applied'
+                    WHERE Status__c IN ('Applied', 'Withdrawal Pending')
                     ORDER BY Start_Date__c ASC
                 `);
             } else if (isHR) {
                 pendingApprovalsQueryPromise = conn.query(`
                     SELECT Id, Name, Employee__c, Employee__r.Employee_Name__c, 
                            Leave_Type__c, Leave_Category__c, Start_Date__c, 
-                           End_Date__c, Total_Days__c, TL_Approval__c, Sandwich_Rule__c, OnePlusTwo_Rule__c, Doubtfull_Case__c
+                           End_Date__c, Total_Days__c, Status__c, TL_Approval__c, Sandwich_Rule__c, OnePlusTwo_Rule__c, Doubtfull_Case__c
                     FROM Leave__c
-                    WHERE Status__c = 'Applied' ${hrDashboardLeaveFilter}
+                    WHERE Status__c IN ('Applied', 'Withdrawal Pending') ${hrDashboardLeaveFilter}
                     ORDER BY Start_Date__c ASC
                 `);
             } else {
                 pendingApprovalsQueryPromise = conn.query(`
                     SELECT Id,Name, Employee__c, Employee__r.Employee_Name__c, 
                            Leave_Type__c, Leave_Category__c, Start_Date__c, 
-                           End_Date__c, Total_Days__c, TL_Approval__c, Sandwich_Rule__c, OnePlusTwo_Rule__c, Doubtfull_Case__c
+                           End_Date__c, Total_Days__c, Status__c, TL_Approval__c, Sandwich_Rule__c, OnePlusTwo_Rule__c, Doubtfull_Case__c
                     FROM Leave__c
-                    WHERE Status__c = 'Applied' AND Employee__r.Role__c != 'HR'
+                    WHERE Status__c IN ('Applied', 'Withdrawal Pending') AND Employee__r.Role__c != 'HR'
                     ORDER BY Start_Date__c ASC
                 `);
             }
@@ -189,6 +189,8 @@ export async function GET(req: NextRequest) {
                     startDate: record.Start_Date__c,
                     endDate: record.End_Date__c,
                     duration: record.Total_Days__c,
+                    status: record.Status__c,
+                    isWithdrawalRequest: record.Status__c === 'Withdrawal Pending',
                     tlApproved: record.TL_Approval__c,
                     sandwichRuleApplicable,
                     onePlusTwoRuleApplicable,
@@ -288,9 +290,9 @@ export async function GET(req: NextRequest) {
             ? conn.query(`
                 SELECT Id, Name, Employee__c, Employee__r.Employee_Name__c,
                        Leave_Type__c, Leave_Category__c, Start_Date__c,
-                       End_Date__c, Total_Days__c, TL_Approval__c
+                       End_Date__c, Total_Days__c, Status__c, TL_Approval__c
                 FROM Leave__c
-                WHERE Status__c = 'Applied'
+                WHERE Status__c IN ('Applied', 'Withdrawal Pending')
                 AND Employee__r.Team_Lead__c = '${currentEmployeeId}'
                 AND (TL_Approval__c = null OR TL_Approval__c = '')
                 ORDER BY Start_Date__c ASC
@@ -390,6 +392,8 @@ export async function GET(req: NextRequest) {
                 startDate: record.Start_Date__c,
                 endDate: record.End_Date__c,
                 duration: record.Total_Days__c,
+                status: record.Status__c,
+                isWithdrawalRequest: record.Status__c === 'Withdrawal Pending',
                 tlApproved: record.TL_Approval__c
             }));
         }
@@ -403,15 +407,15 @@ export async function GET(req: NextRequest) {
         let teamMembers: any[] = [];
         if (currentEmployeeQuery.records.length > 0) {
             const currentEmployee = currentEmployeeQuery.records[0];
-            const teamLeadId = currentEmployee.Team_Lead__c;
+            const currentId = currentEmployeeId;
 
-            if (teamLeadId) {
-                // Fetch all employees under the same team lead, excluding the current employee
+            if (isTeamLead) {
+                // If the current user is a Team Lead, fetch their direct reports
                 const teamQuery = await conn.query(`
                     SELECT Id, Employee_Name__c, Employee_Email__c, Title__c
                     FROM Employee__c
-                    WHERE Team_Lead__c = '${teamLeadId}'
-                    AND Id != '${currentEmployeeId}'
+                    WHERE Team_Lead__c = '${currentId}'
+                    AND Id != '${currentId}'
                     AND Status__c = 'Active'
                     ORDER BY Employee_Name__c ASC
                 `);
@@ -422,6 +426,27 @@ export async function GET(req: NextRequest) {
                     email: record.Employee_Email__c || "",
                     title: record.Title__c || ""
                 }));
+            } else {
+                // Non team-leads see colleagues under the same team lead (existing behavior)
+                const teamLeadId = currentEmployee.Team_Lead__c;
+
+                if (teamLeadId) {
+                    const teamQuery = await conn.query(`
+                        SELECT Id, Employee_Name__c, Employee_Email__c, Title__c
+                        FROM Employee__c
+                        WHERE Team_Lead__c = '${teamLeadId}'
+                        AND Id != '${currentId}'
+                        AND Status__c = 'Active'
+                        ORDER BY Employee_Name__c ASC
+                    `);
+
+                    teamMembers = teamQuery.records.map((record: any) => ({
+                        id: record.Id,
+                        name: record.Employee_Name__c || "Unknown",
+                        email: record.Employee_Email__c || "",
+                        title: record.Title__c || ""
+                    }));
+                }
             }
         }
         const employeeName = currentEmployeeQuery.records[0]?.Employee_Name__c || email || name;

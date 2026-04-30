@@ -16,6 +16,8 @@ export default function HandbookClient({ role, userId }: HandbookClientProps) {
   const [searchTerm, setSearchTerm] = useState("")
   const [uploadModalOpen, setUploadModalOpen] = useState(false)
   const [previewDoc, setPreviewDoc] = useState<any | null>(null)
+
+    const sanitizeFileName = (name: string) => name.replace(/<[^>]*>/g, "")
   
   const queryClient = useQueryClient();
   const isHR = role?.includes('HR') || role?.includes('Admin');
@@ -193,7 +195,7 @@ export default function HandbookClient({ role, userId }: HandbookClientProps) {
                              <FileText size={40} className="text-blue-500 z-10 drop-shadow-sm" />
                              
                              {/* Overlay Actions */}
-                             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center gap-3 backdrop-blur-[2px] z-20">
+                             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center gap-3 backdrop-blur-[2px] z-20 hidden md:flex">
                                    <Tooltip title="Preview">
                                         <Button shape="circle" icon={<Eye size={18} />} onClick={() => setPreviewDoc(doc)} className="border-0 shadow-lg hover:scale-110 transition-transform" />
                                    </Tooltip>
@@ -208,10 +210,20 @@ export default function HandbookClient({ role, userId }: HandbookClientProps) {
                              </div>
                          </div>
                          <div className="p-5 flex-1 flex flex-col">
-                             <div className="mb-2">
+                             <div className="mb-2 flex items-center justify-between gap-2">
                                 <Tag color="blue" className="px-2 py-0.5 rounded-full text-xs font-medium border-0 bg-blue-50 text-blue-600">
                                     {doc.Document_Type__c || 'Document'}
                                 </Tag>
+                                <div className="flex gap-2 md:hidden">
+                                    <Tooltip title="Preview">
+                                        <Button size="small" type="text" icon={<Eye size={16} />} onClick={() => setPreviewDoc(doc)} />
+                                    </Tooltip>
+                                    {isHR && (
+                                        <Tooltip title="Delete">
+                                            <Button size="small" type="text" danger icon={<Trash2 size={16} />} onClick={() => handleDelete(doc.Id)} />
+                                        </Tooltip>
+                                    )}
+                                </div>
                              </div>
                              <h3 className="font-semibold text-gray-800 mb-1 line-clamp-2 text-base" title={doc.Name}>
                                  {doc.Name}
@@ -240,8 +252,11 @@ export default function HandbookClient({ role, userId }: HandbookClientProps) {
         >
             <Spin spinning={uploadMutation.status === 'pending'} tip="Uploading Handbook..." size="large">
                 <Form onFinish={handleUpload} layout="vertical" className="pt-4">
-                    <Form.Item name="name" label="Document Name" rules={[{ required: true, message: 'Please enter a name' }]}>
-                        <Input placeholder="e.g. Employee Handbook 2024" size="large" disabled={uploadMutation.status === 'pending'} />
+                    <Form.Item name="name" label="Document Name" rules={[
+                        { required: true, message: 'Please enter a name' },
+                        { max: 50, message: 'Document name must be 50 characters or less' }
+                    ]}>
+                        <Input placeholder="e.g. Employee Handbook 2024" size="large" disabled={uploadMutation.status === 'pending'} maxLength={50} showCount />
                     </Form.Item>
                     <Form.Item name="type" label="Category / Type" rules={[{ required: true, message: 'Please select a type' }]}>
                         <Select size="large" placeholder="Select Type" disabled={uploadMutation.status === 'pending'}>
@@ -253,16 +268,39 @@ export default function HandbookClient({ role, userId }: HandbookClientProps) {
                         </Select>
                     </Form.Item>
                     <Form.Item name="file" label="File" rules={[{ required: true, message: 'Please upload a file' }]}>
-                         <Upload.Dragger maxCount={1} beforeUpload={(file) => {
+                        <Upload.Dragger
+                           maxCount={1}
+                           beforeUpload={(file) => {
+                                const supportedFormats = ['pdf', 'docx', 'jpg', 'jpeg', 'png'];
+                                const fileExt = file.name.split('.').pop()?.toLowerCase();
+                                const isValidFormat = fileExt && supportedFormats.includes(fileExt);
                                 const isSmall = file.size < 5 * 1024 * 1024;
-                                if (!isSmall) message.error("File too large");
-                                return isSmall || Upload.LIST_IGNORE;
-                            }} accept=".pdf,.doc,.docx,.jpg,.png" disabled={uploadMutation.status === 'pending'}>
+                                
+                                if (!isValidFormat) {
+                                    message.error(`Only PDF, DOCX, JPG, PNG formats are supported. You uploaded ${fileExt?.toUpperCase()}`);
+                                    return Upload.LIST_IGNORE;
+                                }
+                                if (!isSmall) {
+                                    message.error("File too large");
+                                    return Upload.LIST_IGNORE;
+                                }
+                                return true;
+                            }}
+                            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                            disabled={uploadMutation.status === 'pending'}
+                            itemRender={(_, file) => (
+                                <div className="flex items-center justify-between gap-3 rounded-md border border-dashed border-gray-200 bg-white px-3 py-2">
+                                    <span className="truncate text-sm text-gray-700" title={sanitizeFileName(file.name)}>
+                                        {sanitizeFileName(file.name)}
+                                    </span>
+                                </div>
+                            )}
+                         >
                               <p className="ant-upload-drag-icon text-blue-500">
                                   <InboxOutlined />
                               </p>
                               <p className="ant-upload-text">Click or drag file to this area to upload</p>
-                              <p className="ant-upload-hint">Supported formats: PDF, DOCX, JPG, PNG</p>
+                            <p className="ant-upload-hint">Supported formats: PDF, DOCX, JPG, PNG · Max file size: 5 MB</p>
                          </Upload.Dragger>
                     </Form.Item>
                     <div className="flex justify-end gap-3 mt-8">
