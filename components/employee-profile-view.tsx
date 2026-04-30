@@ -395,11 +395,18 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
         )
     }
 
-    const getValidationErrors = () => {
+    const getValidationErrors = (validateAll: boolean = false) => {
         const newErrors: Record<string, string> = {}
 
-        // Always validate based on the activeTab
-        if (activeTab === 'personal') {
+        // Decide which tabs to validate: either only the active tab, or all tabs when saving
+        const tabsToValidate: TabId[] = validateAll
+            ? (['personal', 'employment', 'salary-calculation'] as TabId[])
+            : [activeTab]
+
+        // Personal tab validations
+        if (tabsToValidate.includes('personal')) {
+            // Always validate personal fields when validating all or when active
+        
             const employeeName = formData.Employee_Name__c?.trim()
             const email = formData.Employee_Email__c?.trim()
             const phone = formData.Employee_Phone__c?.trim()
@@ -461,7 +468,8 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
             }
         }
 
-        if (activeTab === 'employment') {
+        // Employment tab validations
+        if (tabsToValidate.includes('employment')) {
             const employeeCode = formData.Employee_Id__c?.trim()
 
             if (employeeCode && employeesList) {
@@ -525,7 +533,8 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
             }
         }
 
-        if (activeTab === 'salary-calculation') {
+        // Salary calculation validations - validate only when requested (admins)
+        if (tabsToValidate.includes('salary-calculation') && (currentUserRole || '').trim().toLowerCase() === 'admin') {
             salaryCalculationFields.forEach((field) => {
                 const rawValue = formData[field.fieldKey]
                 const numericValue = parseNumberValue(rawValue)
@@ -555,7 +564,9 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
     }
 
     const validateForm = () => {
-        const newErrors = getValidationErrors()
+        // When saving, validate across all relevant tabs so required fields
+        // (e.g. personal email) are enforced even if the user switched tabs.
+        const newErrors = getValidationErrors(true)
         setErrors(newErrors)
         return Object.keys(newErrors).length === 0
     }
