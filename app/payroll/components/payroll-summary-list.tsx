@@ -81,12 +81,6 @@ export function PayrollSummaryList({ summaries, onSelectSummary, onDeleteSummary
       key: "totalEmployees",
     },
     {
-      title: "Total Days After Rule",
-      dataIndex: "totalDaysAfterRule",
-      key: "totalDaysAfterRule",
-      render: (value: number) => (Number(value || 0)).toFixed(1),
-    },
-    {
       title: "Net Total Salary",
       dataIndex: "netTotalSalary",
       key: "netTotalSalary",
@@ -100,12 +94,15 @@ export function PayrollSummaryList({ summaries, onSelectSummary, onDeleteSummary
       dataIndex: "status",
       key: "status",
       render: (status: string, record: PayrollSummary) => {
+        if (status === "paid") {
+          return <Tag color="green">PAID</Tag>
+        }
+
         if (isAdmin && onStatusChange) {
-          const safeValue = status === "paid" ? "paid" : "draft"
           return (
             <div onClick={(event) => event.stopPropagation()}>
               <Select
-                value={safeValue}
+                value="draft"
                 size="small"
                 style={{ minWidth: 110 }}
                 disabled={isBusy}
