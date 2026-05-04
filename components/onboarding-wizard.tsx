@@ -537,7 +537,11 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                         setLoading(false);
                         return;
                     }
-
+                    if(values.bankbranch){
+                        if(values.bankbranch.length > 100){
+                            customErrors.bankbranch = 'Bank Branch name cannot exceed 100 characters.'
+                        }
+                    }
                     if (!passbookUploaded) {
                         message.error("Please upload your Passbook or Bank Statement to proceed.");
                         setLoading(false);

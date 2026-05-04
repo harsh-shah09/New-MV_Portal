@@ -81,6 +81,7 @@ export default function EmployeesClient({ role }: EmployeesClientProps) {
             phone: record.Employee_Phone__c || '',
             department: record.Department__c || 'Un-Assigned',
             position: record.Role__c || '',
+            title : record.Title__c || '',
             joinDate: record.Joining_Date__c || '',
             status: record.Status__c,
             active: record.Active__c,
