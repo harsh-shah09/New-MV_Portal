@@ -540,6 +540,9 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                     if(values.bankbranch){
                         if(values.bankbranch.length > 100){
                             customErrors.bankbranch = 'Bank Branch name cannot exceed 100 characters.'
+                            message.error("Bank Branch name cannot exceed 100 characters.");
+                            setLoading(false);
+                            return;
                         }
                     }
                     if (!passbookUploaded) {

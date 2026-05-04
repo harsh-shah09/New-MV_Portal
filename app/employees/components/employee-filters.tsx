@@ -72,7 +72,7 @@ export function EmployeeFilters({
             Employment Status
           </label>
           <Select
-            value={status || undefined}
+            value={status || ""}
             onChange={onStatusChange}
             placeholder="All"
             allowClear
@@ -93,7 +93,7 @@ export function EmployeeFilters({
             Account Status
           </label>
           <Select
-            value={accountStatus || undefined}
+            value={accountStatus || ""}
             onChange={onAccountStatusChange}
             placeholder="All"
             allowClear
