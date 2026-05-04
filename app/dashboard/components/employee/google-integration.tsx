@@ -15,6 +15,8 @@ export function GoogleIntegration({ employeeId }: { employeeId?: string } ) {
     const [showFirstTimeModal, setShowFirstTimeModal] = useState(false)
     const [me, setMe] = useState<any>(null)
     const [googleEmail, setGoogleEmail] = useState<string | null>(null)
+    const currentUserId = me?.employeeId || me?.id || null
+    const isViewingOtherUser = !!employeeId && !!currentUserId && employeeId !== currentUserId
 
     useEffect(() => {
         // 1. Fetch session (to know whether we are viewing another profile)
@@ -124,7 +126,7 @@ export function GoogleIntegration({ employeeId }: { employeeId?: string } ) {
 
     const handleConnect = async () => {
         // Prevent connecting for other users
-        if (employeeId && me && employeeId !== me.employeeId) {
+        if (isViewingOtherUser) {
             showNotification('error', 'You cannot connect Google for another user. Ask the user to connect from their account.');
             return;
         }
@@ -142,7 +144,7 @@ export function GoogleIntegration({ employeeId }: { employeeId?: string } ) {
 
     const handleDisconnect = async () => {
         // Prevent disconnecting for other users
-        if (employeeId && me && employeeId !== me.employeeId) {
+        if (isViewingOtherUser) {
             showNotification('error', 'You cannot disconnect Google for another user.');
             return;
         }
@@ -247,7 +249,7 @@ export function GoogleIntegration({ employeeId }: { employeeId?: string } ) {
                 {!connected ? (
                     <button 
                         onClick={handleConnect}
-                        disabled={actionLoading || (!!employeeId && me && employeeId !== me.employeeId)}
+                        disabled={actionLoading || isViewingOtherUser}
                         className="w-full bg-white border border-slate-200 hover:border-blue-400 hover:bg-blue-50/50 text-slate-700 hover:text-blue-600 font-semibold py-3 rounded-xl transition-all flex items-center justify-center gap-2 group disabled:opacity-70 disabled:cursor-not-allowed shadow-sm hover:shadow"
                     >
                         {actionLoading ? (
@@ -262,7 +264,7 @@ export function GoogleIntegration({ employeeId }: { employeeId?: string } ) {
                 ) : (
                     <button 
                         onClick={handleDisconnect}
-                        disabled={actionLoading || (!!employeeId && me && employeeId !== me.employeeId)}
+                        disabled={actionLoading || isViewingOtherUser}
                         className="w-full bg-slate-50 border border-slate-200 hover:bg-red-50 hover:border-red-200 text-slate-600 hover:text-red-600 font-semibold py-3 rounded-xl transition-all flex items-center justify-center gap-2 group disabled:opacity-70 disabled:cursor-not-allowed"
                     >
                         {actionLoading ? (
