@@ -18,6 +18,14 @@ export default function HandbookClient({ role, userId }: HandbookClientProps) {
   const [previewDoc, setPreviewDoc] = useState<any | null>(null)
 
     const sanitizeFileName = (name: string) => name.replace(/<[^>]*>/g, "")
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 Bytes'
+    const k = 1024
+    const sizes = ['Bytes', 'KB', 'MB']
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i]
+  }
   
   const queryClient = useQueryClient();
   const isHR = role?.includes('HR') || role?.includes('Admin');
@@ -292,6 +300,9 @@ export default function HandbookClient({ role, userId }: HandbookClientProps) {
                                 <div className="flex items-center justify-between gap-3 rounded-md border border-dashed border-gray-200 bg-white px-3 py-2">
                                     <span className="truncate text-sm text-gray-700" title={sanitizeFileName(file.name)}>
                                         {sanitizeFileName(file.name)}
+                                    </span>
+                                    <span className="text-xs text-gray-500 flex-shrink-0">
+                                        {file.originFileObj ? formatFileSize(file.originFileObj.size) : ''}
                                     </span>
                                 </div>
                             )}

@@ -51,6 +51,9 @@ export default function HolidaysPage() {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString())
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deletingHolidayId, setDeletingHolidayId] = useState<string | null>(null)
+  const [isBulkSubmitting, setIsBulkSubmitting] = useState(false)
+  const [isEditSubmitting, setIsEditSubmitting] = useState(false)
+  const [editDateError, setEditDateError] = useState("")
 
   // Fetch holidays
   const { data, isLoading, error, refetch } = useQuery({
@@ -80,6 +83,17 @@ export default function HolidaysPage() {
     availableYears.unshift(currentYear)
   }
 
+  const handleEdit = (holiday: Holiday) => {
+    setEditingHoliday(holiday)
+    setEditFormData({
+      name: holiday.name,
+      date: holiday.date,
+      day: holiday.day,
+      year: holiday.year,
+    })
+    setShowEditModal(true)
+  }
+
   // Filter holidays by selected year (ensure both are strings for comparison)
   const filteredHolidays = holidays.filter(h => String(h.year) === String(selectedYear)).sort((a, b) => 
     new Date(a.date).getTime() - new Date(b.date).getTime()
@@ -95,12 +109,63 @@ export default function HolidaysPage() {
   //   sampleHoliday: holidays[0]
   // })
 
+  const getYearPart = (dateValue: string) => {
+    return (dateValue || "").split("-")[0] || ""
+  }
+
+  const validateDateYear = (dateValue: string) => {
+    if (!dateValue) return ""
+    
+    const yearPart = getYearPart(dateValue)
+    if (yearPart.length > 4) {
+      return "Year must be 4 digits"
+    }
+    
+    // Validate complete date format YYYY-MM-DD
+    if (dateValue.length === 10) {
+      try {
+        const date = new Date(dateValue)
+        if (isNaN(date.getTime())) {
+          return "Invalid date format"
+        }
+        const year = date.getFullYear().toString()
+        if (year.length !== 4) {
+          return "Year must be 4 digits"
+        }
+      } catch {
+        return "Invalid date"
+      }
+    }
+    
+    return ""
+  }
+
+  const sanitizeHolidayName = (value: string) => {
+    return value.replace(/[^a-zA-Z\-(),\s]/g, "")
+  }
+
+  const validateHolidayName = (value: string) => {
+    const trimmed = value.trim()
+    if (!trimmed) {
+      return "Holiday name is required"
+    }
+    const lettersCount = (trimmed.match(/[a-zA-Z]/g) || []).length
+    if (lettersCount < 3) {
+      return "Holiday name must have at least 3 letters"
+    }
+    if (/[^a-zA-Z\-(),\s]/.test(trimmed)) {
+      return "Only letters, space, -, (, ) are allowed"
+    }
+    return ""
+  }
+
   // Auto-fill day when date is selected in bulk form
   const updateBulkRowDate = (index: number, date: string) => {
+    const yearError = validateDateYear(date)
     const newRows = [...bulkRows]
-    newRows[index] = { ...newRows[index], date }
+    newRows[index] = { ...newRows[index], date, day: yearError ? "" : newRows[index].day }
     
-    if (date) {
+    if (date && !yearError) {
       const dateObj = new Date(date)
       const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
       newRows[index].day = days[dateObj.getDay()]
@@ -110,8 +175,15 @@ export default function HolidaysPage() {
       const newErrors = [...bulkRowErrors]
       newErrors[index] = {
         ...newErrors[index],
-        date: undefined,
+        date: yearError || undefined,
         row: undefined,
+      }
+      setBulkRowErrors(newErrors)
+    } else if (yearError) {
+      const newErrors = [...bulkRowErrors]
+      newErrors[index] = {
+        ...newErrors[index],
+        date: yearError,
       }
       setBulkRowErrors(newErrors)
     }
@@ -148,6 +220,10 @@ export default function HolidaysPage() {
   // Auto-fill day when date is selected in edit form
   useEffect(() => {
     if (editFormData.date) {
+      const yearPart = getYearPart(editFormData.date)
+      if (yearPart.length !== 4) {
+        return
+      }
       const date = new Date(editFormData.date)
       const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
       setEditFormData(prev => ({
@@ -180,8 +256,10 @@ export default function HolidaysPage() {
     let hasAnyPartialRow = false
 
     bulkRows.forEach((row, index) => {
+      const nameError = row.name ? validateHolidayName(row.name) : ""
       const hasName = row.name.trim().length > 0
       const hasDate = Boolean(row.date)
+      const yearError = row.date ? validateDateYear(row.date) : ""
 
       if (!hasName && !hasDate) {
         hasAnyEmptyRow = true
@@ -189,6 +267,16 @@ export default function HolidaysPage() {
       }
 
       hasAnyFilledRow = true
+
+      if (nameError) {
+        rowErrors[index].name = nameError
+        hasAnyPartialRow = true
+      }
+
+      if (yearError) {
+        rowErrors[index].date = yearError
+        hasAnyPartialRow = true
+      }
 
       if (!hasName) {
         rowErrors[index].name = "Holiday name is required when date is selected"
@@ -235,7 +323,7 @@ export default function HolidaysPage() {
     const existingHolidayDates = new Set(holidays.map((holiday) => holiday.date))
     const existingHolidayNames = new Map<string, string>()
     holidays.forEach((holiday) => {
-      existingHolidayNames.set(holiday.name.toLowerCase().trim(), holiday.year)
+      existingHolidayNames.set((holiday.name || '').toLowerCase().trim(), holiday.year)
     })
 
     const seenDates = new Map<string, number>()
@@ -250,74 +338,68 @@ export default function HolidaysPage() {
 
       const rowDate = row.date
       const rowYear = new Date(rowDate).getFullYear().toString()
-      const normalizedName = row.name.toLowerCase().trim()
+      const normalizedName = (row.name || '').toLowerCase().trim()
 
       if (existingHolidayDates.has(rowDate)) {
         rowErrors[index].date = "A holiday already exists on this date"
         hasDuplicateDates = true
-        return
+      } else {
+        const existingIndex = seenDates.get(rowDate)
+        if (existingIndex !== undefined) {
+          rowErrors[index].date = "Duplicate holiday date in this list"
+          rowErrors[existingIndex].date = rowErrors[existingIndex].date || "Duplicate holiday date in this list"
+          hasDuplicateDates = true
+        } else {
+          seenDates.set(rowDate, index)
+        }
       }
-
-      const existingIndex = seenDates.get(rowDate)
-      if (existingIndex !== undefined) {
-        rowErrors[index].date = "Duplicate holiday date in this list"
-        rowErrors[existingIndex].date = rowErrors[existingIndex].date || "Duplicate holiday date in this list"
-        hasDuplicateDates = true
-        return
-      }
-
-      seenDates.set(rowDate, index)
 
       if (row.name) {
         const existingYear = existingHolidayNames.get(normalizedName)
         if (existingYear && existingYear === rowYear) {
           rowErrors[index].name = `"${row.name}" already exists for ${rowYear}`
           hasDuplicateNames = true
-          return
+        } else {
+          const existingNameIndex = seenNames.get(normalizedName)
+          if (existingNameIndex !== undefined && new Date(bulkRows[existingNameIndex].date).getFullYear().toString() === rowYear) {
+            rowErrors[index].name = `Duplicate holiday name for ${rowYear}`
+            rowErrors[existingNameIndex].name = rowErrors[existingNameIndex].name || `Duplicate holiday name for ${rowYear}`
+            hasDuplicateNames = true
+          } else {
+            seenNames.set(normalizedName, index)
+          }
         }
-
-        const existingNameIndex = seenNames.get(normalizedName)
-        if (existingNameIndex !== undefined && new Date(bulkRows[existingNameIndex].date).getFullYear().toString() === rowYear) {
-          rowErrors[index].name = `Duplicate holiday name for ${rowYear}`
-          rowErrors[existingNameIndex].name = rowErrors[existingNameIndex].name || `Duplicate holiday name for ${rowYear}`
-          hasDuplicateNames = true
-          return
-        }
-
-        seenNames.set(normalizedName, index)
       }
     })
 
-    if (hasDuplicateDates) {
+    if (hasDuplicateDates || hasDuplicateNames) {
       setBulkRowErrors(rowErrors)
-      toast.error("Please remove duplicate holiday dates")
-      return
-    }
-
-    if (hasDuplicateNames) {
-      setBulkRowErrors(rowErrors)
-      toast.error("Please remove duplicate holiday names for the same year")
+      const errors = []
+      if (hasDuplicateDates) errors.push("duplicate holiday dates")
+      if (hasDuplicateNames) errors.push("duplicate holiday names for the same year")
+      toast.error(`Please remove ${errors.join(" and ")}`)
       return
     }
 
     setBulkRowErrors([])
 
+    // Only set submitting state when we're about to perform the network request
+    setIsBulkSubmitting(true)
+
     try {
-      // Prepare holidays data
-      const holidays = bulkRows.map(row => ({
+      const payload = bulkRows.map(row => ({
         name: row.name,
         date: row.date,
         day: row.day,
         year: new Date(row.date).getFullYear().toString(),
       }))
 
-      // Send bulk insert request
       const response = await fetch("/api/holidays", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ holidays }),
+        body: JSON.stringify({ holidays: payload }),
       })
 
       if (!response.ok) {
@@ -335,46 +417,27 @@ export default function HolidaysPage() {
     } catch (error) {
       console.error("Error creating holidays:", error)
       toast.error("Failed to create holidays")
+    } finally {
+      setIsBulkSubmitting(false)
     }
   }
 
-  const handleEdit = (holiday: Holiday) => {
-    setEditingHoliday(holiday)
-    setEditFormData({
-      name: holiday.name,
-      date: holiday.date,
-      day: holiday.day,
-      year: holiday.year,
-    })
-    setShowEditModal(true)
-  }
+  
 
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!editingHoliday) return
-
-    const duplicateHoliday = holidays.find(
-      (holiday) => holiday.id !== editingHoliday.id && holiday.date === editFormData.date
-    )
-
-    if (duplicateHoliday) {
-      toast.error("A holiday already exists on this date")
+    if (isEditSubmitting) return
+    const editNameError = validateHolidayName(editFormData.name)
+    if (editNameError) {
+      toast.error(editNameError)
       return
     }
-
-    const editYear = editFormData.date ? new Date(editFormData.date).getFullYear().toString() : editFormData.year
-    const normalizedEditName = editFormData.name.toLowerCase().trim()
-    const duplicateNameHoliday = holidays.find(
-      (holiday) => holiday.id !== editingHoliday.id && 
-                    holiday.year === editYear && 
-                    holiday.name.toLowerCase().trim() === normalizedEditName
-    )
-
-    if (duplicateNameHoliday) {
-      toast.error(`Holiday "${editFormData.name}" already exists for ${editYear}`)
+    if (editDateError) {
+      toast.error(editDateError)
       return
     }
-
+    setIsEditSubmitting(true)
     try {
       const response = await fetch("/api/holidays", {
         method: "PATCH",
@@ -394,13 +457,26 @@ export default function HolidaysPage() {
         return
       }
 
-      refetch()
+      const refreshed = await refetch()
+      const latestHolidays: Holiday[] = refreshed.data?.holidays || []
+      const previousYear = String(editingHoliday.year)
+      const updatedYear = String(editFormData.date ? new Date(editFormData.date).getFullYear().toString() : editFormData.year)
+      if (previousYear !== updatedYear) {
+        const previousYearHasRemaining = latestHolidays.some(
+          (holiday) => String(holiday.year) === previousYear
+        )
+        if (!previousYearHasRemaining) {
+          setSelectedYear(updatedYear)
+        }
+      }
       setShowEditModal(false)
       setEditingHoliday(null)
       toast.success("Holiday updated successfully!")
     } catch (error) {
       console.error("Error updating holiday:", error)
       toast.error("Failed to update holiday")
+    } finally {
+      setIsEditSubmitting(false)
     }
   }
 
@@ -676,18 +752,17 @@ export default function HolidaysPage() {
                               type="text"
                               value={row.name}
                               onChange={(e) => {
-                                let newValue = e.target.value;
-                                // Remove numbers and enforce 30 char limit
-                                newValue = newValue.replace(/\d/g, '').slice(0, 30);
+                                let newValue = sanitizeHolidayName(e.target.value).slice(0, 30)
                                 const newRows = [...bulkRows]
                                 newRows[index] = { ...newRows[index], name: newValue }
                                 setBulkRows(newRows)
 
-                                if (bulkRowErrors[index]?.name || bulkRowErrors[index]?.row) {
+                                const nameError = newValue ? validateHolidayName(newValue) : undefined
+                                if (bulkRowErrors[index]?.name || bulkRowErrors[index]?.row || nameError) {
                                   const newErrors = [...bulkRowErrors]
                                   newErrors[index] = {
                                     ...newErrors[index],
-                                    name: undefined,
+                                    name: nameError,
                                     row: undefined,
                                   }
                                   setBulkRowErrors(newErrors)
@@ -708,7 +783,18 @@ export default function HolidaysPage() {
                             <input
                               type="date"
                               value={row.date}
-                              onChange={(e) => updateBulkRowDate(index, e.target.value)}
+                              onChange={(e) => {
+                                const inputValue = e.target.value
+                                // Validate year length before updating
+                                if (inputValue && inputValue.length >= 4) {
+                                  const yearPart = inputValue.split('-')[0]
+                                  if (yearPart.length > 4) {
+                                    // Year too long, don't update
+                                    return
+                                  }
+                                }
+                                updateBulkRowDate(index, inputValue)
+                              }}
                               className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm ${bulkRowErrors[index]?.date ? "border-red-400" : "border-gray-300"}`}
                             />
                             {bulkRowErrors[index]?.date && (
@@ -771,9 +857,10 @@ export default function HolidaysPage() {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl font-semibold transition-all transform hover:scale-105"
+                  disabled={isBulkSubmitting}
+                  className={`flex-1 px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl font-semibold transition-all transform hover:scale-105 ${isBulkSubmitting ? 'opacity-60 cursor-not-allowed' : ''}`}
                 >
-                  Save All Holidays
+                  {isBulkSubmitting ? 'Saving...' : 'Save All Holidays'}
                 </button>
               </div>
             </form>
@@ -812,15 +899,16 @@ export default function HolidaysPage() {
                     required
                     value={editFormData.name}
                     onChange={(e) => {
-                      let newValue = e.target.value;
-                      // Remove numbers and enforce 30 char limit
-                      newValue = newValue.replace(/\d/g, '').slice(0, 30);
+                      const newValue = sanitizeHolidayName(e.target.value).slice(0, 30)
                       setEditFormData({ ...editFormData, name: newValue })
                     }}
                     maxLength={30}
                     placeholder="e.g., New Year's Day"
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-gray-900 transition-colors"
+                    className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-gray-900 transition-colors ${editFormData.name && validateHolidayName(editFormData.name) ? "border-red-400" : "border-gray-300"}`}
                   />
+                  {editFormData.name && validateHolidayName(editFormData.name) && (
+                    <p className="mt-1 text-xs text-red-600">{validateHolidayName(editFormData.name)}</p>
+                  )}
                 </div>
 
                 <div>
@@ -831,9 +919,25 @@ export default function HolidaysPage() {
                     type="date"
                     required
                     value={editFormData.date}
-                    onChange={(e) => setEditFormData({ ...editFormData, date: e.target.value })}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-gray-900 transition-colors"
+                    onChange={(e) => {
+                      const inputValue = e.target.value
+                      // Validate year length before updating
+                      if (inputValue && inputValue.length >= 4) {
+                        const yearPart = inputValue.split('-')[0]
+                        if (yearPart.length > 4) {
+                          // Year too long, don't update
+                          return
+                        }
+                      }
+                      const yearError = validateDateYear(inputValue)
+                      setEditDateError(yearError)
+                      setEditFormData({ ...editFormData, date: inputValue })
+                    }}
+                    className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-gray-900 transition-colors ${editDateError ? "border-red-400" : "border-gray-300"}`}
                   />
+                  {editDateError && (
+                    <p className="mt-1 text-xs text-red-600">{editDateError}</p>
+                  )}
                 </div>
 
                 <div>
@@ -863,9 +967,10 @@ export default function HolidaysPage() {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+                  disabled={isEditSubmitting}
+                  className={`flex-1 px-4 py-2.5 bg-blue-600 hover:from-blue-700 hover:to-blue-800 text-white rounded-lg font-medium transition-colors ${isEditSubmitting ? 'opacity-60 cursor-not-allowed' : ''}`}
                 >
-                  Update Holiday
+                  {isEditSubmitting ? 'Updating...' : 'Update Holiday'}
                 </button>
               </div>
             </form>
@@ -916,3 +1021,4 @@ export default function HolidaysPage() {
     </PageContainer>
   )
 }
+
