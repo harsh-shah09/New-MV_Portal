@@ -221,7 +221,7 @@ export default function MyPayrollsPage() {
             image={<FileTextOutlined style={{ fontSize: 64, color: "#d9d9d9" }} />}
           >
             <p className="text-gray-500 mt-2">
-              Your payroll records will appear here once processed by HR.
+              Your payslips will appear here once payroll is processed and marked as Paid by Admin/HR.
             </p>
           </Empty>
         </Card>

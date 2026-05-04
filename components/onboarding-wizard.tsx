@@ -11,6 +11,7 @@ import { Check, AlertCircle, Loader2, Trash2 } from "lucide-react"
 import ImgCrop from "antd-img-crop"
 import { getCountries, getCountryCallingCode, parsePhoneNumberFromString, AsYouType, CountryCode, getExampleNumber } from 'libphonenumber-js'
 import examples from 'libphonenumber-js/examples.mobile.json'
+import { Country, State, City } from "country-state-city"
 
 const regionNames = new Intl.DisplayNames(['en'], { type: 'region' });
 const dynamicCountryOptions = getCountries().map((country) => {
@@ -31,7 +32,7 @@ export interface OnboardingWizardProps {
 
 export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = false, step = 1 }: OnboardingWizardProps = {}) {
     const [open, setOpen] = useState(publicMode ? true : false)
-    const [currentStep, setCurrentStep] = useState(step)
+    const [currentStep, setCurrentStep] = useState(4)
     const [loading, setLoading] = useState(false)
     const [pageLoading, setPageLoading] = useState(true)
     const [form] = Form.useForm()
@@ -72,7 +73,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
             }
         }
 
-        const match = normalized.match(/^(\+\d{1,2})\s*(\d+)$/)
+        const match = value?.trim().match(/^(\+\d{1,3})[- ]?(\d+)$/)
         if (match) {
             return {
                 emergencyCountryCode: 'IN',
@@ -82,7 +83,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
 
         return {
             emergencyCountryCode: 'IN',
-            emergencyPhoneNumber: normalized.replace(/\D/g, '').slice(0, 10),
+            emergencyPhoneNumber: value?.replace(/\D/g, '').slice(0, 10) || '',
         }
     }
 
@@ -91,14 +92,24 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
         const number = phoneNumber?.trim() || ''
         if (!number) return ''
         const parsed = parsePhoneNumberFromString(number, isoCode)
-        return parsed ? parsed.number : `+${getCountryCallingCode(isoCode)}${number.replace(/\D/g, '')}`
+        const dialCode = `+${getCountryCallingCode(isoCode)}`
+        const formattedNumber = parsed ? parsed.nationalNumber : number.replace(/\D/g, '')
+        return `${dialCode}-${formattedNumber}`
     }
 
     const validateEmergencyPhone = (isoCode: string, value: string) => {
-        if (!value) return true
-        const parsed = parsePhoneNumberFromString(value, isoCode as CountryCode)
-        return parsed ? parsed.isValid() : false
-    }
+        if (!value) return true;
+        // Try parsing with the formatted value first
+        let parsed = parsePhoneNumberFromString(value, isoCode as CountryCode);
+        if (!parsed || !parsed.isValid()) {
+            // If that fails, try with digits only
+            const digitsOnly = value.replace(/\D/g, '');
+            if (digitsOnly) {
+                parsed = parsePhoneNumberFromString(digitsOnly, isoCode as CountryCode);
+            }
+        }
+        return parsed ? parsed.isValid() : false;
+    };
 
     const validateEmergencyCountryCode = (value: string) => {
         return true
@@ -353,7 +364,13 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                     return;
                 }
                 if (profileFile) {
-                    if(profileFile.size > 1 * 1024 * 1024) {
+                    const isImage = profileFile.type.startsWith("image/");
+                    if (!isImage) {
+                        message.error("Only image files are allowed (JPG, PNG, etc.)");
+                        setLoading(false);
+                        return;
+                    }
+                    if (profileFile.size > 1.2 * 1024 * 1024) {
                         message.error("File size exceeds 1MB limit.")
                         setLoading(false)
                         return
@@ -376,87 +393,239 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                     })
                 }
             } else if (currentStep === 2) {
-                // Personal Info validation
-                const values = await form.validateFields()
-                const mergedEmergencyPhone = mergeEmergencyContact(values.emergencyCountryCode, values.emergencyPhoneNumber)
+                // Let the form validate naturally
+                try {
+                    const values = await form.validateFields();
 
-                // Manual check to absolutely ensure "Next is working" bug doesn't happen
-                if (!values.street || !values.city || !values.state || !values.postalCode || !values.country || !values.emergencyContact || !values.emergencyCountryCode || !values.emergencyPhoneNumber) {
-                    message.error("Please fill in all required personal information.");
-                    setLoading(false);
-                    return;
-                }
-                if (!values.sameAsCurrent) {
-                    if (!values.permanentstreet || !values.permanentcity || !values.permanentstate || !values.permanentpostalCode || !values.permanentcountry) {
-                        message.error("Please fill in all required permanent address information.");
+                    // Custom validation that can't be done via rules
+                    const postalPattern = /^[0-9]{5,10}$/;
+                    const namePattern = /^[a-zA-Z\s-]*$/;
+
+                    const customErrors: Record<string, string> = {};
+
+                    // Validate current address
+                    if (values.postalCode && !postalPattern.test(values.postalCode)) {
+                        customErrors.postalCode = 'Postal code should contain 5-10 digits';
+                    }
+                    if (values.emergencyContact && !namePattern.test(values.emergencyContact)) {
+                        customErrors.emergencyContact = 'Name cannot contain numbers or special characters';
+                    }
+
+                    // Validate permanent address if not same as current
+                    if (!values.sameAsCurrent) {
+                        if (values.permanentpostalCode && !postalPattern.test(values.permanentpostalCode)) {
+                            customErrors.permanentpostalCode = 'Postal code should contain 5-10 digits';
+                        }
+                    }
+
+                    // Validate emergency phone
+                    if (values.emergencyPhoneNumber) {
+                        const digitsOnly = values.emergencyPhoneNumber.replace(/\D/g, '');
+                        if (!validateEmergencyPhone(values.emergencyCountryCode, digitsOnly)) {
+                            customErrors.emergencyPhoneNumber = 'Please enter a valid phone number for the selected country';
+                        }
+                    }
+
+                    // If there are custom validation errors, set them and stop
+                    if (Object.keys(customErrors).length > 0) {
+                        setFormErrors(customErrors);
+                        // Also set form field errors for inline display
+                        form.setFields(
+                            Object.entries(customErrors).map(([name, error]) => ({
+                                name,
+                                errors: [error],
+                            }))
+                        );
+                        message.error("Please fix all validation errors before proceeding.");
                         setLoading(false);
                         return;
                     }
-                }
 
-                if (values.emergencyPhoneNumber && !validateEmergencyPhone(values.emergencyCountryCode, values.emergencyPhoneNumber)) {
-                    setFormErrors({ emergencyPhoneNumber: 'Please enter a valid phone number for the selected country' })
-                    setLoading(false)
-                    return
-                }
+                    // Manual check for required fields
+                    if (!values.street || !values.city || !values.state || !values.postalCode || !values.country || !values.emergencyContact || !values.emergencyCountryCode || !values.emergencyPhoneNumber) {
+                        message.error("Please fill in all required personal information.");
+                        setLoading(false);
+                        return;
+                    }
+                    if (!values.sameAsCurrent) {
+                        if (!values.permanentstreet || !values.permanentcity || !values.permanentstate || !values.permanentpostalCode || !values.permanentcountry) {
+                            message.error("Please fill in all required permanent address information.");
+                            setLoading(false);
+                            return;
+                        }
+                    }
 
-                // Only call the API if the data has actually changed
-                const personalPayload = {
-                    step: currentStep,
-                    data: { ...values, emergencyPhone: mergedEmergencyPhone },
-                    employeeId: publicMode ? publicEmpId : undefined,
-                };
-                const personalKey = JSON.stringify(personalPayload);
-                if (personalKey !== lastSavedPersonalData.current) {
-                    const res = await fetch(endpoint, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: personalKey,
-                    })
-                    if (!res.ok) throw new Error('Failed')
-                    lastSavedPersonalData.current = personalKey;
+                    const mergedEmergencyPhone = mergeEmergencyContact(values.emergencyCountryCode, values.emergencyPhoneNumber)
+
+                    // Only call the API if the data has actually changed
+                    const personalPayload = {
+                        step: currentStep,
+                        data: { ...values, emergencyPhone: mergedEmergencyPhone },
+                        employeeId: publicMode ? publicEmpId : undefined,
+                    };
+                    const personalKey = JSON.stringify(personalPayload);
+                    if (personalKey !== lastSavedPersonalData.current) {
+                        const res = await fetch(endpoint, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: personalKey,
+                        })
+                        if (!res.ok) throw new Error('Failed')
+                        lastSavedPersonalData.current = personalKey;
+                    }
+                } catch (validationError: any) {
+                    // Ant Design form validation failed - errors will show inline automatically
+                    console.error("Validation error:", validationError);
+                    // Don't show toast here as Ant Design already shows inline errors
+                    setLoading(false);
+                    return;
                 }
-            } else {
-                if (currentStep === 3) {
-                    const values = await form.validateFields()
+            } else if (currentStep === 3) {
+                // Similar approach for bank details
+                try {
+                    const values = await form.validateFields();
+
+                    // Check if form validation failed (this shouldn't happen as errors would be caught)
+                    if (!values) {
+                        setLoading(false);
+                        return;
+                    }
+
+                    const customErrors: Record<string, string> = {};
+                    if (values.accountNumber) {
+                        const accPattern = /^\d{9,18}$/;
+                        if (!accPattern.test(values.accountNumber)) {
+                            customErrors.accountNumber = 'Account number must be 9-18 digits';
+                            setFormErrors(customErrors)
+                            setLoading(false)
+                            message.warning('Account number must be 9-18 digits')
+                            return
+                        }
+                    }
+                    // Validate account holder name specifically
+                    if (values.accountHolder) {
+                        const namePattern = /^[a-zA-Z\s.]+$/;
+                        if (!namePattern.test(values.accountHolder)) {
+                            customErrors.accountHolder = 'Name can only contain letters, spaces and periods';
+                        }
+                    }
+
+                    // Additional bank validations
+                    if (values.accountNumber) {
+                        // Check if account number contains only digits
+                        if (!/^\d+$/.test(values.accountNumber)) {
+                            customErrors.accountNumber = 'Account number must contain only digits';
+                        }
+                        // Check length
+                        else if (values.accountNumber.length < 9) {
+                            customErrors.accountNumber = 'Account number must be at least 9 digits';
+                        }
+                        else if (values.accountNumber.length > 18) {
+                            customErrors.accountNumber = 'Account number must not exceed 18 digits';
+                        }
+
+                        // Check for commonly used test account numbers
+                        const commonTestNumbers = ['12345678', '123456789', '000000000', '111111111', '999999999'];
+                        if (commonTestNumbers.includes(values.accountNumber)) {
+                            customErrors.accountNumber = 'Please enter a valid account number';
+                        }
+                    }
+
+                    // Check for required fields
                     if (!values.bankName || !values.bankbranch || !values.accountNumber || !values.accountHolder || !values.ifscCode) {
                         message.error("Please fill in all required bank details.");
                         setLoading(false);
                         return;
+                    }
+                    if(values.bankbranch){
+                        if(values.bankbranch.length > 100){
+                            customErrors.bankbranch = 'Bank Branch name cannot exceed 100 characters.'
+                            message.error("Bank Branch name cannot exceed 100 characters.");
+                            setLoading(false);
+                            return;
+                        }
                     }
                     if (!passbookUploaded) {
                         message.error("Please upload your Passbook or Bank Statement to proceed.");
                         setLoading(false);
                         return;
                     }
+
+                    // If there are custom validation errors, set them and STOP
+                    if (Object.keys(customErrors).length > 0) {
+                        setFormErrors(customErrors);
+                        form.setFields(
+                            Object.entries(customErrors).map(([name, error]) => ({
+                                name,
+                                errors: [error],
+                            }))
+                        );
+                        // Remove the toast message to avoid confusion with inline errors
+                        // message.error("Please fix all validation errors before proceeding.");
+                        setLoading(false);
+                        return; // This is crucial - stop execution here
+                    }
+
+                    // Only proceed if no errors
+                    const res = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            step: currentStep,
+                            data: values,
+                            employeeId: publicMode ? publicEmpId : undefined
+                        })
+                    })
+                    if (!res.ok) throw new Error('Failed')
+
+                    // Success - move to next step
+                    setCurrentStep(prev => prev + 1)
+                    setLoading(false)
+                    return; // Explicitly return after success
+
+                } catch (validationError: any) {
+                    console.error("Validation error:", validationError);
+                    // Don't show toast for validation errors as inline errors are shown
+                    setLoading(false);
+                    return;
                 }
-                if (currentStep === 4) {
-                    if (documents && documents.length > 0) {
-                        const missingDocs = documents.filter(docName => !existingDocuments.some(d => d.Document_Type__c === docName));
-                        if (missingDocs.length > 0) {
-                            message.error("Please upload all required documents to proceed.");
-                            setLoading(false);
-                            return;
-                        }
+            } else if (currentStep === 4) {
+                // Document validation
+                if (documents && documents.length > 0) {
+                    const missingDocs = documents.filter(docName => !existingDocuments.some(d => d.Document_Type__c === docName));
+                    if (missingDocs.length > 0) {
+                        message.error("Please upload all required documents to proceed.");
+                        setLoading(false);
+                        return;
                     }
                 }
-                const values = await form.validateFields()
-                const res = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        step: currentStep,
-                        data: values,
-                        employeeId: publicMode ? publicEmpId : undefined
+
+                try {
+                    const values = await form.validateFields();
+                    const res = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            step: currentStep,
+                            data: values,
+                            employeeId: publicMode ? publicEmpId : undefined
+                        })
                     })
-                })
-                if (!res.ok) throw new Error('Failed')
+                    if (!res.ok) throw new Error('Failed')
+                } catch (validationError: any) {
+                    console.error("Validation error:", validationError);
+                    setLoading(false);
+                    return;
+                }
             }
 
             setCurrentStep(prev => prev + 1)
             setLoading(false)
         } catch (error) {
-            console.error("Validation Failed:", error)
+            console.error("Error:", error)
+            if (error instanceof Error && !error.message.includes('Validation')) {
+                message.error(error.message || "An error occurred. Please try again.");
+            }
             setLoading(false)
         }
     }
@@ -492,7 +661,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
             })
             if (!res.ok) throw new Error('Upload Failed')
             onSuccess("Ok")
-            setExistingDocuments(prev => [...prev, { Document_Type__c: doc }])
+            setExistingDocuments(prev => [...prev, { Document_Type__c: doc, FileName: file.name }])
             message.success('Uploaded successfully')
         } catch (err) {
             onError({ err })
@@ -555,14 +724,19 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
             message.error(e.message || "Failed to complete onboarding.")
         }
     }
-
+    const formatFileSize = (size?: number) => {
+        if (!size) return '';
+        const kb = size / 1024;
+        if (kb < 1024) return `${kb.toFixed(1)} KB`;
+        return `${(kb / 1024).toFixed(2)} MB`;
+    };
     const renderStepContent = (step: number) => {
         switch (step) {
             case 1:
                 return (
                     <div className="py-8 text-center flex flex-col items-center">
                         <p className="mb-6 text-gray-500">Upload a professional profile picture.</p>
-                        <ImgCrop rotationSlider cropShape="round" showGrid aspect={1}>
+                        <ImgCrop rotationSlider cropShape="round" showGrid aspect={1} quality={0.6} modalTitle="Crop Image">
                             <Upload
                                 listType="picture-circle"
                                 showUploadList={false}
@@ -604,32 +778,87 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                 return (
                     <div className="py-4">
                         <p className="mb-4 text-gray-500">Current Address</p>
-                        <Form.Item name="street" label="Street Address" rules={[{ required: true }]}>
+                        <Form.Item name="street" label="Street Address" rules={[{ required: true, message: 'Street address is required' }]}>
                             <Input placeholder="123 Main St" disabled={disabledsteps.includes(2)} />
                         </Form.Item>
                         <div className="grid grid-cols-2 gap-4">
-                            <Form.Item name="city" label="City" rules={[{ required: true }]}>
-                                <Input disabled={disabledsteps.includes(2)} />
-                            </Form.Item>
-                            <Form.Item name="state" label="State" rules={[{ required: true }]}>
-                                <Input disabled={disabledsteps.includes(2)} />
-                            </Form.Item>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <Form.Item name="postalCode" label="Postal Code" rules={[{ required: true }]}>
-                                <Input disabled={disabledsteps.includes(2)} />
-                            </Form.Item>
-                            <Form.Item name="country" label="Country" rules={[{ required: true }]}>
+                            <Form.Item name="country" label="Country" rules={[{ required: true, message: 'Country is required' }]}>
                                 <Select
                                     showSearch
                                     placeholder="Select country"
-                                    options={dynamicCountryOptions.map(country => ({ label: country.name, value: country.name }))}
+                                    options={Country.getAllCountries().map(country => ({ label: country.name, value: country.name }))}
                                     optionFilterProp="label"
                                     disabled={disabledsteps.includes(2)}
                                     onChange={(val) => {
+                                        form.setFieldsValue({ state: undefined, city: undefined });
                                         const code = dynamicCountryOptions.find(c => c.name === val)?.value;
                                         if (code) form.setFieldValue('emergencyCountryCode', code);
                                         form.setFieldValue('emergencyPhoneNumber', ''); // clear mismatch
+                                    }}
+                                />
+                            </Form.Item>
+                            <Form.Item noStyle shouldUpdate={(prev, curr) => prev.country !== curr.country}>
+                                {({ getFieldValue }) => {
+                                    const countryVal = getFieldValue('country');
+                                    const countryCode = Country.getAllCountries().find(c => c.name === countryVal)?.isoCode;
+                                    const states = countryCode ? State.getStatesOfCountry(countryCode) : [];
+                                    return (
+                                        <Form.Item 
+                                            name="state" 
+                                            label="State" 
+                                            rules={[{ required: true, message: 'State is required' }]}
+                                        >
+                                            <Select
+                                                showSearch
+                                                placeholder="Select state"
+                                                options={states.map(s => ({ label: s.name, value: s.name }))}
+                                                optionFilterProp="label"
+                                                disabled={disabledsteps.includes(2) || !countryVal}
+                                                onChange={() => form.setFieldValue('city', undefined)}
+                                            />
+                                        </Form.Item>
+                                    );
+                                }}
+                            </Form.Item>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <Form.Item noStyle shouldUpdate={(prev, curr) => prev.country !== curr.country || prev.state !== curr.state}>
+                                {({ getFieldValue }) => {
+                                    const countryVal = getFieldValue('country');
+                                    const stateVal = getFieldValue('state');
+                                    const countryCode = Country.getAllCountries().find(c => c.name === countryVal)?.isoCode;
+                                    const stateCode = State.getStatesOfCountry(countryCode || '').find(s => s.name === stateVal)?.isoCode;
+                                    const cities = (countryCode && stateCode) ? City.getCitiesOfState(countryCode, stateCode) : [];
+                                    return (
+                                        <Form.Item 
+                                            name="city" 
+                                            label="City" 
+                                            rules={[{ required: true, message: 'City is required' }]}
+                                        >
+                                            <Select
+                                                showSearch
+                                                placeholder="Select city"
+                                                options={cities.map(c => ({ label: c.name, value: c.name }))}
+                                                optionFilterProp="label"
+                                                disabled={disabledsteps.includes(2) || !stateVal}
+                                            />
+                                        </Form.Item>
+                                    );
+                                }}
+                            </Form.Item>
+                            <Form.Item 
+                                name="postalCode" 
+                                label="Postal Code" 
+                                rules={[
+                                    { required: true, message: 'Postal code is required' },
+                                    { pattern: /^[0-9]{5,10}$/, message: 'Postal code should contain 5-10 digits' }
+                                ]}
+                            >
+                                <Input 
+                                    disabled={disabledsteps.includes(2)}
+                                    onChange={(e) => {
+                                        const onlyDigits = e.target.value.replace(/\D/g, '').slice(0, 10);
+                                        form.setFieldValue('postalCode', onlyDigits);
                                     }}
                                 />
                             </Form.Item>
@@ -653,30 +882,87 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
 
                                 return (
                                     <>
-                                        <Form.Item name="permanentstreet" label="Street Address" rules={[{ required: true }]}>
+                                        <Form.Item name="permanentstreet" label="Street Address" rules={[{ required: true, message: 'Street address is required' }]}>
                                             <Input placeholder="123 Main St" disabled={disabledsteps.includes(2)} />
                                         </Form.Item>
 
                                         <div className="grid grid-cols-2 gap-4">
-                                            <Form.Item name="permanentcity" label="City" rules={[{ required: true }]}>
-                                                <Input disabled={disabledsteps.includes(2)} />
+                                            <Form.Item name="permanentcountry" label="Country" rules={[{ required: true, message: 'Country is required' }]}>
+                                                <Select
+                                                    showSearch
+                                                    placeholder="Select country"
+                                                    options={Country.getAllCountries().map(country => ({ label: country.name, value: country.name }))}
+                                                    optionFilterProp="label"
+                                                    disabled={disabledsteps.includes(2)}
+                                                    onChange={() => {
+                                                        form.setFieldsValue({ permanentstate: undefined, permanentcity: undefined });
+                                                    }}
+                                                />
                                             </Form.Item>
-                                            <Form.Item name="permanentstate" label="State" rules={[{ required: true }]}>
-                                                <Input disabled={disabledsteps.includes(2)} />
+                                            <Form.Item noStyle shouldUpdate={(prev, curr) => prev.permanentcountry !== curr.permanentcountry}>
+                                                {({ getFieldValue }) => {
+                                                    const countryVal = getFieldValue('permanentcountry');
+                                                    const countryCode = Country.getAllCountries().find(c => c.name === countryVal)?.isoCode;
+                                                    const states = countryCode ? State.getStatesOfCountry(countryCode) : [];
+                                                    return (
+                                                        <Form.Item 
+                                                            name="permanentstate" 
+                                                            label="State" 
+                                                            rules={[{ required: true, message: 'State is required' }]}
+                                                        >
+                                                            <Select
+                                                                showSearch
+                                                                placeholder="Select state"
+                                                                options={states.map(s => ({ label: s.name, value: s.name }))}
+                                                                optionFilterProp="label"
+                                                                disabled={disabledsteps.includes(2) || !countryVal}
+                                                                onChange={() => form.setFieldValue('permanentcity', undefined)}
+                                                            />
+                                                        </Form.Item>
+                                                    );
+                                                }}
                                             </Form.Item>
                                         </div>
 
                                         <div className="grid grid-cols-2 gap-4">
-                                            <Form.Item name="permanentpostalCode" label="Postal Code" rules={[{ required: true }]}>
-                                                <Input disabled={disabledsteps.includes(2)} />
+                                            <Form.Item noStyle shouldUpdate={(prev, curr) => prev.permanentcountry !== curr.permanentcountry || prev.permanentstate !== curr.permanentstate}>
+                                                {({ getFieldValue }) => {
+                                                    const countryVal = getFieldValue('permanentcountry');
+                                                    const stateVal = getFieldValue('permanentstate');
+                                                    const countryCode = Country.getAllCountries().find(c => c.name === countryVal)?.isoCode;
+                                                    const stateCode = State.getStatesOfCountry(countryCode || '').find(s => s.name === stateVal)?.isoCode;
+                                                    const cities = (countryCode && stateCode) ? City.getCitiesOfState(countryCode, stateCode) : [];
+                                                    return (
+                                                        <Form.Item 
+                                                            name="permanentcity" 
+                                                            label="City" 
+                                                            rules={[{ required: true, message: 'City is required' }]}
+                                                        >
+                                                            <Select
+                                                                showSearch
+                                                                placeholder="Select city"
+                                                                options={cities.map(c => ({ label: c.name, value: c.name }))}
+                                                                optionFilterProp="label"
+                                                                disabled={disabledsteps.includes(2) || !stateVal}
+                                                            />
+                                                        </Form.Item>
+                                                    );
+                                                }}
                                             </Form.Item>
-                                            <Form.Item name="permanentcountry" label="Country" rules={[{ required: true }]}>
-                                                <Select
-                                                    showSearch
-                                                    placeholder="Select country"
-                                                    options={dynamicCountryOptions.map(country => ({ label: country.name, value: country.name }))}
-                                                    optionFilterProp="label"
+                                            <Form.Item 
+                                                name="permanentpostalCode" 
+                                                label="Postal Code" 
+                                                rules={[
+                                                    { required: true, message: 'Postal code is required' },
+                                                    { pattern: /^[0-9]{5,10}$/, message: 'Postal code should contain 5-10 digits' }
+                                                ]}
+                                            >
+                                                <Input 
                                                     disabled={disabledsteps.includes(2)}
+                                                    onChange={(e) => {
+                                                        const onlyDigits = e.target.value.replace(/\D/g, '').slice(0, 10);
+                                                        form.setFieldValue('permanentpostalCode', onlyDigits);
+                                                    }}
                                                 />
                                             </Form.Item>
                                         </div>
@@ -686,7 +972,14 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                             }}
                         </Form.Item>
                         <Divider />
-                        <Form.Item name="emergencyContact" label="Emergency Contact Name" rules={[{ required: true }]}>
+                        <Form.Item 
+                            name="emergencyContact" 
+                            label="Emergency Contact Name" 
+                            rules={[
+                                { required: true, message: 'Emergency contact name is required' },
+                                { pattern: /^[a-zA-Z\s-]*$/, message: 'Name cannot contain numbers or special characters' }
+                            ]}
+                        >
                             <Input disabled={disabledsteps.includes(2)} />
                         </Form.Item>
                         <div className="grid grid-cols-1 sm:grid-cols-[300px_minmax(500px,_1fr)] sm:gap-4">
@@ -726,24 +1019,29 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                                       }}
                                                 />
                             </Form.Item>
+
                             <Form.Item noStyle shouldUpdate={(prev, current) => prev.emergencyCountryCode !== current.emergencyCountryCode}>
                                 {({ getFieldValue }) => {
                                     const selectedCountry = (getFieldValue('emergencyCountryCode') || 'IN') as CountryCode;
                                     const exampleNumber = getExampleNumber(selectedCountry, examples);
                                     const formatString = exampleNumber ? exampleNumber.formatNational() : '98765 43210';
                                     const phoneMaxLength = formatString.length;
-                                    
+
                                     return (
+                                        // In the emergency phone number section of case 2:
                                         <Form.Item
                                             name="emergencyPhoneNumber"
                                             label="Emergency Contact Number"
                                             dependencies={['emergencyCountryCode']}
+                                            validateTrigger={['onChange', 'onBlur']}
                                             rules={[
                                                 { required: true, message: 'Emergency contact number is required' },
                                                 () => ({
                                                     validator(_, value) {
                                                         if (!value) return Promise.resolve();
-                                                        const parsed = parsePhoneNumberFromString(value, selectedCountry);
+                                                        const selectedCountry = form.getFieldValue('emergencyCountryCode') || 'IN';
+                                                        const cleanValue = value.replace(/\D/g, '');
+                                                        const parsed = parsePhoneNumberFromString(cleanValue, selectedCountry as CountryCode);
                                                         if (parsed && parsed.isValid()) {
                                                             return Promise.resolve();
                                                         }
@@ -752,17 +1050,29 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                                 }),
                                             ]}
                                             getValueFromEvent={(e) => {
-                                                const value = e.target.value;
-                                                const formatter = new AsYouType(selectedCountry);
-                                                return formatter.input(value);
+                                                const inputValue = e.target.value;
+                                                const selectedCountry = form.getFieldValue('emergencyCountryCode') || 'IN';
+                                                const digitsOnly = inputValue.replace(/\D/g, '');
+
+                                                const formatter = new AsYouType(selectedCountry as CountryCode);
+                                                let formatted = '';
+                                                for (const char of digitsOnly) {
+                                                    formatted = formatter.input(char);
+                                                }
+
+                                                return formatted;
                                             }}
-                                        > 
+                                        >
                                             <Input
                                                 placeholder={formatString}
-                                                maxLength={phoneMaxLength}
+                                                maxLength={phoneMaxLength + 5}
                                                 status={formErrors.emergencyPhoneNumber ? 'error' : ''}
-                                                className={formErrors.emergencyPhoneNumber ? 'border-red-500' : ''}
                                                 disabled={disabledsteps.includes(2)}
+                                                onChange={() => {
+                                                    if (formErrors.emergencyPhoneNumber) {
+                                                        setFormErrors(prev => ({ ...prev, emergencyPhoneNumber: '' }));
+                                                    }
+                                                }}
                                             />
                                         </Form.Item>
                                     );
@@ -787,46 +1097,142 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                 return (
                     <div className="py-4">
                         <p className="mb-4 text-gray-500">We need your bank details for payroll processing.</p>
-                        <Form.Item name="bankName" label="Bank Name" rules={[{ required: true }]}>
-                            <Input prefix={<BankOutlined />} disabled={disabledsteps.includes(3)} />
-                        </Form.Item>
-                        <Form.Item name="bankbranch" label="Bank Branch Name" rules={[{ required: true }]}>
-                            <Input disabled={disabledsteps.includes(3)} />
-                        </Form.Item>
+
+                        {/* Bank Name */}
                         <Form.Item
-                            name="accountNumber"
-                            label="Account Number"
+                            name="bankName"
+                            label="Bank Name"
                             rules={[
-                                { required: true, message: 'Account number is required' },
-                                { pattern: /^\d{8,17}$/, message: 'Account number must be 8 to 17 digits and contain numbers only' }
+                                { required: true, message: 'Bank name is required' },
+                                { min: 2, message: 'Bank name must be at least 2 characters' },
+                                { max: 50, message: 'Bank name must not exceed 50 characters' },
+                                { pattern: /^[a-zA-Z\s.&-]+$/, message: 'Bank name can only contain letters, spaces, hyphens, ampersands and periods' }
                             ]}
                         >
                             <Input
+                                prefix={<BankOutlined />}
+                                placeholder="e.g., State Bank of India"
+                                disabled={disabledsteps.includes(3)}
+                            />
+                        </Form.Item>
+
+                        {/* Bank Branch */}
+                        <Form.Item
+                            name="bankbranch"
+                            label="Bank Branch Name"
+                            rules={[
+                                { required: true, message: 'Bank branch is required' },
+                                { min: 2, message: 'Branch name must be at least 2 characters' },
+                                { max: 100, message: 'Branch name must not exceed 100 characters' },
+                                { pattern: /^[a-zA-Z0-9\s.,&\-()]+$/, message: 'Branch name contains invalid characters' }
+                            ]}
+                        >
+                            <Input
+                                placeholder="e.g., MG Road Branch"
+                                disabled={disabledsteps.includes(3)}
+                            />
+                        </Form.Item>
+
+                        {/* Account Number */}
+                        <Form.Item
+                            name="accountNumber"
+                            label="Account Number"
+                            validateTrigger={['onChange', 'onBlur']}  // Add this line
+                            rules={[
+                                { required: true, message: 'Account number is required' },
+                                { pattern: /^\d{9,18}$/, message: 'Account number must be 9-18 digits' }
+                            ]}
+                        >
+                            <Input
+                                placeholder="Enter account number"
                                 type="text"
                                 inputMode="numeric"
-                                maxLength={17}
+                                maxLength={18}
                                 disabled={disabledsteps.includes(3)}
                                 onChange={(e) => {
-                                    const onlyDigits = e.target.value.replace(/\D/g, '').slice(0, 17)
+                                    const onlyDigits = e.target.value.replace(/\D/g, '').slice(0, 18)
                                     form.setFieldValue('accountNumber', onlyDigits)
                                 }}
                             />
                         </Form.Item>
-                        <Form.Item name="accountHolder" label="Account Holder Name" rules={[{ required: true }]}>
-                            <Input disabled={disabledsteps.includes(3)} />
+
+                        {/* Account Holder Name */}
+                        <Form.Item
+                            name="accountHolder"
+                            label="Account Holder Name"
+                            validateTrigger={['onChange', 'onBlur']}  // Add this line
+                            rules={[
+                                { required: true, message: 'Account holder name is required' },
+                                { min: 2, message: 'Name must be at least 2 characters' },
+                                { max: 100, message: 'Name must not exceed 100 characters' },
+                                {
+                                    pattern: /^[a-zA-Z\s.]+$/,
+                                    message: 'Name can only contain letters, spaces and periods'
+                                }
+                            ]}
+                        >
+                            <Input
+                                placeholder="Enter account holder name as per bank records"
+                                disabled={disabledsteps.includes(3)}
+                                onChange={(e) => {
+                                    // Optional: Prevent typing numbers/special chars
+                                    const sanitized = e.target.value.replace(/[^a-zA-Z\s.]/g, '');
+                                    if (sanitized !== e.target.value) {
+                                        form.setFieldValue('accountHolder', sanitized);
+                                    }
+                                }}
+                            />
                         </Form.Item>
-                        <Form.Item name="ifscCode" label="IFSC / Routing Code" rules={[{ required: true }]}>
-                            <Input disabled={disabledsteps.includes(3)} />
+
+                        {/* IFSC Code */}
+                        <Form.Item
+                            name="ifscCode"
+                            label="IFSC Code"
+                            rules={[
+                                { required: true, message: 'IFSC code is required' },
+                                {
+                                    pattern: /^[A-Z]{4}0[A-Z0-9]{6}$/,
+                                    message: 'IFSC code format: 4 letters + 0 + 6 alphanumeric (e.g., SBIN0001234)'
+                                },
+                                { len: 11, message: 'IFSC code must be exactly 11 characters' }
+                            ]}
+                        >
+                            <Input
+                                placeholder="e.g., SBIN0001234"
+                                maxLength={11}
+                                style={{ textTransform: 'uppercase' }}
+                                disabled={disabledsteps.includes(3)}
+                                onChange={(e) => {
+                                    const value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 11)
+                                    form.setFieldValue('ifscCode', value)
+                                }}
+                            />
                         </Form.Item>
 
                         {/* Passbook Upload */}
                         <div className="mt-4">
-                            <p className="text-sm font-medium text-gray-700 mb-2">Passbook / Bank Statement <span className="text-red-500">*</span></p>
+                            <p className="text-sm font-medium text-gray-700 mb-2">
+                                Passbook / Bank Statement <span className="text-red-500">*</span>
+                            </p>
                             <Upload.Dragger
                                 name="passbook"
                                 multiple={false}
                                 showUploadList={passbookFile ? true : false}
                                 beforeUpload={(file) => {
+                                    // Validate file type
+                                    const isValidType = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'].includes(file.type)
+                                    if (!isValidType) {
+                                        message.error('You can only upload PDF, JPG, or PNG files!')
+                                        return Upload.LIST_IGNORE
+                                    }
+
+                                    // Validate file size (5MB)
+                                    const isLessThan5MB = file.size / 1024 / 1024 < 5
+                                    if (!isLessThan5MB) {
+                                        message.error('File must be smaller than 5MB!')
+                                        return Upload.LIST_IGNORE
+                                    }
+
                                     setPassbookFile(file)
                                     handlePassbookUpload(file)
                                     return false
@@ -845,14 +1251,16 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                     {passbookUploading
                                         ? 'Uploading…'
                                         : passbookUploaded
-                                            ? 'Passbook uploaded ✓'
+                                            ? `${passbookFile?.name || 'Passbook'} uploaded ✓`
                                             : 'Click or drag passbook / bank statement'}
+                                </p>
+                                <p className="text-xs text-gray-400 mt-1">
+                                    Supported formats: PDF, JPG, PNG (Max 5MB)
                                 </p>
                             </Upload.Dragger>
                         </div>
                     </div>
                 )
-
             case 4:
                 // Documents (was case 5)
                 return (
@@ -892,7 +1300,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                                     {isUploaded ? <CheckCircleFilled className="text-xl text-green-500" /> : <UploadOutlined className="text-xl text-blue-500" />}
                                                 </p>
                                                 <p className="text-xs text-gray-500">
-                                                    {isUploaded ? 'Document Uploaded' : 'Click or drag file'}
+                                                    {isUploaded ? (existingDocuments.find(d => d.Document_Type__c === doc)?.FileName || 'Document Uploaded') : 'Click or drag file'}
                                                 </p>
                                             </Upload.Dragger>
                                         </Card>
@@ -956,22 +1364,22 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
         )
     };
 
-    if (publicMode && isExpired) {
-        return (
-            <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-                <div className="bg-white rounded-3xl shadow-xl border border-slate-100 max-w-lg w-full p-10 text-center">
-                    <AlertCircle className="w-16 h-16 text-amber-500 mx-auto mb-6" />
-                    <h2 className="text-2xl font-bold text-gray-800 mb-4">Link Expired</h2>
-                    <p className="text-gray-500 text-lg mb-8">This onboarding link is no longer valid or you have already completed the onboarding process.</p>
+    // if (publicMode && isExpired) {
+    //     return (
+    //         <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+    //             <div className="bg-white rounded-3xl shadow-xl border border-slate-100 max-w-lg w-full p-10 text-center">
+    //                 <AlertCircle className="w-16 h-16 text-amber-500 mx-auto mb-6" />
+    //                 <h2 className="text-2xl font-bold text-gray-800 mb-4">Link Expired</h2>
+    //                 <p className="text-gray-500 text-lg mb-8">This onboarding link is no longer valid or you have already completed the onboarding process.</p>
 
-                    <div className="mt-8 flex justify-center items-center gap-3 border-t border-slate-100 pt-8 opacity-80">
-                        <img src="/mv_logo1.png" alt="MV Clouds" className="h-8 drop-shadow-sm" />
-                        <span className="font-bold text-slate-800 tracking-tight">MV Clouds</span>
-                    </div>
-                </div>
-            </div>
-        )
-    }
+    //                 <div className="mt-8 flex justify-center items-center gap-3 border-t border-slate-100 pt-8 opacity-80">
+    //                     <img src="/mv_logo1.png" alt="MV Clouds" className="h-8 drop-shadow-sm" />
+    //                     <span className="font-bold text-slate-800 tracking-tight">MV Clouds</span>
+    //                 </div>
+    //             </div>
+    //         </div>
+    //     )
+    // }
 
     if (publicMode && currentStep > stepItems.length) {
         return (
@@ -1064,7 +1472,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                 <p className="text-gray-500 font-medium">Loading your details...</p>
                             </div>
                         ) : (
-                            <Form form={form} layout="vertical" initialValues={{ emergencyCountryCode: '+91' }}>
+                            <Form form={form} layout="vertical" initialValues={{ emergencyCountryCode: 'IN' }}>
                                 <AnimatePresence mode="wait">
                                     {currentStep <= stepItems.length ? (
                                         <motion.div

@@ -39,6 +39,9 @@ const DEFAULT_LEAVE_FILTERS = {
   dateRange: [null, null] as [any, any],
 }
 
+const ALL_LEAVE_TYPE_VALUE = "__all_leave_types__"
+const ALL_STATUS_VALUE = "__all_status__"
+
 type LeaveTab = "my-requests" | "approvals" | "all-leaves"
 
 const LEAVE_TAB_QUERY_MAP: Record<LeaveTab, string> = {
@@ -1140,11 +1143,16 @@ export default function LeavesPage() {
                     <Select
                       placeholder="Filter by Leave Type"
                       style={{ width: '100%', minWidth: 180 }}
-                      value={filters.leaveType || undefined}
-                      onChange={(value) => setFilters({ ...filters, leaveType: value || "" })}
+                      value={filters.leaveType || ALL_LEAVE_TYPE_VALUE}
+                      onChange={(value) =>
+                        setFilters({
+                          ...filters,
+                          leaveType: value === ALL_LEAVE_TYPE_VALUE || value === undefined ? "" : value,
+                        })
+                      }
                       allowClear
                     >
-                      <Select.Option value="">All Leave Types</Select.Option>
+                      <Select.Option value={ALL_LEAVE_TYPE_VALUE}>All Leave Types</Select.Option>
                       <Select.Option value="Sick Leave">Sick Leave</Select.Option>
                       <Select.Option value="Emergency Leave">Emergency Leave</Select.Option>
                       <Select.Option value="Planned Leave">Planned Leave</Select.Option>
@@ -1154,11 +1162,16 @@ export default function LeavesPage() {
                     <Select
                       placeholder="Filter by Status"
                       style={{ width: '100%', minWidth: 160 }}
-                      value={filters.status || undefined}
-                      onChange={(value) => setFilters({ ...filters, status: value || "" })}
+                      value={filters.status || ALL_STATUS_VALUE}
+                      onChange={(value) =>
+                        setFilters({
+                          ...filters,
+                          status: value === ALL_STATUS_VALUE || value === undefined ? "" : value,
+                        })
+                      }
                       allowClear
                     >
-                      <Select.Option value="">All Status</Select.Option>
+                      <Select.Option value={ALL_STATUS_VALUE}>All Status</Select.Option>
                       <Select.Option value="applied">Applied</Select.Option>
                       <Select.Option value="approved">Approved</Select.Option>
                       <Select.Option value="rejected">Rejected</Select.Option>
@@ -1413,14 +1426,20 @@ export default function LeavesPage() {
                         Leave Type
                       </label>
                       <Select
-                        value={filters.leaveType || undefined}
-                        onChange={(value) => setFilters({ ...filters, leaveType: value || "" })}
+                        value={filters.leaveType || ALL_LEAVE_TYPE_VALUE}
+                        onChange={(value) =>
+                          setFilters({
+                            ...filters,
+                            leaveType: value === ALL_LEAVE_TYPE_VALUE || value === undefined ? "" : value,
+                          })
+                        }
                         placeholder="All Types"
                         allowClear
                         style={{ width: '100%' }}
                         size="large"
                         className="rounded-lg"
                       >
+                        <Select.Option value={ALL_LEAVE_TYPE_VALUE}>All Types</Select.Option>
                         <Select.Option value="Planned Leave">Planned Leave</Select.Option>
                         <Select.Option value="Sick Leave">Sick Leave</Select.Option>
                         <Select.Option value="Emergency Leave">Emergency Leave</Select.Option>
@@ -1433,14 +1452,20 @@ export default function LeavesPage() {
                         Status
                       </label>
                       <Select
-                        value={filters.status || undefined}
-                        onChange={(value) => setFilters({ ...filters, status: value || "" })}
+                        value={filters.status || ALL_STATUS_VALUE}
+                        onChange={(value) =>
+                          setFilters({
+                            ...filters,
+                            status: value === ALL_STATUS_VALUE || value === undefined ? "" : value,
+                          })
+                        }
                         placeholder="All Status"
                         allowClear
                         style={{ width: '100%' }}
                         size="large"
                         className="rounded-lg"
                       >
+                        <Select.Option value={ALL_STATUS_VALUE}>All Status</Select.Option>
                         <Select.Option value="applied">Applied</Select.Option>
                         <Select.Option value="approved">Approved</Select.Option>
                         <Select.Option value="rejected">Rejected</Select.Option>

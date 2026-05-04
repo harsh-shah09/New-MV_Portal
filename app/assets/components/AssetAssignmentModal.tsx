@@ -117,7 +117,7 @@ export function AssetAssignmentModal({ visible, onCancel, onSuccess, asset, curr
       footer={null}
       destroyOnClose
       width="100%"
-      style={{ maxWidth: 600, top: 20 }}
+      style={{ maxHeight: 'calc(100vh - 120px)', top: 20 , overflowY : 'auto' , maxWidth : '80vw' , borderRadius : '10px' , scrollbarWidth : 'none'}}
       className="mobile-modal"
     >
       <div className="mb-4">
@@ -187,11 +187,9 @@ export function AssetAssignmentModal({ visible, onCancel, onSuccess, asset, curr
                 >
                     <Select 
                         className="w-full"
-                        showSearch 
+                        showSearch = {{filterOption : (input, option: any) =>  String(option?.children).toLowerCase().includes(input.toLowerCase()) ,optionFilterProp : 'children'}} 
                         size='large'
                         placeholder="Select Employee"
-                        optionFilterProp="children"
-                        filterOption={(input, option: any) => (option?.children as unknown as string).toLowerCase().includes(input.toLowerCase())}
                     >
                         {employees.map(emp => (
                             <Select.Option key={emp.Id} value={emp.Id}>

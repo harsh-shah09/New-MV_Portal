@@ -43,10 +43,23 @@ export function EmployeeTable({ employees, onEdit, onDelete, onView, loading, is
       responsive: ['md'],
     },
     {
-      title: 'Position',
-      dataIndex: 'position',
-      key: 'position',
-    },
+    title: 'Job Title',  
+    key: 'positionTitle',
+    render: (_, record) => (
+      <div className="space-y-0.5">
+        <div className="font-medium text-card-foreground">
+          {record.position}
+        </div>
+        {record?.title && (
+          <div className="text-sm text-muted-foreground">
+            {record?.title}
+          </div>
+        )}
+      </div>
+    ),
+    sorter: (a, b) => (a.position || '').localeCompare(b.position || ''),
+    responsive: ['sm'],
+  },
     {
       title: 'Join Date',
       dataIndex: 'joinDate',
@@ -66,6 +79,7 @@ export function EmployeeTable({ employees, onEdit, onDelete, onView, loading, is
       title: 'Account Status',
       dataIndex: 'active',
       key: 'active',
+      align: 'right',
       render: (active) => {
         return active ? <Tag color='success' className="capitalize">Active</Tag> : <Tag color='error' className="capitalize">Inactive</Tag>
       }

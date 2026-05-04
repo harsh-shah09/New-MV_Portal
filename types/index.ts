@@ -24,7 +24,8 @@ export interface Employee {
   personalDetails?: PersonalDetails
   documents?: EmployeeDocument[]
   ndaStatus?: "pending" | "signed" | "rejected"
-  profilePhoto?: string
+  profilePhoto?: string,
+  title?:string
 }
 
 export interface BankDetails {

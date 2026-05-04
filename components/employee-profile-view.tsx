@@ -395,11 +395,18 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
         )
     }
 
-    const getValidationErrors = () => {
+    const getValidationErrors = (validateAll: boolean = false) => {
         const newErrors: Record<string, string> = {}
 
-        // Always validate based on the activeTab
-        if (activeTab === 'personal') {
+        // Decide which tabs to validate: either only the active tab, or all tabs when saving
+        const tabsToValidate: TabId[] = validateAll
+            ? (['personal', 'employment', 'salary-calculation'] as TabId[])
+            : [activeTab]
+
+        // Personal tab validations
+        if (tabsToValidate.includes('personal')) {
+            // Always validate personal fields when validating all or when active
+        
             const employeeName = formData.Employee_Name__c?.trim()
             const email = formData.Employee_Email__c?.trim()
             const phone = formData.Employee_Phone__c?.trim()
@@ -420,6 +427,10 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                 newErrors.Employee_Email__c = "Please enter a valid email address"
             } else if (companyEmail && email.toLowerCase() === companyEmail.toLowerCase()) {
                 newErrors.Employee_Email__c = "Personal Email cannot be the same as Company Email"
+            }else if(!companyEmail){
+                newErrors.Company_Email__c = "Company Email is required"
+            }else if(companyEmail && !companyEmail.includes('mvclouds.com')){
+                newErrors.Company_Email__c = "Company Email should include mvclouds.com"
             } else if (employeesList) {
                 const isDuplicate = employeesList.some((emp: any) =>
                     emp.Id !== employeeId &&
@@ -461,7 +472,8 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
             }
         }
 
-        if (activeTab === 'employment') {
+        // Employment tab validations
+        if (tabsToValidate.includes('employment')) {
             const employeeCode = formData.Employee_Id__c?.trim()
 
             if (employeeCode && employeesList) {
@@ -478,7 +490,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
 
             if(employeeCode) {
                 // employee code should start with MV and followed by maximum of 5 digits
-                const employeeCodePattern = /^MV\d{0,5}$/i
+                const employeeCodePattern = /^MV\d{0,5}$/g
                 if (!employeeCodePattern.test(employeeCode)) {
                     newErrors.Employee_Id__c = "Employee ID must start with 'MV' followed by up to 5 digits (e.g., MV12345)"
                 }
@@ -525,7 +537,8 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
             }
         }
 
-        if (activeTab === 'salary-calculation') {
+        // Salary calculation validations - validate only when requested (admins)
+        if (tabsToValidate.includes('salary-calculation') && (currentUserRole || '').trim().toLowerCase() === 'admin') {
             salaryCalculationFields.forEach((field) => {
                 const rawValue = formData[field.fieldKey]
                 const numericValue = parseNumberValue(rawValue)
@@ -550,12 +563,14 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                 }
             })
         }
-
+        console.log(newErrors)
         return newErrors
     }
 
     const validateForm = () => {
-        const newErrors = getValidationErrors()
+        // When saving, validate across all relevant tabs so required fields
+        // (e.g. personal email) are enforced even if the user switched tabs.
+        const newErrors = getValidationErrors(true)
         setErrors(newErrors)
         return Object.keys(newErrors).length === 0
     }
@@ -977,6 +992,16 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
             return res.json()
         },
         onSuccess: () => {
+            if (passbookFile) {
+                const formData = new FormData()
+                formData.append("file", passbookFile)
+                formData.append("employeeId", employeeId)
+                formData.append("type", "document")
+                formData.append("category", "Personal")
+                formData.append("docType", "Passbook")
+                customDocMutation.mutate(formData)
+                setPassbookFile(null)
+            }
             message.success("Bank account added")
             setShowBankForm(false)
             setBankFormData({ Name: '', Bank_Branch_Name__c: '', Bank_Account_Number__c: '', IFSC__c: '', Primary_Account__c: false })
@@ -1091,14 +1116,6 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
             return
         }
         setPassbookFile(file)
-
-        const formData = new FormData()
-        formData.append("file", file)
-        formData.append("employeeId", employeeId)
-        formData.append("type", "document")
-        formData.append("category", "Personal")
-        formData.append("docType", "Passbook")
-        customDocMutation.mutate(formData)
     }
 
     // --- Custom document upload handler ---
@@ -1400,7 +1417,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                 <Power className="w-4 h-4" />
                                 {employee.Active__c ? 'Deactivate' : 'Activate'}
                             </button>
-                        </div>
+                        </div> 
                     )}
                 </div>
             </div>
@@ -1410,7 +1427,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                 <div className="bg-orange-50 border-l-4 border-orange-500 p-4 rounded-r-lg shadow-sm flex items-start gap-4 animate-in slide-in-from-top-2">
                     <AlertTriangle className="w-5 h-5 text-orange-600 shrink-0 mt-0.5" />
                     <div>
-                        <h4 className="font-bold text-orange-800">Please check your inputs</h4>
+                        <h4 className="font-bold text-orange-800">Please check your inputs in below mentioned tabs</h4>
                         <p className="text-sm text-orange-700 mt-1">{warningMsg}</p>
                     </div>
                     <button onClick={() => setWarningMsg(null)} className="ml-auto text-orange-400 hover:text-orange-600">
@@ -1596,7 +1613,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                             </h2>
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                                                 <Field label="Contact Name" value={employee.Emergency_Contact_Name__c} fieldKey="Emergency_Contact_Name__c" isEditing={isEditing} formData={formData} setFormData={setFormData} error={errors.Emergency_Contact_Name__c} />
-                                                <Field label="Contact Number" value={employee.Emergency_Contact_Number__c} fieldKey="Emergency_Contact_Number__c" isEditing={isEditing} formData={formData} setFormData={setFormData} pattern="^(?:\\+91\\d{10}|\\d{10})$" type="tel" error={errors.Emergency_Contact_Number__c} placeholder="+919876543210 or 9876543210" />
+                                                <Field label="Contact Number" value={employee.Emergency_Contact_Number__c} fieldKey="Emergency_Contact_Number__c" isEditing={isEditing} formData={formData} setFormData={setFormData} pattern="^(?:\\+91\\d{10}|\\d{10})$" type="tel" error={errors.Emergency_Contact_Number__c} placeholder="9876543310" />
                                             </div>
                                         </div>
                                         <div className="border-t border-slate-100 pt-8 mt-8">
@@ -1683,16 +1700,14 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                     setFormData={setFormData}
                                                     error={errors.Role__c}
                                                     type="select"
-                                                    options={[
-                                                        { label: 'Intern', value: 'Intern' },
-                                                        { label: 'Developer', value: 'Developer' },
-                                                        { label: 'Manager', value: 'Manager' },
-                                                        { label: 'HR', value: 'HR' },
-                                                        { label: 'Admin', value: 'Admin' },
-                                                        { label: 'BDE', value: 'BDE' },
-                                                        { label: 'Marketing', value: 'Marketing' },
-                                                        { label: 'Finance', value: 'Finance' },
-                                                    ]}
+                                                    options={(
+                                                        formData.Department__c === 'HR' ? ['HR', 'Manager', 'Intern'] :
+                                                        formData.Department__c === 'IT' ? ['Developer', 'Manager', 'Intern'] :
+                                                        formData.Department__c === 'Finance' ? ['Finance', 'Manager', 'Intern'] :
+                                                        formData.Department__c === 'Marketing' ? ['Marketing', 'BDE', 'Manager', 'Intern'] :
+                                                        formData.Department__c === 'Admin' ? ['Admin', 'Manager', 'Intern'] :
+                                                        ['Intern', 'Developer', 'Manager', 'HR', 'Admin', 'BDE', 'Marketing', 'Finance']
+                                                    ).map(r => ({ label: r, value: r }))}
                                                 />
                                                 <Field
                                                     label="Job Title"
@@ -1714,7 +1729,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                     formData={formData}
                                                     setFormData={setFormData}
                                                     error={errors.Company_Email__c}
-                                                    placeholder="e.g. john@company.com"
+                                                    placeholder="e.g. karan.p@mvclouds.com"
                                                 />
 
 
@@ -1730,10 +1745,15 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                                 <input
                                                                     type="number"
                                                                     min="0"
-                                                                    max="50"
+                                                                    max="100"
                                                                     value={formData.exp_years ?? 0}
                                                                     onChange={(e) => {
-                                                                        const y = Math.min(50,Math.max(0, parseInt(e.target.value, 10) || 0))
+                                                                        let y = parseInt(e.target.value, 10) || 0
+                                                                        if (y > 100) {
+                                                                            message.warning("Experience cannot exceed 100 years")
+                                                                            y = 100
+                                                                        }
+                                                                        y = Math.max(0, y)
                                                                         setFormData({ ...formData, exp_years: y })
                                                                     }}
                                                                     className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none transition [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
@@ -1945,7 +1965,19 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                                                     <Field label="Bank Name" value={bankFormData.Name} fieldKey="Name" isEditing={true} formData={bankFormData} setFormData={setBankFormData} placeholder="e.g. HDFC Bank" error={bankErrors.Name} required />
                                                     <Field label="Branch Name" value={bankFormData.Bank_Branch_Name__c} fieldKey="Bank_Branch_Name__c" isEditing={true} formData={bankFormData} setFormData={setBankFormData} placeholder="e.g. Koramangala" error={bankErrors.Bank_Branch_Name__c} required />
-                                                    <Field label="Account Number" value={bankFormData.Bank_Account_Number__c} fieldKey="Bank_Account_Number__c" isEditing={true} formData={bankFormData} setFormData={setBankFormData} type="password" placeholder="Enter Account Number" error={bankErrors.Bank_Account_Number__c} required />
+                                                    <div className="space-y-1.5">
+                                                        <Field label="Account Number" value={bankFormData.Bank_Account_Number__c} fieldKey="Bank_Account_Number__c" isEditing={true} formData={bankFormData} setFormData={(data) => {
+                                                            const newAccNum = data.Bank_Account_Number__c.replace(/\D/g, '').slice(0, 18);
+                                                            const newErrors = { ...bankErrors };
+                                                            if (newAccNum.length > 0 && (newAccNum.length < 9 || newAccNum.length > 18)) {
+                                                                newErrors.Bank_Account_Number__c = "Account number must be 9 to 18 digits.";
+                                                            } else {
+                                                                delete newErrors.Bank_Account_Number__c;
+                                                            }
+                                                            setBankFormData({ ...data, Bank_Account_Number__c: newAccNum });
+                                                            setBankErrors(newErrors);
+                                                        }} type="password" placeholder="Enter Account Number" error={bankErrors.Bank_Account_Number__c} required />
+                                                    </div>
                                                     <Field label="IFSC Code" value={bankFormData.IFSC__c} fieldKey="IFSC__c" isEditing={true} formData={bankFormData} setFormData={setBankFormData} placeholder="e.g. HDFC0001234" error={bankErrors.IFSC__c} required />
                                                 </div>
                                                 <div className="flex items-center gap-2 mb-4">
@@ -1958,31 +1990,48 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                     <h4 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
                                                         <FileText className="w-4 h-4 text-blue-500" /> Upload Passbook (Optional)
                                                     </h4>
-                                                    <label className="flex flex-col items-center justify-center gap-3 p-4 border-2 border-dashed border-blue-300 rounded-lg cursor-pointer hover:bg-blue-50/50 transition">
-                                                        <input
-                                                            ref={passbookFileInputRef}
-                                                            type="file"
-                                                            className="sr-only"
-                                                            accept=".pdf,.jpg,.jpeg,.png"
-                                                            disabled={customDocMutation.isPending}
-                                                            onChange={(e) => {
-                                                                const file = e.target.files?.[0]
-                                                                if (file) handlePassbookFileSelected(file)
-                                                                e.target.value = ''
-                                                            }}
-                                                        />
-                                                        {customDocMutation.isPending ? (
-                                                            <Spin size="small" />
-                                                        ) : (
-                                                            <>
-                                                                <Upload className="w-5 h-5 text-blue-600" />
-                                                                <div className="text-center">
-                                                                    <p className="text-xs font-medium text-slate-700">Click to upload</p>
-                                                                    <p className="text-[11px] text-slate-500 mt-0.5">PDF, JPG, PNG (max 5MB)</p>
+                                                    <div className="relative">
+                                                        <label className="flex flex-col items-center justify-center gap-3 p-4 border-2 border-dashed border-blue-300 rounded-lg cursor-pointer hover:bg-blue-50/50 transition">
+                                                            <input
+                                                                ref={passbookFileInputRef}
+                                                                type="file"
+                                                                className="sr-only"
+                                                                accept=".pdf,.jpg,.jpeg,.png"
+                                                                disabled={customDocMutation.isPending}
+                                                                onChange={(e) => {
+                                                                    const file = e.target.files?.[0]
+                                                                    if (file) handlePassbookFileSelected(file)
+                                                                    e.target.value = ''
+                                                                }}
+                                                            />
+                                                            {customDocMutation.isPending ? (
+                                                                <Spin size="small" />
+                                                            ) : passbookFile ? (
+                                                                <div className="text-center flex flex-col items-center gap-2">
+                                                                    <FileText className="w-6 h-6 text-green-500" />
+                                                                    <p className="text-sm font-medium text-slate-700 truncate max-w-[200px]">{passbookFile.name}</p>
+                                                                    <p className="text-xs text-green-600 font-medium">Ready to upload</p>
                                                                 </div>
-                                                            </>
+                                                            ) : (
+                                                                <>
+                                                                    <Upload className="w-5 h-5 text-blue-600" />
+                                                                    <div className="text-center">
+                                                                        <p className="text-xs font-medium text-slate-700">Click to upload</p>
+                                                                        <p className="text-[11px] text-slate-500 mt-0.5">PDF, JPG, PNG (max 5MB)</p>
+                                                                    </div>
+                                                                </>
+                                                            )}
+                                                        </label>
+                                                        {passbookFile && (
+                                                            <button 
+                                                                type="button"
+                                                                onClick={(e) => { e.preventDefault(); setPassbookFile(null); }}
+                                                                className="absolute top-2 right-2 bg-white rounded-full p-1 shadow-sm text-slate-400 hover:text-red-500 border border-slate-200"
+                                                            >
+                                                                <X className="w-3 h-3" />
+                                                            </button>
                                                         )}
-                                                    </label>
+                                                    </div>
                                                 </div>
 
                                                 <div className="flex justify-end gap-3 mt-4">

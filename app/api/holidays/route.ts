@@ -43,14 +43,14 @@ const fetchExistingHolidayDates = async (conn: any, excludeHolidayId?: string) =
 const fetchExistingHolidayNames = async (conn: any, year: string, excludeHolidayId?: string) => {
   const yearNum = parseInt(year, 10);
   const query = excludeHolidayId
-    ? `SELECT Id, Name, Year__c FROM Holidays_List__c WHERE Year__c = ${yearNum} AND Id != '${excludeHolidayId}'`
-    : `SELECT Id, Name, Year__c FROM Holidays_List__c WHERE Year__c = ${yearNum}`;
+    ? `SELECT Id, Holiday_Name__c, Year__c FROM Holidays_List__c WHERE Year__c = ${yearNum} AND Id != '${excludeHolidayId}'`
+    : `SELECT Id, Holiday_Name__c, Year__c FROM Holidays_List__c WHERE Year__c = ${yearNum}`;
 
   const holidayRecords = await conn.query<any>(query);
 
   return new Set(
     holidayRecords.records
-      .map((record: any) => record.Name)
+      .map((record: any) => record.Holiday_Name__c)
       .filter(Boolean)
       .map((name: string) => name.toLowerCase().trim())
   );
@@ -116,7 +116,7 @@ export async function GET(request: NextRequest) {
     const holidayRecords = await conn.query<any>(`
       SELECT 
         Id,
-        Name,
+        Holiday_Name__c,
         Date__c,
         Day__c,
         Year__c
@@ -126,7 +126,7 @@ export async function GET(request: NextRequest) {
 
     const holidays = holidayRecords.records.map((record: any) => ({
       id: record.Id,
-      name: record.Name,
+      name: record.Holiday_Name__c,
       date: record.Date__c,
       day: record.Day__c,
       year: record.Year__c ? String(record.Year__c) : new Date(record.Date__c).getFullYear().toString(),
@@ -256,23 +256,39 @@ export async function POST(request: NextRequest) {
 
       // Prepare bulk insert data
       const holidayRecords = holidays.map(h => ({
-        Name: h.name,
+        Name: `${h.name}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        Holiday_Name__c: h.name,
         Date__c: h.date,
         Day__c: h.day,
-        Year__c: h.year || new Date(h.date).getFullYear().toString(),
+        Year__c: parseInt(h.year || new Date(h.date).getFullYear().toString(), 10),
       }));
+
+      console.log("Creating holidays with records:", JSON.stringify(holidayRecords, null, 2));
 
       // Bulk create all holidays at once
       const results = await conn.sobject('Holidays_List__c').create(holidayRecords) as any[];
 
+      console.log("Salesforce create results:", JSON.stringify(results, null, 2));
+
       // Check for failures
       const failures = results.filter(r => !r.success);
       if (failures.length > 0) {
-        console.error("Failed to create some holidays:", failures);
+        console.error("Failed to create some holidays. Full details:", JSON.stringify(failures, null, 2));
+        const errorDetails = failures.map((f: any) => ({
+          success: f.success,
+          id: f.id,
+          errors: f.errors ? f.errors.map((e: any) => ({
+            message: e.message,
+            errorCode: e.errorCode,
+            fields: e.fields,
+          })) : f.error,
+        }));
+        console.error("Formatted error details:", JSON.stringify(errorDetails, null, 2));
         return NextResponse.json({ 
           error: "Failed to create some holidays",
           failures: failures.length,
-          total: results.length
+          total: results.length,
+          details: errorDetails
         }, { status: 500 });
       }
 
@@ -326,10 +342,11 @@ export async function POST(request: NextRequest) {
 
       // Create holiday record
       const result = await conn.sobject('Holidays_List__c').create({
-        Name: name,
+        Name: `${name}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        Holiday_Name__c: name,
         Date__c: date,
         Day__c: day,
-        Year__c: year || new Date(date).getFullYear().toString(),
+        Year__c: parseInt(year || new Date(date).getFullYear().toString(), 10),
       }) as any;
 
       if (!result.success) {
@@ -427,13 +444,16 @@ export async function PATCH(request: NextRequest) {
       Id: holidayId,
     };
 
-    if (name) updateData.Name = name;
+    if (name) {
+      updateData.Name = `${name}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      updateData.Holiday_Name__c = name;
+    }
     if (date) updateData.Date__c = date;
     if (day) updateData.Day__c = day;
     if (year) {
-      updateData.Year__c = year;
+      updateData.Year__c = parseInt(year, 10);
     } else if (date) {
-      updateData.Year__c = new Date(date).getFullYear().toString();
+      updateData.Year__c = parseInt(new Date(date).getFullYear().toString(), 10);
     }
 
     await conn.sobject('Holidays_List__c').update(updateData);

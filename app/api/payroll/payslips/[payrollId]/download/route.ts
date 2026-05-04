@@ -25,6 +25,9 @@ export async function GET(
       return NextResponse.json({ error: "Invalid session" }, { status: 401 })
     }
 
+    const userRole = payload.role || ""
+    const isPrivilegedUser = userRole === "Admin" || userRole === "HR"
+
     console.info("[API][PayslipDownload] Session verified", { payrollId, userEmail: payload.email, role: payload.role })
 
     const conn = await getSalesforceConnection()
@@ -38,9 +41,11 @@ export async function GET(
       SELECT 
         Id,
         Employee__c,
+        Employee__r.Employee_Email__c,
         Employee__r.Employee_Id__c,
         Employee__r.Employee_Name__c,
         Employee__r.Name,
+        Payroll_Summary__r.Status__c,
         Payroll_Summary__r.Payroll_Month__c,
         Payroll_Summary__r.Payroll_Year__c,
         Payroll_Month__c
@@ -55,6 +60,26 @@ export async function GET(
     }
 
     const payroll = payrollResult.records[0]
+    const payrollOwnerEmail = payroll.Employee__r?.Employee_Email__c || ""
+    const payrollSummaryStatus = String(payroll.Payroll_Summary__r?.Status__c || "").toLowerCase()
+
+    if (!isPrivilegedUser && payload.email !== payrollOwnerEmail) {
+      console.warn("[API][PayslipDownload] Forbidden - employee attempted download of another employee payslip", {
+        payrollId,
+        requester: payload.email,
+        owner: payrollOwnerEmail,
+      })
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
+
+    if (!isPrivilegedUser && payrollSummaryStatus !== "paid") {
+      console.warn("[API][PayslipDownload] Blocked - payroll not marked paid for employee download", {
+        payrollId,
+        summaryStatus: payroll.Payroll_Summary__r?.Status__c,
+      })
+      return NextResponse.json({ error: "Payslip is available only after payroll is marked as Paid" }, { status: 403 })
+    }
+
   const employeeId = payroll.Employee__r?.Employee_Id__c || payroll.Employee__r?.Name
     const employeeName = payroll.Employee__r?.Employee_Name__c || "Unknown"
     const payrollMonth = payroll.Payroll_Summary__r?.Payroll_Month__c || payroll.Payroll_Month__c
