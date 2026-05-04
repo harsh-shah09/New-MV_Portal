@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
 
     const employeeId = employeeResult.records[0].Id
 
-    // Fetch all payroll records for this employee
+    // Fetch payroll records that are released to employees (Paid summaries only)
     const payrollResult = await conn.query<any>(`
       SELECT 
         Id,
@@ -67,11 +67,13 @@ export async function GET(request: NextRequest) {
         Total_Additions__c,
         Total_Deductions__c,
         Net_Salary__c,
+        Payroll_Summary__r.Status__c,
         Payroll_Summary__r.Payroll_Month__c,
         Payroll_Summary__r.Payroll_Year__c,
         CreatedDate
       FROM Payroll__c
       WHERE Employee__c = '${employeeId}'
+      AND Payroll_Summary__r.Status__c = 'Paid'
       ORDER BY CreatedDate DESC
     `)
 
@@ -113,6 +115,7 @@ export async function GET(request: NextRequest) {
       totalAdditions: record.Total_Additions__c || 0,
       totalDeductions: record.Total_Deductions__c || 0,
       netSalary: record.Net_Salary__c || 0,
+      summaryStatus: record.Payroll_Summary__r?.Status__c || "",
       createdDate: record.CreatedDate,
     }))
 
