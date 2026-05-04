@@ -198,6 +198,14 @@ export async function createAsset(data: Partial<SalesforceAsset>) {
   const conn = await getSalesforceConnection();
   if (!conn) throw new Error("Salesforce connection failed");
 
+  if (data.AMS_Asset_Serial_Number__c) {
+      const query = `SELECT Id FROM MVC_Internal_Asset__c WHERE AMS_Asset_Serial_Number__c = '${data.AMS_Asset_Serial_Number__c}' LIMIT 1`;
+      const duplicateCheck = await conn.query(query);
+      if (duplicateCheck.records.length > 0) {
+          throw new Error("duplicate serial number: An asset with this serial number already exists.");
+      }
+  }
+
   const payload = {
     ...data,
     AMS_Status__c: 'Un-Assigned',

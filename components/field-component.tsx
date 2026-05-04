@@ -66,13 +66,14 @@ export const Field = ({
             {/* Country Code */}
             <input
               type="text"
-              value={formData[`${fieldKey}`].split(" ")[0] || ""}
-              onChange={(e) =>
+              value={formData[`${fieldKey}`]?.includes("-") ? formData[`${fieldKey}`].split("-")[0] : (formData[`${fieldKey}`]?.startsWith("+") ? formData[`${fieldKey}`].slice(0, 3) : "+91")}
+              onChange={(e) => {
+                const phonePart = formData[`${fieldKey}`]?.includes("-") ? formData[`${fieldKey}`].split("-").slice(1).join("-") : formData[`${fieldKey}`]?.replace(/^\+?\d{1,3}/, "") || "";
                 setFormData({
                   ...formData,
-                  [`${fieldKey}`]: e.target.value + " " + formData[fieldKey].split(" ")[1],
+                  [`${fieldKey}`]: e.target.value + "-" + phonePart,
                 })
-              }
+              }}
               placeholder="+91"
               className={cn(
                 "w-1/3 bg-slate-50 border rounded-lg px-3 py-2.5 text-sm",
@@ -83,8 +84,14 @@ export const Field = ({
             {/* Phone Number */}
             <input
               type="tel"
-              value={formData[fieldKey].split(" ")[1] || ""}
-              onChange={(e) => handleChange(e.target.value)}
+              value={formData[fieldKey]?.includes("-") ? formData[fieldKey].split("-").slice(1).join("-") : formData[fieldKey]?.replace(/^\+?\d{1,3}/, "") || ""}
+              onChange={(e) => {
+                const codePart = formData[`${fieldKey}`]?.includes("-") ? formData[`${fieldKey}`].split("-")[0] : (formData[`${fieldKey}`]?.startsWith("+") ? formData[`${fieldKey}`].slice(0, 3) : "+91");
+                setFormData({
+                  ...formData,
+                  [`${fieldKey}`]: codePart + "-" + e.target.value,
+                })
+              }}
               placeholder={placeholder || "Enter phone number"}
               className={cn(
                 "w-2/3 bg-slate-50 border rounded-lg px-3 py-2.5 text-sm",

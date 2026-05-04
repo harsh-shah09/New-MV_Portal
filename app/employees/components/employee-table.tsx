@@ -66,6 +66,7 @@ export function EmployeeTable({ employees, onEdit, onDelete, onView, loading, is
       title: 'Account Status',
       dataIndex: 'active',
       key: 'active',
+      align: 'right',
       render: (active) => {
         return active ? <Tag color='success' className="capitalize">Active</Tag> : <Tag color='error' className="capitalize">Inactive</Tag>
       }

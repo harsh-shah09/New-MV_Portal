@@ -11,6 +11,7 @@ import { Check, AlertCircle, Loader2, Trash2 } from "lucide-react"
 import ImgCrop from "antd-img-crop"
 import { getCountries, getCountryCallingCode, parsePhoneNumberFromString, AsYouType, CountryCode, getExampleNumber } from 'libphonenumber-js'
 import examples from 'libphonenumber-js/examples.mobile.json'
+import { Country, State, City } from "country-state-city"
 
 const regionNames = new Intl.DisplayNames(['en'], { type: 'region' });
 const dynamicCountryOptions = getCountries().map((country) => {
@@ -31,7 +32,7 @@ export interface OnboardingWizardProps {
 
 export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = false, step = 1 }: OnboardingWizardProps = {}) {
     const [open, setOpen] = useState(publicMode ? true : false)
-    const [currentStep, setCurrentStep] = useState(step)
+    const [currentStep, setCurrentStep] = useState(4)
     const [loading, setLoading] = useState(false)
     const [pageLoading, setPageLoading] = useState(true)
     const [form] = Form.useForm()
@@ -72,7 +73,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
             }
         }
 
-        const match = normalized.match(/^(\+\d{1,2})\s*(\d+)$/)
+        const match = value?.trim().match(/^(\+\d{1,3})[- ]?(\d+)$/)
         if (match) {
             return {
                 emergencyCountryCode: 'IN',
@@ -82,7 +83,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
 
         return {
             emergencyCountryCode: 'IN',
-            emergencyPhoneNumber: normalized.replace(/\D/g, '').slice(0, 10),
+            emergencyPhoneNumber: value?.replace(/\D/g, '').slice(0, 10) || '',
         }
     }
 
@@ -91,7 +92,9 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
         const number = phoneNumber?.trim() || ''
         if (!number) return ''
         const parsed = parsePhoneNumberFromString(number, isoCode)
-        return parsed ? parsed.number : `+${getCountryCallingCode(isoCode)}${number.replace(/\D/g, '')}`
+        const dialCode = `+${getCountryCallingCode(isoCode)}`
+        const formattedNumber = parsed ? parsed.nationalNumber : number.replace(/\D/g, '')
+        return `${dialCode}-${formattedNumber}`
     }
 
     const validateEmergencyPhone = (isoCode: string, value: string) => {
@@ -361,7 +364,13 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                     return;
                 }
                 if (profileFile) {
-                    if (profileFile.size > 1 * 1024 * 1024) {
+                    const isImage = profileFile.type.startsWith("image/");
+                    if (!isImage) {
+                        message.error("Only image files are allowed (JPG, PNG, etc.)");
+                        setLoading(false);
+                        return;
+                    }
+                    if (profileFile.size > 1.2 * 1024 * 1024) {
                         message.error("File size exceeds 1MB limit.")
                         setLoading(false)
                         return
@@ -389,20 +398,12 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                     const values = await form.validateFields();
 
                     // Custom validation that can't be done via rules
-                    const cityPattern = /^[a-zA-Z\s-]*$/;
-                    const statePattern = /^[a-zA-Z\s-]*$/;
                     const postalPattern = /^[0-9]{5,10}$/;
                     const namePattern = /^[a-zA-Z\s-]*$/;
 
                     const customErrors: Record<string, string> = {};
 
                     // Validate current address
-                    if (values.city && !cityPattern.test(values.city)) {
-                        customErrors.city = 'City cannot contain numbers or special characters';
-                    }
-                    if (values.state && !statePattern.test(values.state)) {
-                        customErrors.state = 'State cannot contain numbers or special characters';
-                    }
                     if (values.postalCode && !postalPattern.test(values.postalCode)) {
                         customErrors.postalCode = 'Postal code should contain 5-10 digits';
                     }
@@ -412,12 +413,6 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
 
                     // Validate permanent address if not same as current
                     if (!values.sameAsCurrent) {
-                        if (values.permanentcity && !cityPattern.test(values.permanentcity)) {
-                            customErrors.permanentcity = 'City cannot contain numbers or special characters';
-                        }
-                        if (values.permanentstate && !statePattern.test(values.permanentstate)) {
-                            customErrors.permanentstate = 'State cannot contain numbers or special characters';
-                        }
                         if (values.permanentpostalCode && !postalPattern.test(values.permanentpostalCode)) {
                             customErrors.permanentpostalCode = 'Postal code should contain 5-10 digits';
                         }
@@ -659,7 +654,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
             })
             if (!res.ok) throw new Error('Upload Failed')
             onSuccess("Ok")
-            setExistingDocuments(prev => [...prev, { Document_Type__c: doc }])
+            setExistingDocuments(prev => [...prev, { Document_Type__c: doc, FileName: file.name }])
             message.success('Uploaded successfully')
         } catch (err) {
             onError({ err })
@@ -722,14 +717,19 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
             message.error(e.message || "Failed to complete onboarding.")
         }
     }
-
+    const formatFileSize = (size?: number) => {
+        if (!size) return '';
+        const kb = size / 1024;
+        if (kb < 1024) return `${kb.toFixed(1)} KB`;
+        return `${(kb / 1024).toFixed(2)} MB`;
+    };
     const renderStepContent = (step: number) => {
         switch (step) {
             case 1:
                 return (
                     <div className="py-8 text-center flex flex-col items-center">
                         <p className="mb-6 text-gray-500">Upload a professional profile picture.</p>
-                        <ImgCrop rotationSlider cropShape="round" showGrid aspect={1}>
+                        <ImgCrop rotationSlider cropShape="round" showGrid aspect={1} quality={0.6} modalTitle="Crop Image">
                             <Upload
                                 listType="picture-circle"
                                 showUploadList={false}
@@ -775,28 +775,70 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                             <Input placeholder="123 Main St" disabled={disabledsteps.includes(2)} />
                         </Form.Item>
                         <div className="grid grid-cols-2 gap-4">
-                            <Form.Item 
-                                name="city" 
-                                label="City" 
-                                rules={[
-                                    { required: true, message: 'City is required' },
-                                    { pattern: /^[a-zA-Z\s-]*$/, message: 'City cannot contain numbers or special characters' }
-                                ]}
-                            >
-                                <Input disabled={disabledsteps.includes(2)} />
+                            <Form.Item name="country" label="Country" rules={[{ required: true, message: 'Country is required' }]}>
+                                <Select
+                                    showSearch
+                                    placeholder="Select country"
+                                    options={Country.getAllCountries().map(country => ({ label: country.name, value: country.name }))}
+                                    optionFilterProp="label"
+                                    disabled={disabledsteps.includes(2)}
+                                    onChange={(val) => {
+                                        form.setFieldsValue({ state: undefined, city: undefined });
+                                        const code = dynamicCountryOptions.find(c => c.name === val)?.value;
+                                        if (code) form.setFieldValue('emergencyCountryCode', code);
+                                        form.setFieldValue('emergencyPhoneNumber', ''); // clear mismatch
+                                    }}
+                                />
                             </Form.Item>
-                            <Form.Item 
-                                name="state" 
-                                label="State" 
-                                rules={[
-                                    { required: true, message: 'State is required' },
-                                    { pattern: /^[a-zA-Z\s-]*$/, message: 'State cannot contain numbers or special characters' }
-                                ]}
-                            >
-                                <Input disabled={disabledsteps.includes(2)} />
+                            <Form.Item noStyle shouldUpdate={(prev, curr) => prev.country !== curr.country}>
+                                {({ getFieldValue }) => {
+                                    const countryVal = getFieldValue('country');
+                                    const countryCode = Country.getAllCountries().find(c => c.name === countryVal)?.isoCode;
+                                    const states = countryCode ? State.getStatesOfCountry(countryCode) : [];
+                                    return (
+                                        <Form.Item 
+                                            name="state" 
+                                            label="State" 
+                                            rules={[{ required: true, message: 'State is required' }]}
+                                        >
+                                            <Select
+                                                showSearch
+                                                placeholder="Select state"
+                                                options={states.map(s => ({ label: s.name, value: s.name }))}
+                                                optionFilterProp="label"
+                                                disabled={disabledsteps.includes(2) || !countryVal}
+                                                onChange={() => form.setFieldValue('city', undefined)}
+                                            />
+                                        </Form.Item>
+                                    );
+                                }}
                             </Form.Item>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
+                            <Form.Item noStyle shouldUpdate={(prev, curr) => prev.country !== curr.country || prev.state !== curr.state}>
+                                {({ getFieldValue }) => {
+                                    const countryVal = getFieldValue('country');
+                                    const stateVal = getFieldValue('state');
+                                    const countryCode = Country.getAllCountries().find(c => c.name === countryVal)?.isoCode;
+                                    const stateCode = State.getStatesOfCountry(countryCode || '').find(s => s.name === stateVal)?.isoCode;
+                                    const cities = (countryCode && stateCode) ? City.getCitiesOfState(countryCode, stateCode) : [];
+                                    return (
+                                        <Form.Item 
+                                            name="city" 
+                                            label="City" 
+                                            rules={[{ required: true, message: 'City is required' }]}
+                                        >
+                                            <Select
+                                                showSearch
+                                                placeholder="Select city"
+                                                options={cities.map(c => ({ label: c.name, value: c.name }))}
+                                                optionFilterProp="label"
+                                                disabled={disabledsteps.includes(2) || !stateVal}
+                                            />
+                                        </Form.Item>
+                                    );
+                                }}
+                            </Form.Item>
                             <Form.Item 
                                 name="postalCode" 
                                 label="Postal Code" 
@@ -810,20 +852,6 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                     onChange={(e) => {
                                         const onlyDigits = e.target.value.replace(/\D/g, '').slice(0, 10);
                                         form.setFieldValue('postalCode', onlyDigits);
-                                    }}
-                                />
-                            </Form.Item>
-                            <Form.Item name="country" label="Country" rules={[{ required: true, message: 'Country is required' }]}>
-                                <Select
-                                    showSearch
-                                    placeholder="Select country"
-                                    options={dynamicCountryOptions.map(country => ({ label: country.name, value: country.name }))}
-                                    optionFilterProp="label"
-                                    disabled={disabledsteps.includes(2)}
-                                    onChange={(val) => {
-                                        const code = dynamicCountryOptions.find(c => c.name === val)?.value;
-                                        if (code) form.setFieldValue('emergencyCountryCode', code);
-                                        form.setFieldValue('emergencyPhoneNumber', ''); // clear mismatch
                                     }}
                                 />
                             </Form.Item>
@@ -852,29 +880,68 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                         </Form.Item>
 
                                         <div className="grid grid-cols-2 gap-4">
-                                            <Form.Item 
-                                                name="permanentcity" 
-                                                label="City" 
-                                                rules={[
-                                                    { required: true, message: 'City is required' },
-                                                    { pattern: /^[a-zA-Z\s-]*$/, message: 'City cannot contain numbers or special characters' }
-                                                ]}
-                                            >
-                                                <Input disabled={disabledsteps.includes(2)} />
+                                            <Form.Item name="permanentcountry" label="Country" rules={[{ required: true, message: 'Country is required' }]}>
+                                                <Select
+                                                    showSearch
+                                                    placeholder="Select country"
+                                                    options={Country.getAllCountries().map(country => ({ label: country.name, value: country.name }))}
+                                                    optionFilterProp="label"
+                                                    disabled={disabledsteps.includes(2)}
+                                                    onChange={() => {
+                                                        form.setFieldsValue({ permanentstate: undefined, permanentcity: undefined });
+                                                    }}
+                                                />
                                             </Form.Item>
-                                            <Form.Item 
-                                                name="permanentstate" 
-                                                label="State" 
-                                                rules={[
-                                                    { required: true, message: 'State is required' },
-                                                    { pattern: /^[a-zA-Z\s-]*$/, message: 'State cannot contain numbers or special characters' }
-                                                ]}
-                                            >
-                                                <Input disabled={disabledsteps.includes(2)} />
+                                            <Form.Item noStyle shouldUpdate={(prev, curr) => prev.permanentcountry !== curr.permanentcountry}>
+                                                {({ getFieldValue }) => {
+                                                    const countryVal = getFieldValue('permanentcountry');
+                                                    const countryCode = Country.getAllCountries().find(c => c.name === countryVal)?.isoCode;
+                                                    const states = countryCode ? State.getStatesOfCountry(countryCode) : [];
+                                                    return (
+                                                        <Form.Item 
+                                                            name="permanentstate" 
+                                                            label="State" 
+                                                            rules={[{ required: true, message: 'State is required' }]}
+                                                        >
+                                                            <Select
+                                                                showSearch
+                                                                placeholder="Select state"
+                                                                options={states.map(s => ({ label: s.name, value: s.name }))}
+                                                                optionFilterProp="label"
+                                                                disabled={disabledsteps.includes(2) || !countryVal}
+                                                                onChange={() => form.setFieldValue('permanentcity', undefined)}
+                                                            />
+                                                        </Form.Item>
+                                                    );
+                                                }}
                                             </Form.Item>
                                         </div>
 
                                         <div className="grid grid-cols-2 gap-4">
+                                            <Form.Item noStyle shouldUpdate={(prev, curr) => prev.permanentcountry !== curr.permanentcountry || prev.permanentstate !== curr.permanentstate}>
+                                                {({ getFieldValue }) => {
+                                                    const countryVal = getFieldValue('permanentcountry');
+                                                    const stateVal = getFieldValue('permanentstate');
+                                                    const countryCode = Country.getAllCountries().find(c => c.name === countryVal)?.isoCode;
+                                                    const stateCode = State.getStatesOfCountry(countryCode || '').find(s => s.name === stateVal)?.isoCode;
+                                                    const cities = (countryCode && stateCode) ? City.getCitiesOfState(countryCode, stateCode) : [];
+                                                    return (
+                                                        <Form.Item 
+                                                            name="permanentcity" 
+                                                            label="City" 
+                                                            rules={[{ required: true, message: 'City is required' }]}
+                                                        >
+                                                            <Select
+                                                                showSearch
+                                                                placeholder="Select city"
+                                                                options={cities.map(c => ({ label: c.name, value: c.name }))}
+                                                                optionFilterProp="label"
+                                                                disabled={disabledsteps.includes(2) || !stateVal}
+                                                            />
+                                                        </Form.Item>
+                                                    );
+                                                }}
+                                            </Form.Item>
                                             <Form.Item 
                                                 name="permanentpostalCode" 
                                                 label="Postal Code" 
@@ -889,15 +956,6 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                                         const onlyDigits = e.target.value.replace(/\D/g, '').slice(0, 10);
                                                         form.setFieldValue('permanentpostalCode', onlyDigits);
                                                     }}
-                                                />
-                                            </Form.Item>
-                                            <Form.Item name="permanentcountry" label="Country" rules={[{ required: true, message: 'Country is required' }]}>
-                                                <Select
-                                                    showSearch
-                                                    placeholder="Select country"
-                                                    options={dynamicCountryOptions.map(country => ({ label: country.name, value: country.name }))}
-                                                    optionFilterProp="label"
-                                                    disabled={disabledsteps.includes(2)}
                                                 />
                                             </Form.Item>
                                         </div>
@@ -1186,7 +1244,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                     {passbookUploading
                                         ? 'Uploading…'
                                         : passbookUploaded
-                                            ? 'Passbook uploaded ✓'
+                                            ? `${passbookFile?.name || 'Passbook'} uploaded ✓`
                                             : 'Click or drag passbook / bank statement'}
                                 </p>
                                 <p className="text-xs text-gray-400 mt-1">
@@ -1235,7 +1293,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                                     {isUploaded ? <CheckCircleFilled className="text-xl text-green-500" /> : <UploadOutlined className="text-xl text-blue-500" />}
                                                 </p>
                                                 <p className="text-xs text-gray-500">
-                                                    {isUploaded ? 'Document Uploaded' : 'Click or drag file'}
+                                                    {isUploaded ? (existingDocuments.find(d => d.Document_Type__c === doc)?.FileName || 'Document Uploaded') : 'Click or drag file'}
                                                 </p>
                                             </Upload.Dragger>
                                         </Card>
@@ -1407,7 +1465,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                 <p className="text-gray-500 font-medium">Loading your details...</p>
                             </div>
                         ) : (
-                            <Form form={form} layout="vertical" initialValues={{ emergencyCountryCode: '+91' }}>
+                            <Form form={form} layout="vertical" initialValues={{ emergencyCountryCode: 'IN' }}>
                                 <AnimatePresence mode="wait">
                                     {currentStep <= stepItems.length ? (
                                         <motion.div
