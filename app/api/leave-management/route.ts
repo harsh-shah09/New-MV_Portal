@@ -232,6 +232,45 @@ function isHalfDaySessionRange(
     && (startSession === "Session-1" || startSession === "Session-2");
 }
 
+function getCalendarEventRange(
+  startDate: dayjs.Dayjs,
+  endDate: dayjs.Dayjs,
+  startSession?: string,
+  endSession?: string
+): { startDate: string; endDate: string } | null {
+  if (!startDate.isValid() || !endDate.isValid()) {
+    return null;
+  }
+
+  const isSameDay = startDate.isSame(endDate, "day");
+  const isHalfDay = isHalfDaySessionRange(startSession, endSession, startDate, endDate);
+  if (isHalfDay) {
+    return null;
+  }
+
+  let eventStart = startDate.clone();
+  let eventEnd = endDate.clone();
+
+  if (!isSameDay) {
+    if (startSession && startSession !== "Session-1") {
+      eventStart = eventStart.add(1, "day");
+    }
+
+    if (endSession && endSession !== "Session-2") {
+      eventEnd = eventEnd.subtract(1, "day");
+    }
+  }
+
+  if (eventEnd.isBefore(eventStart, "day")) {
+    return null;
+  }
+
+  return {
+    startDate: eventStart.format("YYYY-MM-DD"),
+    endDate: eventEnd.format("YYYY-MM-DD"),
+  };
+}
+
 function logLeaveEmailDispatch(stage: string, to: string, cc?: string | string[], subject?: string): void {
   const ccList = Array.isArray(cc) ? cc.filter(Boolean) : cc ? [cc] : [];
   console.log('📧 [Leave Email Debug]', {
@@ -986,16 +1025,25 @@ export async function POST(request: NextRequest) {
       // Keep leave summary/balance in sync for direct-approved apply-for-others flow
       await updateLeaveBalance(conn, approvedLeaveRecord, 'approve');
 
-      const createdEventId = await createLeaveCalendarEventForEmployee({
-        employeeId: targetEmployeeId,
-        employeeName: targetEmployee.Employee_Name__c || 'Employee',
-        leaveType,
-        leaveCategory: approvedLeaveRecord.Leave_Category__c,
-        startDate: parsedStart.format('YYYY-MM-DD'),
-        endDate: parsedEnd.format('YYYY-MM-DD'),
-        reason: reason || `Applied by ${approverTitle}`,
-        approvedBy: approverTitle,
-      });
+      const calendarRange = getCalendarEventRange(
+        parsedStart,
+        parsedEnd,
+        approvedLeaveRecord.Session_Start__c,
+        approvedLeaveRecord.Session_End__c
+      );
+
+      const createdEventId = calendarRange
+        ? await createLeaveCalendarEventForEmployee({
+            employeeId: targetEmployeeId,
+            employeeName: targetEmployee.Employee_Name__c || 'Employee',
+            leaveType,
+            leaveCategory: approvedLeaveRecord.Leave_Category__c,
+            startDate: calendarRange.startDate,
+            endDate: calendarRange.endDate,
+            reason: reason || `Applied by ${approverTitle}`,
+            approvedBy: approverTitle,
+          })
+        : null;
 
       console.log('📅 [Leave] applyForOthers calendar creation result:', {
         leaveId: createResult.id,
@@ -1742,15 +1790,24 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      const createdEventId = await createLeaveCalendarEventForEmployee({
-        employeeId,
-        leaveType: leaveRecord.Leave_Type__c || leaveRecord.Leave_Category__c || 'Leave',
-        leaveCategory: leaveRecord.Leave_Category__c,
-        startDate: saveStartDate,
-        endDate: saveEndDate,
-        reason: leaveRecord.Reason__c,
-        approvedBy: 'Admin',
-      });
+      const calendarRange = getCalendarEventRange(
+        start,
+        end,
+        sessionStartValue,
+        sessionEndValue
+      );
+
+      const createdEventId = calendarRange
+        ? await createLeaveCalendarEventForEmployee({
+            employeeId,
+            leaveType: leaveRecord.Leave_Type__c || leaveRecord.Leave_Category__c || 'Leave',
+            leaveCategory: leaveRecord.Leave_Category__c,
+            startDate: calendarRange.startDate,
+            endDate: calendarRange.endDate,
+            reason: leaveRecord.Reason__c,
+            approvedBy: 'Admin',
+          })
+        : null;
 
       await persistLeaveEventId(conn, savedLeaveId, createdEventId || null, 'admin-auto-approval');
     }
@@ -2459,15 +2516,24 @@ export async function PATCH(request: NextRequest) {
 
       if (leavesToRecreateEvents.length > 0) {
         for (const leaveSlice of leavesToRecreateEvents) {
-          const recreatedEventId = await createLeaveCalendarEventForEmployee({
-            employeeId: leave.Employee__c,
-            leaveType: leave.Leave_Type__c || leave.Leave_Category__c || 'Leave',
-            leaveCategory: leave.Leave_Category__c,
-            startDate: leaveSlice.startDate,
-            endDate: leaveSlice.endDate,
-            reason: leave.Reason__c,
-            approvedBy: isAdmin ? 'Admin' : 'HR',
-          });
+          const calendarRange = getCalendarEventRange(
+            dayjs(leaveSlice.startDate),
+            dayjs(leaveSlice.endDate),
+            leave.Session_Start__c,
+            leave.Session_End__c
+          );
+
+          const recreatedEventId = calendarRange
+            ? await createLeaveCalendarEventForEmployee({
+                employeeId: leave.Employee__c,
+                leaveType: leave.Leave_Type__c || leave.Leave_Category__c || 'Leave',
+                leaveCategory: leave.Leave_Category__c,
+                startDate: calendarRange.startDate,
+                endDate: calendarRange.endDate,
+                reason: leave.Reason__c,
+                approvedBy: isAdmin ? 'Admin' : 'HR',
+              })
+            : null;
 
           console.log('📅 [Leave] withdrawal calendar recreation result:', {
             leaveId: leaveSlice.leaveId,
@@ -2924,15 +2990,24 @@ export async function PATCH(request: NextRequest) {
             // HR or Admin just approved - send email to employee
             const approverTitle = isAdmin ? 'Admin' : 'HR';
 
-            const createdEventId = await createLeaveCalendarEventForEmployee({
-              employeeId: oldLeave.Employee__c,
-              employeeName,
-              leaveType: oldLeave.Leave_Type__c || oldLeave.Leave_Category__c || 'Leave',
-              leaveCategory: oldLeave.Leave_Category__c,
-              startDate: oldLeave.Start_Date__c,
-              endDate: oldLeave.End_Date__c,
-              approvedBy: approverTitle,
-            });
+            const calendarRange = getCalendarEventRange(
+              dayjs(oldLeave.Start_Date__c),
+              dayjs(oldLeave.End_Date__c),
+              oldLeave.Session_Start__c,
+              oldLeave.Session_End__c
+            );
+
+            const createdEventId = calendarRange
+              ? await createLeaveCalendarEventForEmployee({
+                  employeeId: oldLeave.Employee__c,
+                  employeeName,
+                  leaveType: oldLeave.Leave_Type__c || oldLeave.Leave_Category__c || 'Leave',
+                  leaveCategory: oldLeave.Leave_Category__c,
+                  startDate: calendarRange.startDate,
+                  endDate: calendarRange.endDate,
+                  approvedBy: approverTitle,
+                })
+              : null;
 
             console.log('📅 [Leave] final approval calendar creation result:', {
               leaveId: oldLeave.Id,
