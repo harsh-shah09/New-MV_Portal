@@ -733,6 +733,10 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                     <div className="py-8 text-center flex flex-col items-center">
                         <p className="mb-6 text-gray-500">Upload a professional profile picture.</p>
                         <ImgCrop rotationSlider cropShape="round" showGrid aspect={1} quality={0.6} modalTitle="Crop Image" beforeCrop={(file)=>{
+                            if(!file.type.includes('image/')) {
+                                showToast.error('Only image files are allowed')
+                                return false
+                            }
                             if(file.size > 1.1*1024*1024) {
                                 showToast.error('File size should be less than 1MB')
 
@@ -745,7 +749,10 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                 showUploadList={false}
                                 beforeUpload={(file) => {
                                     console.log(file.size)
-                                    if(file.size > 1.5*1024*1024) {
+                                    if(file.size > 1.1*1024*1024) {
+                                        return false
+                                    }
+                                    if(!file.type.includes('image/')) {
                                         return false
                                     }
                                     setProfileFile(file)
@@ -785,7 +792,10 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                 return (
                     <div className="py-4">
                         <p className="mb-4 text-gray-500">Current Address</p>
-                        <Form.Item name="street" label="Street Address" rules={[{ required: true, message: 'Street address is required' }]}>
+                        <Form.Item name="street" label="Street Address" rules={[{ required: true, message: 'Street address is required' } , {pattern: /^[A-Za-z]*$/, message: 'Street address should contain only alphabets'} ,
+                            { max: 100, message: 'Street address should not exceed 100 characters'} ,
+                            { min: 2, message: 'Street address should be at least 2 characters long'}
+                        ]}>
                             <Input placeholder="123 Main St" disabled={disabledsteps.includes(2)} />
                         </Form.Item>
                         <div className="grid grid-cols-2 gap-4">
@@ -984,10 +994,13 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                             label="Emergency Contact Name" 
                             rules={[
                                 { required: true, message: 'Emergency contact name is required' },
-                                { pattern: /^[a-zA-Z\s-]*$/, message: 'Name cannot contain numbers or special characters' }
+                                { pattern: /^[a-zA-Z\s-]*$/, message: 'Name cannot contain numbers or special characters' },
+                                { max:100, message: 'Emergency contact name cannot exceed 100 characters' },
+                                { min:3, message: 'Emergency contact name cannot be less than 3 characters' },
                             ]}
+                            
                         >
-                            <Input disabled={disabledsteps.includes(2)} />
+                            <Input disabled={disabledsteps.includes(2)} placeholder="Enter emergency contact name" />
                         </Form.Item>
                         <div className="grid grid-cols-1 sm:grid-cols-[300px_minmax(500px,_1fr)] sm:gap-4">
                             <Form.Item
@@ -1113,7 +1126,10 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                 { required: true, message: 'Bank name is required' },
                                 { min: 2, message: 'Bank name must be at least 2 characters' },
                                 { max: 50, message: 'Bank name must not exceed 50 characters' },
-                                { pattern: /^[a-zA-Z\s.&-]+$/, message: 'Bank name can only contain letters, spaces, hyphens, ampersands and periods' }
+                                { 
+                                    pattern: /^[a-zA-Z\s]+$/, 
+                                    message: 'Bank name can only contain letters.' 
+                                  }
                             ]}
                         >
                             <Input
