@@ -254,7 +254,11 @@ export default function HandbookClient({ role, userId }: HandbookClientProps) {
                 <Form onFinish={handleUpload} layout="vertical" className="pt-4">
                     <Form.Item name="name" label="Document Name" rules={[
                         { required: true, message: 'Please enter a name' },
-                        { max: 50, message: 'Document name must be 50 characters or less' }
+                        { max: 50, message: 'Document name must be 50 characters or less' },
+                        {
+                            pattern: /^[a-zA-Z0-9 ]*$/,
+                            message: 'No Special characters are allowed',
+                        },
                     ]}>
                         <Input placeholder="e.g. Employee Handbook 2024" size="large" disabled={uploadMutation.status === 'pending'} maxLength={50} showCount />
                     </Form.Item>

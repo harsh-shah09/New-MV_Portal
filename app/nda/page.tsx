@@ -25,7 +25,7 @@ function extractTemplateKeys(html: string): string[] {
     return [...new Set(matches.map(m => m[1].trim()))];
 }
 
-/** Make a human-readable label from a key like "Register_No" → "Register No" */
+/** Make a human-readable label from a key like "Register_Number" → "Register_Number" */
 function toLabel(key: string): string {
     return key.replace(/_/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2');
 }
@@ -174,7 +174,7 @@ export default function NDAPage() {
                 const regex = new RegExp(`{{${key}}}`, 'g');
                 html = html.replace(regex, value || `<span style="color:red; background:#fee; padding: 0 4px; border-radius: 4px;">[${key} Missing]</span>`);
             }
-            replace('Register_No', manualValues.Register_No)
+            replace('Register_Number', manualValues.Register_Number)
             replace('FirstName', contact.Employee_Name__c?.split(' ')[0]);
             replace('LastName', contact.Employee_Name__c?.split(' ').slice(1).join(' '));
             replace('Employee_Name__c' , emp.Employee_Name__c);

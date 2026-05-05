@@ -43,7 +43,7 @@ export function Sidebar({
   const [isMobile, setIsMobile] = useState(false)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
 
-  const { data: user } = useQuery({
+  const { data: user, isLoading: isUserLoading } = useQuery({
     queryKey: ['me'],
     queryFn: async () => {
       const res = await fetch('/api/me');
@@ -178,49 +178,58 @@ export function Sidebar({
         <div className="mb-2 px-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">
           Main Menu
         </div>
-        {navItems.map((item) => {
-          const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`)
-          // derive tour key: "/my-payrolls" → "my-payrolls"
-          const tourKey = item.href.replace(/^\//, '')
+        {isUserLoading ? (
+          Array.from({ length: 7 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-3 px-3 py-2.5 rounded-xl animate-pulse mb-1">
+              <div className="w-5 h-5 rounded bg-slate-200/60"></div>
+              <div className="h-4 w-32 bg-slate-200/60 rounded"></div>
+            </div>
+          ))
+        ) : (
+          navItems.map((item) => {
+            const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`)
+            // derive tour key: "/my-payrolls" → "my-payrolls"
+            const tourKey = item.href.replace(/^\//, '')
 
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={() => isMobile && setOpen?.(false)}
-              data-tour={tourKey}
-              className="block"
-            >
-              <div
-                className={cn(
-                  "group relative flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-300",
-                  isActive
-                    ? "text-white shadow-md shadow-blue-500/15"
-                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/80"
-                )}
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => isMobile && setOpen?.(false)}
+                data-tour={tourKey}
+                className="block"
               >
-                {isActive && (
-                  <motion.div
-                    layoutId="active-pill"
-                    className="absolute inset-0 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-xl -z-10"
-                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                  />
-                )}
-                <item.icon className={cn("w-5 h-5", isActive ? "text-white" : "text-slate-500 group-hover:text-cyan-600 transition-colors")} />
-                <span className="font-medium">{item.label}</span>
-                {isActive && (
-                  <motion.div
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    className="ml-auto"
-                  >
-                    <ChevronRight className="w-4 h-4 text-white/80" />
-                  </motion.div>
-                )}
-              </div>
-            </Link>
-          )
-        })}
+                <div
+                  className={cn(
+                    "group relative flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-300",
+                    isActive
+                      ? "text-white shadow-md shadow-blue-500/15"
+                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/80"
+                  )}
+                >
+                  {isActive && (
+                    <motion.div
+                      layoutId="active-pill"
+                      className="absolute inset-0 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-xl -z-10"
+                      transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                    />
+                  )}
+                  <item.icon className={cn("w-5 h-5", isActive ? "text-white" : "text-slate-500 group-hover:text-cyan-600 transition-colors")} />
+                  <span className="font-medium">{item.label}</span>
+                  {isActive && (
+                    <motion.div
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      className="ml-auto"
+                    >
+                      <ChevronRight className="w-4 h-4 text-white/80" />
+                    </motion.div>
+                  )}
+                </div>
+              </Link>
+            )
+          })
+        )}
       </div>
 
       {/* Notifications & Profile */}
@@ -247,8 +256,18 @@ export function Sidebar({
         </div>
 
         {/* Profile Card */}
-        <div
-          data-tour="profile-card"
+        {isUserLoading ? (
+          <div className="flex items-center gap-3 p-3 rounded-xl bg-white border border-slate-100 shadow-sm animate-pulse">
+            <div className="h-10 w-10 shrink-0 rounded-full bg-slate-200/60"></div>
+            <div className="flex-1 min-w-0 space-y-2">
+              <div className="h-4 w-24 bg-slate-200/60 rounded"></div>
+              <div className="h-3 w-16 bg-slate-200/60 rounded"></div>
+            </div>
+            <div className="h-6 w-6 rounded-md bg-slate-200/60 ml-auto"></div>
+          </div>
+        ) : (
+          <div
+            data-tour="profile-card"
           onClick={handleProfileClick}
           className="flex items-center gap-3 p-3 rounded-xl bg-white border border-slate-100 shadow-sm hover:shadow-md transition-all group cursor-pointer relative"
         >
@@ -292,6 +311,7 @@ export function Sidebar({
             </button>
           </div>
         </div>
+        )}
       </div>
       <LogoutConfirmModal 
         open={showLogoutConfirm} 
