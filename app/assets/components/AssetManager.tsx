@@ -68,6 +68,7 @@ export function AssetManager({ initialAssets }: AssetManagerProps) {
   const handleManageAssignment = async (asset: SalesforceAsset) => {
     setSelectedAsset(asset);
     try {
+      setIsModalVisible(true);
       const details = await getAssetById(asset.Id);
       if (details && details.history) {
         const active = details.history.find(h => !h.AMS_Returned_Date__c);
@@ -75,9 +76,9 @@ export function AssetManager({ initialAssets }: AssetManagerProps) {
       } else {
         setCurrentAssignment(null);
       }
-      setIsModalVisible(true);
     } catch (e) {
       showToast.error("Failed to fetch assignment details");
+      setIsModalVisible(false);
     }
   };
 

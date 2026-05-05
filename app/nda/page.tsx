@@ -300,6 +300,7 @@ export default function NDAPage() {
             setSelectedTemplateFile(null);
             setDynamicManualKeys([])
             setLoadingTemplate(false);
+            setIsFullscreen(false);
         }
     }
 
@@ -629,6 +630,13 @@ export default function NDAPage() {
                                                     >
                                                         {isFullscreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
                                                     </button>
+                                                    <button
+                                                        onClick={handleDownload}
+                                                        className="p-2.5 bg-white/80 backdrop-blur-md rounded-xl shadow-lg border border-slate-200 hover:bg-slate-50 transition-all text-slate-600 hover:text-blue-600 hover:scale-105"
+                                                        title="Download NDA"
+                                                    >
+                                                        {loadingTemplate ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
+                                                    </button>
                                                 </div>
 
                                                 {previewContent ? (
@@ -650,7 +658,7 @@ export default function NDAPage() {
                                             </div>
                                             
                                             {/* Download Button visible dynamically in Full Screen */}
-                                            {isFullscreen && (
+                                            {/* {isFullscreen && (
                                                 <div className="fixed bottom-8 left-1/2 -translate-x-1/2 shadow-2xl rounded-2xl z-[110] animate-in slide-in-from-bottom-8">
                                                     <Button
                                                         type="primary"
@@ -664,7 +672,7 @@ export default function NDAPage() {
                                                         {loadingTemplate ? 'Generating PDF...' : 'Download PDF'}
                                                     </Button>
                                                 </div>
-                                            )}
+                                            )} */}
                                         </div>
                                     </div>
                                 )

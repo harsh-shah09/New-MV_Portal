@@ -12,6 +12,7 @@ import ImgCrop from "antd-img-crop"
 import { getCountries, getCountryCallingCode, parsePhoneNumberFromString, AsYouType, CountryCode, getExampleNumber } from 'libphonenumber-js'
 import examples from 'libphonenumber-js/examples.mobile.json'
 import { Country, State, City } from "country-state-city"
+import { showToast } from "@/app/assets/components/toast"
 
 const regionNames = new Intl.DisplayNames(['en'], { type: 'region' });
 const dynamicCountryOptions = getCountries().map((country) => {
@@ -324,7 +325,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
     const handlePassbookUpload = async (file: File) => {
         if (!file) return
         if (file.size > 5 * 1024 * 1024) {
-            message.error("File size exceeds 5MB limit.")
+            showToast.error("File size exceeds 5MB limit.")
             return
         }
         setPassbookUploading(true)
@@ -340,9 +341,9 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
             })
             if (!res.ok) throw new Error('Upload Failed')
             setPassbookUploaded(true)
-            message.success(`${file.name} uploaded successfully`)
+            showToast.success(`${file.name} uploaded successfully`)
         } catch (err) {
-            message.error(`${file.name} upload failed`)
+            showToast.error(`${file.name} upload failed`)
         } finally {
             setPassbookUploading(false)
         }
@@ -359,21 +360,16 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
 
             if (currentStep === 1) {
                 if (!profileFile && !existingProfilePhoto) {
-                    message.error("Please upload a profile picture to proceed.");
+                    showToast.error("Please upload a profile picture to proceed.");
                     setLoading(false);
                     return;
                 }
                 if (profileFile) {
                     const isImage = profileFile.type.startsWith("image/");
                     if (!isImage) {
-                        message.error("Only image files are allowed (JPG, PNG, etc.)");
+                        showToast.error("Only image files are allowed (JPG, PNG, etc.)");
                         setLoading(false);
                         return;
-                    }
-                    if (profileFile.size > 1.2 * 1024 * 1024) {
-                        message.error("File size exceeds 1MB limit.")
-                        setLoading(false)
-                        return
                     }
                     const formData = new FormData()
                     formData.append('file', profileFile)
@@ -436,20 +432,20 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                 errors: [error],
                             }))
                         );
-                        message.error("Please fix all validation errors before proceeding.");
+                        showToast.error("Please fix all validation errors before proceeding.");
                         setLoading(false);
                         return;
                     }
 
                     // Manual check for required fields
                     if (!values.street || !values.city || !values.state || !values.postalCode || !values.country || !values.emergencyContact || !values.emergencyCountryCode || !values.emergencyPhoneNumber) {
-                        message.error("Please fill in all required personal information.");
+                        showToast.error("Please fill in all required personal information.");
                         setLoading(false);
                         return;
                     }
                     if (!values.sameAsCurrent) {
                         if (!values.permanentstreet || !values.permanentcity || !values.permanentstate || !values.permanentpostalCode || !values.permanentcountry) {
-                            message.error("Please fill in all required permanent address information.");
+                            showToast.error("Please fill in all required permanent address information.");
                             setLoading(false);
                             return;
                         }
@@ -498,7 +494,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                             customErrors.accountNumber = 'Account number must be 9-18 digits';
                             setFormErrors(customErrors)
                             setLoading(false)
-                            message.warning('Account number must be 9-18 digits')
+                            showToast.warning('Account number must be 9-18 digits')
                             return
                         }
                     }
@@ -533,20 +529,20 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
 
                     // Check for required fields
                     if (!values.bankName || !values.bankbranch || !values.accountNumber || !values.accountHolder || !values.ifscCode) {
-                        message.error("Please fill in all required bank details.");
+                        showToast.error("Please fill in all required bank details.");
                         setLoading(false);
                         return;
                     }
                     if(values.bankbranch){
                         if(values.bankbranch.length > 100){
                             customErrors.bankbranch = 'Bank Branch name cannot exceed 100 characters.'
-                            message.error("Bank Branch name cannot exceed 100 characters.");
+                            showToast.error("Bank Branch name cannot exceed 100 characters.");
                             setLoading(false);
                             return;
                         }
                     }
                     if (!passbookUploaded) {
-                        message.error("Please upload your Passbook or Bank Statement to proceed.");
+                        showToast.error("Please upload your Passbook or Bank Statement to proceed.");
                         setLoading(false);
                         return;
                     }
@@ -594,7 +590,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                 if (documents && documents.length > 0) {
                     const missingDocs = documents.filter(docName => !existingDocuments.some(d => d.Document_Type__c === docName));
                     if (missingDocs.length > 0) {
-                        message.error("Please upload all required documents to proceed.");
+                        showToast.error("Please upload all required documents to proceed.");
                         setLoading(false);
                         return;
                     }
@@ -624,7 +620,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
         } catch (error) {
             console.error("Error:", error)
             if (error instanceof Error && !error.message.includes('Validation')) {
-                message.error(error.message || "An error occurred. Please try again.");
+                showToast.error(error.message || "An error occurred. Please try again.");
             }
             setLoading(false)
         }
@@ -639,7 +635,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
         const { file, onSuccess, onError } = options
          // 5 MB client-side limit
         if (file.size > 5 * 1024 * 1024) {
-            message.error(`File size exceeds 5MB limit.`)
+            showToast.error(`File size exceeds 5MB limit.`)
             onError({ event: new Error('File too large') })
             return
         }
@@ -662,10 +658,10 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
             if (!res.ok) throw new Error('Upload Failed')
             onSuccess("Ok")
             setExistingDocuments(prev => [...prev, { Document_Type__c: doc, FileName: file.name }])
-            message.success('Uploaded successfully')
+            showToast.success('Uploaded successfully')
         } catch (err) {
             onError({ err })
-            message.error('Upload failed')
+            showToast.error('Upload failed')
             setdocumentsUploading(false)
         } finally {
             setdocumentsUploading(false)
@@ -679,7 +675,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
         if (documents && documents.length > 0) {
             const missingDocs = documents.filter(doc => !existingDocuments.some(d => d.Document_Type__c === doc));
             if (missingDocs.length > 0) {
-                message.error(`Please upload the following required documents: ${missingDocs.join(', ')}`);
+                showToast.error(`Please upload the following required documents: ${missingDocs.join(', ')}`);
                 return;
             }
         }
@@ -713,7 +709,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                 setCurrentStep(6)
             }
             setShowConfetti(true)
-            message.success("Onboarding Completed! 🎉")
+            showToast.success("Onboarding Completed! 🎉")
             // Start tour globally after confetti delay (only for internal mode)
             setTimeout(() => {
                 setShowConfetti(false)
@@ -721,7 +717,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
             }, 3000)
         } catch (e: any) {
             setLoading(false)
-            message.error(e.message || "Failed to complete onboarding.")
+            showToast.error(e.message || "Failed to complete onboarding.")
         }
     }
     const formatFileSize = (size?: number) => {
@@ -736,11 +732,22 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                 return (
                     <div className="py-8 text-center flex flex-col items-center">
                         <p className="mb-6 text-gray-500">Upload a professional profile picture.</p>
-                        <ImgCrop rotationSlider cropShape="round" showGrid aspect={1} quality={0.6} modalTitle="Crop Image">
+                        <ImgCrop rotationSlider cropShape="round" showGrid aspect={1} quality={0.6} modalTitle="Crop Image" beforeCrop={(file)=>{
+                            if(file.size > 1.1*1024*1024) {
+                                showToast.error('File size should be less than 1MB')
+
+                                return false
+                            }
+                            return true
+                        }}>
                             <Upload
                                 listType="picture-circle"
                                 showUploadList={false}
                                 beforeUpload={(file) => {
+                                    console.log(file.size)
+                                    if(file.size > 1.5*1024*1024) {
+                                        return false
+                                    }
                                     setProfileFile(file)
                                     return false
                                 }}
@@ -1222,14 +1229,14 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                     // Validate file type
                                     const isValidType = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'].includes(file.type)
                                     if (!isValidType) {
-                                        message.error('You can only upload PDF, JPG, or PNG files!')
+                                        showToast.error('You can only upload PDF, JPG, or PNG files!')
                                         return Upload.LIST_IGNORE
                                     }
 
                                     // Validate file size (5MB)
                                     const isLessThan5MB = file.size / 1024 / 1024 < 5
                                     if (!isLessThan5MB) {
-                                        message.error('File must be smaller than 5MB!')
+                                        showToast.error('File must be smaller than 5MB!')
                                         return Upload.LIST_IGNORE
                                     }
 

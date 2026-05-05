@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from 'react';
-import { Modal, Form, Select, DatePicker, Input, Switch, Alert, Button, Divider } from 'antd';
+import { Modal, Form, Select, DatePicker, Input, Switch, Alert, Button, Divider , Spin } from 'antd';
 import { SalesforceAsset, AssignmentHistory } from '../types';
 import { updateAssetAssignment, getAllEmployeesForSelect, getAssetById } from '../actions';
 import dayjs from 'dayjs';
@@ -25,23 +25,33 @@ export function AssetAssignmentModal({ visible, onCancel, onSuccess, asset, curr
   const [history, setHistory] = useState<AssignmentHistory[]>([]);
 
   useEffect(() => {
-    if (visible) {
-      loadEmployees();
-      if (asset) loadHistory(asset.Id);
-      form.resetFields();
-      
-      // Default state
-      if (!currentAssignment) {
-        setIsAssigning(true); // If Un-Assigned, assume we want to assign
-        form.setFieldsValue({
-            assignToNewPerson: true
-        })
-      } else {
-        setIsAssigning(false); // If assigned, default to "just return" or "idle"
-         form.setFieldsValue({
-            assignToNewPerson: false
-        })
-      }
+    async function fetchData(){
+        if (visible) {
+            form.resetFields();
+            await loadEmployees();
+            if (asset) loadHistory(asset.Id);
+            
+            // Default state
+            if (!currentAssignment) {
+              setIsAssigning(true); // If Un-Assigned, assume we want to assign
+              form.setFieldsValue({
+                  assignToNewPerson: true
+              })
+            } else {
+              setIsAssigning(false); // If assigned, default to "just return" or "idle"
+               form.setFieldsValue({
+                  assignToNewPerson: false
+              })
+            }
+          }
+    }
+    try{
+        setLoading(true);
+        fetchData();
+    }catch(e){
+        console.error("Failed to load data", e);
+    }finally{
+        setLoading(false);
     }
   }, [visible, asset, currentAssignment]);
 
@@ -120,6 +130,7 @@ export function AssetAssignmentModal({ visible, onCancel, onSuccess, asset, curr
       style={{ maxHeight: 'calc(100vh - 120px)', top: 20 , overflowY : 'auto' , maxWidth : '80vw' , borderRadius : '10px' , scrollbarWidth : 'none'}}
       className="mobile-modal"
     >
+    <Spin spinning={loading} size="large" tip="Loading...">
       <div className="mb-4">
           <p className="text-sm text-gray-500 break-words">Asset: <b>{asset?.AMS_Product__r?.Name || asset?.AMS_Category__c}</b> ({asset?.AMS_Asset_Serial_Number__c})</p>
           <div className="flex flex-wrap items-center gap-2 mt-2">
@@ -188,7 +199,6 @@ export function AssetAssignmentModal({ visible, onCancel, onSuccess, asset, curr
                     <Select 
                         className="w-full"
                         showSearch = {{filterOption : (input, option: any) =>  String(option?.children).toLowerCase().includes(input.toLowerCase()) ,optionFilterProp : 'children'}} 
-                        size='large'
                         placeholder="Select Employee"
                     >
                         {employees.map(emp => (
@@ -205,15 +215,14 @@ export function AssetAssignmentModal({ visible, onCancel, onSuccess, asset, curr
                         label="Assigned Date" 
                         rules={[{ required: true, message: 'Date required' }]}
                     >
-                        <DatePicker className="w-full" size='large'/>
+                        <DatePicker className="w-full h-11" size='middle'/>
                     </Form.Item>
 
                      <Form.Item 
                         name="conditionOnAssignment" 
                         label="Condition" 
                     >
-                         <Select size='large'>
-
+                         <Select className='h-11'>
                             <Select.Option value="New">New</Select.Option>
                             <Select.Option value="Second-hand">Second hand</Select.Option>
                         </Select>
@@ -221,14 +230,14 @@ export function AssetAssignmentModal({ visible, onCancel, onSuccess, asset, curr
                 </div>
 
                 <Form.Item name="remarks" label="Remarks">
-                    <Input.TextArea rows={2} size='large' placeholder='Enter Remarks'/>
+                    <Input.TextArea rows={2} placeholder='Enter Remarks'/>
                 </Form.Item>
             </div>
         )}
 
          <div className="flex flex-col sm:flex-row justify-end gap-2 pt-4">
-            <Button onClick={onCancel} size='large'>Cancel</Button>
-            <Button type="primary" htmlType="submit" loading={loading} size='large'>
+            <Button onClick={onCancel}>Cancel</Button>
+            <Button type="primary" htmlType="submit" loading={loading}>
                 {isAssigning ? 'Save Assignment' : (currentAssignment ? 'Return Asset' : 'Close')}
             </Button>
         </div>
@@ -276,7 +285,7 @@ export function AssetAssignmentModal({ visible, onCancel, onSuccess, asset, curr
             </div>
           </>
       )}
-
+    </Spin>
     </Modal>
   );
 }
