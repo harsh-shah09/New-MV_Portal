@@ -56,6 +56,9 @@ export function AssetManager({ initialAssets }: AssetManagerProps) {
     } catch (e) {
       showToast.error("Failed to refresh assets");
     } finally {
+      setSearchText('')
+      setCategoryFilter('')
+      setStatusFilter('')
       setLoading(false);
     }
   };
