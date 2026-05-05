@@ -1405,10 +1405,10 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                         }
                                     });
                                 }}
-                                disabled={!employee.Active__c && (!currentEmployeeCode || !employee.Company_Email__c || !employee.Role__c || !employee.Title__c || !employee.Department__c || !isAllDocumentsVerified)}
+                                disabled={!employee.Active__c && (!currentEmployeeCode || !employee.Company_Email__c || !employee.Role__c || !employee.Title__c || !employee.Department__c || !isAllDocumentsVerified) || !employee.Employee_Address__City__s || !employee.Employee_Address__Street__s || !employee.Employee_Address__StateCode__s || !employee.Employee_Address__PostalCode__s || !employee.Emergency_Contact_Name__c || !employee.Emergency_Contact_Number__c || !employee.Employee_Id__c}
                                 className={cn(
                                     'flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all border shadow-lg',
-                                    (!employee.Active__c && (!currentEmployeeCode || !employee.Company_Email__c || !employee.Role__c || !employee.Title__c || !employee.Department__c || !isAllDocumentsVerified)) && 'opacity-50 cursor-not-allowed',
+                                    (!employee.Active__c && (!currentEmployeeCode || !employee.Company_Email__c || !employee.Role__c || !employee.Title__c || !employee.Department__c || !isAllDocumentsVerified) || !employee.Employee_Address__City__s || !employee.Employee_Address__Street__s || !employee.Employee_Address__StateCode__s || !employee.Employee_Address__PostalCode__s || !employee.Emergency_Contact_Name__c || !employee.Emergency_Contact_Number__c || !employee.Employee_Id__c) && 'opacity-50 cursor-not-allowed',
                                     employee.Active__c
                                         ? 'bg-red-600/90 text-white border-red-500/50 hover:bg-red-700'
                                         : 'bg-green-600/90 text-white border-green-500/50 hover:bg-green-700'

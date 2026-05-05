@@ -105,9 +105,12 @@ export function CreateAssetModal({ visible, onCancel, onSuccess }: CreateAssetMo
              <Form.Item 
                 name="AMS_Asset_Serial_Number__c" 
                 label="Serial Number"
-                rules={[{ required: true, message: 'Required' }]}
+                rules={[
+                    { required: true, message: 'Required' },
+                    { pattern: /^[0-9]+$/, message: 'Only numbers are allowed',},
+                ]}
             >
-                <Input />
+                <Input placeholder='Enter Serial Number'/>
             </Form.Item>
         </div>
 

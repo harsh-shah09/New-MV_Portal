@@ -113,8 +113,12 @@ export default function EmailEditor({ template, onSave, onBack }: EmailEditorPro
            });
            
            doc.body.addEventListener('blur', () => {
-               const newContent = "<!DOCTYPE html>\n<html" + doc.documentElement.innerHTML.split('<html')[1];
-               setContent(newContent);
+               // The visual editor might lose focus, so we sync changes.
+               // We need to use a short timeout because syncContentFromIframe references iframeRef 
+               // and if we execute it synchronously it might sometimes miss the latest keystroke.
+               setTimeout(() => {
+                   setContent(syncContentFromIframe());
+               }, 10);
            });
        }
     }
@@ -236,7 +240,9 @@ export default function EmailEditor({ template, onSave, onBack }: EmailEditorPro
                <button 
                 onClick={() => {
                      // Going to code, sync from iframe first
-                     if(mode === 'visual') syncContentFromIframe();
+                     if(mode === 'visual') {
+                         setContent(syncContentFromIframe());
+                     }
                      setMode("code");
                 }}
                 className={`px-3 py-1.5 rounded-md flex items-center gap-2 transition ${mode === "code" ? "bg-white shadow-sm text-blue-600" : "hover:text-slate-900"}`}

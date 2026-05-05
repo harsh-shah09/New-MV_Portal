@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useMemo } from 'react';
-import { Input, Button, Card, Modal, Row, Col, Select } from 'antd';
+import { Input, Button, Card, Modal, Row, Col, Select , Spin} from 'antd';
 import { PlusOutlined, SearchOutlined, AppstoreOutlined, ExclamationCircleOutlined, FilterOutlined } from '@ant-design/icons';
 import { useRouter } from 'next/navigation';
 import { AssetTable } from './AssetTable';
@@ -149,6 +149,7 @@ export function AssetManager({ initialAssets }: AssetManagerProps) {
   });
 
   return (
+    <Spin spinning={catalogLoading} size='large'>
     <div className="space-y-4">
 
       {/* ── Page Header with New Asset CTA ── */}
@@ -264,5 +265,6 @@ export function AssetManager({ initialAssets }: AssetManagerProps) {
         onSuccess={handleCreateSuccess}
       />
     </div>
+    </Spin>
   );
 }

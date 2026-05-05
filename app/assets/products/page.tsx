@@ -4,8 +4,6 @@ import Link from 'next/link';
 import { ArrowLeft, Package } from 'lucide-react';
 import { ProductList } from './product-list'; // Client component for search/table
 
-export const dynamic = 'force-dynamic';
-
 export default async function ProductsPage() {
   const products = await getProducts(); // Returns SalesforceProduct[]
 
