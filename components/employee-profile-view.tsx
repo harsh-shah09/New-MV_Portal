@@ -2398,7 +2398,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                             {bankErrors.Bank_Account_Number__c && <span className="text-red-500 text-[10px] normal-case tracking-normal font-medium animate-pulse">{bankErrors.Bank_Account_Number__c}</span>}
                                                         </label>
                                                         <input
-                                                            type="password"
+                                                            type="number"
                                                             value={bankFormData.Bank_Account_Number__c}
                                                             onChange={(e) => {
                                                                 const newAccNum = e.target.value.replace(/\D/g, '').slice(0, 18)
