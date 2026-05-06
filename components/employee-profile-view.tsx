@@ -581,6 +581,27 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                     }
                 }
             }
+
+            const esi = formData.ESI__c?.trim()
+            if (esi) {
+                if (!/^\d{2}-\d{2}-\d{6}-\d{3}-\d{4}$/.test(esi)) {
+                    newErrors.ESI__c = "ESI must be in XX-XX-XXXXXX-XXX-XXXX format"
+                }
+            }
+
+            const pfNumber = formData.PF_Number__c?.trim()
+            if (pfNumber) {
+                if (!/^[A-Za-z0-9]{22}$/.test(pfNumber)) {
+                    newErrors.PF_Number__c = "PF Number must be a 22-character alphanumeric code"
+                }
+            }
+
+            const uan = formData.UAN_Number__c?.trim()
+            if (uan) {
+                if (!/^\d{12}$/.test(uan)) {
+                    newErrors.UAN_Number__c = "UAN must be a 12-digit numeric number"
+                }
+            }
         }
 
         // Salary calculation validations - validate only when requested (admins)
@@ -698,6 +719,8 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                 PF__c: employee.PF__c,
                 PT__c: employee.PT__c,
                 ESI__c: employee.ESI__c,
+                PF_Number__c: employee.PF_Number__c,
+                UAN_Number__c: employee.UAN_Number__c,
                 Status__c: employee.Status__c
             })
             setIsEditing(true)
@@ -1938,9 +1961,6 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                                         errors.Emergency_Contact_Number__c ? "border-red-300 focus:ring-red-200" : "border-slate-200 focus:ring-blue-500/20 focus:border-blue-400"
                                                                     )}
                                                                 />
-                                                                <span className="text-[11px] text-slate-400 mt-1">
-                                                                    Dial code: +{getCountryCallingCode(emergencyCountryCode)} &middot; e.g. {getEmergencyPhonePlaceholder(emergencyCountryCode)}
-                                                                </span>
                                                             </div>
                                                         </div>
                                                     ) : (
@@ -2081,6 +2101,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                                     type="number"
                                                                     min="0"
                                                                     max="100"
+                                                                    maxLength={2}
                                                                     value={formData.exp_years ?? 0}
                                                                     onChange={(e) => {
                                                                         let y = parseInt(e.target.value, 10) || 0
@@ -2105,6 +2126,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                                     type="number"
                                                                     min="0"
                                                                     max="11"
+                                                                    maxLength={2}
                                                                     value={formData.exp_months ?? 0}
                                                                     onChange={(e) => {
                                                                         const m = Math.min(11, Math.max(0, parseInt(e.target.value, 10) || 0))
@@ -2182,6 +2204,47 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                         <p className="font-medium text-slate-800 text-sm break-words">{teamLeadName || employee.Team_Lead__c || <span className="text-slate-400 italic">Not set</span>}</p>
                                                     )}
                                                 </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="border-t border-slate-100 pt-8">
+                                            <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+                                                <FileText className="w-5 h-5 text-indigo-500" /> Statutory Details
+                                            </h2>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                                                <Field
+                                                    label="ESI Number"
+                                                    value={employee.ESI__c}
+                                                    fieldKey="ESI__c"
+                                                    isEditing={isEditing && ['HR', 'Admin'].includes(currentUserRole)}
+                                                    formData={formData}
+                                                    setFormData={setFormData}
+                                                    error={errors.ESI__c}
+                                                    placeholder="XX-XX-XXXXXX-XXX-XXXX"
+                                                    maxLength={21}
+                                                />
+                                                <Field
+                                                    label="PF Number"
+                                                    value={employee.PF_Number__c}
+                                                    fieldKey="PF_Number__c"
+                                                    isEditing={isEditing && ['HR', 'Admin'].includes(currentUserRole)}
+                                                    formData={formData}
+                                                    setFormData={setFormData}
+                                                    error={errors.PF_Number__c}
+                                                    placeholder="22-character alphanumeric code"
+                                                    maxLength={22}
+                                                />
+                                                <Field
+                                                    label="UAN Number"
+                                                    value={employee.UAN_Number__c}
+                                                    fieldKey="UAN_Number__c"
+                                                    isEditing={isEditing && ['HR', 'Admin'].includes(currentUserRole)}
+                                                    formData={formData}
+                                                    setFormData={setFormData}
+                                                    error={errors.UAN_Number__c}
+                                                    placeholder="12-digit numeric number"
+                                                    maxLength={12}
+                                                />
                                             </div>
                                         </div>
 
@@ -2660,21 +2723,24 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                                 ? 'text-green-600'
                                                                 : 'text-blue-600'
                                                         const isUploading = customDocMutation.isPending && selectedDocTile === docName
+                                                        const isVerified = tileStatusLower === 'verified' || tileStatusLower === 'approved'
                                                         return (
                                                             <label
                                                                 key={docName}
-                                                                className={`relative flex flex-col items-center justify-center gap-2 p-4 rounded-2xl border-2 cursor-pointer transition-all select-none
+                                                                className={`relative flex flex-col items-center justify-center gap-2 p-4 rounded-2xl border-2 transition-all select-none
                                                               ${isUploading
                                                                         ? 'border-blue-300 bg-blue-50 opacity-80 cursor-wait'
-                                                                        : uploaded
-                                                                            ? 'border-green-300 bg-green-50 hover:border-green-400'
-                                                                            : 'border-dashed border-slate-300 bg-white hover:border-blue-400 hover:bg-blue-50/40'
+                                                                        : isVerified
+                                                                            ? 'border-green-300 bg-green-50 opacity-70 cursor-not-allowed'
+                                                                            : uploaded
+                                                                                ? 'border-green-300 bg-green-50 hover:border-green-400 cursor-pointer'
+                                                                                : 'border-dashed border-slate-300 bg-white hover:border-blue-400 hover:bg-blue-50/40 cursor-pointer'
                                                                     }`}
                                                             >
                                                                 <input
                                                                     type="file"
                                                                     className="sr-only"
-                                                                    disabled={isUploading || customDocMutation.isPending}
+                                                                    disabled={isUploading || customDocMutation.isPending || isVerified}
                                                                     onChange={(e) => {
                                                                         const file = e.target.files?.[0]
                                                                         if (file) handleTileFileSelected(file, docName)

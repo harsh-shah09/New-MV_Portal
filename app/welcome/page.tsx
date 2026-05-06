@@ -3,7 +3,7 @@
 import { useSearchParams } from "next/navigation"
 import { OnboardingWizard } from "@/components/onboarding-wizard"
 import { Suspense, useEffect, useState } from "react"
-import { Loader2, AlertCircle } from "lucide-react"
+import { Loader2, AlertCircle, CheckCircle } from "lucide-react"
 
 function WelcomeContent() {
     const searchParams = useSearchParams()
@@ -11,32 +11,50 @@ function WelcomeContent() {
     const token = searchParams.get('token')
     const [firsttime , setFirsttime] = useState(false)
     const [isExpired, setIsExpired] = useState(false)
+    const [isCompleted, setIsCompleted] = useState(false)
     const [isValidating, setIsValidating] = useState(true)
     const [step , setStep] = useState(1);
+    
     useEffect(() => {
-        console.log(id , token)
-        if (!id || !token) {
-            setIsExpired(true)
-            console.log('here')
-            setIsValidating(false)
-            return
-        }
-
-        try {
-            const decodedStr = atob(token)
-            const decoded = JSON.parse(decodedStr)
-            console.log( decoded)
-            setFirsttime(decoded.firsttime)
-            setStep(decoded.step ?? step)
-            if (decoded.expirationtime && decoded.expirationtime < Date.now()) {
+        const checkStatusAndToken = async () => {
+            console.log(id, token)
+            if (!id || !token) {
                 setIsExpired(true)
+                console.log('here')
+                setIsValidating(false)
+                return
             }
-        } catch (e) {
-            setIsExpired(true)
-            console.log(e)
-        }
+
+            try {
+                const decodedStr = atob(token)
+                const decoded = JSON.parse(decodedStr)
+                console.log(decoded)
+                setFirsttime(decoded.firsttime)
+                setStep(decoded.step ?? step)
+                
+                if (decoded.expirationtime && decoded.expirationtime < Date.now()) {
+                    setIsExpired(true)
+                } else {
+                    // Check completion status from DB
+                    try {
+                        const res = await fetch(`/api/public/onboarding-status?id=${id}&firsttime=${decoded.firsttime}`);
+                        const data = await res.json();
+                        if (data.isCompleted) {
+                            setIsCompleted(true);
+                        }
+                    } catch (fetchErr) {
+                        console.error("Failed to fetch onboarding status", fetchErr);
+                    }
+                }
+            } catch (e) {
+                setIsExpired(true)
+                console.log(e)
+            }
+            
+            setIsValidating(false)
+        };
         
-        setIsValidating(false)
+        checkStatusAndToken();
     }, [id, token])
 
     if (isValidating) {
@@ -46,7 +64,18 @@ function WelcomeContent() {
             </div>
         )
     }
-
+    
+    if (isCompleted) {
+        return (
+             <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+                 <div className="bg-white rounded-3xl shadow-xl border border-slate-100 max-w-lg w-full p-10 text-center">
+                     <CheckCircle className="w-16 h-16 text-emerald-500 mx-auto mb-6" />
+                     <h2 className="text-2xl font-bold text-slate-800 mb-4">Onboarding Completed</h2>
+                     <p className="text-slate-500 mt-2">Your onboarding process is already complete. You can close this window.</p>
+                 </div>
+             </div>
+        )
+    }
     if (isExpired || !id) {
         return (
              <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">

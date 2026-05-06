@@ -355,7 +355,6 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
 
         try {
             setLoading(true)
-            setFormErrors({}) // Clear previous errors
 
             const endpoint = publicMode ? '/api/public/onboarding-status' : '/api/auth/onboarding-status';
 
@@ -537,10 +536,17 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                         setLoading(false);
                         return;
                     }
+                    if(values.ifscCode){
+                        if(!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(values.ifscCode)){
+                            showToast.error("IFSC code format: 4 letters + 0 + 6 alphanumeric (e.g., SBIN0001234).");
+                            setLoading(false);
+                            return;
+                        }
+                    }
                     if(values.bankbranch){
-                        if(values.bankbranch.length > 100){
-                            customErrors.bankbranch = 'Bank Branch name cannot exceed 100 characters.'
-                            showToast.error("Bank Branch name cannot exceed 100 characters.");
+                        if(values.bankbranch.length > 50){
+                            customErrors.bankbranch = 'Bank Branch name cannot exceed 50 characters.'
+                            showToast.error("Bank Branch name cannot exceed 50 characters.");
                             setLoading(false);
                             return;
                         }
@@ -880,6 +886,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                     onChange={(e) => {
                                         const onlyDigits = e.target.value.replace(/\D/g, '').slice(0, 10);
                                         form.setFieldValue('postalCode', onlyDigits);
+                                        form.validateFields(['postalCode']);
                                     }}
                                 />
                             </Form.Item>
@@ -983,6 +990,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                                     onChange={(e) => {
                                                         const onlyDigits = e.target.value.replace(/\D/g, '').slice(0, 10);
                                                         form.setFieldValue('permanentpostalCode', onlyDigits);
+                                                        form.validateFields(['permanentpostalCode']);    
                                                     }}
                                                 />
                                             </Form.Item>
@@ -1042,12 +1050,16 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                                           const isValid = validateEmergencyPhone(value, phone)
                                                     
                                                           if (!isValid) {
-                                                            setFormErrors({
-                                                              emergencyPhoneNumber: 'Please enter a valid phone number for the selected country'
-                                                            })
-                                                          } else {
-                                                            setFormErrors({})
-                                                          }
+                                                            setFormErrors(prev => ({
+                                                                ...prev,
+                                                                emergencyPhoneNumber: 'Please enter a valid phone number for the selected country'
+                                                            }))
+                                                        } else {
+                                                            setFormErrors(prev => ({
+                                                                ...prev,
+                                                                emergencyPhoneNumber: ''
+                                                            }))
+                                                        }
                                                         } else {
                                                           setFormErrors({})
                                                         }
@@ -1104,9 +1116,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                                 status={formErrors.emergencyPhoneNumber ? 'error' : ''}
                                                 disabled={disabledsteps.includes(2)}
                                                 onChange={() => {
-                                                    if (formErrors.emergencyPhoneNumber) {
-                                                        setFormErrors(prev => ({ ...prev, emergencyPhoneNumber: '' }));
-                                                    }
+                                                    form.validateFields(['emergencyPhoneNumber']);
                                                 }}
                                             />
                                         </Form.Item>
@@ -1148,6 +1158,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                             ]}
                         >
                             <Input
+                                maxLength={50}
                                 prefix={<BankOutlined />}
                                 placeholder="e.g., State Bank of India"
                                 disabled={disabledsteps.includes(3)}
@@ -1161,11 +1172,12 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                             rules={[
                                 { required: true, message: 'Bank branch is required' },
                                 { min: 2, message: 'Branch name must be at least 2 characters' },
-                                { max: 100, message: 'Branch name must not exceed 100 characters' },
+                                { max: 50, message: 'Branch name must not exceed 100 characters' },
                                 { pattern: /^[a-zA-Z0-9\s.,&\-()]+$/, message: 'Branch name contains invalid characters' }
                             ]}
                         >
                             <Input
+                                maxLength={50}
                                 placeholder="e.g., MG Road Branch"
                                 disabled={disabledsteps.includes(3)}
                             />
@@ -1190,6 +1202,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                 onChange={(e) => {
                                     const onlyDigits = e.target.value.replace(/\D/g, '').slice(0, 18)
                                     form.setFieldValue('accountNumber', onlyDigits)
+                                    form.validateFields(['accountNumber']);
                                 }}
                             />
                         </Form.Item>
@@ -1219,6 +1232,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                         form.setFieldValue('accountHolder', sanitized);
                                     }
                                 }}
+                                maxLength={100}
                             />
                         </Form.Item>
 

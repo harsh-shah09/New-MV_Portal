@@ -40,8 +40,9 @@ export async function GET(req: Request) {
    if (!employeeId) return NextResponse.json({ error: 'Missing employee ID' }, { status: 400 });
 
    // Priority 1: completed flag – never re-show the wizard once finished
+   // Priority 1: completed flag – never re-show the wizard once finished
    const isCompleted = await getOnboardingCompleted(employeeId);
-   if (isCompleted) return NextResponse.json({ showOnboarding: false });
+   if (isCompleted) return NextResponse.json({ showOnboarding: false, isCompleted: true });
 
    // Priority 2: first-time login flag (or ?firsttime=true override)
    const isFirstTime = await getIsFirstTimeLogin(employeeId);
@@ -51,7 +52,7 @@ export async function GET(req: Request) {
    const rawStep = await getOnboardingStep(employeeId);
    // Step beyond total → all saved, treat as completed
    if (rawStep > TOTAL_STEPS) {
-       return NextResponse.json({ showOnboarding: false });
+       return NextResponse.json({ showOnboarding: false, isCompleted: true });
    }
    const currentStep = rawStep > 0 ? rawStep : 1;
 
