@@ -20,6 +20,7 @@ export interface FieldProps {
   className?: string
   locked?: boolean
   required?: boolean
+  maxLength?: number
 }
 
 export const Field = ({ 
@@ -36,7 +37,8 @@ export const Field = ({
   error,
   className,
   locked,
-  required
+  required,
+  maxLength
 }: FieldProps) => {
   const [showPassword, setShowPassword] = useState(false)
   const [showNumber, setShowNumber] = useState(false)
@@ -50,7 +52,6 @@ export const Field = ({
   const handleChange = (val: any) => {
       setFormData({ ...formData, [fieldKey]: val })
   }
-
   return (
     <div className={cn("space-y-1.5", className)}>
       <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 flex justify-between">
@@ -105,6 +106,11 @@ export const Field = ({
           <DatePicker
             value={currentValue ? dayjs(currentValue) : null}
             onChange={(date) => {
+              console.log(date , "date from field" , currentValue)
+              if (!date || !date.isValid()) {
+                handleChange(null);
+                return;
+              }
               handleChange(date ? date.format("YYYY-MM-DD") : null)
               const year = date?.year();
               if (year && year > 3000) {
@@ -112,6 +118,7 @@ export const Field = ({
                   return;
               }
             }}
+            
             className={cn(
               "w-full bg-slate-50 border rounded-lg px-3 py-2.5 text-sm",
               error ? "border-red-300" : "border-slate-200"
@@ -158,6 +165,7 @@ export const Field = ({
                 pattern={pattern}
                 placeholder={placeholder}
                 required={required}
+                maxLength={maxLength}
               />
               {isPasswordType && (
                 <button

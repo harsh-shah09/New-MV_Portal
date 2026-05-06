@@ -22,8 +22,10 @@ export function EmployeeTable({ employees, onEdit, onDelete, onView, loading, is
     {
       title: 'Name',
       key: 'name',
+      width : 220,
+      align : 'center',
       render: (_, record) => (
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 pl-5">
           {record.profilePhoto ? (
             <img src={record.profilePhoto} alt="" className="w-8 h-8 rounded-full object-cover" />
           ) : (
@@ -39,12 +41,16 @@ export function EmployeeTable({ employees, onEdit, onDelete, onView, loading, is
     {
       title: 'Email',
       dataIndex: 'email',
+      width : 260,
+      align:'center',
       key: 'email',
       responsive: ['md'],
     },
     {
     title: 'Job Title',  
     key: 'positionTitle',
+    width : 220,
+    align : 'center',
     render: (_, record) => (
       <div className="space-y-0.5">
         <div className="font-medium text-card-foreground">
@@ -64,6 +70,7 @@ export function EmployeeTable({ employees, onEdit, onDelete, onView, loading, is
       title: 'Join Date',
       dataIndex: 'joinDate',
       key: 'joinDate',
+      width : 140,
       render: (date) => (date ? formatDate(date) : ''),
       sorter: (a, b) => {
         const left = a.joinDate ? new Date(a.joinDate).getTime() : 0
@@ -79,7 +86,8 @@ export function EmployeeTable({ employees, onEdit, onDelete, onView, loading, is
       title: 'Account Status',
       dataIndex: 'active',
       key: 'active',
-      align: 'right',
+      width : 130,
+      align: 'center',
       render: (active) => {
         return active ? <Tag color='success' className="capitalize">Active</Tag> : <Tag color='error' className="capitalize">Inactive</Tag>
       }
@@ -88,6 +96,8 @@ export function EmployeeTable({ employees, onEdit, onDelete, onView, loading, is
       title: 'Employment Status',
       dataIndex: 'status',
       key: 'status',
+      width : 160,
+      align : 'center',
       render: (status) => {
         let color = 'default';
         if (status?.toLowerCase() === 'active') color = 'success';
@@ -104,7 +114,8 @@ export function EmployeeTable({ employees, onEdit, onDelete, onView, loading, is
     columns.push({
       title: 'Actions',
       key: 'actions',
-      align: 'right',
+      align: 'center',
+      width : 120,
       render: (_, record) => (
         <Space size="small">
           {onView && (
@@ -162,6 +173,7 @@ export function EmployeeTable({ employees, onEdit, onDelete, onView, loading, is
               }
             },
           })}
+          tableLayout='fixed'
         />
       </div>
 

@@ -48,7 +48,7 @@ export function CreateAssetModal({ visible, onCancel, onSuccess }: CreateAssetMo
         showToast.success("Asset Created", { description: "Asset created successfully!" });
         onSuccess();
     } catch (err: any) {
-        showToast.error("Creation Failed", { description: err.message.includes('duplicate') ? 'Serial number should be unique'  : 'Check inputs and try again' });
+        showToast.error("Creation Failed", { description: err.message.includes('duplicate') ? 'Serial number should be unique'  : 'Serial Number should be unique or Internal Error' });
     } finally {
         setLoading(false);
     }
