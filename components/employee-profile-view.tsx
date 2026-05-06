@@ -42,6 +42,7 @@ import { cn } from "@/lib/utils"
 import { Field } from "./field-component"
 import { EmployeeSalaryHistoryTab } from "./employee-salary-history-tab"
 import { GoogleIntegration } from "@/app/dashboard/components/employee/google-integration"
+import { Country, State, City } from "country-state-city"
 
 interface ViewProps {
     employeeId: string;
@@ -1590,20 +1591,146 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                             </h2>
                                             <div className="grid grid-cols-1 gap-y-6">
                                                 <Field label="Street" value={employee.Employee_Current_Address__c?.street} fieldKey="Employee_Address__Street__s" isEditing={isEditing} formData={formData} setFormData={setFormData} />
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                                    <Field label="City" value={employee.Employee_Current_Address__c?.city} fieldKey="Employee_Address__City__s" isEditing={isEditing} formData={formData} setFormData={setFormData} />
-                                                    <Field label="State" value={employee.Employee_Current_Address__c?.state} fieldKey="Employee_Address__StateCode__s" isEditing={isEditing} formData={formData} setFormData={setFormData} />
-                                                </div>
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                                    <Field label="Zip / Postal" value={employee.Employee_Current_Address__c?.postalCode} fieldKey="Employee_Address__PostalCode__s" isEditing={isEditing} formData={formData} setFormData={setFormData} />
-                                                    <Field label="Country" value={employee.Employee_Current_Address__c?.country} fieldKey="Employee_Address__CountryCode__s" isEditing={isEditing} formData={formData} setFormData={setFormData} />
-                                                </div>
-                                                {/* Coordinates & Accuracy */}
-                                                {/* <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                             <Field label="Latitude" value={employee.Employee_Address__Latitude__s} fieldKey="Employee_Address__Latitude__s" type="number" isEditing={isEditing} formData={formData} setFormData={setFormData} />
-                                             <Field label="Longitude" value={employee.Employee_Address__Longitude__s} fieldKey="Employee_Address__Longitude__s" type="number" isEditing={isEditing} formData={formData} setFormData={setFormData} />
-                                             <Field label="Geocode Accuracy" value={employee.Employee_Address__GeocodeAccuracy__s} fieldKey="Employee_Address__GeocodeAccuracy__s" isEditing={isEditing} formData={formData} setFormData={setFormData} />
-                                          </div> */}
+
+                                                {/* Cascading Country → State → City */}
+                                                {isEditing ? (
+                                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                                        {/* Country */}
+                                                        <div className="space-y-1.5">
+                                                            <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">Country</label>
+                                                            <div className="relative">
+                                                                <select
+                                                                    value={formData.Employee_Address__CountryCode__s || ''}
+                                                                    onChange={(e) => {
+                                                                        const newCountry = e.target.value;
+                                                                        // Check if current state belongs to new country, reset if not
+                                                                        const states = State.getStatesOfCountry(newCountry);
+                                                                        const currentState = formData.Employee_Address__StateCode__s;
+                                                                        const stateStillValid = states.some(s => s.name === currentState || s.isoCode === currentState);
+                                                                        setFormData({
+                                                                            ...formData,
+                                                                            Employee_Address__CountryCode__s: newCountry,
+                                                                            ...(stateStillValid ? {} : {
+                                                                                Employee_Address__StateCode__s: '',
+                                                                                Employee_Address__City__s: ''
+                                                                            })
+                                                                        });
+                                                                    }}
+                                                                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none transition appearance-none"
+                                                                >
+                                                                    <option value="">Select Country</option>
+                                                                    {Country.getAllCountries().map(c => (
+                                                                        <option key={c.isoCode} value={c.isoCode}>{c.name}</option>
+                                                                    ))}
+                                                                </select>
+                                                                <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none">
+                                                                    <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* State */}
+                                                        <div className="space-y-1.5">
+                                                            <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">State</label>
+                                                            <div className="relative">
+                                                                {(() => {
+                                                                    const selectedCountry = formData.Employee_Address__CountryCode__s;
+                                                                    const statesForCountry = selectedCountry ? State.getStatesOfCountry(selectedCountry) : [];
+                                                                    return (
+                                                                        <select
+                                                                            value={formData.Employee_Address__StateCode__s || ''}
+                                                                            disabled={!selectedCountry || statesForCountry.length === 0}
+                                                                            onChange={(e) => {
+                                                                                const newState = e.target.value;
+                                                                                // Check if current city belongs to new state, reset if not
+                                                                                const stateObj = statesForCountry.find(s => s.name === newState || s.isoCode === newState);
+                                                                                const cities = stateObj ? City.getCitiesOfState(selectedCountry, stateObj.isoCode) : [];
+                                                                                const currentCity = formData.Employee_Address__City__s;
+                                                                                const cityStillValid = cities.some(c => c.name === currentCity);
+                                                                                setFormData({
+                                                                                    ...formData,
+                                                                                    Employee_Address__StateCode__s: newState,
+                                                                                    ...(!cityStillValid ? { Employee_Address__City__s: '' } : {})
+                                                                                });
+                                                                            }}
+                                                                            className={cn(
+                                                                                "w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none transition appearance-none",
+                                                                                (!selectedCountry || statesForCountry.length === 0) && "opacity-50 cursor-not-allowed"
+                                                                            )}
+                                                                        >
+                                                                            <option value="">{!selectedCountry ? 'Select Country First' : 'Select State'}</option>
+                                                                            {statesForCountry.map(s => (
+                                                                                <option key={s.isoCode} value={s.name}>{s.name}</option>
+                                                                            ))}
+                                                                        </select>
+                                                                    );
+                                                                })()}
+                                                                <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none">
+                                                                    <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* City */}
+                                                        <div className="space-y-1.5">
+                                                            <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">City</label>
+                                                            <div className="relative">
+                                                                {(() => {
+                                                                    const selectedCountry = formData.Employee_Address__CountryCode__s;
+                                                                    const selectedState = formData.Employee_Address__StateCode__s;
+                                                                    const stateObj = selectedState
+                                                                        ? State.getStatesOfCountry(selectedCountry).find(s => s.name === selectedState || s.isoCode === selectedState)
+                                                                        : null;
+                                                                    const citiesForState = stateObj ? City.getCitiesOfState(selectedCountry, stateObj.isoCode) : [];
+                                                                    return (
+                                                                        <select
+                                                                            value={formData.Employee_Address__City__s || ''}
+                                                                            disabled={!selectedState || citiesForState.length === 0}
+                                                                            onChange={(e) => setFormData({ ...formData, Employee_Address__City__s: e.target.value })}
+                                                                            className={cn(
+                                                                                "w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none transition appearance-none",
+                                                                                (!selectedState || citiesForState.length === 0) && "opacity-50 cursor-not-allowed"
+                                                                            )}
+                                                                        >
+                                                                            <option value="">{!selectedState ? 'Select State First' : citiesForState.length === 0 ? 'No Cities Available' : 'Select City'}</option>
+                                                                            {citiesForState.map(c => (
+                                                                                <option key={c.name} value={c.name}>{c.name}</option>
+                                                                            ))}
+                                                                        </select>
+                                                                    );
+                                                                })()}
+                                                                <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none">
+                                                                    <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                                        <div className="space-y-1.5">
+                                                            <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">Country</label>
+                                                            <p className="font-medium text-slate-800 text-sm break-words py-1">
+                                                                {employee.Employee_Current_Address__c?.country
+                                                                    ? (Country.getAllCountries().find(c => c.isoCode === employee.Employee_Current_Address__c.country)?.name || employee.Employee_Current_Address__c.country)
+                                                                    : <span className="text-slate-400 italic">Not set</span>}
+                                                            </p>
+                                                        </div>
+                                                        <div className="space-y-1.5">
+                                                            <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">State</label>
+                                                            <p className="font-medium text-slate-800 text-sm break-words py-1">
+                                                                {employee.Employee_Current_Address__c?.state || <span className="text-slate-400 italic">Not set</span>}
+                                                            </p>
+                                                        </div>
+                                                        <div className="space-y-1.5">
+                                                            <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">City</label>
+                                                            <p className="font-medium text-slate-800 text-sm break-words py-1">
+                                                                {employee.Employee_Current_Address__c?.city || <span className="text-slate-400 italic">Not set</span>}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                <Field label="Zip / Postal" value={employee.Employee_Current_Address__c?.postalCode} fieldKey="Employee_Address__PostalCode__s" isEditing={isEditing} formData={formData} setFormData={setFormData} />
                                             </div>
                                         </div>
 
@@ -1612,7 +1739,35 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                 <Phone className="w-5 h-5 text-blue-500" /> Emergency Contact
                                             </h2>
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-                                                <Field label="Contact Name" value={employee.Emergency_Contact_Name__c} fieldKey="Emergency_Contact_Name__c" isEditing={isEditing} formData={formData} setFormData={setFormData} error={errors.Emergency_Contact_Name__c} />
+                                                <div className="space-y-1.5">
+                                                    <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 flex justify-between">
+                                                        <div>Contact Name</div>
+                                                        {errors.Emergency_Contact_Name__c && isEditing && (
+                                                            <span className="text-red-500 text-[10px] normal-case tracking-normal font-medium animate-pulse">{errors.Emergency_Contact_Name__c}</span>
+                                                        )}
+                                                    </label>
+                                                    {isEditing ? (
+                                                        <input
+                                                            type="text"
+                                                            value={formData.Emergency_Contact_Name__c ?? (employee.Emergency_Contact_Name__c || '')}
+                                                            maxLength={50}
+                                                            onChange={(e) => {
+                                                                // Block special characters and digits
+                                                                const sanitized = e.target.value.replace(/[^A-Za-z\s]/g, '');
+                                                                setFormData({ ...formData, Emergency_Contact_Name__c: sanitized });
+                                                            }}
+                                                            placeholder="Enter contact name"
+                                                            className={cn(
+                                                                "w-full bg-slate-50 border rounded-lg px-3 py-2.5 text-sm text-slate-800 focus:ring-2 outline-none transition placeholder:text-slate-400",
+                                                                errors.Emergency_Contact_Name__c ? "border-red-300 focus:ring-red-200" : "border-slate-200 focus:ring-blue-500/20 focus:border-blue-400"
+                                                            )}
+                                                        />
+                                                    ) : (
+                                                        <p className="font-medium text-slate-800 text-sm break-words py-1">
+                                                            {employee.Emergency_Contact_Name__c || <span className="text-slate-400 italic">Not set</span>}
+                                                        </p>
+                                                    )}
+                                                </div>
                                                 <Field label="Contact Number" value={employee.Emergency_Contact_Number__c} fieldKey="Emergency_Contact_Number__c" isEditing={isEditing} formData={formData} setFormData={setFormData} pattern="^(?:\\+91\\d{10}|\\d{10})$" type="tel" error={errors.Emergency_Contact_Number__c} placeholder="9876543310" />
                                             </div>
                                         </div>
