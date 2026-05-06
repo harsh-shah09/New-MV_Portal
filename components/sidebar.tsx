@@ -154,7 +154,7 @@ export function Sidebar({
       <div className="absolute top-0 left-0 w-full h-64 bg-cyan-100/30 blur-[100px] z-0"></div>
 
       {/* Logo Section */}
-      <Link href={'/'} className="relative z-10 flex items-center gap-3 p-6 border-b border-slate-100">
+      <Link href={'#'} className="relative z-10 flex items-center gap-3 p-6 border-b border-slate-100 cursor-default">
         <div className="relative group cursor-pointer">
           <div className="absolute -inset-1 bg-gradient-to-r from-cyan-400 to-blue-600 rounded-lg blur opacity-20 group-hover:opacity-40 transition duration-1000 group-hover:duration-200"></div>
           <div className="relative bg-white rounded-lg p-1.5 ring-1 ring-slate-100 shadow-sm">

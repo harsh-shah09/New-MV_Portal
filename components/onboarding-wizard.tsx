@@ -180,6 +180,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                             permanentcountry: permanentAddr?.country || 'India',
 
                             emergencyContact: emp.Emergency_Contact_Name__c || '',
+                            emergencyRelation: emp.Emergency_Contact_Relation__c || '',
                             ...splitEmergencyContact(emp.Emergency_Contact_Number__c),
                         });
 
@@ -406,6 +407,9 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                     if (values.emergencyContact && !namePattern.test(values.emergencyContact)) {
                         customErrors.emergencyContact = 'Name cannot contain numbers or special characters';
                     }
+                    if (values.emergencyRelation && !namePattern.test(values.emergencyRelation)) {
+                        customErrors.emergencyRelation = 'Relation cannot contain numbers or special characters';
+                    }
 
                     // Validate permanent address if not same as current
                     if (!values.sameAsCurrent) {
@@ -438,7 +442,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                     }
 
                     // Manual check for required fields
-                    if (!values.street || !values.city || !values.state || !values.postalCode || !values.country || !values.emergencyContact || !values.emergencyCountryCode || !values.emergencyPhoneNumber) {
+                    if (!values.street || !values.city || !values.state || !values.postalCode || !values.country || !values.emergencyContact || !values.emergencyRelation || !values.emergencyCountryCode || !values.emergencyPhoneNumber) {
                         showToast.error("Please fill in all required personal information.");
                         setLoading(false);
                         return;
@@ -1001,6 +1005,17 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                             
                         >
                             <Input disabled={disabledsteps.includes(2)} placeholder="Enter emergency contact name" />
+                        </Form.Item>
+                        <Form.Item 
+                            name="emergencyRelation" 
+                            label="Emergency Contact Relation" 
+                            rules={[
+                                { required: true, message: 'Emergency contact relation is required' },
+                                { pattern: /^[a-zA-Z\s-]*$/, message: 'Relation cannot contain numbers or special characters' },
+                                { max:100, message: 'Emergency contact relation cannot exceed 100 characters' }
+                            ]}
+                        >
+                            <Input disabled={disabledsteps.includes(2)} placeholder="e.g. Spouse, Parent, Sibling" />
                         </Form.Item>
                         <div className="grid grid-cols-1 sm:grid-cols-[300px_minmax(500px,_1fr)] sm:gap-4">
                             <Form.Item

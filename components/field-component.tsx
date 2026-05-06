@@ -20,6 +20,7 @@ export interface FieldProps {
   className?: string
   locked?: boolean
   required?: boolean
+  maxLength?: number
 }
 
 export const Field = ({ 
@@ -36,7 +37,8 @@ export const Field = ({
   error,
   className,
   locked,
-  required
+  required,
+  maxLength
 }: FieldProps) => {
   const [showPassword, setShowPassword] = useState(false)
   const [showNumber, setShowNumber] = useState(false)
@@ -158,6 +160,7 @@ export const Field = ({
                 pattern={pattern}
                 placeholder={placeholder}
                 required={required}
+                maxLength={maxLength}
               />
               {isPasswordType && (
                 <button

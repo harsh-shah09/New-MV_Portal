@@ -3,6 +3,8 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import Image from "next/image"
+import { getCountries, getCountryCallingCode, parsePhoneNumberFromString, getExampleNumber, CountryCode } from 'libphonenumber-js'
+import examples from 'libphonenumber-js/examples.mobile.json'
 import {
     User,
     Mail,
@@ -318,6 +320,36 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     const phonePattern = /^(?:\+91\d{10}|\d{10})$/
 
+    // --- Emergency contact phone state ---
+    const [emergencyCountryCode, setEmergencyCountryCode] = useState<CountryCode>('IN')
+
+    // Build country options from libphonenumber-js
+    const regionNames = useMemo(() => new Intl.DisplayNames(['en'], { type: 'region' }), [])
+    const countryPhoneOptions = useMemo(() =>
+        getCountries().map((c) => ({
+            value: c,
+            label: `${regionNames.of(c)} (+${getCountryCallingCode(c)})`,
+            dialCode: `+${getCountryCallingCode(c)}`,
+        })).sort((a, b) => a.label.localeCompare(b.label))
+    , [regionNames])
+
+    const getEmergencyPhonePlaceholder = (isoCode: CountryCode) => {
+        try {
+            const ex = getExampleNumber(isoCode, examples)
+            return ex ? ex.formatNational() : 'Enter phone number'
+        } catch { return 'Enter phone number' }
+    }
+
+    const validateEmergencyPhone = (isoCode: CountryCode, value: string): boolean => {
+        if (!value) return true
+        const digitsOnly = value.replace(/\D/g, '')
+        let parsed = parsePhoneNumberFromString(value, isoCode)
+        if (!parsed || !parsed.isValid()) {
+            parsed = parsePhoneNumberFromString(digitsOnly, isoCode)
+        }
+        return !!(parsed && parsed.isValid())
+    }
+
     // --- Experience Helpers ---
     const decimalToYearsMonths = (decimal: number | string | null | undefined): { years: number; months: number } => {
         const val = parseFloat(String(decimal || 0))
@@ -414,7 +446,6 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
             const companyEmail = formData.Company_Email__c?.trim()
             const normalizedPhone = phone?.replace(/[\s-]/g, "")
             const emergencyPhone = formData.Emergency_Contact_Number__c?.trim()
-            const normalizedEmergencyPhone = emergencyPhone?.replace(/[\s-]/g, "")
             const gender = formData.Gender__c?.trim()
 
             // Required Basic Information
@@ -460,8 +491,22 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                 newErrors.Gender__c = "Please select a valid gender"
             }
 
-            if (emergencyPhone && (!normalizedEmergencyPhone || !phonePattern.test(normalizedEmergencyPhone))) {
-                newErrors.Emergency_Contact_Number__c = "Emergency contact must be 10 digits or +91 followed by 10 digits"
+            if (emergencyPhone) {
+                if (!validateEmergencyPhone(emergencyCountryCode, emergencyPhone)) {
+                    const dialCode = `+${getCountryCallingCode(emergencyCountryCode)}`
+                    const example = getEmergencyPhonePlaceholder(emergencyCountryCode)
+                    newErrors.Emergency_Contact_Number__c = `Invalid phone number for selected country (${dialCode}). Example: ${example}`
+                }
+            }
+
+            // Emergency Contact Relation: only letters/spaces, max 100 chars
+            const emergencyRelation = formData.Emergency_Contact_Relation__c?.trim()
+            if (emergencyRelation) {
+                if (!/^[A-Za-z\s]+$/.test(emergencyRelation)) {
+                    newErrors.Emergency_Contact_Relation__c = "Relation must contain only letters"
+                } else if (emergencyRelation.length > 100) {
+                    newErrors.Emergency_Contact_Relation__c = "Relation cannot exceed 100 characters"
+                }
             }
 
             // Date Validation
@@ -617,7 +662,22 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                 Employee_Address__PostalCode__s: employee.Employee_Current_Address__c?.postalCode || '',
                 Employee_Address__CountryCode__s: employee.Employee_Current_Address__c?.country || '',
                 Emergency_Contact_Name__c: employee.Emergency_Contact_Name__c,
-                Emergency_Contact_Number__c: employee.Emergency_Contact_Number__c,
+                Emergency_Contact_Relation__c: employee.Emergency_Contact_Relation__c,
+                Emergency_Contact_Number__c: (() => {
+                    const raw = employee.Emergency_Contact_Number__c || ''
+                    // Try to parse stored E.164 / dial-prefixed number and extract national part
+                    try {
+                        const parsed = parsePhoneNumberFromString(raw)
+                        if (parsed) {
+                            setEmergencyCountryCode(parsed.country as CountryCode || 'IN')
+                            return parsed.formatNational()
+                        }
+                    } catch {}
+                    // Fallback: strip leading dialcode if stored as +CC-NUMBER
+                    const match = raw.match(/^\+(\d{1,3})[- ]?(\d+)$/)
+                    if (match) return match[2]
+                    return raw
+                })(),
                 Technology__c: employee.Technology__c,
                 Enrollment_Number__c: employee.Enrollment_Number__c,
                 exp_years: expParsed.years,
@@ -655,7 +715,14 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
             payload.Company_Email__c = payload.Company_Email__c?.trim();
             payload.Employee_Id__c = payload.Employee_Id__c?.trim();
             payload.Employee_Phone__c = payload.Employee_Phone__c?.trim()?.replace(/[\s-]/g, '');
-            payload.Emergency_Contact_Number__c = payload.Emergency_Contact_Number__c?.trim()?.replace(/[\s-]/g, '');
+            // Merge emergency contact back to E.164 format
+            const emergencyRaw = payload.Emergency_Contact_Number__c?.trim() || ''
+            if (emergencyRaw) {
+                const parsed = parsePhoneNumberFromString(emergencyRaw, emergencyCountryCode)
+                payload.Emergency_Contact_Number__c = parsed ? parsed.number : `+${getCountryCallingCode(emergencyCountryCode)}${emergencyRaw.replace(/\D/g, '')}`
+            } else {
+                payload.Emergency_Contact_Number__c = ''
+            }
             payload.Employee_Current_Address__c = JSON.stringify(
                 {
                     street: formData.Employee_Address__Street__s,
@@ -1081,18 +1148,37 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
         const newErrors: Record<string, string> = {}
 
         if (!bankFormData.Name) newErrors.Name = "Bank Name is required"
-        if (!bankFormData.Bank_Branch_Name__c) newErrors.Bank_Branch_Name__c = "Branch Name is required"
 
-        if (!bankFormData.Bank_Account_Number__c) {
-            newErrors.Bank_Account_Number__c = "Account Number is required"
-        } else if (!/^\d{9,18}$/.test(bankFormData.Bank_Account_Number__c)) {
-            newErrors.Bank_Account_Number__c = "Invalid account number (9-18 digits)"
+        // Branch Name: required, only letters/spaces, max 100 chars
+        if (!bankFormData.Bank_Branch_Name__c) {
+            newErrors.Bank_Branch_Name__c = "Branch Name is required"
+        } else if (!/^[A-Za-z\s]+$/.test(bankFormData.Bank_Branch_Name__c)) {
+            newErrors.Bank_Branch_Name__c = "Branch Name must contain only letters and spaces"
+        } else if (bankFormData.Bank_Branch_Name__c.length > 100) {
+            newErrors.Bank_Branch_Name__c = "Branch Name cannot exceed 100 characters"
         }
 
+        // Account Number: required, digits only, 9-18 digits
+        if (!bankFormData.Bank_Account_Number__c) {
+            newErrors.Bank_Account_Number__c = "Account Number is required"
+        } else if (!/^\d+$/.test(bankFormData.Bank_Account_Number__c)) {
+            newErrors.Bank_Account_Number__c = "Account Number must contain digits only (no spaces or letters)"
+        } else if (bankFormData.Bank_Account_Number__c.length < 9) {
+            newErrors.Bank_Account_Number__c = "Account Number must be at least 9 digits"
+        } else if (bankFormData.Bank_Account_Number__c.length > 18) {
+            newErrors.Bank_Account_Number__c = "Account Number must not exceed 18 digits"
+        }
+
+        // IFSC Code: required, format ABCD0123456
         if (!bankFormData.IFSC__c) {
             newErrors.IFSC__c = "IFSC Code is required"
-        } else if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(bankFormData.IFSC__c)) {
-            newErrors.IFSC__c = "Invalid IFSC Code format"
+        } else if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(bankFormData.IFSC__c.toUpperCase())) {
+            newErrors.IFSC__c = "Invalid IFSC format. Must be 4 letters + '0' + 6 alphanumeric (e.g. HDFC0001234)"
+        }
+
+        // Passbook is required
+        if (!passbookFile) {
+            newErrors.passbook = "Passbook / Bank Statement upload is required"
         }
 
         setBankErrors(newErrors)
@@ -1594,7 +1680,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
 
                                                 {/* Cascading Country → State → City */}
                                                 {isEditing ? (
-                                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                                         {/* Country */}
                                                         <div className="space-y-1.5">
                                                             <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">Country</label>
@@ -1706,7 +1792,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                         </div>
                                                     </div>
                                                 ) : (
-                                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                                         <div className="space-y-1.5">
                                                             <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">Country</label>
                                                             <p className="font-medium text-slate-800 text-sm break-words py-1">
@@ -1730,7 +1816,21 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                     </div>
                                                 )}
 
-                                                <Field label="Zip / Postal" value={employee.Employee_Current_Address__c?.postalCode} fieldKey="Employee_Address__PostalCode__s" isEditing={isEditing} formData={formData} setFormData={setFormData} />
+                                                {/* Zip / Postal Code */}
+                                                {isEditing ? (
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                        <Field label="Zip / Postal" value={employee.Employee_Current_Address__c?.postalCode} fieldKey="Employee_Address__PostalCode__s" isEditing={isEditing} formData={formData} setFormData={setFormData} placeholder="e.g. 400001" />
+                                                    </div>
+                                                ) : (
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                        <div className="space-y-1.5">
+                                                            <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">Zip / Postal</label>
+                                                            <p className="font-medium text-slate-800 text-sm break-words py-1">
+                                                                {employee.Employee_Current_Address__c?.postalCode || <span className="text-slate-400 italic">Not set</span>}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
 
@@ -1768,7 +1868,87 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                         </p>
                                                     )}
                                                 </div>
-                                                <Field label="Contact Number" value={employee.Emergency_Contact_Number__c} fieldKey="Emergency_Contact_Number__c" isEditing={isEditing} formData={formData} setFormData={setFormData} pattern="^(?:\\+91\\d{10}|\\d{10})$" type="tel" error={errors.Emergency_Contact_Number__c} placeholder="9876543310" />
+
+                                                {/* Relation field */}
+                                                <div className="space-y-1.5">
+                                                    <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 flex justify-between">
+                                                        <div>Relation</div>
+                                                        {errors.Emergency_Contact_Relation__c && isEditing && (
+                                                            <span className="text-red-500 text-[10px] normal-case tracking-normal font-medium animate-pulse">{errors.Emergency_Contact_Relation__c}</span>
+                                                        )}
+                                                    </label>
+                                                    {isEditing ? (
+                                                        <input
+                                                            type="text"
+                                                            value={formData.Emergency_Contact_Relation__c ?? (employee.Emergency_Contact_Relation__c || '')}
+                                                            maxLength={100}
+                                                            onChange={(e) => {
+                                                                const sanitized = e.target.value.replace(/[^A-Za-z\s]/g, '')
+                                                                setFormData({ ...formData, Emergency_Contact_Relation__c: sanitized })
+                                                            }}
+                                                            placeholder="e.g. Spouse, Parent, Sibling"
+                                                            className={cn(
+                                                                "w-full bg-slate-50 border rounded-lg px-3 py-2.5 text-sm text-slate-800 focus:ring-2 outline-none transition placeholder:text-slate-400",
+                                                                errors.Emergency_Contact_Relation__c ? "border-red-300 focus:ring-red-200" : "border-slate-200 focus:ring-blue-500/20 focus:border-blue-400"
+                                                            )}
+                                                        />
+                                                    ) : (
+                                                        <p className="font-medium text-slate-800 text-sm break-words py-1">
+                                                            {employee.Emergency_Contact_Relation__c || <span className="text-slate-400 italic">Not set</span>}
+                                                        </p>
+                                                    )}
+                                                </div>
+
+                                                <div className="space-y-1.5">
+                                                    <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 flex justify-between">
+                                                        <div>Contact Number</div>
+                                                        {errors.Emergency_Contact_Number__c && isEditing && (
+                                                            <span className="text-red-500 text-[10px] normal-case tracking-normal font-medium animate-pulse max-w-[200px] text-right">{errors.Emergency_Contact_Number__c}</span>
+                                                        )}
+                                                    </label>
+                                                    {isEditing ? (
+                                                        <div className="flex flex-wrap gap-2">
+                                                            <div className="relative w-fit h-full">
+                                                                <select
+                                                                defaultValue={'IN'}
+                                                                    value={emergencyCountryCode}
+                                                                    onChange={(e) => {
+                                                                        setEmergencyCountryCode(e.target.value as CountryCode)
+                                                                        // clear phone value so user re-enters for new country
+                                                                        setFormData({ ...formData, Emergency_Contact_Number__c: '' })
+                                                                    }}
+                                                                    className="h-full bg-slate-50 border w-[100px] truncate border-slate-200 rounded-lg px-2 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none transition appearance-none"
+                                                                >
+                                                                    {countryPhoneOptions.map(opt => (
+                                                                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                                                    ))}
+                                                                </select>
+                                                                <div className="absolute inset-y-0 right-1 flex items-center pointer-events-none">
+                                                                    <svg className="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex-1 flex flex-col">
+                                                                <input
+                                                                    type="tel"
+                                                                    value={formData.Emergency_Contact_Number__c ?? ''}
+                                                                    onChange={(e) => setFormData({ ...formData, Emergency_Contact_Number__c: e.target.value })}
+                                                                    placeholder={getEmergencyPhonePlaceholder(emergencyCountryCode)}
+                                                                    className={cn(
+                                                                        "w-full bg-slate-50 border rounded-lg px-3 py-2.5 text-sm text-slate-800 focus:ring-2 outline-none transition placeholder:text-slate-400",
+                                                                        errors.Emergency_Contact_Number__c ? "border-red-300 focus:ring-red-200" : "border-slate-200 focus:ring-blue-500/20 focus:border-blue-400"
+                                                                    )}
+                                                                />
+                                                                <span className="text-[11px] text-slate-400 mt-1">
+                                                                    Dial code: +{getCountryCallingCode(emergencyCountryCode)} &middot; e.g. {getEmergencyPhonePlaceholder(emergencyCountryCode)}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <p className="font-medium text-slate-800 text-sm break-words py-1">
+                                                            {employee.Emergency_Contact_Number__c || <span className="text-slate-400 italic">Not set</span>}
+                                                        </p>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
                                         <div className="border-t border-slate-100 pt-8 mt-8">
@@ -2118,33 +2298,104 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                             <div className="mb-6 p-6 bg-slate-50 border border-blue-100 rounded-xl animate-in fade-in slide-in-from-top-2">
                                                 <h3 className="font-semibold text-slate-800 mb-4 flex items-center gap-2"><CreditCard className="w-4 h-4" /> Account Details</h3>
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                                                    <Field label="Bank Name" value={bankFormData.Name} fieldKey="Name" isEditing={true} formData={bankFormData} setFormData={setBankFormData} placeholder="e.g. HDFC Bank" error={bankErrors.Name} required />
-                                                    <Field label="Branch Name" value={bankFormData.Bank_Branch_Name__c} fieldKey="Bank_Branch_Name__c" isEditing={true} formData={bankFormData} setFormData={setBankFormData} placeholder="e.g. Koramangala" error={bankErrors.Bank_Branch_Name__c} required />
+                                                    <Field label="Bank Name" value={bankFormData.Name} fieldKey="Name" isEditing={true} formData={bankFormData} setFormData={setBankFormData} placeholder="e.g. HDFC Bank" error={bankErrors.Name} required maxLength={100}/>
+
+                                                    {/* Branch Name with inline validation */}
                                                     <div className="space-y-1.5">
-                                                        <Field label="Account Number" value={bankFormData.Bank_Account_Number__c} fieldKey="Bank_Account_Number__c" isEditing={true} formData={bankFormData} setFormData={(data) => {
-                                                            const newAccNum = data.Bank_Account_Number__c.replace(/\D/g, '').slice(0, 18);
-                                                            const newErrors = { ...bankErrors };
-                                                            if (newAccNum.length > 0 && (newAccNum.length < 9 || newAccNum.length > 18)) {
-                                                                newErrors.Bank_Account_Number__c = "Account number must be 9 to 18 digits.";
-                                                            } else {
-                                                                delete newErrors.Bank_Account_Number__c;
-                                                            }
-                                                            setBankFormData({ ...data, Bank_Account_Number__c: newAccNum });
-                                                            setBankErrors(newErrors);
-                                                        }} type="password" placeholder="Enter Account Number" error={bankErrors.Bank_Account_Number__c} required />
+                                                        <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 flex justify-between">
+                                                            <span>Branch Name <span className="text-red-400">*</span></span>
+                                                            {bankErrors.Bank_Branch_Name__c && <span className="text-red-500 text-[10px] normal-case tracking-normal font-medium animate-pulse">{bankErrors.Bank_Branch_Name__c}</span>}
+                                                        </label>
+                                                        <input
+                                                            type="text"
+                                                            value={bankFormData.Bank_Branch_Name__c}
+                                                            maxLength={100}
+                                                            onChange={(e) => {
+                                                                const val = e.target.value.replace(/[^A-Za-z\s]/g, '')
+                                                                const newErrors = { ...bankErrors }
+                                                                if (!val) newErrors.Bank_Branch_Name__c = 'Branch Name is required'
+                                                                else if (val.length > 100) newErrors.Bank_Branch_Name__c = 'Cannot exceed 100 characters'
+                                                                else delete newErrors.Bank_Branch_Name__c
+                                                                setBankFormData({ ...bankFormData, Bank_Branch_Name__c: val })
+                                                                setBankErrors(newErrors)
+                                                            }}
+                                                            placeholder="e.g. Koramangala"
+                                                            className={cn(
+                                                                "w-full bg-slate-50 border rounded-lg px-3 py-2.5 text-sm text-slate-800 focus:ring-2 outline-none transition placeholder:text-slate-400",
+                                                                bankErrors.Bank_Branch_Name__c ? "border-red-300 focus:ring-red-200" : "border-slate-200 focus:ring-blue-500/20 focus:border-blue-400"
+                                                            )}
+                                                        />
+                                                        <p className="text-[11px] text-slate-400">Only letters and spaces allowed (max 100 chars)</p>
                                                     </div>
-                                                    <Field label="IFSC Code" value={bankFormData.IFSC__c} fieldKey="IFSC__c" isEditing={true} formData={bankFormData} setFormData={setBankFormData} placeholder="e.g. HDFC0001234" error={bankErrors.IFSC__c} required />
+
+                                                    {/* Account Number with digits-only enforcement */}
+                                                    <div className="space-y-1.5">
+                                                        <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 flex justify-between">
+                                                            <span>Account Number <span className="text-red-400">*</span></span>
+                                                            {bankErrors.Bank_Account_Number__c && <span className="text-red-500 text-[10px] normal-case tracking-normal font-medium animate-pulse">{bankErrors.Bank_Account_Number__c}</span>}
+                                                        </label>
+                                                        <input
+                                                            type="password"
+                                                            value={bankFormData.Bank_Account_Number__c}
+                                                            onChange={(e) => {
+                                                                const newAccNum = e.target.value.replace(/\D/g, '').slice(0, 18)
+                                                                const newErrors = { ...bankErrors }
+                                                                if (!newAccNum) newErrors.Bank_Account_Number__c = 'Account Number is required'
+                                                                else if (newAccNum.length < 9) newErrors.Bank_Account_Number__c = `Account Number must be at least 9 digits (${newAccNum.length}/9 entered)`
+                                                                else delete newErrors.Bank_Account_Number__c
+                                                                setBankFormData({ ...bankFormData, Bank_Account_Number__c: newAccNum })
+                                                                setBankErrors(newErrors)
+                                                            }}
+                                                            placeholder="Enter Account Number"
+                                                            className={cn(
+                                                                "w-full bg-slate-50 border rounded-lg px-3 py-2.5 text-sm text-slate-800 focus:ring-2 outline-none transition placeholder:text-slate-400",
+                                                                bankErrors.Bank_Account_Number__c ? "border-red-300 focus:ring-red-200" : "border-slate-200 focus:ring-blue-500/20 focus:border-blue-400"
+                                                            )}
+                                                        />
+                                                        <p className="text-[11px] text-slate-400">9–18 digits, numbers only</p>
+                                                    </div>
+
+                                                    {/* IFSC Code with format hint */}
+                                                    <div className="space-y-1.5">
+                                                        <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 flex justify-between">
+                                                            <span>IFSC Code <span className="text-red-400">*</span></span>
+                                                            {bankErrors.IFSC__c && <span className="text-red-500 text-[10px] normal-case tracking-normal font-medium animate-pulse">{bankErrors.IFSC__c}</span>}
+                                                        </label>
+                                                        <input
+                                                            type="text"
+                                                            value={bankFormData.IFSC__c}
+                                                            maxLength={11}
+                                                            onChange={(e) => {
+                                                                const val = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 11)
+                                                                const newErrors = { ...bankErrors }
+                                                                if (!val) newErrors.IFSC__c = 'IFSC Code is required'
+                                                                else if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(val)) newErrors.IFSC__c = 'Invalid IFSC format'
+                                                                else delete newErrors.IFSC__c
+                                                                setBankFormData({ ...bankFormData, IFSC__c: val })
+                                                                setBankErrors(newErrors)
+                                                            }}
+                                                            placeholder="e.g. HDFC0001234"
+                                                            className={cn(
+                                                                "w-full bg-slate-50 border rounded-lg px-3 py-2.5 text-sm text-slate-800 focus:ring-2 outline-none transition placeholder:text-slate-400 font-mono tracking-wider",
+                                                                bankErrors.IFSC__c ? "border-red-300 focus:ring-red-200" : "border-slate-200 focus:ring-blue-500/20 focus:border-blue-400"
+                                                            )}
+                                                        />
+                                                        <p className="text-[11px] text-slate-400">Format: 4 letters + '0' + 6 alphanumeric &nbsp;|&nbsp; e.g. <span className="font-mono">HDFC0001234</span></p>
+                                                    </div>
                                                 </div>
                                                 <div className="flex items-center gap-2 mb-4">
                                                     <input type="checkbox" id="primary" checked={bankFormData.Primary_Account__c} onChange={e => setBankFormData({ ...bankFormData, Primary_Account__c: e.target.checked })} />
                                                     <label htmlFor="primary" className="text-sm text-slate-700">Set as Primary Account</label>
                                                 </div>
 
-                                                {/* Passbook Upload in Bank Form */}
+                                                {/* Passbook Upload in Bank Form - Required */}
                                                 <div className="border-t border-slate-200 pt-4 mt-4">
-                                                    <h4 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-                                                        <FileText className="w-4 h-4 text-blue-500" /> Upload Passbook (Optional)
+                                                    <h4 className="text-sm font-semibold text-slate-700 mb-1 flex items-center gap-2">
+                                                        <FileText className="w-4 h-4 text-blue-500" /> Upload Passbook / Bank Statement <span className="text-red-400">*</span>
                                                     </h4>
+                                                    {bankErrors.passbook && (
+                                                        <p className="text-red-500 text-xs mb-2 flex items-center gap-1"><span>⚠</span> {bankErrors.passbook}</p>
+                                                    )}
                                                     <div className="relative">
                                                         <label className="flex flex-col items-center justify-center gap-3 p-4 border-2 border-dashed border-blue-300 rounded-lg cursor-pointer hover:bg-blue-50/50 transition">
                                                             <input
@@ -2165,7 +2416,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                                 <div className="text-center flex flex-col items-center gap-2">
                                                                     <FileText className="w-6 h-6 text-green-500" />
                                                                     <p className="text-sm font-medium text-slate-700 truncate max-w-[200px]">{passbookFile.name}</p>
-                                                                    <p className="text-xs text-green-600 font-medium">Ready to upload</p>
+                                                                    <p className="text-xs text-green-600 font-medium">Uploaded</p>
                                                                 </div>
                                                             ) : (
                                                                 <>
