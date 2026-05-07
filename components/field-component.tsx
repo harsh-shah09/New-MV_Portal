@@ -103,32 +103,32 @@ export const Field = ({
           </div>
         ) : isDateType ? (
         <>  
-          <DatePicker
-            value={currentValue ? dayjs(currentValue) : null}
-            onChange={(date) => {
+          <input
+            type="date"
+            value={currentValue || ""}
+            onChange={(e) => {
+              const value = e.target.value;
 
-              if (!date || !date.isValid()) {
+              if (!value) {
                 handleChange(null);
                 return;
               }
-              handleChange(date ? date.format("YYYY-MM-DD") : null)
-              const year = date?.year();
-              if (year && year > 3000) {
-                  // Prevent year > 3000
-                  return;
+
+              const year = new Date(value).getFullYear();
+
+              // Prevent year > 3000
+              if (year > 3000) {
+                return;
               }
+
+              handleChange(value); // format: YYYY-MM-DD
             }}
-            
             className={cn(
               "w-full bg-slate-50 border rounded-lg px-3 py-2.5 text-sm",
               error ? "border-red-300" : "border-slate-200"
             )}
             placeholder={placeholder || "Select date"}
-            format="DD/MM/YYYY"
             style={{ height: "42px", width: "100%" }}
-            disabledDate={(current) => {
-              return current && current.year() > 3000;
-            }}
           />
         </>
         ) : 

@@ -37,7 +37,7 @@ import {
     Calculator
 } from "lucide-react"
 import { generate2FASecretAction, verifyAndEnable2FAAction, disable2FAAction, getEmployeeTitles, sendWelcomeEmailAction } from "@/app/employees/[id]/actions"
-import { message, Spin, Select, Modal, Form, DatePicker, Space, Button, Pagination } from "antd"
+import { message, Spin, Select, Modal, Form, DatePicker, Space, Button, Pagination, Input } from "antd"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import dayjs from "dayjs"
 import { cn } from "@/lib/utils"
@@ -166,7 +166,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
         { fieldKey: "PF_Basic__c", label: "PF Base", kind: "number" as const, format: (v: any) => typeof v === 'number' ? v.toLocaleString('en-IN', { maximumFractionDigits: 2 }) : v },
         { fieldKey: "PF__c", label: "PF", kind: "percentage" as const },
         { fieldKey: "PT__c", label: "PT", kind: "number" as const },
-        { fieldKey: "ESI_Number__c", label: "ESI Number", kind: "percentage" as const },
+        { fieldKey: "ESI__c", label: "ESI", kind: "percentage" as const },
     ]
     useEffect(() => {
         getEmployeeTitles().then(setTitles).catch(console.error)
@@ -459,10 +459,6 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                 newErrors.Employee_Email__c = "Please enter a valid email address"
             } else if (companyEmail && email.toLowerCase() === companyEmail.toLowerCase()) {
                 newErrors.Employee_Email__c = "Personal Email cannot be the same as Company Email"
-            }else if(!companyEmail){
-                newErrors.Company_Email__c = "Company Email is required"
-            }else if(companyEmail && !companyEmail.includes('mvclouds.com')){
-                newErrors.Company_Email__c = "Company Email should include mvclouds.com"
             } else if (employeesList) {
                 const isDuplicate = employeesList.some((emp: any) =>
                     emp.Id !== employeeId &&
@@ -521,7 +517,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
         // Employment tab validations
         if (tabsToValidate.includes('employment')) {
             const employeeCode = formData.Employee_Id__c?.trim()
-
+            const companyEmail = formData.Company_Email__c?.trim()
             if (employeeCode && employeesList) {
                 const normalizedEmployeeCode = employeeCode.toLowerCase()
                 const isDuplicateEmployeeCode = employeesList.some((emp: any) => {
@@ -547,7 +543,11 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                     newErrors.Joining_Date__c = "Joining date cannot be before birth date"
                 }
             }
-
+            if(!companyEmail){
+                newErrors.Company_Email__c = "Company Email is required"
+            }else if(companyEmail && !companyEmail.includes('mvclouds.com')){
+                newErrors.Company_Email__c = "Company Email should include mvclouds.com"
+            }
             if (formData.Joining_Date__c && formData.Onboarding_Date__c) {
                 const joiningDate = dayjs(formData.Joining_Date__c)
                 const onboardingDate = dayjs(formData.Onboarding_Date__c)
@@ -563,7 +563,6 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                 if (!formData.Department__c) newErrors.Department__c = "Department is required"
             }
 
-            const companyEmail = formData.Company_Email__c?.trim();
             const personalEmail = formData.Employee_Email__c?.trim();
             if (companyEmail) {
                 if (!emailPattern.test(companyEmail)) {
@@ -636,6 +635,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
     const validateForm = () => {
         // Validate only the current active tab
         const newErrors = getValidationErrors(false)
+        console.log(newErrors)
         setErrors(newErrors)
         return Object.keys(newErrors).length === 0
     }
@@ -675,9 +675,10 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                     const raw = employee.Employee_Phone__c || ''
                     try {
                         const parsed = parsePhoneNumberFromString(raw)
+                        console.log(parsed)
                         if (parsed) {
                             setEmployeeCountryCode(parsed.country as CountryCode || 'IN')
-                            return parsed.formatNational()
+                            return parsed.formatNational().startsWith('0') ? parsed.formatNational().slice(1) : parsed.formatNational()
                         }   
                     } catch {}
                     // Fallback: strip leading dialcode if stored as +CC-NUMBER
@@ -709,7 +710,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                         const parsed = parsePhoneNumberFromString(raw)
                         if (parsed) {
                             setEmergencyCountryCode(parsed.country as CountryCode || 'IN')
-                            return parsed.formatNational()
+                            return parsed.formatNational().startsWith('0') ? parsed.formatNational().slice(1) : parsed.formatNational()
                         }
                     } catch {}
                     // Fallback: strip leading dialcode if stored as +CC-NUMBER
@@ -816,6 +817,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
 
             updateMutation.mutate(payload)
         } else {
+            console.log(validateForm())
             setWarningMsg("Please fix the validation errors before saving.")
             window.scrollTo({ top: 0, behavior: 'smooth' })
         }
@@ -1542,10 +1544,10 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                         }
                                     });
                                 }}
-                                disabled={!employee.Active__c && (!currentEmployeeCode || !employee.Company_Email__c || !employee.Role__c || !employee.Title__c || !employee.Department__c || !isAllDocumentsVerified) || !employee.Employee_Address__City__s || !employee.Employee_Address__Street__s || !employee.Employee_Address__StateCode__s || !employee.Employee_Address__PostalCode__s || !employee.Emergency_Contact_Name__c || !employee.Emergency_Contact_Number__c || !employee.Employee_Id__c}
+                                disabled={!employee.Active__c && (!currentEmployeeCode || !employee.Company_Email__c || !employee.Role__c || !employee.Title__c || !employee.Department__c || !isAllDocumentsVerified) || !employee.Employee_Current_Address__c ||  !employee.Emergency_Contact_Name__c || !employee.Emergency_Contact_Number__c || !employee.Employee_Id__c}
                                 className={cn(
                                     'flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all border shadow-lg',
-                                    (!employee.Active__c && (!currentEmployeeCode || !employee.Company_Email__c || !employee.Role__c || !employee.Title__c || !employee.Department__c || !isAllDocumentsVerified) || !employee.Employee_Address__City__s || !employee.Employee_Address__Street__s || !employee.Employee_Address__StateCode__s || !employee.Employee_Address__PostalCode__s || !employee.Emergency_Contact_Name__c || !employee.Emergency_Contact_Number__c || !employee.Employee_Id__c) && 'opacity-50 cursor-not-allowed',
+                                    (!employee.Active__c && (!currentEmployeeCode || !employee.Company_Email__c || !employee.Role__c || !employee.Title__c || !employee.Department__c || !isAllDocumentsVerified) || !employee.Employee_Current_Address__c || !employee.Emergency_Contact_Name__c || !employee.Emergency_Contact_Number__c || !employee.Employee_Id__c) && 'opacity-50 cursor-not-allowed',
                                     employee.Active__c
                                         ? 'bg-red-600/90 text-white border-red-500/50 hover:bg-red-700'
                                         : 'bg-green-600/90 text-white border-green-500/50 hover:bg-green-700'
@@ -2130,11 +2132,11 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                     type="select"
                                                     options={(
                                                         formData.Department__c === 'HR' ? ['HR', 'Manager', 'Intern'] :
-                                                        formData.Department__c === 'IT' ? ['Developer', 'Manager', 'Intern'] :
-                                                        formData.Department__c === 'Finance' ? ['Finance', 'Manager', 'Intern'] :
+                                                        formData.Department__c === 'IT' ? ['Developer', 'Intern' , 'QA'] :
+                                                        formData.Department__c === 'Finance' ? ['Manager', 'Intern'] :
                                                         formData.Department__c === 'Marketing' ? ['Marketing', 'BDE', 'Manager', 'Intern'] :
                                                         formData.Department__c === 'Admin' ? ['Admin', 'Manager', 'Intern'] :
-                                                        ['Intern', 'Developer', 'Manager', 'HR', 'Admin', 'BDE', 'Marketing', 'Finance']
+                                                        ['Intern', 'Developer', 'Manager', 'HR', 'Admin', 'BDE', 'Marketing', 'Finance' , 'QA']
                                                     ).map(r => ({ label: r, value: r }))}
                                                 />
                                                 <Field
@@ -2170,14 +2172,22 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                         <div className="flex items-center gap-2">
                                                             {/* Years */}
                                                             <div className="flex-1 relative">
-                                                                <input
+                                                                <Input
                                                                     type="number"
                                                                     min="0"
                                                                     max="100"
-                                                                    maxLength={2}
                                                                     value={formData.exp_years ?? 0}
+                                                                    onInput={(e) => {
+                                                                        if (e.currentTarget.value.length > 3) {
+                                                                            e.currentTarget.value = e.currentTarget.value.slice(0, 3)
+                                                                        }
+                                                                    }}
                                                                     onChange={(e) => {
+                                                                        if(e.target.value.length > 3){
+                                                                           return;
+                                                                        }
                                                                         let y = parseInt(e.target.value, 10) || 0
+
                                                                         if (y > 100) {
                                                                             message.warning("Experience cannot exceed 100 years")
                                                                             y = 100
@@ -2195,7 +2205,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                             <span className="text-slate-400 text-sm font-medium shrink-0">:</span>
                                                             {/* Months */}
                                                             <div className="flex-1 relative">
-                                                                <input
+                                                                <Input
                                                                     type="number"
                                                                     min="0"
                                                                     max="11"
@@ -2654,16 +2664,20 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                                     );
                                                                 })()}
                                                                 {bank.Primary_Account__c && <span className="bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded-full font-medium">Primary</span>}
-                                                                {/* {!bank.Primary_Account__c && (
+                                                                {currentUserRole === 'HR' && !bank.Primary_Account__c && (
                                                                     <button
-                                                                        onClick={() => setPrimaryBankMutation.mutate(bank.Id)}
+                                                                        onClick={() => {
+                                                                            if (confirm("Are you sure you want to set this as the primary bank account?")) {
+                                                                                setPrimaryBankMutation.mutate(bank.Id)
+                                                                            }
+                                                                        }}
                                                                         disabled={setPrimaryBankMutation.isPending}
                                                                         className="text-xs px-2 py-1 rounded-md border border-blue-100 text-blue-600 hover:bg-blue-50 disabled:opacity-50"
                                                                         title="Set as Primary"
                                                                     >
                                                                         Set Primary
                                                                     </button>
-                                                                )} */}
+                                                                )}
                                                                 {currentUserRole === 'Admin' && (
                                                                     <button
                                                                         onClick={() => {
@@ -2808,15 +2822,17 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                                         ? 'border-blue-300 bg-blue-50 opacity-80 cursor-wait'
                                                                         : isVerified
                                                                             ? 'border-green-300 bg-green-50 opacity-70 cursor-not-allowed'
-                                                                            : uploaded
-                                                                                ? 'border-green-300 bg-green-50 hover:border-green-400 cursor-pointer'
-                                                                                : 'border-dashed border-slate-300 bg-white hover:border-blue-400 hover:bg-blue-50/40 cursor-pointer'
+                                                                            : currentUserEmployeeId !== employeeId
+                                                                                ? (uploaded ? 'border-green-300 bg-green-50 opacity-70 cursor-not-allowed' : 'border-dashed border-slate-300 bg-gray-50 opacity-70 cursor-not-allowed')
+                                                                                : uploaded
+                                                                                    ? 'border-green-300 bg-green-50 hover:border-green-400 cursor-pointer'
+                                                                                    : 'border-dashed border-slate-300 bg-white hover:border-blue-400 hover:bg-blue-50/40 cursor-pointer'
                                                                     }`}
                                                             >
                                                                 <input
                                                                     type="file"
                                                                     className="sr-only"
-                                                                    disabled={isUploading || customDocMutation.isPending || isVerified}
+                                                                    disabled={isUploading || customDocMutation.isPending || isVerified || currentUserEmployeeId !== employeeId}
                                                                     onChange={(e) => {
                                                                         const file = e.target.files?.[0]
                                                                         if (file) handleTileFileSelected(file, docName)
@@ -2994,7 +3010,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                                     onChange={(page) => setCurrentPage(page)}
                                                                     showSizeChanger={false}
                                                                     className="ant-pagination-custom"
-
+                                                                    
                                                                 />
                                                             </div>
                                                         )}
