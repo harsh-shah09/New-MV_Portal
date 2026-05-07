@@ -51,6 +51,7 @@ export default function HolidaysPage() {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString())
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deletingHolidayId, setDeletingHolidayId] = useState<string | null>(null)
+  const [isDeletingHoliday, setIsDeletingHoliday] = useState(false)
   const [isBulkSubmitting, setIsBulkSubmitting] = useState(false)
   const [isEditSubmitting, setIsEditSubmitting] = useState(false)
   const [editDateError, setEditDateError] = useState("")
@@ -99,15 +100,7 @@ export default function HolidaysPage() {
     new Date(a.date).getTime() - new Date(b.date).getTime()
   )
 
-  // console.log("Holidays data:", { 
-  //   totalHolidays: holidays.length, 
-  //   availableYears, 
-  //   selectedYear, 
-  //   filteredCount: filteredHolidays.length,
-  //   userRole,
-  //   isHR,
-  //   sampleHoliday: holidays[0]
-  // })
+  
 
   const getYearPart = (dateValue: string) => {
     return (dateValue || "").split("-")[0] || ""
@@ -120,6 +113,20 @@ export default function HolidaysPage() {
     if (yearPart.length > 4) {
       return "Year must be 4 digits"
     }
+
+    const currentDate = new Date()
+    const currentYear = currentDate.getFullYear()
+    const isDecember = currentDate.getMonth() === 11
+    const allowedYears = isDecember ? [currentYear, currentYear + 1] : [currentYear]
+
+    if (yearPart.length === 4) {
+      const numericYear = Number(yearPart)
+      if (!Number.isNaN(numericYear) && !allowedYears.includes(numericYear)) {
+        return isDecember
+          ? `Only ${currentYear} or ${currentYear + 1} holidays are allowed`
+          : `Only ${currentYear} holidays are allowed`
+      }
+    }
     
     // Validate complete date format YYYY-MM-DD
     if (dateValue.length === 10) {
@@ -131,6 +138,13 @@ export default function HolidaysPage() {
         const year = date.getFullYear().toString()
         if (year.length !== 4) {
           return "Year must be 4 digits"
+        }
+
+        const numericYear = Number(year)
+        if (!Number.isNaN(numericYear) && !allowedYears.includes(numericYear)) {
+          return isDecember
+            ? `Only ${currentYear} or ${currentYear + 1} holidays are allowed`
+            : `Only ${currentYear} holidays are allowed`
         }
       } catch {
         return "Invalid date"
@@ -481,8 +495,9 @@ export default function HolidaysPage() {
   }
 
   const handleDelete = async () => {
-    if (!deletingHolidayId) return
+    if (!deletingHolidayId || isDeletingHoliday) return
 
+    setIsDeletingHoliday(true)
     try {
       const response = await fetch(`/api/holidays?id=${deletingHolidayId}`, {
         method: "DELETE",
@@ -511,6 +526,8 @@ export default function HolidaysPage() {
     } catch (error) {
       console.error("Error deleting holiday:", error)
       toast.error("Failed to delete holiday")
+    } finally {
+      setIsDeletingHoliday(false)
     }
   }
 
@@ -1008,9 +1025,10 @@ export default function HolidaysPage() {
               </button>
               <button
                 onClick={handleDelete}
-                className="flex-1 px-4 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-lg font-medium transition-colors"
+                disabled={isDeletingHoliday}
+                className={`flex-1 px-4 py-2.5 bg-red-500 text-white rounded-lg font-medium transition-colors ${isDeletingHoliday ? 'opacity-60 cursor-not-allowed' : 'hover:bg-red-600'}`}
               >
-                Yes, Delete
+                {isDeletingHoliday ? 'Deleting...' : 'Yes, Delete'}
               </button>
             </div>
           </div>

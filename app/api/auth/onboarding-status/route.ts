@@ -14,18 +14,15 @@ export async function GET() {
    // Priority 1: check completed flag – if done, never re-show wizard
    const isCompleted = await getOnboardingCompleted(session.employeeId);
    if (isCompleted) return NextResponse.json({ showOnboarding: false });
-    console.log("isCompleted", isCompleted);
    // Priority 2: check first-time flag
    const isFirstTime = await getIsFirstTimeLogin(session.employeeId);
    if (!isFirstTime) return NextResponse.json({ showOnboarding: false });
-    console.log("isFirstTime", isFirstTime);
    // Priority 3: resolve current step from DynamoDB
    const rawStep = await getOnboardingStep(session.employeeId);
    // If step exceeds total steps it means all steps were saved – treat as completed
    if (rawStep > TOTAL_STEPS) {
        return NextResponse.json({ showOnboarding: false });
    }
-    console.log("rawStep", rawStep);
    const currentStep = rawStep > 0 ? rawStep : 1;
 
    const employeeData = await getEmployeeById(session.employeeId);

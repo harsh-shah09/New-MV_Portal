@@ -48,7 +48,7 @@ export const Field = ({
   const isTelType = type === 'tel';
   const isDateType = type === 'date';
   const currentValue = formData[fieldKey] !== undefined ? formData[fieldKey] : (value || "")
-  console.log(currentValue , fieldKey)
+  
   const handleChange = (val: any) => {
       setFormData({ ...formData, [fieldKey]: val })
   }
@@ -106,7 +106,7 @@ export const Field = ({
           <DatePicker
             value={currentValue ? dayjs(currentValue) : null}
             onChange={(date) => {
-              console.log(date , "date from field" , currentValue)
+
               if (!date || !date.isValid()) {
                 handleChange(null);
                 return;

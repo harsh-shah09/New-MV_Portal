@@ -17,10 +17,10 @@ function WelcomeContent() {
     
     useEffect(() => {
         const checkStatusAndToken = async () => {
-            console.log(id, token)
+
             if (!id || !token) {
                 setIsExpired(true)
-                console.log('here')
+
                 setIsValidating(false)
                 return
             }
@@ -28,7 +28,7 @@ function WelcomeContent() {
             try {
                 const decodedStr = atob(token)
                 const decoded = JSON.parse(decodedStr)
-                console.log(decoded)
+
                 setFirsttime(decoded.firsttime)
                 setStep(decoded.step ?? step)
                 
@@ -48,7 +48,7 @@ function WelcomeContent() {
                 }
             } catch (e) {
                 setIsExpired(true)
-                console.log(e)
+
             }
             
             setIsValidating(false)

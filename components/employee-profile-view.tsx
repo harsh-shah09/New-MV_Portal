@@ -166,7 +166,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
         { fieldKey: "PF_Basic__c", label: "PF Base", kind: "number" as const, format: (v: any) => typeof v === 'number' ? v.toLocaleString('en-IN', { maximumFractionDigits: 2 }) : v },
         { fieldKey: "PF__c", label: "PF", kind: "percentage" as const },
         { fieldKey: "PT__c", label: "PT", kind: "number" as const },
-        { fieldKey: "ESI__c", label: "ESI", kind: "percentage" as const },
+        { fieldKey: "ESI_Number__c", label: "ESI Number", kind: "percentage" as const },
     ]
     useEffect(() => {
         getEmployeeTitles().then(setTitles).catch(console.error)
@@ -246,7 +246,6 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
         (doc: any) => doc.Document_Type__c?.trim().toLowerCase() !== 'payslip'
     )
     const isAllDocumentsVerified = nonPayslipDocs.every((doc: any) => doc.Status__c === 'Verified');
-    console.log(isAllDocumentsVerified, nonPayslipDocs)
     // Fetch all employees for Team Lead dropdown
     const { data: employeesList, isLoading: loadingEmployeesList } = useQuery({
         queryKey: ['employeesList'],
@@ -320,7 +319,8 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     const phonePattern = /^(?:\+91\d{10}|\d{10})$/
 
-    // --- Emergency contact phone state ---
+    // --- Phone state ---
+    const [employeeCountryCode, setEmployeeCountryCode] = useState<CountryCode>('IN')
     const [emergencyCountryCode, setEmergencyCountryCode] = useState<CountryCode>('IN')
 
     // Build country options from libphonenumber-js
@@ -333,14 +333,14 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
         })).sort((a, b) => a.label.localeCompare(b.label))
     , [regionNames])
 
-    const getEmergencyPhonePlaceholder = (isoCode: CountryCode) => {
+    const getPhonePlaceholder = (isoCode: CountryCode) => {
         try {
             const ex = getExampleNumber(isoCode, examples)
             return ex ? ex.formatNational() : 'Enter phone number'
         } catch { return 'Enter phone number' }
     }
 
-    const validateEmergencyPhone = (isoCode: CountryCode, value: string): boolean => {
+    const validatePhone = (isoCode: CountryCode, value: string): boolean => {
         if (!value) return true
         const digitsOnly = value.replace(/\D/g, '')
         let parsed = parsePhoneNumberFromString(value, isoCode)
@@ -477,7 +477,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
 
             if (!phone) {
                 newErrors.Employee_Phone__c = "Phone number is required"
-            } else if (!normalizedPhone || !phonePattern.test(normalizedPhone)) {
+            } else if (!validatePhone(employeeCountryCode, phone)) {
                 newErrors.Employee_Phone__c = "Phone must be 10 digits or +91 followed by 10 digits"
             }
 
@@ -492,9 +492,9 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
             }
 
             if (emergencyPhone) {
-                if (!validateEmergencyPhone(emergencyCountryCode, emergencyPhone)) {
+                if (!validatePhone(emergencyCountryCode, emergencyPhone)) {
                     const dialCode = `+${getCountryCallingCode(emergencyCountryCode)}`
-                    const example = getEmergencyPhonePlaceholder(emergencyCountryCode)
+                    const example = getPhonePlaceholder(emergencyCountryCode)
                     newErrors.Emergency_Contact_Number__c = `Invalid phone number for selected country (${dialCode}). Example: ${example}`
                 }
             }
@@ -582,10 +582,10 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                 }
             }
 
-            const esi = formData.ESI__c?.trim()
+            const esi = formData.ESI_Number__c
             if (esi) {
-                if (!/^\d{2}-\d{2}-\d{6}-\d{3}-\d{4}$/.test(esi)) {
-                    newErrors.ESI__c = "ESI must be in XX-XX-XXXXXX-XXX-XXXX format"
+                if (!/^[0-9]{10}$/.test(esi)) {
+                    newErrors.ESI_Number__c = "ESI Number must be a 10-digit numeric code"
                 }
             }
 
@@ -630,14 +630,12 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                 }
             })
         }
-        console.log(newErrors)
         return newErrors
     }
 
     const validateForm = () => {
-        // When saving, validate across all relevant tabs so required fields
-        // (e.g. personal email) are enforced even if the user switched tabs.
-        const newErrors = getValidationErrors(true)
+        // Validate only the current active tab
+        const newErrors = getValidationErrors(false)
         setErrors(newErrors)
         return Object.keys(newErrors).length === 0
     }
@@ -673,7 +671,20 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                 Employee_Email__c: employee.Employee_Email__c,
                 Company_Email__c: employee.Company_Email__c,
                 Employee_Id__c: employee.Employee_Id__c,
-                Employee_Phone__c: employee.Employee_Phone__c,
+                Employee_Phone__c: (() => {
+                    const raw = employee.Employee_Phone__c || ''
+                    try {
+                        const parsed = parsePhoneNumberFromString(raw)
+                        if (parsed) {
+                            setEmployeeCountryCode(parsed.country as CountryCode || 'IN')
+                            return parsed.formatNational()
+                        }   
+                    } catch {}
+                    // Fallback: strip leading dialcode if stored as +CC-NUMBER
+                    const match = raw.match(/^\+(\d{1,3})[- ]?(\d+)$/)
+                    if (match) return match[2]
+                    return raw
+                })(),
                 Birthdate__c: employee.Birthdate__c,
                 Gender__c: employee.Gender__c,
                 Employee_Address__c: employee.Employee_Current_Address__c || {},
@@ -681,7 +692,14 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                 Employee_Address__City__s: employee.Employee_Current_Address__c?.city || '',
                 Employee_Address__StateCode__s: employee.Employee_Current_Address__c?.state || '',
                 Employee_Address__PostalCode__s: employee.Employee_Current_Address__c?.postalCode || '',
-                Employee_Address__CountryCode__s: employee.Employee_Current_Address__c?.country || '',
+                Employee_Address__CountryCode__s: (() => {
+                    const countryNameOrCode = employee.Employee_Current_Address__c?.country || '';
+                    if (!countryNameOrCode) return '';
+                    const found = Country.getAllCountries().find(
+                        c => c.name.toLowerCase() === countryNameOrCode.toLowerCase() || c.isoCode.toLowerCase() === countryNameOrCode.toLowerCase()
+                    );
+                    return found ? found.isoCode : countryNameOrCode;
+                })(),
                 Emergency_Contact_Name__c: employee.Emergency_Contact_Name__c,
                 Emergency_Contact_Relation__c: employee.Emergency_Contact_Relation__c,
                 Emergency_Contact_Number__c: (() => {
@@ -718,7 +736,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                 PF_Basic__c: employee.PF_Basic__c,
                 PF__c: employee.PF__c,
                 PT__c: employee.PT__c,
-                ESI__c: employee.ESI__c,
+                ESI_Number__c: employee.ESI_Number__c,
                 PF_Number__c: employee.PF_Number__c,
                 UAN_Number__c: employee.UAN_Number__c,
                 Status__c: employee.Status__c
@@ -737,7 +755,13 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
             payload.Employee_Email__c = payload.Employee_Email__c?.trim();
             payload.Company_Email__c = payload.Company_Email__c?.trim();
             payload.Employee_Id__c = payload.Employee_Id__c?.trim();
-            payload.Employee_Phone__c = payload.Employee_Phone__c?.trim()?.replace(/[\s-]/g, '');
+            const phoneRaw = payload.Employee_Phone__c?.trim() || ''
+            if (phoneRaw) {
+                const parsed = parsePhoneNumberFromString(phoneRaw, employeeCountryCode)
+                payload.Employee_Phone__c = parsed ? parsed.number : `+${getCountryCallingCode(employeeCountryCode)}${phoneRaw.replace(/\D/g, '')}`
+            } else {
+                payload.Employee_Phone__c = ''
+            }
             // Merge emergency contact back to E.164 format
             const emergencyRaw = payload.Emergency_Contact_Number__c?.trim() || ''
             if (emergencyRaw) {
@@ -746,13 +770,16 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
             } else {
                 payload.Emergency_Contact_Number__c = ''
             }
+            const countryIso = formData.Employee_Address__CountryCode__s;
+            const countryName = countryIso ? (Country.getAllCountries().find(c => c.isoCode === countryIso)?.name || countryIso) : '';
+
             payload.Employee_Current_Address__c = JSON.stringify(
                 {
                     street: formData.Employee_Address__Street__s,
                     city: formData.Employee_Address__City__s,
                     state: formData.Employee_Address__StateCode__s,
                     postalCode: formData.Employee_Address__PostalCode__s,
-                    country: formData.Employee_Address__CountryCode__s
+                    country: countryName
                 }
             );
 
@@ -1688,7 +1715,52 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                                                 <Field label="Employee Name" value={employee.Employee_Name__c} fieldKey="Employee_Name__c" isEditing={isEditing} formData={formData} setFormData={setFormData} error={errors.Employee_Name__c} placeholder="e.g. John Doe" required />
                                                 <Field label="Personal Email" value={employee.Employee_Email__c} fieldKey="Employee_Email__c" type="email" isEditing={isEditing} formData={formData} setFormData={setFormData} error={errors.Employee_Email__c} placeholder="e.g. john@example.com" required />
-                                                <Field label="Phone Number" value={employee.Employee_Phone__c} fieldKey="Employee_Phone__c" type="tel" isEditing={isEditing} formData={formData} setFormData={setFormData} error={errors.Employee_Phone__c} placeholder="+919876543210 or 9876543210" required />
+                                                <div className="space-y-1.5">
+                                                    <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 flex justify-between">
+                                                        <div>Phone Number <span className="text-red-500">*</span></div>
+                                                        {errors.Employee_Phone__c && isEditing && (
+                                                            <span className="text-red-500 text-[10px] normal-case tracking-normal font-medium animate-pulse max-w-[200px] text-right">{errors.Employee_Phone__c}</span>
+                                                        )}
+                                                    </label>
+                                                    {isEditing ? (
+                                                        <div className="flex flex-wrap gap-2">
+                                                            <div className="relative w-fit h-full">
+                                                                <select
+                                                                    defaultValue={'IN'}
+                                                                    value={employeeCountryCode}
+                                                                    onChange={(e) => {
+                                                                        setEmployeeCountryCode(e.target.value as CountryCode)
+                                                                        setFormData({ ...formData, Employee_Phone__c: '' })
+                                                                    }}
+                                                                    className="h-full bg-slate-50 border w-[100px] truncate border-slate-200 rounded-lg px-2 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none transition appearance-none"
+                                                                >
+                                                                    {countryPhoneOptions.map(opt => (
+                                                                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                                                    ))}
+                                                                </select>
+                                                                <div className="absolute inset-y-0 right-1 flex items-center pointer-events-none">
+                                                                    <svg className="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex-1 flex flex-col">
+                                                                <input
+                                                                    type="tel"
+                                                                    value={formData.Employee_Phone__c ?? ''}
+                                                                    onChange={(e) => setFormData({ ...formData, Employee_Phone__c: e.target.value })}
+                                                                    placeholder={getPhonePlaceholder(employeeCountryCode)}
+                                                                    className={cn(
+                                                                        "w-full bg-slate-50 border rounded-lg px-3 py-2.5 text-sm text-slate-800 focus:ring-2 outline-none transition placeholder:text-slate-400",
+                                                                        errors.Employee_Phone__c ? "border-red-300 focus:ring-red-200" : "border-slate-200 focus:ring-blue-500/20 focus:border-blue-400"
+                                                                    )}
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <p className="font-medium text-slate-800 text-sm break-words py-1">
+                                                            {employee.Employee_Phone__c || <span className="text-slate-400 italic">Not set</span>}
+                                                        </p>
+                                                    )}
+                                                </div>
                                                 <Field label="Date of Birth" value={employee.Birthdate__c} fieldKey="Birthdate__c" type="date" isEditing={isEditing} formData={formData} setFormData={setFormData} error={errors.Birthdate__c} required />
                                                 <Field label="Gender" value={employee.Gender__c} fieldKey="Gender__c" isEditing={isEditing} formData={formData} setFormData={setFormData} options={[{ label: 'Male', value: 'Male' }, { label: 'Female', value: 'Female' }]} type="select" error={errors.Gender__c} required />
                                             </div>
@@ -1709,6 +1781,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                             <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">Country</label>
                                                             <div className="relative">
                                                                 <select
+                                                                defaultValue={'IN'}
                                                                     value={formData.Employee_Address__CountryCode__s || ''}
                                                                     onChange={(e) => {
                                                                         const newCountry = e.target.value;
@@ -1955,7 +2028,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                                     type="tel"
                                                                     value={formData.Emergency_Contact_Number__c ?? ''}
                                                                     onChange={(e) => setFormData({ ...formData, Emergency_Contact_Number__c: e.target.value })}
-                                                                    placeholder={getEmergencyPhonePlaceholder(emergencyCountryCode)}
+                                                                    placeholder={getPhonePlaceholder(emergencyCountryCode)}
                                                                     className={cn(
                                                                         "w-full bg-slate-50 border rounded-lg px-3 py-2.5 text-sm text-slate-800 focus:ring-2 outline-none transition placeholder:text-slate-400",
                                                                         errors.Emergency_Contact_Number__c ? "border-red-300 focus:ring-red-200" : "border-slate-200 focus:ring-blue-500/20 focus:border-blue-400"
@@ -2214,13 +2287,13 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                                                 <Field
                                                     label="ESI Number"
-                                                    value={employee.ESI__c}
-                                                    fieldKey="ESI__c"
+                                                    value={employee.ESI_Number__c}
+                                                    fieldKey="ESI_Number__c"
                                                     isEditing={isEditing && ['HR', 'Admin'].includes(currentUserRole)}
                                                     formData={formData}
                                                     setFormData={setFormData}
-                                                    error={errors.ESI__c}
-                                                    placeholder="XX-XX-XXXXXX-XXX-XXXX"
+                                                    error={errors.ESI_Number__c}
+                                                    placeholder="Enter 10 digit Number"
                                                     maxLength={21}
                                                 />
                                                 <Field
@@ -2398,7 +2471,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                             {bankErrors.Bank_Account_Number__c && <span className="text-red-500 text-[10px] normal-case tracking-normal font-medium animate-pulse">{bankErrors.Bank_Account_Number__c}</span>}
                                                         </label>
                                                         <input
-                                                            type="password"
+                                                            type="number"
                                                             value={bankFormData.Bank_Account_Number__c}
                                                             onChange={(e) => {
                                                                 const newAccNum = e.target.value.replace(/\D/g, '').slice(0, 18)
@@ -2653,7 +2726,10 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                         <div className="flex gap-2 mt-4">
                                                             <button
                                                                 type="button"
-                                                                onClick={() => openDocumentPreview(passbookDoc.File_URL__c, 'Passbook')}
+                                                                onClick={() => {
+                                                                    const fn = passbookDoc.File_Name__c || passbookDoc.Name || (passbookDoc.File_URL__c ? passbookDoc.File_URL__c.split('/').pop().split('?')[0] : '');
+                                                                    openDocumentPreview(passbookDoc.File_URL__c, fn ? `Passbook (${fn})` : 'Passbook')
+                                                                }}
                                                                 className="flex-1 bg-white border border-slate-200 text-slate-600 text-xs font-semibold py-2 rounded-lg flex items-center justify-center gap-2 hover:bg-slate-50 transition"
                                                             >
                                                                 <Eye className="w-3 h-3" /> View
@@ -2760,7 +2836,12 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                                 )}
                                                                 <span className="text-xs font-semibold text-center text-slate-700 leading-tight break-all">{docName}</span>
                                                                 {uploaded && (
-                                                                    <span className={`text-[10px] font-medium ${tileStatusClass}`}>{tileStatus}</span>
+                                                                    <>
+                                                                        <span className="text-[10px] text-slate-500 text-center leading-tight truncate w-full px-2" title={uploaded.File_Name__c || uploaded.Name || (uploaded.File_URL__c ? uploaded.File_URL__c.split('/').pop().split('?')[0] : '')}>
+                                                                            {uploaded.File_Name__c || uploaded.Name || (uploaded.File_URL__c ? uploaded.File_URL__c.split('/').pop().split('?')[0] : '')}
+                                                                        </span>
+                                                                        <span className={`text-[10px] font-medium ${tileStatusClass}`}>{tileStatus}</span>
+                                                                    </>
                                                                 )}
                                                                 {!uploaded && !isUploading && (
                                                                     <span className="text-[10px] text-slate-400">Click to upload</span>
@@ -2820,7 +2901,10 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                                         </div>
                                                                         <div className="flex-1 min-w-0">
                                                                             <h4 className="font-semibold text-slate-800 truncate" title={doc.Document_Type__c}>{doc.Document_Type__c}</h4>
-                                                                            <p className="text-xs text-slate-500">{doc.Document_Category__c} • {doc.Status__c}</p>
+                                                                            <p className="text-xs text-slate-500 truncate" title={doc.File_Name__c || doc.Name || (doc.File_URL__c ? doc.File_URL__c.split('/').pop().split('?')[0] : '')}>
+                                                                                {doc.File_Name__c || doc.Name || (doc.File_URL__c ? doc.File_URL__c.split('/').pop().split('?')[0] : '')}
+                                                                            </p>
+                                                                            <p className="text-xs text-slate-500 mt-0.5">{doc.Document_Category__c} • {doc.Status__c}</p>
                                                                         </div>
                                                                         {/* Approve / Reject — top right (STAGED) */}
                                                                         {((doc.Status__c === 'Uploaded') &&
@@ -2859,7 +2943,10 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                                     <div className="mt-4 flex gap-2">
                                                                         <button
                                                                             type="button"
-                                                                            onClick={() => openDocumentPreview(doc.File_URL__c, doc.Document_Type__c)}
+                                                                            onClick={() => {
+                                                                                const fn = doc.File_Name__c || doc.Name || (doc.File_URL__c ? doc.File_URL__c.split('/').pop().split('?')[0] : '');
+                                                                                openDocumentPreview(doc.File_URL__c, fn ? `${doc.Document_Type__c} (${fn})` : doc.Document_Type__c)
+                                                                            }}
                                                                             className="flex-1 bg-white border border-slate-200 text-slate-600 text-xs font-semibold py-2 rounded-lg flex items-center justify-center gap-2 hover:bg-slate-50 transition"
                                                                         >
                                                                             <Eye className="w-3 h-3" /> View

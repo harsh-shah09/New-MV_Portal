@@ -410,7 +410,6 @@ export function LeaveRequestForm({ onSubmit, onCancel, isSubmitting, setIsSubmit
       }
     }
 
-    console.log("Submitting leave request:", { ...values, duration: computedDuration, totalDeduction, penaltyDays })
 
     setIsSubmitting(true)
 

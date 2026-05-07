@@ -186,7 +186,6 @@ export default function EmployeesClient({ role }: EmployeesClientProps) {
   const handleDeleteEmployee = (id: string) => {
     if (confirm("Are you sure you want to delete this employee?")) {
       // deleteEmployee(id)
-       console.log("Delete not implemented fully via API yet", id);
     }
   }
 

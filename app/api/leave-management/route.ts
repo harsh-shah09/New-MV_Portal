@@ -63,15 +63,6 @@ async function fetchLeaveConfigurations(conn: any): Promise<LeaveConfig> {
     const minWorkingDayNoticePeriod = parseInt(configMap.get('minimum_working_working_day_notice_perio') || '5');
     const penaltyDaysPerDay = parseFloat(configMap.get('penalty_days_per_day') || '2');
 
-    console.log('[Leave Config] Fetched configurations:', {
-      annualLeaveBalance,
-      OnePlusTwoRule,
-      SandwichRule,
-      sandwichRuleAppliesTo,
-      penaltyAppliesTo,
-      minWorkingDayNoticePeriod,
-      penaltyDaysPerDay,
-    });
 
     return {
       annualLeaveBalance,
@@ -273,12 +264,6 @@ function getCalendarEventRange(
 
 function logLeaveEmailDispatch(stage: string, to: string, cc?: string | string[], subject?: string): void {
   const ccList = Array.isArray(cc) ? cc.filter(Boolean) : cc ? [cc] : [];
-  console.log('📧 [Leave Email Debug]', {
-    stage,
-    to,
-    cc: ccList,
-    subject,
-  });
 }
 
 function createRuleCalculationDetails(
@@ -550,8 +535,6 @@ export async function GET(request: NextRequest) {
     }
 
     const { employeeId, email, recordId, name, role, title } = payload;
-    console.log("Payload:", payload);
-    console.log("Authenticated user:", employeeId || name, email, recordId, "Role:", role, "Title:", title);
 
     // Use name as fallback if employeeId is not present
     const currentEmployeeId = employeeId || name || recordId;
@@ -578,7 +561,6 @@ export async function GET(request: NextRequest) {
       ORDER BY Start_Date__c DESC
     `);
 
-    console.log("Fetched leave records:", leaveRecords);
     // Map Salesforce records to LeaveRequest format
     const leaves: LeaveRequest[] = leaveRecords.records.map((record: any) => {
       const parsedDetails = parseRuleCalculationDetails(record.Rule_Calculation_Details__c);
@@ -636,7 +618,6 @@ export async function GET(request: NextRequest) {
         ORDER BY Start_Date__c ASC
       `);
 
-      console.log("Fetched pending HR approvals for Admin:", pendingLeaveRecords);
 
       pendingApprovals = pendingLeaveRecords.records.map((record: any) => {
         const parsedDetails = parseRuleCalculationDetails(record.Rule_Calculation_Details__c);
@@ -704,7 +685,6 @@ export async function GET(request: NextRequest) {
         ORDER BY Start_Date__c ASC
       `);
 
-      console.log("Fetched pending approvals for HR:", pendingLeaveRecords);
       pendingApprovals = pendingLeaveRecords.records.map((record: any) => {
         const parsedDetails = parseRuleCalculationDetails(record.Rule_Calculation_Details__c);
         const partialRequest = (parsedDetails as any)?.partialWithdrawalRequest;
@@ -768,7 +748,6 @@ export async function GET(request: NextRequest) {
         ORDER BY Start_Date__c ASC
       `);
 
-      console.log("Fetched pending approvals for Team Lead:", pendingLeaveRecords);
 
       pendingApprovals = pendingLeaveRecords.records.map((record: any) => {
         const parsedDetails = parseRuleCalculationDetails(record.Rule_Calculation_Details__c);
@@ -844,9 +823,6 @@ export async function POST(request: NextRequest) {
 
     const { employeeId, name, email, role, title } = payload;
     const body = await request.json();
-    console.log("Request body:", body);
-    console.log("Submitting user - Role:", role, "Title:", title);
-
     const {
       applyForOthers,
       leaveCategory,
@@ -886,7 +862,6 @@ export async function POST(request: NextRequest) {
       gapDates: string[];
     } | null = null;
 
-    console.log('Duration received from client:', duration);
 
     const conn = await getSalesforceConnection();
 
@@ -1045,11 +1020,6 @@ export async function POST(request: NextRequest) {
           })
         : null;
 
-      console.log('📅 [Leave] applyForOthers calendar creation result:', {
-        leaveId: createResult.id,
-        targetEmployeeId,
-        createdEventId,
-      });
 
       if (createdEventId) {
         await persistLeaveEventId(conn, createResult.id, createdEventId, 'applyForOthers-approved');
@@ -1214,7 +1184,6 @@ export async function POST(request: NextRequest) {
       )
     `);
 
-    console.log("Existing leaves check:", existingLeavesQuery);
 
     if (existingLeavesQuery.records && existingLeavesQuery.records.length > 0) {
       const overlappingLeave = existingLeavesQuery.records[0];
@@ -1253,7 +1222,6 @@ export async function POST(request: NextRequest) {
       AND Leave_Category__c = '${leaveCategory === 'loss-of-pay' ? 'Loss of Pay' : 'Extra Day Pay'}'
     `);
 
-    console.log("Consecutive leaves check:", consecutiveLeavesQuery);
 
     if (consecutiveLeavesQuery.records && consecutiveLeavesQuery.records.length > 0) {
       for (const existingLeave of consecutiveLeavesQuery.records) {
@@ -1345,7 +1313,6 @@ export async function POST(request: NextRequest) {
     const earlyHolidayQuery = await conn.query<any>(
       "SELECT Name, Date__c, Day__c, Year__c FROM Holidays_List__c"
     );
-    console.log("Fetched holidays:", earlyHolidayQuery);
     const tempHolidayDates = (earlyHolidayQuery.records || [])
       .map((h: any) => h?.Date__c)
       .filter(Boolean)
@@ -1458,7 +1425,6 @@ export async function POST(request: NextRequest) {
     const holidayQuery = await conn.query<any>(
       "SELECT Name, Date__c, Day__c, Year__c FROM Holidays_List__c"
     );
-    console.log("Fetched holidays:", holidayQuery);
     const holidayDates = (holidayQuery.records || [])
       .map((h: any) => h?.Date__c)
       .filter(Boolean)
@@ -1488,10 +1454,8 @@ export async function POST(request: NextRequest) {
       const nonWorkingDays: string[] = [];
       let allNonWorking = true;
       let cursor = start.clone();
-      console.log('is same or before', cursor.isSame(end) || cursor.isBefore(end));
 
       if (isNonWorking(start)) {
-        console.log('start is non working');
         return NextResponse.json(
           {
             error: "Leave dates fall on weekends/holidays",
@@ -1504,7 +1468,6 @@ export async function POST(request: NextRequest) {
         );
       }
       if (isNonWorking(end)) {
-        console.log('end is non working');
         return NextResponse.json(
           {
             error: "Leave dates fall on weekends/holidays",
@@ -1698,9 +1661,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log("Prepared leave record:", leaveRecord);
-    console.log('[Critical] Total_Days__c value being stored:', leaveRecord.Total_Days__c, 'Type:', typeof leaveRecord.Total_Days__c);
-    console.log('[Rule Details] Storing calculation details:', ruleCalculationDetails);
 
     // Add fields based on leave category
     if (leaveCategory === 'loss-of-pay') {
@@ -1757,14 +1717,11 @@ export async function POST(request: NextRequest) {
 
       result = await conn.sobject('Leave__c').update(updatePayload) as any;
       mergedExistingLeave = true;
-      console.log("Leave record merge (update) result:", result);
     } else {
       result = await conn.sobject('Leave__c').create(leaveRecord) as any;
-      console.log("Leave record creation result:", result);
     }
 
     if (!result.success) {
-      console.error("Failed to save leave record:", result);
       return NextResponse.json({ error: "Failed to create leave request" }, { status: 500 });
     }
 
@@ -1828,8 +1785,6 @@ export async function POST(request: NextRequest) {
         const employeeRole = emp.Role__c || role;
         const employeeTitle = emp.Title__c || title;
 
-        console.log("Employee applying leave - Name:", employeeName, "Role:", employeeRole, "Title:", employeeTitle);
-
         // Prepare notification recipients
         const notificationRecipients: string[] = [];
 
@@ -1875,10 +1830,8 @@ export async function POST(request: NextRequest) {
                 body: emailTemplate.html,
                 senderEmployeeId: employeeId,
               });
-              console.log("Email sent to Admin:", adminEmail);
             }
           } else {
-            console.log("No Admin found to send notification for HR leave");
           }
         }
         // Case 2: If employee is Team Lead, send notification directly to HR
@@ -1920,7 +1873,6 @@ export async function POST(request: NextRequest) {
             body: emailTemplate.html,
             senderEmployeeId: employeeId,
           });
-          console.log("Email sent to HR for Team Lead leave:", hrEmail);
         }
         // Case 3: Regular employee - send to their Team Lead and HR
         else {
@@ -1974,7 +1926,6 @@ export async function POST(request: NextRequest) {
               body: emailTemplate.html,
               senderEmployeeId: employeeId,
             });
-            console.log("Email sent to HR with CC Team Lead/Admin:", hrEmail);
           }
         }
 
@@ -2535,14 +2486,6 @@ export async function PATCH(request: NextRequest) {
               })
             : null;
 
-          console.log('📅 [Leave] withdrawal calendar recreation result:', {
-            leaveId: leaveSlice.leaveId,
-            employeeId: leave.Employee__c,
-            recreatedEventId,
-            startDate: leaveSlice.startDate,
-            endDate: leaveSlice.endDate,
-          });
-
           await persistLeaveEventId(conn, leaveSlice.leaveId, recreatedEventId || null, 'withdrawal-recreate');
         }
       }
@@ -2557,12 +2500,10 @@ export async function PATCH(request: NextRequest) {
           LIMIT 1
         `);
 
-        console.log("Employee data for withdrawal approval notification:", empData);
 
         if (empData.records && empData.records.length > 0) {
           const emp = empData.records[0];
           const employeeName = emp.Employee_Name__c || emp.Name || 'Employee';
-          console.log("Notifying employee:", employeeName);
           const employeeRole = emp.Role__c;
           const employeeTitle = emp.Title__c;
 
@@ -2842,8 +2783,6 @@ export async function PATCH(request: NextRequest) {
       const isTeamLead = role === 'Developer' && title === 'Team Lead';
       const isAdmin = role === 'Admin';
 
-      console.log("Approval attempt by:", role, title, "isHR:", isHR, "isTeamLead:", isTeamLead, "isAdmin:", isAdmin);
-
       if (!isHR && !isTeamLead && !isAdmin) {
         return NextResponse.json({ error: "Only HR, Team Lead, or Admin can approve leaves" }, { status: 403 });
       }
@@ -3008,12 +2947,6 @@ export async function PATCH(request: NextRequest) {
                   approvedBy: approverTitle,
                 })
               : null;
-
-            console.log('📅 [Leave] final approval calendar creation result:', {
-              leaveId: oldLeave.Id,
-              employeeId: oldLeave.Employee__c,
-              createdEventId,
-            });
 
             await persistLeaveEventId(conn, oldLeave.Id, createdEventId || null, 'final-approval');
 
@@ -3405,7 +3338,6 @@ async function updateLeaveBalance(conn: any, leaveRecord: any, action: 'approve'
     // Upsert the Leave Balance record
     if (isNewRecord) {
       await conn.sobject('Leave_Balance__c').create(leaveBalance);
-      console.log('Created new Leave Balance record:', leaveBalance);
     } else {
       await conn.sobject('Leave_Balance__c').update({
         Id: leaveBalance.Id,
@@ -3415,10 +3347,8 @@ async function updateLeaveBalance(conn: any, leaveRecord: any, action: 'approve'
         Emergency_Leave_Count__c: leaveBalance.Emergency_Leave_Count__c,
         Planned_Leave_Count__c: leaveBalance.Planned_Leave_Count__c,
       });
-      console.log('Updated Leave Balance record:', leaveBalance.Id);
     }
   } catch (error) {
-    console.error('Error updating Leave Balance:', error);
     throw error; // Re-throw to handle in calling function
   }
 }
@@ -3430,11 +3360,6 @@ async function persistLeaveEventId(
   context: string
 ): Promise<boolean> {
   try {
-    console.log('📅 [Leave] Persisting Event_ID__c...', {
-      context,
-      leaveId,
-      eventId,
-    });
 
     const updateResult = await conn.sobject('Leave__c').update({
       Id: leaveId,
@@ -3445,28 +3370,12 @@ async function persistLeaveEventId(
     const hasFailure = resultList.some((item: any) => item?.success !== true);
 
     if (hasFailure) {
-      console.error('❌ [Leave] Failed to persist Event_ID__c', {
-        context,
-        leaveId,
-        eventId,
-        updateResult: resultList,
-      });
       return false;
     }
 
-    console.log('✅ [Leave] Event_ID__c persisted', {
-      context,
-      leaveId,
-      eventId,
-    });
+
     return true;
   } catch (error) {
-    console.error('❌ [Leave] Exception while persisting Event_ID__c', {
-      context,
-      leaveId,
-      eventId,
-      error,
-    });
     return false;
   }
 }
