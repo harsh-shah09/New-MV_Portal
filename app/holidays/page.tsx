@@ -121,6 +121,20 @@ export default function HolidaysPage() {
     if (yearPart.length > 4) {
       return "Year must be 4 digits"
     }
+
+    const currentDate = new Date()
+    const currentYear = currentDate.getFullYear()
+    const isDecember = currentDate.getMonth() === 11
+    const allowedYears = isDecember ? [currentYear, currentYear + 1] : [currentYear]
+
+    if (yearPart.length === 4) {
+      const numericYear = Number(yearPart)
+      if (!Number.isNaN(numericYear) && !allowedYears.includes(numericYear)) {
+        return isDecember
+          ? `Only ${currentYear} or ${currentYear + 1} holidays are allowed`
+          : `Only ${currentYear} holidays are allowed`
+      }
+    }
     
     // Validate complete date format YYYY-MM-DD
     if (dateValue.length === 10) {
@@ -132,6 +146,13 @@ export default function HolidaysPage() {
         const year = date.getFullYear().toString()
         if (year.length !== 4) {
           return "Year must be 4 digits"
+        }
+
+        const numericYear = Number(year)
+        if (!Number.isNaN(numericYear) && !allowedYears.includes(numericYear)) {
+          return isDecember
+            ? `Only ${currentYear} or ${currentYear + 1} holidays are allowed`
+            : `Only ${currentYear} holidays are allowed`
         }
       } catch {
         return "Invalid date"
