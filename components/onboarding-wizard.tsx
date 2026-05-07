@@ -45,6 +45,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
     const [passbookFile, setPassbookFile] = useState<File | null>(null)
     const [passbookUploading, setPassbookUploading] = useState(false)
     const [passbookUploaded, setPassbookUploaded] = useState(false)
+    const [passbookError, setPassbookError] = useState(false)
     const [userRole, setUserRole] = useState('')
     // Google integration state (for step 4)
     const [googleConnected, setGoogleConnected] = useState(false)
@@ -753,7 +754,8 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                 return false
                             }
                             return true
-                        }}>
+                        }}
+                        >
                             <Upload
                                 listType="picture-circle"
                                 showUploadList={false}
@@ -910,7 +912,10 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
 
                                 return (
                                     <>
-                                        <Form.Item name="permanentstreet" label="Street Address" rules={[{ required: true, message: 'Street address is required' }]}>
+                                        <Form.Item name="permanentstreet" label="Street Address" rules={[{ required: true, message: 'Street address is required' } , {pattern: /^[A-Za-z]*$/, message: 'Street address should contain only alphabets'} ,
+                            { max: 100, message: 'Street address should not exceed 100 characters'} ,
+                            { min: 2, message: 'Street address should be at least 2 characters long'}
+                        ]}>
                                             <Input placeholder="123 Main St" disabled={disabledsteps.includes(2)} />
                                         </Form.Item>
 
@@ -1271,9 +1276,11 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                 multiple={false}
                                 showUploadList={passbookFile ? true : false}
                                 beforeUpload={(file) => {
+                                    setPassbookError(false)
                                     // Validate file type
                                     const isValidType = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'].includes(file.type)
                                     if (!isValidType) {
+                                        setPassbookError(true)
                                         showToast.error('You can only upload PDF, JPG, or PNG files!')
                                         return Upload.LIST_IGNORE
                                     }
@@ -1281,6 +1288,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                     // Validate file size (5MB)
                                     const isLessThan5MB = file.size / 1024 / 1024 < 5
                                     if (!isLessThan5MB) {
+                                        setPassbookError(true)
                                         showToast.error('File must be smaller than 5MB!')
                                         return Upload.LIST_IGNORE
                                     }
@@ -1289,7 +1297,11 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                     handlePassbookUpload(file)
                                     return false
                                 }}
-                                className="!bg-gray-50 hover:!bg-blue-50 transition rounded-lg"
+                                className={`!bg-gray-50 hover:!bg-blue-50 transition rounded-lg ${
+                                    passbookError
+                                        ? '!border !border-red-500 !shadow-[0_0_0_2px_rgba(239,68,68,0.2)]'
+                                        : ''
+                                }`}                                
                                 disabled={passbookUploading || disabledsteps.includes(3)}
                                 accept=".pdf,.jpg,.jpeg,.png"
                             >
