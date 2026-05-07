@@ -135,7 +135,6 @@ export async function POST(req: Request) {
            const { step, data, action, employeeId } = body;
            
            if (!employeeId) return NextResponse.json({ error: 'Missing employeeId' }, { status: 400 });
-            console.log("Onboarding API called with", { step, action, employeeId });
            if (action === 'complete') {
                const employeeData = await getEmployeeById(employeeId);
 
@@ -156,7 +155,7 @@ export async function POST(req: Request) {
 
                let hrNotificationSent = false;
                const hrEmail = await getHREmail();
-               console.log("HR Email for onboarding completion notification:", hrEmail);
+
                if (hrEmail) {
                    const employeeName = employeeData?.Employee_Name__c || employeeData?.Name || employeeId;
                    const employeeEmail = employeeData?.Company_Email__c || employeeData?.Employee_Email__c || 'N/A';
@@ -176,7 +175,7 @@ export async function POST(req: Request) {
                            contentType: 'text/html',
                            isInfo: true,
                        });
-                       console.log(`Onboarding completion email sent to HR at ${hrEmail} for employee ${employeeName}`);
+                       
                        hrNotificationSent = true;
                    } catch (emailError) {
                        console.error('Error sending onboarding completion email to HR', emailError);

@@ -36,7 +36,7 @@ export const getSalesforceConnection = async () => {
         }
     });
     const data = await db.send(getCmd);
-    // console.log('Dyanmo data',data)
+  
     if (data.Item) {
       const stored = data.Item as StoredToken;
       // Initialize connection with stored token
@@ -49,11 +49,9 @@ export const getSalesforceConnection = async () => {
       // Verify token validity
       try {
         await conn.identity();
-        console.log('Salesforce connection restored from DynamoDB');
         connection = conn;
         return connection;
       } catch (err) {
-        console.log('Stored token invalid or expired, refreshing...', err);
         // Token invalid, fall through to login
       }
     }
@@ -63,7 +61,7 @@ export const getSalesforceConnection = async () => {
   }
 
   // 3. Perform fresh login
-  console.log('Initiating new Salesforce login...');
+  
   const conn = new Connection({
     loginUrl: process.env.SALESFORCE_LOGIN_URL || 'https://login.salesforce.com',
     version: '50.0'
@@ -88,7 +86,6 @@ export const getSalesforceConnection = async () => {
     }
   });
     await db.send(putCmd);
-    console.log('Salesforce token updated in DynamoDB');
   } catch (error) {
     console.error('Failed to save token to DynamoDB:', error);
     // Don't fail the request just because caching failed, but log it
@@ -155,7 +152,7 @@ export const findEmployee = async (identifier: string): Promise<Employee | null>
     WHERE ${isEmail ? 'Company_Email__c' : 'Employee_Id__c'} = '${escapedIdentifier}' 
     LIMIT 1
   `;
-  console.log(query)
+  
   // Login accepts email or employee ID.
   
   const result = await conn.query(query);
@@ -372,7 +369,7 @@ export const updateEmployee = async (id: string, data: any) => {
     const conn = await getSalesforceConnection();
     if (!conn) throw new Error("No Salesforce connection");
     const updateData: any = { Id: id, ...data };
-    console.log('Updated data',updateData)
+  
     delete updateData.contactId;
 
     await conn.sobject("Employee__c").update(updateData);
@@ -574,7 +571,7 @@ export const sendInAppNotifications = async (
         }));
 
         await conn.sobject("MV_Notification__c").create(notifications);
-        console.log(`✓ In-app notifications sent to ${validRecipients.length} recipient(s)`);
+      
     } catch (error) {
         console.error('Error sending in-app notifications:', error);
         // Don't throw error to prevent breaking the main flow

@@ -106,7 +106,6 @@ export async function DELETE(
       return NextResponse.json({ error: "Failed to connect to Salesforce" }, { status: 500 })
     }
 
-    console.log(`Starting deletion process for Payroll Summary: ${id}`)
 
     // Step 1: Fetch the Payroll Summary to get month and year
     const summaryQuery = `
@@ -124,7 +123,6 @@ export async function DELETE(
     const month = summary.Payroll_Month__c
     const year = summary.Payroll_Year__c
 
-    console.log(`Found Payroll Summary: ${month} ${year}`)
 
     // Step 2: Fetch all Payroll__c records associated with this summary
     const payrollQuery = `
@@ -135,7 +133,6 @@ export async function DELETE(
     const payrollResult = await conn.query(payrollQuery)
     const payrollRecords = payrollResult.records || []
 
-    console.log(`Found ${payrollRecords.length} Payroll records to delete`)
 
     // Step 3: Delete Document__c records and S3 files for each employee
     const deletionResults = {
@@ -162,7 +159,6 @@ export async function DELETE(
             const documentId = documentResult.records[0].Id
             await conn.sobject("Document__c").delete(documentId as string)
             deletionResults.documents.success++
-            console.log(`✓ Deleted Document record: ${documentName}`)
           }
         } catch (error: any) {
           console.error(`Failed to delete Document record for ${employeeId}:`, error)
@@ -174,7 +170,6 @@ export async function DELETE(
         try {
           await deletePayslipFromS3(employeeId, month, year)
           deletionResults.s3Files.success++
-          console.log(`✓ Deleted S3 file: Payslip_${employeeId}_${month}_${year}.pdf`)
         } catch (error: any) {
           console.error(`Failed to delete S3 file for ${employeeId}:`, error)
           deletionResults.s3Files.failed++
@@ -199,7 +194,6 @@ export async function DELETE(
           }
         })
         
-        console.log(`✓ Deleted ${deletionResults.payrollRecords.success} Payroll records`)
       } catch (error: any) {
         console.error("Failed to delete Payroll records:", error)
         return NextResponse.json({ 
@@ -212,7 +206,6 @@ export async function DELETE(
     // Step 5: Delete the Payroll Summary itself
     try {
       await conn.sobject("Payroll_Summary__c").delete(id)
-      console.log(`✓ Deleted Payroll Summary: ${id}`)
     } catch (error: any) {
       console.error("Failed to delete Payroll Summary:", error)
       return NextResponse.json({ 
@@ -221,7 +214,6 @@ export async function DELETE(
       }, { status: 500 })
     }
 
-    console.log("Deletion process completed successfully")
 
     return NextResponse.json({
       message: "Payroll Summary and all related records deleted successfully",

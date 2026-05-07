@@ -305,7 +305,7 @@ export default function NDAPage() {
     }
 
     const handleUploadClick = (record: any) => {
-        console.log(record)
+
         setSelectedRequest(record);
         setIsUploadModalOpen(true);
     }

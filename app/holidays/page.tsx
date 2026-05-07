@@ -100,15 +100,7 @@ export default function HolidaysPage() {
     new Date(a.date).getTime() - new Date(b.date).getTime()
   )
 
-  // console.log("Holidays data:", { 
-  //   totalHolidays: holidays.length, 
-  //   availableYears, 
-  //   selectedYear, 
-  //   filteredCount: filteredHolidays.length,
-  //   userRole,
-  //   isHR,
-  //   sampleHoliday: holidays[0]
-  // })
+  
 
   const getYearPart = (dateValue: string) => {
     return (dateValue || "").split("-")[0] || ""

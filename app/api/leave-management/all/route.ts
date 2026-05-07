@@ -51,7 +51,6 @@ export async function GET(request: NextRequest) {
       LIMIT 1000
     `);
 
-    console.log("Fetched all leave records:", leaveRecords.totalSize);
 
     // Map Salesforce records to LeaveRequest format
     const allLeaves: LeaveRequest[] = leaveRecords.records.map((record: any) => ({

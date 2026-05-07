@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
       Period_Type__c: "Month",
     }
 
-    console.log("Creating Payroll Summary:", summaryPayload)
+   
 
     const summaryResult = await conn.sobject("Payroll_Summary__c").create(summaryPayload)
     
@@ -90,7 +90,6 @@ export async function POST(request: NextRequest) {
     }
 
     const summaryId = summary.id
-    console.log("Payroll Summary created with ID:", summaryId)
 
     const selectedMonthNumber = monthIndex + 1
     const periodStartDate = `${year}-${String(selectedMonthNumber).padStart(2, '0')}-01`
@@ -111,7 +110,6 @@ export async function POST(request: NextRequest) {
         .map((record: any) => record?.Date__c)
         .filter(Boolean)
 
-      console.log(`Fetched ${holidayDates.length} holiday(s) for payroll period ${month} ${year}`)
     } catch (holidayError) {
       console.error('Failed to fetch holidays for payslip working details:', holidayError)
       holidayDates = []
@@ -151,12 +149,10 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    console.log("Creating Payroll records:", JSON.stringify(payrollRecords, null, 2))
-    console.log("Number of payroll records to create:", payrollRecords.length)
-
+    
     const payrollResult = await conn.sobject("Payroll__c").create(payrollRecords, { allOrNone: false })
     
-    console.log("Payroll creation result:", JSON.stringify(payrollResult, null, 2))
+   
 
     // Generate payroll TXT summary (Employee Name + Net Salary) for direct download
     let payrollSummaryTxtContent: string | null = null
@@ -180,7 +176,7 @@ export async function POST(request: NextRequest) {
         ]
 
         payrollSummaryTxtContent = txtLines.join("\n")
-        console.log(`✓ Payroll TXT summary prepared: ${payrollSummaryTxtFileName}`)
+        
       }
     } catch (txtError: any) {
       console.error("Error generating payroll TXT summary:", txtError)
@@ -188,7 +184,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate and upload PDFs to S3
-    console.log("Generating and uploading payslip PDFs to S3...")
+    
     const pdfUploadResults = []
     
     for (let i = 0; i < employees.length; i++) {
@@ -270,7 +266,7 @@ export async function POST(request: NextRequest) {
         const employeeCode = emp.Employee_Id__c || emp.employeeId
         const s3Url = await uploadPayslipToS3(pdfBuffer, employeeCode, month, year)
 
-        console.log(`✓ PDF uploaded for ${emp.employeeName}: ${s3Url}`)
+        
         
         // Create Document__c record for the payslip
         try {
@@ -287,7 +283,7 @@ export async function POST(request: NextRequest) {
           const documentResult = await conn.sobject("Document__c").create(documentRecord)
           
           if (Array.isArray(documentResult) ? documentResult[0].success : documentResult.success) {
-            console.log(`✓ Document record created for ${emp.employeeName}`)
+          
           } else {
             console.error(`Failed to create document record for ${emp.employeeName}:`, 
               Array.isArray(documentResult) ? documentResult[0].errors : documentResult.errors)
@@ -314,7 +310,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    console.log("PDF generation and upload completed")
+    
 
     // Send in-app notifications to all employees about payslip generation
     try {
@@ -327,7 +323,7 @@ export async function POST(request: NextRequest) {
           'Payroll',
           false
         );
-        console.log(`✓ In-app notifications sent to ${employeeIds.length} employees about payslip generation`);
+        
       }
     } catch (notifError) {
       console.error('Error sending payslip notifications:', notifError);

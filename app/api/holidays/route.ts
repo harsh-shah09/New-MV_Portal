@@ -263,12 +263,10 @@ export async function POST(request: NextRequest) {
         Year__c: parseInt(h.year || new Date(h.date).getFullYear().toString(), 10),
       }));
 
-      console.log("Creating holidays with records:", JSON.stringify(holidayRecords, null, 2));
 
       // Bulk create all holidays at once
       const results = await conn.sobject('Holidays_List__c').create(holidayRecords) as any[];
 
-      console.log("Salesforce create results:", JSON.stringify(results, null, 2));
 
       // Check for failures
       const failures = results.filter(r => !r.success);

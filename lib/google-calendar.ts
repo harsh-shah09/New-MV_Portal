@@ -117,37 +117,29 @@ export async function createLeaveCalendarEventForEmployee({
     const normalizedEndDate = normalizeDateOnly(endDate);
 
     if (!isLossOfPayCategory(leaveCategory)) {
-      console.log('📅 [Calendar] Skipping event creation: not Loss of Pay', {
-        employeeId,
-        leaveCategory,
-        startDate: normalizedStartDate,
-        endDate: normalizedEndDate,
-      });
+    
       return null;
     }
 
     if (!isTodayOrFutureDate(normalizedStartDate)) {
-      console.log('📅 [Calendar] Skipping event creation: leave starts in the past', {
-        employeeId,
-        startDate: normalizedStartDate,
-        endDate: normalizedEndDate,
-      });
+    
+      return null;
+    }
+
+    if (!isTodayOrFutureDate(normalizedStartDate)) {
+
       return null;
     }
 
     const oauth2Client = createOAuth2Client();
     if (!oauth2Client) {
-      console.log('📅 [Calendar] Skipping event creation: OAuth client not configured', {
-        employeeId,
-      });
+      
       return null;
     }
 
     const integration = await getGoogleIntegration(employeeId);
     if (!integration?.refresh_token) {
-      console.log('📅 [Calendar] Skipping event creation: no Google integration refresh token', {
-        employeeId,
-      });
+      
       return null;
     }
 
@@ -161,10 +153,7 @@ export async function createLeaveCalendarEventForEmployee({
 
     const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
     const safeEmployeeName = (employeeName || 'Employee').trim();
-    console.log('📅 [Calendar] Creating leave calendar event:', {
-      employeeId,
-      safeEmployeeName,
-    });
+   
     const eventSummary = `Leave - ${safeEmployeeName}`;
     const summaryLeaveType = leaveType || 'Leave';
 
@@ -194,18 +183,9 @@ export async function createLeaveCalendarEventForEmployee({
       },
     });
 
-    console.log('📅 Leave calendar event created:', {
-      employeeId,
-      eventId: createdEvent.data?.id,
-      startDate: normalizedStartDate,
-      endDate: normalizedEndDate,
-    });
+    
     const eventId = createdEvent.data?.id || null;
-    console.log('📅 [Calendar] Event id extracted from Google response:', {
-      employeeId,
-      eventId,
-      googleEventStatus: createdEvent.data?.status,
-    });
+    
 
     try {
       const refreshedCredentials = oauth2Client.credentials;
@@ -277,10 +257,7 @@ export async function deleteLeaveCalendarEventForEmployee({
       scope: refreshedCredentials.scope ?? undefined,
     });
 
-    console.log('🗑️ Leave calendar event deleted:', {
-      employeeId,
-      eventId,
-    });
+    
 
     return true;
   } catch (error) {

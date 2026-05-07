@@ -118,9 +118,9 @@ export default function LeavesPage() {
     ? searchedEmployeeLeaves.find((leave) => leave.employeeId === searchedEmployeeId)?.employeeName || ""
     : ""
 
-  console.log("Current User:", currentUser)
+
   const { leaves, pendingApprovals, setLeaves, setPendingApprovals, updateLeave } = useLeaveStore()
-  console.log("Leaves from store:", pendingApprovals)
+
 
   const promptGoogleWorkspaceAuthentication = () => {
     Modal.confirm({
@@ -271,8 +271,6 @@ export default function LeavesPage() {
         if (response.ok) {
           const data = await response.json()
           setAllLeaves(data.allLeaves || [])
-          // toast.success('All leaves refreshed successfully')
-          console.log('All leaves refreshed successfully')
         }
       } catch (error) {
         console.error('Error fetching all leaves:', error)
@@ -461,7 +459,7 @@ export default function LeavesPage() {
     const submit = async (payload: Partial<LeaveRequest>, confirmedRules = false): Promise<void> => {
       const toastId = toast.loading("Submitting leave request...")
       try {
-        console.log("Submitting leave request data:", payload, "confirmedRules:", confirmedRules)
+
         const response = await fetch("/api/leave-management", {
           method: "POST",
           headers: {
@@ -1201,7 +1199,7 @@ export default function LeavesPage() {
                   pendingApprovals.length > 0 ? (
                     <div className="space-y-4">
                       {pendingApprovals.map((leave) => {
-                        console.log("Pending Approval Leave:", leave)
+
                         const isTeamLead = currentUser?.role === 'Developer' && currentUser?.title === 'Team Lead'
                         const isHR = currentUser?.role === 'HR'
                         const isAdmin = currentUser?.role === 'Admin'

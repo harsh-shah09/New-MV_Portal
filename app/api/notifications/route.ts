@@ -25,7 +25,6 @@ export async function GET(req: NextRequest) {
         
         return NextResponse.json(notifs);
     } catch(e: any) {
-        console.log(e)
         return NextResponse.json({ error: e.message }, { status: 500 });
     }
 }
@@ -69,7 +68,6 @@ export async function PATCH(req: NextRequest) {
         
         return NextResponse.json({ success: true });
     } catch(e: any) {
-        console.log(e)
         return NextResponse.json({ error: e.message }, { status: 500 });
     }
 }

@@ -134,7 +134,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                 if (data.showOnboarding) {
                     if (!publicMode) setOpen(true)
                     setCurrentStep(data.currentStep || 1)
-                    console.log("currentStep", data.currentStep);
+
                     if (data.employeeData) {
                         const emp = data.employeeData || {};
 
@@ -758,7 +758,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                 listType="picture-circle"
                                 showUploadList={false}
                                 beforeUpload={(file) => {
-                                    console.log(file.size)
+
                                     if(file.size > 1.1*1024*1024) {
                                         return false
                                     }
