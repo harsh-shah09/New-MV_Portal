@@ -211,7 +211,7 @@ export async function forgotPasswordAction(identifier: string) {
         const configs = await getSpecificConfigurations(['emailTemplates']);
         const templates = configs.emailTemplates || [];
         const forgotTemplate = templates.find(
-            (t: any) => (t.MasterLabel || '').toLowerCase() === 'forgot-password'
+            (t: any) => (t.MasterLabel || '').toLowerCase() === 'forgot password'
         );
 
         if (forgotTemplate?.Value__c) {

@@ -6,13 +6,22 @@ let connection: Connection | null = null;
 
 const TABLE_NAME = 'MV_Portal';
 const TOKEN_ID = 'Salesforce_Access_token';
+const CREDENTIALS_ID = 'Salesforce_Credentials';
 
-// Interface for stored token
+// Interface for stored OAuth token
 interface StoredToken {
   id: string;
   access_token: string;
   instance_url: string;
   updated_time: string;
+}
+
+// Interface for stored login credentials (fetched from DynamoDB)
+interface StoredCredentials {
+  username: string;
+  password: string;
+  security_token: string;
+  login_url?: string;
 }
 
 export const getSalesforceConnection = async () => {
@@ -60,20 +69,38 @@ export const getSalesforceConnection = async () => {
     // Continue to login if DB fails (maybe first run or DB issue)
   }
 
-  // 3. Perform fresh login
-  
+  // 3. Fetch credentials from DynamoDB
+  let sfCredentials: StoredCredentials;
+  try {
+    const credCmd = new GetCommand({
+      TableName: TABLE_NAME,
+      Key: {
+        Employee_Id: CREDENTIALS_ID,
+        SortKey: 'CREDENTIALS'
+      }
+    });
+    const credData = await db.send(credCmd);
+    if (!credData.Item) {
+      throw new Error('Salesforce credentials not found in DynamoDB. Please configure them via the Admin → Org Details panel.');
+    }
+    sfCredentials = credData.Item as StoredCredentials;
+    if (!sfCredentials.username || !sfCredentials.password || !sfCredentials.security_token) {
+      throw new Error('Salesforce credentials in DynamoDB are incomplete (username / password / security_token required).');
+    }
+  } catch (error: any) {
+    // Re-throw configuration errors so callers can surface them
+    throw error;
+  }
+
+  // 4. Perform fresh login using DynamoDB credentials
   const conn = new Connection({
-    loginUrl: process.env.SALESFORCE_LOGIN_URL || 'https://login.salesforce.com',
+    loginUrl: sfCredentials.login_url || 'https://login.salesforce.com',
     version: '50.0'
   });
 
-  if (!process.env.SALESFORCE_USERNAME || !process.env.SALESFORCE_PASSWORD || !process.env.SALESFORCE_SECURITY_TOKEN) {
-    throw new Error('Salesforce credentials (SALESFORCE_USERNAME, SALESFORCE_PASSWORD, SALESFORCE_TOKEN) are missing from environment variables.');
-  }
+  await conn.login(sfCredentials.username, sfCredentials.password + sfCredentials.security_token);
 
-  await conn.login(process.env.SALESFORCE_USERNAME, process.env.SALESFORCE_PASSWORD + process.env.SALESFORCE_SECURITY_TOKEN);
-
-  // 4. Store new token in DynamoDB
+  // 5. Store new token in DynamoDB
   try {
     const putCmd = new PutCommand({
     TableName: TABLE_NAME,

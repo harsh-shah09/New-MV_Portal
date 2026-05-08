@@ -5,6 +5,7 @@ import { verifySession } from '@/lib/auth';
 import { getEmployeeById, updateEmployee } from '@/lib/salesforce';
 import { db } from '@/lib/dynamodb';
 import { PutCommand, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { getAdminSettings } from '@/lib/admin-settings';
 
 const SCOPES = [
   'https://www.googleapis.com/auth/gmail.send',
@@ -43,8 +44,9 @@ async function fetchGoogleAccountEmail(oauth2Client: any): Promise<string | null
 }
 
 async function getOAuth2Client() {
-    const clientId = process.env.GOOGLE_CLIENT_ID;
-    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+    const settings = await getAdminSettings();
+    const clientId = settings.GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID;
+    const clientSecret = settings.GOOGLE_CLIENT_SECRET || process.env.GOOGLE_CLIENT_SECRET;
     
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:8080';
     const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/api/integrations/google/callback`;
