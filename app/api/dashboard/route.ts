@@ -333,7 +333,7 @@ export async function GET(req: NextRequest) {
                 ORDER BY Start_Date__c ASC
             `),
             conn.query(`
-                SELECT Name, Date__c, Day__c
+                SELECT Name, Holiday_Name__c, Date__c, Day__c
                 FROM Holidays_List__c
                 WHERE Date__c >= TODAY
                 ORDER BY Date__c ASC
@@ -400,6 +400,7 @@ export async function GET(req: NextRequest) {
 
         const holidays = holidaysQuery.records.map((record: any) => ({
             name: record.Name,
+            holiday_name: record.Holiday_Name__c,
             date: record.Date__c,
             day: record.Day__c
         }));

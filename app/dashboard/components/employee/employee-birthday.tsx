@@ -29,7 +29,7 @@ const BirthdayKpiCard: React.FC<BirthdayKpiCardProps> = ({ data }) => {
             Today’s {data?.length > 1 ? 'Birthdays' : 'Birthday'}
           </h2>
           <p className="text-sm text-gray-400">
-            Celebrate your team
+            Celebrate your team member’s birthday
           </p>
         </div>
 

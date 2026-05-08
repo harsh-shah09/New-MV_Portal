@@ -63,7 +63,7 @@ export function UpcomingLeavesHolidays({ upcomingLeaves, holidays }: UpcomingLea
                 <div key={index} className="p-3 bg-green-50 rounded-lg border border-green-200">
                   <div className="flex justify-between items-start">
                     <div>
-                      <div className="font-semibold text-gray-900">{holiday.name}</div>
+                      <div className="font-semibold text-gray-900">{holiday.holiday_name}</div>
                       <div className="text-sm text-gray-600">
                         {dayjs(holiday.date).format('MMM DD, YYYY')} • {holiday.day}
                       </div>

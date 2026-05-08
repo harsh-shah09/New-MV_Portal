@@ -29,6 +29,7 @@ export function PendingApprovalsQueue({
   const [isLoading, setIsLoading] = useState(false)
   const [rejectModalVisible, setRejectModalVisible] = useState(false)
   const [rejectingLeaveId, setRejectingLeaveId] = useState<string | null>(null)
+  const [rejectingLeaveAction, setRejectingLeaveAction] = useState<"reject" | "reject_withdrawal">("reject")
   const [rejectReason, setRejectReason] = useState("")
   const [ruleChoiceModalVisible, setRuleChoiceModalVisible] = useState(false)
   const [ruleChoiceLeave, setRuleChoiceLeave] = useState<any | null>(null)
@@ -58,7 +59,8 @@ export function PendingApprovalsQueue({
 
   const handleApprove = async (
     leaveId: string,
-    ruleOptions: { applySandwichRule: boolean; applyOnePlusTwoRule: boolean }
+    ruleOptions: { applySandwichRule: boolean; applyOnePlusTwoRule: boolean },
+    action: "approve" | "approve_withdrawal" = "approve"
   ) => {
     setLoading(leaveId)
     try {
@@ -69,7 +71,7 @@ export function PendingApprovalsQueue({
         },
         body: JSON.stringify({
           leaveId,
-          action: 'approve',
+          action,
           applySandwichRule: ruleOptions.applySandwichRule,
           applyOnePlusTwoRule: ruleOptions.applyOnePlusTwoRule,
         })
@@ -78,10 +80,13 @@ export function PendingApprovalsQueue({
       const result = await response.json()
 
       if (response.ok) {
+        const isWithdrawal = action === "approve_withdrawal"
         message.success(
-          dashboardView === 'hr'
-            ? `Leave approved successfully${ruleOptions.applySandwichRule || ruleOptions.applyOnePlusTwoRule ? ' with selected rules.' : ' without rules.'}`
-            : 'Leave approved successfully'
+          isWithdrawal
+            ? 'Withdrawal approved successfully'
+            : dashboardView === 'hr'
+                ? `Leave approved successfully${ruleOptions.applySandwichRule || ruleOptions.applyOnePlusTwoRule ? ' with selected rules.' : ' without rules.'}`
+                : 'Leave approved successfully'
         )
         // Refresh only this component's data
         await fetchPendingApprovals()
@@ -165,11 +170,16 @@ export function PendingApprovalsQueue({
       }
     }
 
+    const isWithdrawalRequest = record?.isWithdrawalRequest === true
     confirmModalRef = Modal.confirm({
-      title: 'Approve Leave Request',
+      title: isWithdrawalRequest ? 'Approve Withdrawal Request' : 'Approve Leave Request',
       content: record ? (
         <div>
-          <p className="mb-3">Are you sure you want to approve this leave request?</p>
+          <p className="mb-3">
+            {isWithdrawalRequest
+              ? 'Are you sure you want to approve this withdrawal request?'
+              : 'Are you sure you want to approve this leave request?'}
+          </p>
           <div className="p-3 bg-green-50 border border-green-200 rounded">
             <div className="text-sm space-y-1">
               <div><strong>Employee:</strong> {record.employeeName}</div>
@@ -185,7 +195,7 @@ export function PendingApprovalsQueue({
             </div>
           </div>
           <p className="mt-3 text-sm text-green-700">✓ Email notification will be sent to the employee</p>
-          {isHRUser && (
+          {isHRUser && !record?.isWithdrawalRequest && (
             <div className="mt-4 pt-3 border-t border-amber-200">
               <Button danger type="default" onClick={handleMarkDoubtfulCaseClick}>
                 Mark as Doubtful Case
@@ -193,11 +203,16 @@ export function PendingApprovalsQueue({
             </div>
           )}
         </div>
-      ) : 'Are you sure you want to approve this leave request?',
-      okText: 'Approve',
+      ) : isWithdrawalRequest ? 'Are you sure you want to approve this withdrawal request?' : 'Are you sure you want to approve this leave request?',
+      okText: isWithdrawalRequest ? 'Approve Withdrawal' : 'Approve',
       cancelText: 'Cancel',
       okButtonProps: { style: { backgroundColor: '#10b981' } },
       onOk: async () => {
+        if (isWithdrawalRequest) {
+          await handleApprove(record.id, { applySandwichRule: false, applyOnePlusTwoRule: false }, "approve_withdrawal")
+          return
+        }
+
         if (shouldShowRulesPopup(record)) {
           setRuleChoiceLeave(record)
           setApplySandwichSelection(record?.sandwichRuleApplicable === true)
@@ -216,7 +231,11 @@ export function PendingApprovalsQueue({
     })
   }
 
-  const handleReject = async (leaveId: string, reason: string): Promise<boolean> => {
+  const handleReject = async (
+    leaveId: string,
+    reason: string,
+    action: "reject" | "reject_withdrawal" = "reject"
+  ): Promise<boolean> => {
     setLoading(leaveId)
     try {
       const response = await fetch('/api/leave-management', {
@@ -226,7 +245,7 @@ export function PendingApprovalsQueue({
         },
         body: JSON.stringify({
           leaveId,
-          action: 'reject',
+          action,
           reason
         })
       })
@@ -234,7 +253,7 @@ export function PendingApprovalsQueue({
       const result = await response.json()
 
       if (response.ok) {
-        message.success('Leave rejected successfully')
+        message.success(action === "reject_withdrawal" ? 'Withdrawal rejected successfully' : 'Leave rejected successfully')
         // Refresh only this component's data
         await fetchPendingApprovals()
         return true
@@ -251,8 +270,9 @@ export function PendingApprovalsQueue({
     }
   }
 
-  const openRejectModal = (leaveId: string) => {
-    setRejectingLeaveId(leaveId)
+  const openRejectModal = (record: any) => {
+    setRejectingLeaveId(record?.id || null)
+    setRejectingLeaveAction(record?.isWithdrawalRequest ? "reject_withdrawal" : "reject")
     setRejectReason("")
     setRejectModalVisible(true)
   }
@@ -269,10 +289,11 @@ export function PendingApprovalsQueue({
       return
     }
 
-    const success = await handleReject(rejectingLeaveId, trimmedReason)
+    const success = await handleReject(rejectingLeaveId, trimmedReason, rejectingLeaveAction)
     if (success) {
       setRejectModalVisible(false)
       setRejectingLeaveId(null)
+      setRejectingLeaveAction("reject")
       setRejectReason("")
     }
   }
@@ -319,9 +340,14 @@ export function PendingApprovalsQueue({
       dataIndex: 'tlApproved',
       key: 'tlApproved',
       width: 120,
-      render: (status) => {
+      render: (_status, record) => {
+        if (record?.isWithdrawalRequest) {
+          return <Badge status="warning" text="Withdrawal Pending" />
+        }
+
+        const status = record?.tlApproved
         if (!status) return <Badge status="default" text="N/A" />
-        return status === 'Approved' 
+        return status === 'Approved'
           ? <Badge status="success" text="Approved" />
           : <Badge status="error" text="Rejected" />
       }
@@ -348,7 +374,7 @@ export function PendingApprovalsQueue({
             icon={<CloseCircleOutlined />}
             loading={loading === record.id}
             disabled={loading !== null}
-            onClick={() => openRejectModal(record.id)}
+            onClick={() => openRejectModal(record)}
           >
             Reject
           </Button>
