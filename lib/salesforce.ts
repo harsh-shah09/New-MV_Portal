@@ -5,95 +5,140 @@ import { GetCommand, PutCommand } from '@aws-sdk/lib-dynamodb';
 let connection: Connection | null = null;
 
 const TABLE_NAME = 'MV_Portal';
-const TOKEN_ID = 'Salesforce_Access_token';
+const ORG_TOKEN_ID = 'SALESFORCE_ORG_CONNECTION';  // OAuth-based token key
 
-// Interface for stored token
-interface StoredToken {
-  id: string;
+// Interface for stored OAuth token
+interface StoredOAuthToken {
   access_token: string;
+  refresh_token?: string;
   instance_url: string;
-  updated_time: string;
+  login_domain: string;
+  org_type: string;
+  connected_at: string;
+  user_info?: Record<string, any>;
 }
 
-export const getSalesforceConnection = async () => {
-  // 1. Return in-memory connection if active
+/** Resets the cached in-memory connection (called after disconnect / new connection). */
+export const resetConnection = () => {
+  connection = null;
+};
+
+/**
+ * Try to refresh the access token using the stored refresh token.
+ * Returns the new access_token, or null if refresh fails.
+ */
+const refreshAccessToken = async (stored: StoredOAuthToken): Promise<string | null> => {
+  if (!stored.refresh_token) return null;
+
+  const clientId = process.env.SALESFORCE_CLIENT_ID;
+  const clientSecret = process.env.SALESFORCE_CLIENT_SECRET;
+  if (!clientId || !clientSecret) return null;
+
+  const loginDomain = stored.login_domain || 'login.salesforce.com';
+
+  try {
+    const refreshRes = await fetch(`https://${loginDomain}/services/oauth2/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'refresh_token',
+        client_id: clientId,
+        client_secret: clientSecret,
+        refresh_token: stored.refresh_token,
+      }).toString(),
+    });
+
+    if (!refreshRes.ok) {
+      const err = await refreshRes.json().catch(() => ({}));
+      console.error('Token refresh failed:', err);
+      return null;
+    }
+
+    const refreshData = await refreshRes.json();
+    const newAccessToken = refreshData.access_token;
+
+    // Persist refreshed token back to DynamoDB
+    const putCmd = new PutCommand({
+      TableName: TABLE_NAME,
+      Item: {
+        ...stored,
+        Employee_Id: ORG_TOKEN_ID,
+        SortKey: 'TOKEN',
+        access_token: newAccessToken,
+        updated_at: new Date().toISOString(),
+      },
+    });
+    await db.send(putCmd);
+    return newAccessToken;
+  } catch (e) {
+    console.error('Error during token refresh:', e);
+    return null;
+  }
+};
+
+export const getSalesforceConnection = async (): Promise<Connection> => {
+  // 1. Return in-memory connection if still alive
   if (connection) {
-      try {
-           return connection;
-      } catch(e) {
-          connection = null;
-      }
+    try {
+      await connection.identity(); // lightweight check
+      return connection;
+    } catch {
+      connection = null; // expired — fall through
+    }
   }
 
-  // 2. Try to get invalid/expired token logic is handled by "try to use it, if fail, login"
-  // But first, let's check DB for an existing token to avoid login spam
+  // 2. Load OAuth token from DynamoDB (new OAuth-based key first)
+  let stored: StoredOAuthToken | null = null;
   try {
     const getCmd = new GetCommand({
       TableName: TABLE_NAME,
-      Key: {
-          Employee_Id: TOKEN_ID,
-          SortKey: "TOKEN"
-        }
+      Key: { Employee_Id: ORG_TOKEN_ID, SortKey: 'TOKEN' },
     });
     const data = await db.send(getCmd);
-  
     if (data.Item) {
-      const stored = data.Item as StoredToken;
-      // Initialize connection with stored token
-      const conn = new Connection({
-        instanceUrl: stored.instance_url,
-        accessToken: stored.access_token,
-        version: '50.0'
-      });
-
-      // Verify token validity
-      try {
-        await conn.identity();
-        connection = conn;
-        return connection;
-      } catch (err) {
-        // Token invalid, fall through to login
-      }
+      stored = data.Item as StoredOAuthToken;
     }
   } catch (error) {
-    console.warn('Failed to fetch token from DynamoDB:', error);
-    // Continue to login if DB fails (maybe first run or DB issue)
+    console.warn('Failed to fetch OAuth token from DynamoDB:', error);
   }
 
-  // 3. Perform fresh login
-  
+  if (!stored) {
+    throw new Error('No Salesforce org connected. Please connect an org via the Salesforce Connect page.');
+  }
+
+  // 3. Try using the stored access token
+  let accessToken = stored.access_token;
   const conn = new Connection({
-    loginUrl: process.env.SALESFORCE_LOGIN_URL || 'https://login.salesforce.com',
-    version: '50.0'
+    instanceUrl: stored.instance_url,
+    accessToken,
+    version: '50.0',
   });
 
-  if (!process.env.SALESFORCE_USERNAME || !process.env.SALESFORCE_PASSWORD || !process.env.SALESFORCE_SECURITY_TOKEN) {
-    throw new Error('Salesforce credentials (SALESFORCE_USERNAME, SALESFORCE_PASSWORD, SALESFORCE_TOKEN) are missing from environment variables.');
-  }
-
-  await conn.login(process.env.SALESFORCE_USERNAME, process.env.SALESFORCE_PASSWORD + process.env.SALESFORCE_SECURITY_TOKEN);
-
-  // 4. Store new token in DynamoDB
   try {
-    const putCmd = new PutCommand({
-    TableName: TABLE_NAME,
-    Item: {
-      Employee_Id: TOKEN_ID,
-      SortKey: "TOKEN",
-      access_token: conn.accessToken,
-      instance_url: conn.instanceUrl,
-      updated_time: new Date().toISOString()
-    }
-  });
-    await db.send(putCmd);
-  } catch (error) {
-    console.error('Failed to save token to DynamoDB:', error);
-    // Don't fail the request just because caching failed, but log it
+    await conn.identity();
+    connection = conn;
+    return connection;
+  } catch {
+    // Token expired — try refresh
+    console.log('Access token expired, attempting refresh...');
   }
 
-  connection = conn;
+  // 4. Refresh the token
+  const newAccessToken = await refreshAccessToken(stored);
+  if (!newAccessToken) {
+    throw new Error('Salesforce session expired and could not be refreshed. Please reconnect the org.');
+  }
+
+  const freshConn = new Connection({
+    instanceUrl: stored.instance_url,
+    accessToken: newAccessToken,
+    version: '50.0',
+  });
+
+  connection = freshConn;
   return connection;
 };
+
 
 export interface Employee {
   Id: string;

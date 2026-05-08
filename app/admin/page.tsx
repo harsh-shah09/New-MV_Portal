@@ -21,7 +21,13 @@ import {
     Trash2,
     Package,
     ChevronLeft,
-    ChevronRight
+    ChevronRight,
+    Cloud,
+    Link2Off,
+    Globe,
+    UserCircle,
+    Clock,
+    RefreshCcw
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { message, Modal, Select, Spin, Collapse, Input } from "antd";
@@ -34,9 +40,9 @@ const formatLabel = (str: string) => {
     return str.replace(/_/g, ' ').replace(/([A-Z])/g, ' $1').trim();
 };
 
-type AdminTab = "admin" | "documents" | "email" | "leave" | "users" | "integration" | "assets";
+type AdminTab = "admin" | "documents" | "email" | "leave" | "users" | "integration" | "assets" | "org";
 
-const VALID_TABS: AdminTab[] = ["admin", "documents", "leave", "users", "integration", "email", "assets"];
+const VALID_TABS: AdminTab[] = ["admin", "documents", "leave", "users", "integration", "email", "assets", "org"];
 
 function getTabFromQuery(): AdminTab {
     if (typeof window === "undefined") return "admin";
@@ -74,6 +80,11 @@ export default function AdminConsole() {
     const [connectedUsers, setConnectedUsers] = useState<any[]>([]);
     const [loadingIntegrations, setLoadingIntegrations] = useState(false);
 
+    // Org Details State
+    const [orgStatus, setOrgStatus] = useState<any>(null);
+    const [loadingOrg, setLoadingOrg] = useState(false);
+    const [disconnecting, setDisconnecting] = useState(false);
+
     // Email Editor State
     const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
 
@@ -97,6 +108,9 @@ export default function AdminConsole() {
             if (users.length === 0) fetchUsers(); // Need users to match names
             fetchConnectedUsers();
         }
+        if (activeTab === 'org') {
+            fetchOrgStatus();
+        }
     }, [activeTab]);
 
     const fetchConnectedUsers = async () => {
@@ -113,6 +127,55 @@ export default function AdminConsole() {
             setLoadingIntegrations(false);
         }
     }
+
+    const fetchOrgStatus = async () => {
+        try {
+            setLoadingOrg(true);
+            const res = await fetch('/api/salesforce/status');
+            if (res.ok) {
+                const data = await res.json();
+                setOrgStatus(data);
+            }
+        } catch (e) {
+            console.error('Failed to fetch org status', e);
+        } finally {
+            setLoadingOrg(false);
+        }
+    };
+
+    const handleDisconnectOrg = async () => {
+        Modal.confirm({
+            title: 'Disconnect Salesforce Org?',
+            icon: <AlertTriangle className="text-red-500 w-6 h-6 mr-2" />,
+            content: (
+                <div className="space-y-2">
+                    <p className="font-semibold text-red-600">⚠️ This action will disconnect the entire portal from Salesforce.</p>
+                    <p className="text-sm text-slate-600">Once disconnected, <strong>no users will be able to access the portal</strong> until an Admin reconnects an org. All tokens will be permanently deleted from the system.</p>
+                </div>
+            ),
+            okText: 'Yes, Disconnect',
+            okButtonProps: { danger: true },
+            cancelText: 'Cancel',
+            onOk: async () => {
+                try {
+                    setDisconnecting(true);
+                    const res = await fetch('/api/salesforce/disconnect', { method: 'DELETE' });
+                    if (res.ok) {
+                        message.success('Salesforce org disconnected successfully');
+                        setOrgStatus(null);
+                        window.location.href = '/salesforce-connect';
+                    } else {
+                        const err = await res.json();
+                        message.error(err.error || 'Failed to disconnect');
+                    }
+                } catch (e) {
+                    message.error('Failed to disconnect org');
+                } finally {
+                    setDisconnecting(false);
+                }
+            }
+        });
+    };
 
     const handleDeleteIntegration = async (employeeId: string) => {
         if (!confirm("Are you sure you want to disconnect this user's Google integration?")) return;
@@ -380,6 +443,7 @@ export default function AdminConsole() {
                                 <TabButton id="integration" label="Connected Users" icon={Workflow} />
                                 <TabButton id="email" label="Email Templates" icon={Mail} />
                                 <TabButton id="assets" label="Asset Settings" icon={Package} />
+                                <TabButton id="org" label="Org Details" icon={Cloud} />
                             </div>
 
                             {unsavedChanges.length > 0 && (
@@ -918,6 +982,142 @@ export default function AdminConsole() {
                                                         </>
                                                     )}
                                                 </div>
+                                            </div>
+                                        )}
+
+                                        {activeTab === "org" && (
+                                            <div className="space-y-6">
+                                                <div className="flex items-center justify-between">
+                                                    <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                                                        <Cloud className="w-5 h-5 text-blue-500" /> Salesforce Org Details
+                                                    </h2>
+                                                    <button onClick={fetchOrgStatus} className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-blue-600 transition">
+                                                        <RefreshCcw className="w-4 h-4" /> Refresh
+                                                    </button>
+                                                </div>
+
+                                                {loadingOrg ? (
+                                                    <div className="flex justify-center py-16"><Spin size="large" /></div>
+                                                ) : orgStatus?.connected ? (
+                                                    <>
+                                                        {/* Connection Badge */}
+                                                        <div className="flex items-center gap-3 p-4 bg-green-50 border border-green-200 rounded-2xl">
+                                                            <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center">
+                                                                <CheckCircle2 className="w-5 h-5 text-green-600" />
+                                                            </div>
+                                                            <div>
+                                                                <div className="font-semibold text-green-800">Org Connected</div>
+                                                                <div className="text-xs text-green-600">
+                                                                    Connected on {orgStatus.connected_at ? new Date(orgStatus.connected_at).toLocaleString() : 'N/A'}
+                                                                </div>
+                                                            </div>
+                                                            <span className={`ml-auto px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide ${
+                                                                orgStatus.org_type === 'production' ? 'bg-blue-100 text-blue-700' :
+                                                                orgStatus.org_type === 'sandbox' ? 'bg-amber-100 text-amber-700' :
+                                                                'bg-violet-100 text-violet-700'
+                                                            }`}>
+                                                                {orgStatus.org_type}
+                                                            </span>
+                                                        </div>
+
+                                                        {/* Org Info Grid */}
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                            {[
+                                                                { icon: Globe, label: 'Login Domain', value: orgStatus.login_domain },
+                                                                { icon: Globe, label: 'Instance URL', value: orgStatus.instance_url },
+                                                            ].map(({ icon: Icon, label, value }) => (
+                                                                <div key={label} className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                                                                    <div className="flex items-center gap-2 text-slate-500 text-xs font-medium mb-1">
+                                                                        <Icon className="w-3.5 h-3.5" />
+                                                                        {label}
+                                                                    </div>
+                                                                    <div className="text-slate-900 font-mono text-sm break-all">{value || '—'}</div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+
+                                                        {/* Admin User Info */}
+                                                        {orgStatus.user_info && (
+                                                            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6">
+                                                                <h3 className="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2">
+                                                                    <UserCircle className="w-4 h-4 text-blue-500" /> Connected User Info
+                                                                </h3>
+                                                                <div className="flex items-center gap-4 mb-5">
+                                                                    {orgStatus.user_info.photos?.thumbnail ? (
+                                                                        <img src={orgStatus.user_info.photos.thumbnail} className="w-14 h-14 rounded-full border-2 border-blue-200 object-cover" />
+                                                                    ) : (
+                                                                        <div className="w-14 h-14 rounded-full bg-blue-100 flex items-center justify-center">
+                                                                            <UserCircle className="w-7 h-7 text-blue-400" />
+                                                                        </div>
+                                                                    )}
+                                                                    <div>
+                                                                        <div className="font-bold text-slate-900 text-lg">{orgStatus.user_info.name || '—'}</div>
+                                                                        <div className="text-slate-500 text-sm">{orgStatus.user_info.email || '—'}</div>
+                                                                        <span className="inline-block mt-1 px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full font-medium">
+                                                                            {orgStatus.user_info.user_type || 'Standard'}
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+                                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                                                                    {[
+                                                                        { label: 'Username', value: orgStatus.user_info.preferred_username },
+                                                                        { label: 'Locale', value: orgStatus.user_info.locale },
+                                                                        { label: 'Language', value: orgStatus.user_info.language },
+                                                                        { label: 'Timezone', value: orgStatus.user_info.zoneinfo },
+                                                                        { label: 'Mobile', value: orgStatus.user_info.mobile_phone },
+                                                                        { label: 'Org ID', value: orgStatus.user_info.organization_id },
+                                                                    ].filter(r => r.value).map(({ label, value }) => (
+                                                                        <div key={label} className="bg-white border border-slate-100 rounded-lg p-3">
+                                                                            <div className="text-xs text-slate-400 mb-0.5">{label}</div>
+                                                                            <div className="font-medium text-slate-800 text-sm break-all">{value}</div>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Warning + Disconnect */}
+                                                        <div className="border border-red-200 bg-red-50 rounded-2xl p-5">
+                                                            <div className="flex items-start gap-3">
+                                                                <Link2Off className="w-5 h-5 text-red-500 mt-0.5 shrink-0" />
+                                                                <div className="flex-1">
+                                                                    <div className="font-semibold text-red-800 mb-1">Danger Zone — Disconnect Org</div>
+                                                                    <p className="text-red-700 text-sm mb-4">
+                                                                        Disconnecting will delete all Salesforce tokens and make the entire portal inaccessible to all users until an Admin reconnects a new org. This action cannot be undone.
+                                                                    </p>
+                                                                    <div className="text-xs text-red-500 mb-3 flex items-center gap-1.5">
+                                                                        <Clock className="w-3.5 h-3.5" />
+                                                                        To connect a different org, disconnect first then visit the Salesforce Connect page.
+                                                                    </div>
+                                                                    <button
+                                                                        onClick={handleDisconnectOrg}
+                                                                        disabled={disconnecting}
+                                                                        className="flex items-center gap-2 px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-semibold text-sm shadow-lg shadow-red-600/20 transition disabled:opacity-60 disabled:cursor-not-allowed"
+                                                                    >
+                                                                        {disconnecting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link2Off className="w-4 h-4" />}
+                                                                        Disconnect Org
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </>
+                                                ) : (
+                                                    <div className="flex flex-col items-center justify-center py-16 text-center">
+                                                        <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
+                                                            <Cloud className="w-8 h-8 text-slate-400" />
+                                                        </div>
+                                                        <h3 className="font-bold text-slate-700 text-lg mb-2">No Salesforce Org Connected</h3>
+                                                        <p className="text-slate-500 text-sm mb-6 max-w-sm">
+                                                            Connect a Salesforce org to power the portal with live data. Only one org can be connected at a time.
+                                                        </p>
+                                                        <a
+                                                            href="/salesforce-connect"
+                                                            className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-xl font-semibold text-sm shadow-lg shadow-blue-500/20 hover:bg-blue-700 transition"
+                                                        >
+                                                            <Cloud className="w-4 h-4" /> Connect Salesforce Org
+                                                        </a>
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
 
