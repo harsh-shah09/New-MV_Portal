@@ -280,6 +280,21 @@ function createRuleCalculationDetails(
   mergeInfo?: RuleCalculationDetails["mergeInfo"],
   ruleSelection?: boolean | { applySandwichRule?: boolean; applyOnePlusTwoRule?: boolean }
 ): RecalculatedLeaveMetrics {
+  const LEAVE_POLICY_DEBUG = false
+
+  const debugLog = (message: string, details?: Record<string, unknown>) => {
+    if (!LEAVE_POLICY_DEBUG) {
+      return;
+    }
+
+    if (details) {
+      console.debug(`[leave-management] ${message}`, details);
+      return;
+    }
+
+    console.debug(`[leave-management] ${message}`);
+  };
+
   const isWeekend = (d: dayjs.Dayjs) => {
     const day = d.day();
     return day === 0 || day === 6;
@@ -310,8 +325,20 @@ function createRuleCalculationDetails(
   }
   
   // Check if start day is partial (doesn't start with Session-1) or end day is partial (doesn't end with Session-2)
-  const startDayIsPartial = sessionStartValue && sessionStartValue !== "Session-1";
-  const endDayIsPartial = sessionEndValue && sessionEndValue !== "Session-2";
+  const startDayIsPartial = !!sessionStartValue && sessionStartValue !== "Session-1";
+  const endDayIsPartial = !!sessionEndValue && sessionEndValue !== "Session-2";
+
+  debugLog("sessionFlags", {
+    startDate: startDate.format("YYYY-MM-DD"),
+    endDate: endDate.format("YYYY-MM-DD"),
+    sessionStartValue,
+    sessionEndValue,
+    isHalfDay,
+    startDayIsPartial,
+    endDayIsPartial,
+    workingDaysInRange,
+    nonWorkingDaysInRange,
+  });
   
   // Calculate the number of full working days (excluding partial days at start/end)
   let fullWorkingDaysInRange = workingDaysInRange;
@@ -348,23 +375,44 @@ function createRuleCalculationDetails(
     const sandwichWindowEnd = endDate.add(3, "day");
     while (sandwichCursor.isSame(sandwichWindowEnd) || sandwichCursor.isBefore(sandwichWindowEnd)) {
       const dateKey = sandwichCursor.format("YYYY-MM-DD");
+      const isStartDate = sandwichCursor.isSame(startDate, "day");
+      const isEndDate = sandwichCursor.isSame(endDate, "day");
       const isLeaveDay =
         (sandwichCursor.isSame(startDate) || sandwichCursor.isAfter(startDate)) &&
         (sandwichCursor.isSame(endDate) || sandwichCursor.isBefore(endDate)) &&
         !isNonWorking(sandwichCursor);
+      const isHalfDayForDate = isStartDate && isEndDate
+        ? isHalfDay
+        : (isStartDate && startDayIsPartial) || (isEndDate && endDayIsPartial);
 
       sandwichDateList.push({
         date: dateKey,
         isLeaveDay,
-        isHalfDay,
+        isHalfDay: isHalfDayForDate,
         leaveType,
         leaveCategory,
         isPublicHoliday: holidaySet.has(dateKey),
         isWeekend: isWeekend(sandwichCursor),
       });
 
+      debugLog("sandwichDate", {
+        date: dateKey,
+        isLeaveDay,
+        isHalfDay: isHalfDayForDate,
+        isPublicHoliday: holidaySet.has(dateKey),
+        isWeekend: isWeekend(sandwichCursor),
+      });
+
       sandwichCursor = sandwichCursor.add(1, "day");
     }
+
+    debugLog("sandwichWindow", {
+      startDate: startDate.format("YYYY-MM-DD"),
+      endDate: endDate.format("YYYY-MM-DD"),
+      sandwichWindowEnd: sandwichWindowEnd.format("YYYY-MM-DD"),
+      applySandwichRule,
+      fullWorkingDaysInRange,
+    });
   }
 
   const sandwichPolicy =

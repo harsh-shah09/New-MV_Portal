@@ -45,6 +45,20 @@ interface NormalizedEntry {
 
 const DEFAULT_ALLOWED_LEAVE_TYPES = ["planned leave"]
 const DEFAULT_ALLOWED_LEAVE_CATEGORIES = ["loss of pay", "loss-of-pay"]
+const LEAVE_POLICY_DEBUG = false
+
+function debugLog(message: string, details?: Record<string, unknown>): void {
+  if (!LEAVE_POLICY_DEBUG) {
+    return
+  }
+
+  if (details) {
+    console.debug(`[leave-policy] ${message}`, details)
+    return
+  }
+
+  console.debug(`[leave-policy] ${message}`)
+}
 
 function normalizeDateKey(value: string): string {
   return dayjs(value).format("YYYY-MM-DD")
@@ -176,6 +190,12 @@ export function calculateLeaveDays(
     (options.allowedLeaveCategories ?? DEFAULT_ALLOWED_LEAVE_CATEGORIES).map((value) => value.trim().toLowerCase())
   )
 
+  debugLog("calculateLeaveDays:start", {
+    inputCount: dateList.length,
+    allowedLeaveTypes: [...allowedLeaveTypes],
+    allowedLeaveCategories: [...allowedLeaveCategories],
+  })
+
   const entriesByDate = normalizeEntries(dateList)
   const calendarDays = buildCalendarWindow(entriesByDate)
   const dayMap = new Map(calendarDays.map((entry) => [entry.date, entry]))
@@ -226,6 +246,29 @@ export function calculateLeaveDays(
 
     const applied = hasLeaveBefore && hasLeaveAfter
 
+    debugLog("nonWorkingBlock", {
+      startDate: blockDates[0],
+      endDate: blockDates[blockDates.length - 1],
+      hasLeaveBefore,
+      hasLeaveAfter,
+      applied,
+      prevDay: prevDay ? {
+        date: prevDay.date,
+        isLeaveDay: prevDay.isLeaveDay,
+        isHalfDay: prevDay.isHalfDay,
+        leaveType: prevDay.leaveType,
+        leaveCategory: prevDay.leaveCategory,
+      } : undefined,
+      nextDay: nextDay ? {
+        date: nextDay.date,
+        isLeaveDay: nextDay.isLeaveDay,
+        isHalfDay: nextDay.isHalfDay,
+        leaveType: nextDay.leaveType,
+        leaveCategory: nextDay.leaveCategory,
+      } : undefined,
+      dates: blockDates,
+    })
+
     if (applied) {
       blockDates.forEach((date) => standardSandwichDates.add(date))
     }
@@ -268,6 +311,12 @@ export function calculateLeaveDays(
     const hasMondayHoliday = !!monday && monday.isPublicHoliday && !monday.isLeaveDay
 
     if (hasWeekendAfterFriday && hasMondayHoliday) {
+      debugLog("customOverrideApplied", {
+        friday: day.date,
+        saturday: saturday?.date,
+        sunday: sunday?.date,
+        monday: monday?.date,
+      })
       customOverrideDates.add(saturday.date)
       customOverrideDates.add(sunday.date)
       customOverrideDates.add(monday.date)
@@ -285,6 +334,14 @@ export function calculateLeaveDays(
       totalLeaveDays += 1
     }
   }
+
+  debugLog("calculateLeaveDays:result", {
+    totalLeaveDays,
+    sandwichApplied: sandwichDates.size > 0,
+    sandwichDates: sortDateStrings(sandwichDates),
+    standardSandwichDates: sortDateStrings(standardSandwichDates),
+    customOverrideDates: sortDateStrings(customOverrideDates),
+  })
 
   return {
     totalLeaveDays,

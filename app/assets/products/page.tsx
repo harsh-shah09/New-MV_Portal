@@ -1,8 +1,7 @@
 import { getProducts } from '../actions';
-import { Button } from 'antd';
-import Link from 'next/link';
-import { ArrowLeft, Package } from 'lucide-react';
+import { Package } from 'lucide-react';
 import { ProductList } from './product-list'; // Client component for search/table
+import { BackLink } from '../components/backlink';  
 
 export default async function ProductsPage() {
   const products = await getProducts(); // Returns SalesforceProduct[]
@@ -10,12 +9,7 @@ export default async function ProductsPage() {
   return (
     <div className="p-6 md:p-8 w-full mx-auto space-y-6">
         <div className="flex items-center gap-4 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-            <Link href="/assets">
-                <Button 
-                    icon={<ArrowLeft className="w-4 h-4" />} 
-                    className="flex items-center justify-center h-10 w-10 rounded-xl border-gray-200 text-gray-600 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 shadow-sm transition-all"
-                />
-            </Link>
+            <BackLink />
             <div className="flex-1">
                 <div className="flex items-center gap-2">
                     <Package className="w-6 h-6 text-blue-600" />
