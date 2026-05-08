@@ -34,6 +34,21 @@ const sessionOptions = [
   { value: "Session-2", label: "Session-2 (2nd Half)" },
 ]
 
+const LEAVE_REQUEST_DEBUG = true
+
+function debugLog(message: string, details?: Record<string, unknown>): void {
+  if (!LEAVE_REQUEST_DEBUG) {
+    return
+  }
+
+  if (details) {
+    console.debug(`[leave-request-form] ${message}`, details)
+    return
+  }
+
+  console.debug(`[leave-request-form] ${message}`)
+}
+
 export function LeaveRequestForm({ onSubmit, onCancel, isSubmitting, setIsSubmitting, employeeId, employeeName }: LeaveRequestFormProps) {
   const [form] = Form.useForm()
   const [duration, setDuration] = useState(0)
@@ -147,7 +162,15 @@ export function LeaveRequestForm({ onSubmit, onCancel, isSubmitting, setIsSubmit
     const sessionEnd = allValues.sessionEnd
 
     if (start && end) {
-      setDuration(calculateDuration(start, end, sessionStart, sessionEnd))
+      const nextDuration = calculateDuration(start, end, sessionStart, sessionEnd)
+      setDuration(nextDuration)
+      debugLog("durationRecalculated", {
+        startDate: start.format("YYYY-MM-DD"),
+        endDate: end.format("YYYY-MM-DD"),
+        sessionStart,
+        sessionEnd,
+        duration: nextDuration,
+      })
     }
   }
 
@@ -351,6 +374,16 @@ export function LeaveRequestForm({ onSubmit, onCancel, isSubmitting, setIsSubmit
     let totalDeduction = computedDuration
     let penaltyDays = 0
 
+    debugLog("submitAttempt", {
+      leaveCategory: values.leaveCategory,
+      leaveType: values.leaveType,
+      startDate: startDate.format("YYYY-MM-DD"),
+      endDate: endDate.format("YYYY-MM-DD"),
+      sessionStart,
+      sessionEnd,
+      computedDuration,
+    })
+
     // Check if it's a planned leave and calculate penalties day by day
     if (leaveType === 'Planned Leave' && startDate && endDate) {
 
@@ -409,6 +442,13 @@ export function LeaveRequestForm({ onSubmit, onCancel, isSubmitting, setIsSubmit
         totalDeduction = computedDuration + penaltyDays
       }
     }
+
+    debugLog("submitComputed", {
+      computedDuration,
+      penaltyDays,
+      totalDeduction,
+      onePlusTwoApplied: penaltyDays > 0,
+    })
 
 
     setIsSubmitting(true)
