@@ -336,8 +336,8 @@ export async function POST(request: NextRequest) {
       const isHalfDay = start.isSame(end, "day")
         && sessionStartValue === sessionEndValue
         && (sessionStartValue === "Session-1" || sessionStartValue === "Session-2")
-      const startDayIsPartial = sessionStartValue && sessionStartValue !== "Session-1"
-      const endDayIsPartial = sessionEndValue && sessionEndValue !== "Session-2"
+      const startDayIsPartial = !!sessionStartValue && sessionStartValue !== "Session-1"
+      const endDayIsPartial = !!sessionEndValue && sessionEndValue !== "Session-2"
       
   
       // Calculate base calendar days for the FULL leave period
@@ -423,6 +423,19 @@ export async function POST(request: NextRequest) {
       let preSandwich = 0
       let postSandwich = 0
       let sandwichDates: string[] = []
+      const LEAVE_POLICY_DEBUG = false
+      const debugLog = (message: string, details?: Record<string, unknown>) => {
+        if (!LEAVE_POLICY_DEBUG) {
+          return
+        }
+
+        if (details) {
+          console.debug(`[payroll-sandwich] ${message}`, details)
+          return
+        }
+
+        console.debug(`[payroll-sandwich] ${message}`)
+      }
 
       if (applySandwichRule) {
         const sandwichDateList: LeaveDateInput[] = []
@@ -431,23 +444,47 @@ export async function POST(request: NextRequest) {
 
         while (sandwichCursor.isSame(sandwichWindowEnd) || sandwichCursor.isBefore(sandwichWindowEnd)) {
           const dateKey = sandwichCursor.format("YYYY-MM-DD")
+          const isStartDate = sandwichCursor.isSame(start, "day")
+          const isEndDate = sandwichCursor.isSame(end, "day")
           const isLeaveDay =
             (sandwichCursor.isSame(start) || sandwichCursor.isAfter(start)) &&
             (sandwichCursor.isSame(end) || sandwichCursor.isBefore(end)) &&
             !isNonWorking(sandwichCursor)
+          const isHalfDayForDate = isStartDate && isEndDate
+            ? isHalfDay
+            : (isStartDate && startDayIsPartial) || (isEndDate && endDayIsPartial)
 
           sandwichDateList.push({
             date: dateKey,
             isLeaveDay,
-            isHalfDay,
+            isHalfDay: isHalfDayForDate,
             leaveType,
             leaveCategory,
             isPublicHoliday: holidaySet.has(dateKey),
             isWeekend: isWeekend(sandwichCursor),
           })
 
+          debugLog("sandwichDate", {
+            date: dateKey,
+            isLeaveDay,
+            isHalfDay: isHalfDayForDate,
+            isPublicHoliday: holidaySet.has(dateKey),
+            isWeekend: isWeekend(sandwichCursor),
+          })
+
           sandwichCursor = sandwichCursor.add(1, "day")
         }
+
+        debugLog("sandwichWindow", {
+          startDate: start.format("YYYY-MM-DD"),
+          endDate: end.format("YYYY-MM-DD"),
+          sandwichWindowEnd: sandwichWindowEnd.format("YYYY-MM-DD"),
+          applySandwichRule,
+          fullWorkingDaysInRange,
+          startDayIsPartial,
+          endDayIsPartial,
+          isHalfDay,
+        })
 
         const sandwichPolicy = calculateLeaveDays(sandwichDateList, {
           allowedLeaveTypes: ["Planned Leave"],
