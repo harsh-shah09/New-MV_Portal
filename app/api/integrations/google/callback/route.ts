@@ -11,7 +11,7 @@ async function getOAuth2Client() {
     const clientId = settings.GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID;
     const clientSecret = settings.GOOGLE_CLIENT_SECRET || process.env.GOOGLE_CLIENT_SECRET;
     
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || 'http://localhost:3000';
+    const baseUrl = settings.NEXT_PUBLIC_APP_URL || settings.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || 'http://localhost:3000';
     const redirectUri = `${baseUrl}/api/integrations/google/callback`;
 
     if (!clientId || !clientSecret) {

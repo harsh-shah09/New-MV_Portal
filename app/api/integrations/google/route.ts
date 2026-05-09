@@ -48,8 +48,8 @@ async function getOAuth2Client() {
     const clientId = settings.GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID;
     const clientSecret = settings.GOOGLE_CLIENT_SECRET || process.env.GOOGLE_CLIENT_SECRET;
     
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:8080';
-    const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/api/integrations/google/callback`;
+    const baseUrl = settings.NEXT_PUBLIC_APP_URL || settings.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:8080';
+    const redirectUri = `${baseUrl}/api/integrations/google/callback`;
     if (!clientId || !clientSecret) {
         throw new Error("Missing Google Client ID or Secret in Environment Variables");
     }

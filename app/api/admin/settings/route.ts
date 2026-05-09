@@ -36,14 +36,29 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { INFO_USERNAME, INFO_GMAIL_APP_PASSWORD, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET } = body;
+    const { 
+      INFO_USERNAME, INFO_GMAIL_APP_PASSWORD, GOOGLE_CLIENT_ID, 
+      GOOGLE_CLIENT_SECRET, S3_BUCKET_NAME, AWS_ACCESS_KEY_ID, 
+      AWS_SECRET_ACCESS_KEY, AWS_REGION, NEXTAUTH_SECRET, 
+      NEXTAUTH_URL, NEXT_PUBLIC_APP_URL, ENCRYPTION_KEY, 
+      SESSION_SECRET 
+    } = body;
 
     // Validate that at least one field is being updated
     if (
       INFO_USERNAME === undefined &&
       INFO_GMAIL_APP_PASSWORD === undefined &&
       GOOGLE_CLIENT_ID === undefined &&
-      GOOGLE_CLIENT_SECRET === undefined
+      GOOGLE_CLIENT_SECRET === undefined &&
+      S3_BUCKET_NAME === undefined &&
+      AWS_ACCESS_KEY_ID === undefined &&
+      AWS_SECRET_ACCESS_KEY === undefined &&
+      AWS_REGION === undefined &&
+      NEXTAUTH_SECRET === undefined &&
+      NEXTAUTH_URL === undefined &&
+      NEXT_PUBLIC_APP_URL === undefined &&
+      ENCRYPTION_KEY === undefined &&
+      SESSION_SECRET === undefined
     ) {
       return NextResponse.json({ error: 'No fields to update' }, { status: 400 });
     }
@@ -53,6 +68,15 @@ export async function POST(req: Request) {
       INFO_GMAIL_APP_PASSWORD,
       GOOGLE_CLIENT_ID,
       GOOGLE_CLIENT_SECRET,
+      S3_BUCKET_NAME,
+      AWS_ACCESS_KEY_ID,
+      AWS_SECRET_ACCESS_KEY,
+      AWS_REGION,
+      NEXTAUTH_SECRET,
+      NEXTAUTH_URL,
+      NEXT_PUBLIC_APP_URL,
+      ENCRYPTION_KEY,
+      SESSION_SECRET,
     });
 
     return NextResponse.json({ success: true, message: 'Settings updated successfully' });

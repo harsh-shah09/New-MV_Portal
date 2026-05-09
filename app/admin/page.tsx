@@ -83,6 +83,15 @@ export default function AdminConsole() {
         INFO_GMAIL_APP_PASSWORD: '',
         GOOGLE_CLIENT_ID: '',
         GOOGLE_CLIENT_SECRET: '',
+        S3_BUCKET_NAME: '',
+        AWS_ACCESS_KEY_ID: '',
+        AWS_SECRET_ACCESS_KEY: '',
+        AWS_REGION: '',
+        NEXTAUTH_SECRET: '',
+        NEXTAUTH_URL: '',
+        NEXT_PUBLIC_APP_URL: '',
+        ENCRYPTION_KEY: '',
+        SESSION_SECRET: '',
     });
     const [settingsChanges, setSettingsChanges] = useState<any>({});
 
@@ -598,6 +607,148 @@ export default function AdminConsole() {
                                                                 placeholder="••••••••••••••••"
                                                             />
                                                             <p className="text-xs text-slate-500 mt-1">OAuth 2.0 Client Secret from Google Cloud Console</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* AWS S3 Configuration */}
+                                                <div className="border-t pt-8">
+                                                    <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                                                        <Package className="w-5 h-5 text-amber-500" /> AWS S3 Configuration
+                                                    </h3>
+                                                    <div className="grid grid-cols-1 gap-6 bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                                                        <div className="group">
+                                                            <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                                                S3 Bucket Name
+                                                            </label>
+                                                            <input
+                                                                type="text"
+                                                                value={adminSettings.S3_BUCKET_NAME || ''}
+                                                                onChange={(e) => handleSettingChange('S3_BUCKET_NAME', e.target.value)}
+                                                                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none transition group-hover:border-slate-300"
+                                                                placeholder="my-bucket-name"
+                                                            />
+                                                            <p className="text-xs text-slate-500 mt-1">AWS S3 bucket name for file uploads</p>
+                                                        </div>
+
+                                                        <div className="group">
+                                                            <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                                                AWS Access Key ID
+                                                            </label>
+                                                            <input
+                                                                type="password"
+                                                                value={adminSettings.AWS_ACCESS_KEY_ID || ''}
+                                                                onChange={(e) => handleSettingChange('AWS_ACCESS_KEY_ID', e.target.value)}
+                                                                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none transition group-hover:border-slate-300"
+                                                                placeholder="••••••••••••••••"
+                                                            />
+                                                            <p className="text-xs text-slate-500 mt-1">AWS IAM Access Key ID</p>
+                                                        </div>
+
+                                                        <div className="group">
+                                                            <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                                                AWS Secret Access Key
+                                                            </label>
+                                                            <input
+                                                                type="password"
+                                                                value={adminSettings.AWS_SECRET_ACCESS_KEY || ''}
+                                                                onChange={(e) => handleSettingChange('AWS_SECRET_ACCESS_KEY', e.target.value)}
+                                                                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none transition group-hover:border-slate-300"
+                                                                placeholder="••••••••••••••••"
+                                                            />
+                                                            <p className="text-xs text-slate-500 mt-1">AWS IAM Secret Access Key</p>
+                                                        </div>
+
+                                                        <div className="group">
+                                                            <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                                                AWS Region
+                                                            </label>
+                                                            <input
+                                                                type="text"
+                                                                value={adminSettings.AWS_REGION || ''}
+                                                                onChange={(e) => handleSettingChange('AWS_REGION', e.target.value)}
+                                                                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none transition group-hover:border-slate-300"
+                                                                placeholder="us-east-1"
+                                                            />
+                                                            <p className="text-xs text-slate-500 mt-1">AWS region (e.g., us-east-1, eu-west-1)</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Core Application Settings */}
+                                                <div className="border-t pt-8">
+                                                    <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                                                        <Settings className="w-5 h-5 text-indigo-500" /> Core Application Settings
+                                                    </h3>
+                                                    <div className="grid grid-cols-1 gap-6 bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                                                        <div className="group">
+                                                            <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                                                NextAuth URL
+                                                            </label>
+                                                            <input
+                                                                type="text"
+                                                                value={adminSettings.NEXTAUTH_URL || ''}
+                                                                onChange={(e) => handleSettingChange('NEXTAUTH_URL', e.target.value)}
+                                                                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition group-hover:border-slate-300"
+                                                                placeholder="https://yourdomain.com"
+                                                            />
+                                                            <p className="text-xs text-slate-500 mt-1">Base URL for authentication</p>
+                                                        </div>
+
+                                                        <div className="group">
+                                                            <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                                                NextAuth Secret
+                                                            </label>
+                                                            <input
+                                                                type="password"
+                                                                value={adminSettings.NEXTAUTH_SECRET || ''}
+                                                                onChange={(e) => handleSettingChange('NEXTAUTH_SECRET', e.target.value)}
+                                                                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition group-hover:border-slate-300"
+                                                                placeholder="••••••••••••••••"
+                                                            />
+                                                            <p className="text-xs text-slate-500 mt-1">Secret used to encrypt session tokens</p>
+                                                        </div>
+
+                                                        <div className="group">
+                                                            <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                                                App URL
+                                                            </label>
+                                                            <input
+                                                                type="text"
+                                                                value={adminSettings.NEXT_PUBLIC_APP_URL || ''}
+                                                                onChange={(e) => handleSettingChange('NEXT_PUBLIC_APP_URL', e.target.value)}
+                                                                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition group-hover:border-slate-300"
+                                                                placeholder="https://yourdomain.com"
+                                                            />
+                                                            <p className="text-xs text-slate-500 mt-1">Public base URL of the application</p>
+                                                        </div>
+
+                                                        <div className="group">
+                                                            <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                                                Encryption Key
+                                                            </label>
+                                                            <input
+                                                                type="password"
+                                                                value={adminSettings.ENCRYPTION_KEY || ''}
+                                                                onChange={(e) => handleSettingChange('ENCRYPTION_KEY', e.target.value)}
+                                                                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition group-hover:border-slate-300"
+                                                                placeholder="••••••••••••••••"
+                                                            />
+                                                            <p className="text-xs text-slate-500 mt-1">Key for encrypting sensitive data in database</p>
+                                                        </div>
+
+                                                        <div className="group">
+                                                            <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                                                Session Secret
+                                                            </label>
+                                                            <input
+                                                                type="password"
+                                                                value={adminSettings.SESSION_SECRET || ''}
+                                                                onChange={(e) => handleSettingChange('SESSION_SECRET', e.target.value)}
+                                                                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition group-hover:border-slate-300"
+                                                                placeholder="••••••••••••••••"
+                                                            />
+                                                            <p className="text-xs text-slate-500 mt-1">Secret used for signing session cookies</p>
                                                         </div>
 
                                                         {Object.keys(settingsChanges).length > 0 && (

@@ -1,4 +1,4 @@
-import { GetCommand, UpdateCommand, PutCommand } from '@aws-sdk/lib-dynamodb';
+import { GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { db } from '@/lib/dynamodb';
 
 export interface AdminSettings {
@@ -6,6 +6,15 @@ export interface AdminSettings {
   INFO_GMAIL_APP_PASSWORD?: string;
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
+  S3_BUCKET_NAME?: string;
+  AWS_ACCESS_KEY_ID?: string;
+  AWS_SECRET_ACCESS_KEY?: string;
+  AWS_REGION?: string;
+  NEXTAUTH_SECRET?: string;
+  NEXTAUTH_URL?: string;
+  NEXT_PUBLIC_APP_URL?: string;
+  ENCRYPTION_KEY?: string;
+  SESSION_SECRET?: string;
   updated_at?: string;
 }
 
@@ -36,6 +45,15 @@ export async function getAdminSettings(): Promise<AdminSettings> {
       INFO_GMAIL_APP_PASSWORD: item.INFO_GMAIL_APP_PASSWORD,
       GOOGLE_CLIENT_ID: item.GOOGLE_CLIENT_ID,
       GOOGLE_CLIENT_SECRET: item.GOOGLE_CLIENT_SECRET,
+      S3_BUCKET_NAME: item.S3_BUCKET_NAME,
+      AWS_ACCESS_KEY_ID: item.AWS_ACCESS_KEY_ID,
+      AWS_SECRET_ACCESS_KEY: item.AWS_SECRET_ACCESS_KEY,
+      AWS_REGION: item.AWS_REGION,
+      NEXTAUTH_SECRET: item.NEXTAUTH_SECRET,
+      NEXTAUTH_URL: item.NEXT_PUBLIC_APP_URL,
+      NEXT_PUBLIC_APP_URL: item.NEXT_PUBLIC_APP_URL,
+      ENCRYPTION_KEY: item.ENCRYPTION_KEY,
+      SESSION_SECRET: item.SESSION_SECRET,
       updated_at: item.updated_at,
     };
   } catch (error) {
@@ -76,6 +94,60 @@ export async function updateAdminSettings(settings: AdminSettings): Promise<void
     if (settings.GOOGLE_CLIENT_SECRET !== undefined) {
       updateExpression.push(`GOOGLE_CLIENT_SECRET = :attr${attrIndex}`);
       expressionAttributeValues[`:attr${attrIndex}`] = settings.GOOGLE_CLIENT_SECRET;
+      attrIndex++;
+    }
+
+    if (settings.S3_BUCKET_NAME !== undefined) {
+      updateExpression.push(`S3_BUCKET_NAME = :attr${attrIndex}`);
+      expressionAttributeValues[`:attr${attrIndex}`] = settings.S3_BUCKET_NAME;
+      attrIndex++;
+    }
+
+    if (settings.AWS_ACCESS_KEY_ID !== undefined) {
+      updateExpression.push(`AWS_ACCESS_KEY_ID = :attr${attrIndex}`);
+      expressionAttributeValues[`:attr${attrIndex}`] = settings.AWS_ACCESS_KEY_ID;
+      attrIndex++;
+    }
+
+    if (settings.AWS_SECRET_ACCESS_KEY !== undefined) {
+      updateExpression.push(`AWS_SECRET_ACCESS_KEY = :attr${attrIndex}`);
+      expressionAttributeValues[`:attr${attrIndex}`] = settings.AWS_SECRET_ACCESS_KEY;
+      attrIndex++;
+    }
+
+    if (settings.AWS_REGION !== undefined) {
+      updateExpression.push(`AWS_REGION = :attr${attrIndex}`);
+      expressionAttributeValues[`:attr${attrIndex}`] = settings.AWS_REGION;
+      attrIndex++;
+    }
+
+    if (settings.NEXTAUTH_SECRET !== undefined) {
+      updateExpression.push(`NEXTAUTH_SECRET = :attr${attrIndex}`);
+      expressionAttributeValues[`:attr${attrIndex}`] = settings.NEXTAUTH_SECRET;
+      attrIndex++;
+    }
+
+    if (settings.NEXTAUTH_URL !== undefined) {
+      updateExpression.push(`NEXTAUTH_URL = :attr${attrIndex}`);
+      expressionAttributeValues[`:attr${attrIndex}`] = settings.NEXTAUTH_URL;
+      attrIndex++;
+    }
+
+    if (settings.NEXT_PUBLIC_APP_URL !== undefined) {
+      updateExpression.push(`NEXT_PUBLIC_APP_URL = :attr${attrIndex}`);
+      expressionAttributeValues[`:attr${attrIndex}`] = settings.NEXT_PUBLIC_APP_URL;
+      attrIndex++;
+    }
+
+    if (settings.ENCRYPTION_KEY !== undefined) {
+      updateExpression.push(`ENCRYPTION_KEY = :attr${attrIndex}`);
+      expressionAttributeValues[`:attr${attrIndex}`] = settings.ENCRYPTION_KEY;
+      attrIndex++;
+    }
+
+    if (settings.SESSION_SECRET !== undefined) {
+      updateExpression.push(`SESSION_SECRET = :attr${attrIndex}`);
+      expressionAttributeValues[`:attr${attrIndex}`] = settings.SESSION_SECRET;
       attrIndex++;
     }
 

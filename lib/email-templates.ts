@@ -5,6 +5,7 @@
  */
 
 import { getSalesforceConnection } from './salesforce';
+import { getAdminSettingValue } from './admin-settings';
 
 interface LeaveEmailData {
   recipientName: string;
@@ -335,7 +336,8 @@ export async function onboardingCompletedToHR(data: {
 }): Promise<{ subject: string; html: string; text: string }> {
   const subject = `Onboarding Completed - ${data.employeeName}`;
   const recipientName = data.recipientName || 'HR Team';
-  const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_BASE_URL || '').replace(/\/$/, '');
+  const settingsAppUrl = await getAdminSettingValue('NEXT_PUBLIC_APP_URL');
+  const baseUrl = (settingsAppUrl || process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_BASE_URL || '').replace(/\/$/, '');
   const appLink = baseUrl && data.recordId
     ? `${baseUrl}/employees/${encodeURIComponent(data.recordId)}?tab=personal`
     : '';

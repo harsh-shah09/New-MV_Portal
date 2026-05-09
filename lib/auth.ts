@@ -2,18 +2,24 @@
 import { SignJWT } from "jose";
 import { cookies } from "next/headers";
 import crypto from "crypto";
-import { key, verifyToken, SessionPayload } from "./auth-utils";
-
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || "default_encryption_key_change_me";
+import { getKey, verifyToken, SessionPayload } from "./auth-utils";
+import { getAdminSettingValue } from "./admin-settings";
 
 export { verifyToken, type SessionPayload };
 
+export async function getEncryptionKey() {
+  return await getAdminSettingValue("ENCRYPTION_KEY") || process.env.ENCRYPTION_KEY || "default_encryption_key_change_me";
+}
+
+
+
 export async function encrypt(payload: SessionPayload) {
+  const secretKey = await getKey();
   return new SignJWT(payload)
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime('24h')
-    .sign(key)
+    .sign(secretKey)
 }
 
 export async function createSession(payload: SessionPayload) {
@@ -45,8 +51,9 @@ export async function logout() {
 }
 
 export async function hashPassword(password: string): Promise<string> {
+  const encryptionKey = await getEncryptionKey();
   // Using HMAC-SHA256 as implied by "stored in hashes using ENCRYPTION_KEY"
-  const hmac = crypto.createHmac("sha256", ENCRYPTION_KEY);
+  const hmac = crypto.createHmac("sha256", encryptionKey);
   hmac.update(password);
   return hmac.digest("hex");
 }

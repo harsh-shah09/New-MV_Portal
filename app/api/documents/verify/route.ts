@@ -4,6 +4,7 @@ import { createNotification, deleteDocument, getSalesforceConnection, updateDocu
 import { sendEmail } from '@/lib/email';
 import { loadTemplate } from '@/lib/email-templates';
 import { setOnboardingStep, setFirstTimeLogin, setOnboardingCompleted } from '@/lib/dynamodb';
+import { getAdminSettingValue } from '@/lib/admin-settings';
 
 export async function PATCH(req: Request) {
   try {
@@ -67,13 +68,14 @@ export async function PATCH(req: Request) {
     const encoded = btoa(JSON.stringify(data));
 
     if (!active && action !== 'approve') {
+      const settingsNextAuthUrl = await getAdminSettingValue('NEXTAUTH_URL');
       const template = await loadTemplate('Document_Rejected', {
         employeeEmail: personalEmail,
         employeeId: name,
         employeeName: empname,
         endDate: Date.now().toLocaleString(),
         recipientName: name,
-        appLink: process.env.NEXTAUTH_URL + `/welcome?id=${employeeId}&token=${encoded}`,
+        appLink: (settingsNextAuthUrl || process.env.NEXTAUTH_URL) + `/welcome?id=${employeeId}&token=${encoded}`,
         documentName: doc.Document_Type__c,
       });
       await sendEmail({

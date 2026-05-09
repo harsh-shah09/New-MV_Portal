@@ -62,6 +62,7 @@ import { sendEmail } from '@/lib/email';
 import { loadTemplate, onboardingMail } from '@/lib/email-templates';
 import { deleteBankDetail, deleteDocument } from '@/lib/salesforce';
 import { setOnboardingStep, setFirstTimeLogin, setOnboardingCompleted } from '@/lib/dynamodb';
+import { getAdminSettingValue } from '@/lib/admin-settings';
 
 export async function sendWelcomeEmailAction(employeeId: string, email: string, name: string , empName : string) {
     try {
@@ -122,7 +123,9 @@ export async function sendWelcomeEmailAction(employeeId: string, email: string, 
                 step: targetStep
             };
             const encodedToken = btoa(JSON.stringify(tokenData));
-            const appLink = `${process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || 'http://localhost:3000'}/welcome?id=${employeeId}&token=${encodedToken}`;
+            const settingsAppUrl = await getAdminSettingValue('NEXT_PUBLIC_APP_URL');
+            const settingsNextAuthUrl = await getAdminSettingValue('NEXTAUTH_URL');
+            const appLink = `${settingsAppUrl || settingsNextAuthUrl || process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || 'http://localhost:3000'}/welcome?id=${employeeId}&token=${encodedToken}`;
 
             let html = await loadTemplate('Document_Rejected', {
                 employeeEmail: email,
@@ -157,7 +160,8 @@ export async function sendWelcomeEmailAction(employeeId: string, email: string, 
         // 3. Otherwise, if all are verified (or nothing is rejected), send normal welcome email
         const token = { expirationtime : Date.now() + 48 * 60 * 60 * 1000 , firsttime : true };
         const encryptedToken = btoa(JSON.stringify(token));
-        const setupLink = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/welcome?id=${employeeId}&token=${encryptedToken}`;
+        const settingsAppUrl2 = await getAdminSettingValue('NEXT_PUBLIC_APP_URL');
+        const setupLink = `${settingsAppUrl2 || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/welcome?id=${employeeId}&token=${encryptedToken}`;
         let { subject, html } = await onboardingMail({ recipientName: name, setupLink });
         
         if (empName) {

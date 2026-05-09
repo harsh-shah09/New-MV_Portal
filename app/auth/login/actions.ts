@@ -9,7 +9,8 @@ import { cookies } from 'next/headers';
 import { v4 as uuidv4 } from 'uuid';
 import { redirect } from 'next/navigation';
 import { getSpecificConfigurations } from '@/lib/admin-config';
-import { sendEmail } from '@/lib/email'
+import { sendEmail } from '@/lib/email';
+import { getAdminSettingValue } from '@/lib/admin-settings';
 const loginSchema = z.object({
   identifier: z.string().min(1, 'Email or Employee ID is required'),
   password: z.string().min(1, 'Password is required'),
@@ -204,7 +205,9 @@ export async function forgotPasswordAction(identifier: string) {
     }
 
     // --- Load email template from Email_Templates__mdt ---
-    const resetLink = `${process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/auth/change-password?id=${employee.Id}`;
+    const settingsNextAuthUrl = await getAdminSettingValue('NEXTAUTH_URL');
+    const settingsAppUrl = await getAdminSettingValue('NEXT_PUBLIC_APP_URL');
+    const resetLink = `${settingsNextAuthUrl || settingsAppUrl || process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/auth/change-password?id=${employee.Id}`;
     let emailHtml: string;
 
     try {
@@ -219,7 +222,7 @@ export async function forgotPasswordAction(identifier: string) {
             const getCurrentYear = () => new Date().getFullYear().toString();
             emailHtml = forgotTemplate.Value__c
                 .replace('{{employee.Name}}', employee.Employee_Name__c)
-                .replace('resetLink', `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/auth/change-password?id=${employee.Id}`)
+                .replace('resetLink', resetLink)
                 .replace('{{year}}' ,getCurrentYear())
         } else {
             // Fallback inline template

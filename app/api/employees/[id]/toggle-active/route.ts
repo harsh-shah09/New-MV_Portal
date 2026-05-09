@@ -4,6 +4,7 @@ import { verifySession } from '@/lib/auth';
 import { updateEmployee, getEmployeeById } from '@/lib/salesforce';
 import { sendEmail } from '@/lib/email';
 import { welcomeEmail } from '@/lib/email-templates';
+import { getAdminSettingValue } from '@/lib/admin-settings';
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
@@ -27,7 +28,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
                 // In a real app we'd generate a secure token here.
                 // Using a placeholder token logic for demonstration or implicit current user check on that page.
                 // Or passing ID to the page to 'initiate' the flow.
-                const setupLink = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/auth/welcome?id=${employee.Id}`;
+                const settingsAppUrl = await getAdminSettingValue('NEXT_PUBLIC_APP_URL');
+                const setupLink = `${settingsAppUrl || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/auth/welcome?id=${employee.Id}`;
                 
                 let { subject, html, text } = await welcomeEmail({
                     recipientName: employee.Employee_Name__c,

@@ -91,14 +91,14 @@ export const getSalesforceConnection = async () => {
     // Re-throw configuration errors so callers can surface them
     throw error;
   }
-
   // 4. Perform fresh login using DynamoDB credentials
   const conn = new Connection({
-    loginUrl: sfCredentials.login_url || 'https://login.salesforce.com',
+    loginUrl: 'https://login.salesforce.com',
     version: '50.0'
   });
+  const passWordToken = sfCredentials.password.trim().concat(sfCredentials.security_token.trim())
 
-  await conn.login(sfCredentials.username, sfCredentials.password + sfCredentials.security_token);
+  await conn.login(sfCredentials.username, passWordToken);
 
   // 5. Store new token in DynamoDB
   try {
@@ -112,7 +112,9 @@ export const getSalesforceConnection = async () => {
       updated_time: new Date().toISOString()
     }
   });
+  console.log('here' , putCmd)
     await db.send(putCmd);
+    console.log('there')
   } catch (error) {
     console.error('Failed to save token to DynamoDB:', error);
     // Don't fail the request just because caching failed, but log it
