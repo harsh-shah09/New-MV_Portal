@@ -1,7 +1,25 @@
 
 import { NextResponse } from 'next/server';
-import { getAllEmployees, getEmployeeById, updateEmployee, getEmployeesByTeamLead } from '@/lib/salesforce';
+import { getAllEmployees, getEmployeeById, updateEmployee, getEmployeesByTeamLead,getSalesforceConnection } from '@/lib/salesforce';
+async function getRolePicklistOptions() {
+  try {
+    const conn = await getSalesforceConnection();
+    if (!conn) return [];
 
+    const description = await conn.sobject('Employee__c').describe();
+    const roleField = description.fields?.find((field: any) => field.name === 'Role__c');
+
+    if (!roleField?.picklistValues) return [];
+
+    return roleField.picklistValues
+      .filter((picklistValue: any) => picklistValue.active)
+      .map((picklistValue: any) => picklistValue.value)
+      .filter((value: string) => Boolean(value));
+  } catch (error) {
+    console.error('Error fetching Role__c picklist options:', error);
+    return [];
+  }
+}
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> } // Params is a promise in Next.js 15+? Or strictly context? Next 13+ app dir has async params if dynamic.
@@ -9,6 +27,7 @@ export async function GET(
   try {
      const { id } = await params;
     const employee = await getEmployeeById(id);
+    const roleOptions = await getRolePicklistOptions();
     if (!employee) {
       return NextResponse.json({ error: 'Employee not found' }, { status: 404 });
     }
@@ -45,7 +64,7 @@ export async function GET(
         employee.Employee_Current_Address__c = { street: '', city: '', state: '', country: '', postalCode: '' };
     }
 
-    return NextResponse.json(employee);
+    return NextResponse.json({employee,roleOptions});
   } catch (error) {
     console.error('Error fetching employee:', error);
     return NextResponse.json({ error: 'Failed to fetch employee' }, { status: 500 });

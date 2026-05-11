@@ -74,8 +74,8 @@ function getDefaultTemplate(data: LeaveEmailData): string {
   return `
     <div style="font-family: Arial, sans-serif; color: #1f2937; line-height: 1.6;">
       <p>Dear ${data.recipientName || 'Employee'},</p>
-      <p>Please review your leave notification in the HRMS portal.</p>
-      <p style="margin-top: 24px;">Regards,<br/>HRMS System</p>
+      <p>Please review your leave notification in the MV portal.</p>
+      <p style="margin-top: 24px;">Regards,<br/>MV System</p>
       <p style="color:#6b7280;font-size:12px;">© ${new Date().getFullYear()} MV Clouds</p>
     </div>
   `.trim();
@@ -265,7 +265,7 @@ export async function withdrawalRequestSubmitted(data: LeaveEmailData): Promise<
 export async function withdrawalRequestToHR(data: LeaveEmailData): Promise<{ subject: string; html: string; text: string }> {
   const subject = `Withdrawal Request: ${data.employeeName} - Leave from ${data.startDate} to ${data.endDate}`;
   const html = await loadTemplate('withdrawal-request-to-hr', data);
-  const text = `Dear HR Team,\n\n${data.employeeName} has requested to withdraw their approved leave.\n\nLeave Details:\n- Employee: ${data.employeeName}\n- Leave Type: ${data.leaveType}\n- Start Date: ${data.startDate}\n- End Date: ${data.endDate}\n- Duration: ${data.duration} day(s)\n\nPlease review and approve or reject this withdrawal request through the HRMS portal.\n\nRegards,\nHRMS System`;
+  const text = `Dear HR Team,\n\n${data.employeeName} has requested to withdraw their approved leave.\n\nLeave Details:\n- Employee: ${data.employeeName}\n- Leave Type: ${data.leaveType}\n- Start Date: ${data.startDate}\n- End Date: ${data.endDate}\n- Duration: ${data.duration} day(s)\n\nPlease review and approve or reject this withdrawal request through the MV portal.\n\nRegards,\nHRMS System`;
   
   return { subject, html, text };
 }
@@ -298,7 +298,7 @@ export async function withdrawalRejected(data: LeaveEmailData): Promise<{ subjec
 export async function doubtfulLeaveMarkedToAdmin(data: LeaveEmailData): Promise<{ subject: string; html: string; text: string }> {
   const subject = `Doubtful Leave Review Required - ${data.employeeName}`;
   const html = await loadTemplate('doubtful-leave-to-admin', data);
-  const text = `Dear ${data.recipientName},\n\n${data.approverTitle || 'HR'} ${data.approverName || ''} has marked a leave request as doubtful and it requires Admin review.\n\nLeave Details:\n- Employee: ${data.employeeName}\n- Leave Type: ${data.leaveType}\n- Start Date: ${data.startDate}\n- End Date: ${data.endDate}\n- Duration: ${data.duration} day(s)${data.reason ? `\n- Reason: ${data.reason}` : ''}\n\nPlease review this request in the HRMS portal.\n\nRegards,\nHRMS System`;
+  const text = `Dear ${data.recipientName},\n\n${data.approverTitle || 'HR'} ${data.approverName || ''} has marked a leave request as doubtful and it requires Admin review.\n\nLeave Details:\n- Employee: ${data.employeeName}\n- Leave Type: ${data.leaveType}\n- Start Date: ${data.startDate}\n- End Date: ${data.endDate}\n- Duration: ${data.duration} day(s)${data.reason ? `\n- Reason: ${data.reason}` : ''}\n\nPlease review this request in the MV portal.\n\nRegards,\nHRMS System`;
 
   return { subject, html, text };
 }
@@ -349,7 +349,7 @@ export async function onboardingCompletedToHR(data: {
     appLink,
   });
 
-  const text = `Dear ${recipientName},\n\nOnboarding data collection has been completed for the following employee:\n- Employee Name: ${data.employeeName}\n- Employee ID: ${data.employeeId}\n- Email: ${data.employeeEmail}\n\nPlease review the submitted onboarding details in HRMS.\n\nRegards,\nHRMS System`;
+  const text = `Dear ${recipientName},\n\nOnboarding data collection has been completed for the following employee:\n- Employee Name: ${data.employeeName}\n- Employee ID: ${data.employeeId}\n- Email: ${data.employeeEmail}\n\nPlease review the submitted onboarding details in MV Portak.\n\nRegards,\nHRMS System`;
 
   return { subject, html, text };
 }

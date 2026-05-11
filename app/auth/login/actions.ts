@@ -221,7 +221,7 @@ export async function forgotPasswordAction(identifier: string) {
             // Replace placeholders in the template
             const getCurrentYear = () => new Date().getFullYear().toString();
             emailHtml = forgotTemplate.Value__c
-                .replace('{{employee.Name}}', employee.Employee_Name__c)
+                .replace('{{employeeName}}', employee.Employee_Name__c)
                 .replace('resetLink', resetLink)
                 .replace('{{year}}' ,getCurrentYear())
         } else {

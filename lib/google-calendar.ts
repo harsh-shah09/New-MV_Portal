@@ -160,10 +160,8 @@ export async function createLeaveCalendarEventForEmployee({
     const summaryLeaveType = leaveType || 'Leave';
 
     const descriptionLines = [
-      `Leave approved in HRMS`,
-      `Type: ${summaryLeaveType}`,
-      approvedBy ? `Approved by: ${approvedBy}` : null,
-      reason ? `Reason: ${reason}` : null,
+      `Leave approved in MV Portal`,
+      `Type: ${summaryLeaveType}`
     ].filter(Boolean);
 
     const createdEvent = await calendar.events.insert({
@@ -174,11 +172,11 @@ export async function createLeaveCalendarEventForEmployee({
         description: descriptionLines.join('\n'),
         start: { date: normalizedStartDate },
         end: { date: getExclusiveEndDateFromInclusive(normalizedEndDate) },
-        // attendees: [
-        //   {
-        //     email: 'mvteam@mvclouds.com',
-        //   },
-        // ],
+        attendees: [
+          {
+            email: 'mvteam@mvclouds.com',
+          },
+        ],
         guestsCanInviteOthers: false,
         guestsCanModify: false,
         guestsCanSeeOtherGuests: false,

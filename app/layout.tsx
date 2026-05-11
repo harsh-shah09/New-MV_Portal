@@ -70,7 +70,7 @@ export async function generateMetadata(): Promise<Metadata> {
     },
 
     icons: {
-      icon: '/mv_logo1.png',
+      icon: '/favicon.ico',
       apple: '/apple-icon.png',
     },
 
