@@ -71,7 +71,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
     icons: {
       icon: '/favicon.ico',
-      apple: '/apple-icon.png',
+      apple: '/favicon.ico',
     },
 
     alternates: {
