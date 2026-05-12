@@ -192,7 +192,6 @@ export default function AdminConsole() {
             if (res.status === 401 || res.status === 403) {
                 message.error("Unauthorized access");
                 // Redirect or show error
-                window.location.href = '/dashboard';
                 return;
             }
             if (!res.ok) throw new Error("Failed to fetch configurations");
