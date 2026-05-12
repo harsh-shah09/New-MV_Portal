@@ -7,73 +7,79 @@ import './globals.css'
 const geist = Geist({ subsets: ["latin"], variable: "--font-geist" })
 const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono" })
 
-export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL!),
-  title: {
-    default: 'MV Portal',
-    template: '%s | MV Portal',
-  },
+import { getAdminSettingValue } from '@/lib/admin-settings';
 
-  description: 'MV Portal - Manage employees, HR operations, and business workflows efficiently with MVClouds.',
+export async function generateMetadata(): Promise<Metadata> {
+  const appUrl = await getAdminSettingValue('NEXT_PUBLIC_APP_URL') || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  
+  return {
+    metadataBase: new URL(appUrl),
+    title: {
+      default: 'MV Portal',
+      template: '%s | MV Portal',
+    },
 
-  keywords: [
-    'HR Portal',
-    'Employee Management',
-    'MV Portal',
-    'HR Software India',
-    'Employee Dashboard',
-    'Business Management Tool'
-  ],
+    description: 'MV Portal - Manage employees, HR operations, and business workflows efficiently with MVClouds.',
 
-  authors: [{ name: 'MVClouds', url: 'https://mvclouds.com' }],
-  creator: 'MVClouds',
-  publisher: 'MVClouds',
+    keywords: [
+      'HR Portal',
+      'Employee Management',
+      'MV Portal',
+      'HR Software India',
+      'Employee Dashboard',
+      'Business Management Tool'
+    ],
 
-  robots: {
-    index: true,
-    follow: true,
-    googleBot: {
+    authors: [{ name: 'MVClouds', url: 'https://mvclouds.com' }],
+    creator: 'MVClouds',
+    publisher: 'MVClouds',
+
+    robots: {
       index: true,
       follow: true,
-      'max-image-preview': 'large',
-      'max-snippet': -1,
-    },
-  },
-
-  openGraph: {
-    title: 'MV Portal',
-    description: 'Powerful HR & Employee Management Portal by MVClouds.',
-    url: process.env.NEXT_PUBLIC_APP_URL!,
-    siteName: 'MV Portal',
-    images: [
-      {
-        url: '/mv_logo1.png',
-        width: 1200,
-        height: 630,
-        alt: 'MV Portal',
+      googleBot: {
+        index: true,
+        follow: true,
+        'max-image-preview': 'large',
+        'max-snippet': -1,
       },
-    ],
-    locale: 'en_IN',
-    type: 'website',
-  },
+    },
 
-  twitter: {
-    card: 'summary_large_image',
-    title: 'MV Portal',
-    description: 'Smart HR & Employee Management System.',
-    images: ['/mv_logo1.png'],
-  },
+    openGraph: {
+      title: 'MV Portal',
+      description: 'Powerful HR & Employee Management Portal by MVClouds.',
+      url: appUrl,
+      siteName: 'MV Portal',
+      images: [
+        {
+          url: '/mv_logo1.png',
+          width: 1200,
+          height: 630,
+          alt: 'MV Portal',
+        },
+      ],
+      locale: 'en_IN',
+      type: 'website',
+    },
 
-  icons: {
-    icon: '/mv_logo1.png',
-    apple: '/apple-icon.png',
-  },
+    twitter: {
+      card: 'summary_large_image',
+      title: 'MV Portal',
+      description: 'Smart HR & Employee Management System.',
+      images: ['/mv_logo1.png'],
+    },
 
-  alternates: {
-    canonical: process.env.NEXT_PUBLIC_APP_URL!,
-  },
+    icons: {
+      icon: '/favicon.ico',
+      apple: '/apple-icon.png',
+    },
 
-  category: 'technology',
+    alternates: {
+      canonical: appUrl,
+    },
+
+    category: 'technology',
+  };
 }
 
 import AntdStyledRegistry from '@/components/AntdStyledRegistry'

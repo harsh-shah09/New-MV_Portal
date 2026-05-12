@@ -4,6 +4,7 @@ import { getSalesforceConnection, updateBankDetail, updateDocument, createNotifi
 import { sendEmail } from '@/lib/email';
 import { loadTemplate } from '@/lib/email-templates';
 import { setOnboardingStep, setFirstTimeLogin, setOnboardingCompleted } from '@/lib/dynamodb';
+import { getAdminSettingValue } from '@/lib/admin-settings';
 
 type VerificationItem = {
     type: 'bank' | 'document';
@@ -141,7 +142,8 @@ export async function POST(
                         step: targetStep
                     };
                     const encodedToken = btoa(JSON.stringify(tokenData));
-                    const appLink = `${process.env.NEXTAUTH_URL || ''}/welcome?id=${employeeId}&token=${encodedToken}`;
+                    const settingsNextAuthUrl = await getAdminSettingValue('NEXTAUTH_URL');
+                    const appLink = `${settingsNextAuthUrl || process.env.NEXTAUTH_URL || ''}/welcome?id=${employeeId}&token=${encodedToken}`;
 
                     // Re-use Document_Rejected template; replace {{BankDetails}} placeholder
                     let html = await loadTemplate('Document_Rejected', {

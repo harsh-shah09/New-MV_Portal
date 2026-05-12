@@ -37,6 +37,6 @@
   ],
   "exclude": [
     "node_modules",
-    "infra"
+    "infra","sst.config.ts"
   ]
 }

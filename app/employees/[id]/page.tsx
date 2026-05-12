@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { verifySession } from "@/lib/auth";
 import { EmployeeProfileView } from "@/components/employee-profile-view";
 import Link from "next/link";

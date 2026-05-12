@@ -3,8 +3,15 @@ import { Package } from 'lucide-react';
 import { ProductList } from './product-list'; // Client component for search/table
 import { BackLink } from '../components/backlink';  
 
+export const dynamic = 'force-dynamic';
+
 export default async function ProductsPage() {
-  const products = await getProducts(); // Returns SalesforceProduct[]
+  let products: any[] = [];
+  try {
+    products = await getProducts(); // Returns SalesforceProduct[]
+  } catch (e) {
+    console.error('Failed to load products:', e);
+  }
 
   return (
     <div className="p-6 md:p-8 w-full mx-auto space-y-6">

@@ -30,7 +30,7 @@ const fetchExistingHolidayDates = async (conn: any, excludeHolidayId?: string) =
     ? `SELECT Id, Date__c FROM Holidays_List__c WHERE Id != '${excludeHolidayId}'`
     : `SELECT Id, Date__c FROM Holidays_List__c`;
 
-  const holidayRecords = await conn.query<any>(query);
+  const holidayRecords = await conn.query(query);
 
   return new Set(
     holidayRecords.records
@@ -46,7 +46,7 @@ const fetchExistingHolidayNames = async (conn: any, year: string, excludeHoliday
     ? `SELECT Id, Holiday_Name__c, Year__c FROM Holidays_List__c WHERE Year__c = ${yearNum} AND Id != '${excludeHolidayId}'`
     : `SELECT Id, Holiday_Name__c, Year__c FROM Holidays_List__c WHERE Year__c = ${yearNum}`;
 
-  const holidayRecords = await conn.query<any>(query);
+  const holidayRecords = await conn.query(query);
 
   return new Set(
     holidayRecords.records

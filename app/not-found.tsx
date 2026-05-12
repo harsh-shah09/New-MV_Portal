@@ -1,6 +1,16 @@
+"use client"
+
 import Link from 'next/link'
+import { useEffect, useContext } from 'react'
+import { LayoutContext } from '@/components/app-layout'
 
 export default function NotFound() {
+  const { setHideSidebar } = useContext(LayoutContext)
+
+  useEffect(() => {
+    setHideSidebar(true)
+  }, [setHideSidebar])
+
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 px-4 py-16 text-center sm:px-6 lg:px-8">
       <div className="space-y-4">

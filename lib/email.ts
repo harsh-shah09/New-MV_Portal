@@ -3,6 +3,7 @@ import { google } from 'googleapis';
 import { GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { db } from '@/lib/dynamodb';
 import { getSalesforceConnection } from "@/lib/salesforce";
+import { getAdminSettings } from '@/lib/admin-settings';
 
 
 interface EmailParams {
@@ -26,20 +27,25 @@ interface GoogleIntegrationItem {
  * Create nodemailer transporter for Gmail
  */
 
-function createInfoTransporter() {
+async function createInfoTransporter() {
+  const settings = await getAdminSettings();
+  const infoUser = settings.INFO_USERNAME || process.env.INFO_USER;
+  const gmailAppPassword = settings.INFO_GMAIL_APP_PASSWORD || process.env.INFO_GMAIL_APP_PASSWORD;
+
   return nodemailer.createTransport({
     service: 'gmail',
     auth: {
-      user: process.env.INFO_USER,
-      pass: process.env.INFO_GMAIL_APP_PASSWORD,
+      user: infoUser,
+      pass: gmailAppPassword,
     },
   });
 }
 
-function createOAuth2Client() {
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || 'http://localhost:8080';
+async function createOAuth2Client() {
+  const settings = await getAdminSettings();
+  const clientId = settings.GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = settings.GOOGLE_CLIENT_SECRET || process.env.GOOGLE_CLIENT_SECRET;
+  const baseUrl = settings.NEXT_PUBLIC_APP_URL || settings.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || 'http://localhost:8080';
   const redirectUri = `${baseUrl}/api/integrations/google/callback`;
 
   if (!clientId || !clientSecret) {
@@ -143,7 +149,7 @@ async function sendViaUserGoogleAccount(params: EmailParams): Promise<boolean> {
     return false;
   }
 
-  const oauth2Client = createOAuth2Client();
+  const oauth2Client = await createOAuth2Client();
   if (!oauth2Client) {
     console.warn('Google OAuth client not configured. Skipping refresh flow.');
     return false;
@@ -206,10 +212,12 @@ export async function sendEmail({ to, cc, subject, body, contentType = 'text/pla
 
     // If isInfo is true, use nodemailer with Gmail app password
     if (isInfo) {
-      const transporter = createInfoTransporter();
+      const transporter = await createInfoTransporter();
+      const settings = await getAdminSettings();
+      const infoUser = settings.INFO_USERNAME || process.env.INFO_USER;
 
       const mailOptions: any = {
-        from: `"MV Clouds" <${process.env.INFO_USER}>`,
+        from: `"MV Clouds" <${infoUser}>`,
         to,
         subject,
         html: body,

@@ -163,7 +163,7 @@ export function EmployeeTable({ employees, onEdit, onDelete, onView, loading, is
           columns={columns}
           dataSource={employees}
           rowKey="id"
-          pagination={{ pageSize: 10 }}
+          pagination={{ pageSize: 10 , showSizeChanger: false }}
           loading={loading}
           scroll={{ x: 'max-content' }}
           onRow={(record) => ({

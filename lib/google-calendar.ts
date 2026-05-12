@@ -1,6 +1,7 @@
 import { google } from 'googleapis';
 import { GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { db } from '@/lib/dynamodb';
+import { getAdminSettings } from '@/lib/admin-settings';
 
 interface GoogleIntegrationItem {
   access_token?: string;
@@ -26,10 +27,11 @@ interface DeleteLeaveCalendarEventParams {
   eventId?: string | null;
 }
 
-function createOAuth2Client() {
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || 'http://localhost:8080';
+async function createOAuth2Client() {
+  const settings = await getAdminSettings();
+  const clientId = settings.GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = settings.GOOGLE_CLIENT_SECRET || process.env.GOOGLE_CLIENT_SECRET;
+  const baseUrl = settings.NEXT_PUBLIC_APP_URL || settings.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || 'http://localhost:8080';
   const redirectUri = `${baseUrl}/api/integrations/google/callback`;
 
   if (!clientId || !clientSecret) {
@@ -131,7 +133,7 @@ export async function createLeaveCalendarEventForEmployee({
       return null;
     }
 
-    const oauth2Client = createOAuth2Client();
+    const oauth2Client = await createOAuth2Client();
     if (!oauth2Client) {
       
       return null;
@@ -158,10 +160,8 @@ export async function createLeaveCalendarEventForEmployee({
     const summaryLeaveType = leaveType || 'Leave';
 
     const descriptionLines = [
-      `Leave approved in HRMS`,
-      `Type: ${summaryLeaveType}`,
-      approvedBy ? `Approved by: ${approvedBy}` : null,
-      reason ? `Reason: ${reason}` : null,
+      `Leave approved in MV Portal`,
+      `Type: ${summaryLeaveType}`
     ].filter(Boolean);
 
     const createdEvent = await calendar.events.insert({
@@ -172,11 +172,11 @@ export async function createLeaveCalendarEventForEmployee({
         description: descriptionLines.join('\n'),
         start: { date: normalizedStartDate },
         end: { date: getExclusiveEndDateFromInclusive(normalizedEndDate) },
-        // attendees: [
-        //   {
-        //     email: 'mvteam@mvclouds.com',
-        //   },
-        // ],
+        attendees: [
+          {
+            email: 'mvteam@mvclouds.com',
+          },
+        ],
         guestsCanInviteOthers: false,
         guestsCanModify: false,
         guestsCanSeeOtherGuests: false,
@@ -223,7 +223,7 @@ export async function deleteLeaveCalendarEventForEmployee({
       return false;
     }
 
-    const oauth2Client = createOAuth2Client();
+    const oauth2Client = await createOAuth2Client();
     if (!oauth2Client) {
       return false;
     }

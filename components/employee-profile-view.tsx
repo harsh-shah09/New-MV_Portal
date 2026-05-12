@@ -234,7 +234,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
     }, [activeTab, currentUserRole]);
 
     // --- Data Fetching ---
-    const { data: employee, isLoading } = useQuery({
+    const { data: employeeResponse, isLoading } = useQuery({
         queryKey: ["employee", employeeId],
         queryFn: async () => {
             const res = await fetch(`/api/employees/${employeeId}`)
@@ -242,6 +242,8 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
             return res.json()
         }
     })
+    const employee = employeeResponse?.employee || employeeResponse;
+    const roleOptions = employeeResponse?.roleOptions || [];
     const nonPayslipDocs = (employee?.documents || []).filter(
         (doc: any) => doc.Document_Type__c?.trim().toLowerCase() !== 'payslip'
     )
@@ -2136,8 +2138,8 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                         formData.Department__c === 'Finance' ? ['Manager', 'Intern'] :
                                                         formData.Department__c === 'Marketing' ? ['Marketing', 'BDE', 'Manager', 'Intern'] :
                                                         formData.Department__c === 'Admin' ? ['Admin', 'Manager', 'Intern'] :
-                                                        ['Intern', 'Developer', 'Manager', 'HR', 'Admin', 'BDE', 'Marketing', 'Finance' , 'QA']
-                                                    ).map(r => ({ label: r, value: r }))}
+                                                        (roleOptions.length > 0 ? roleOptions : ['Intern', 'Developer', 'Manager', 'HR', 'Admin', 'BDE', 'Marketing', 'Finance' , 'QA'])
+                                                    ).map((r: string) => ({ label: r, value: r }))}
                                                 />
                                                 <Field
                                                     label="Job Title"

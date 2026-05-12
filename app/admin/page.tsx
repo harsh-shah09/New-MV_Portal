@@ -77,6 +77,24 @@ export default function AdminConsole() {
     // Email Editor State
     const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
 
+    // Admin Settings State
+    const [adminSettings, setAdminSettings] = useState<any>({
+        INFO_USERNAME: '',
+        INFO_GMAIL_APP_PASSWORD: '',
+        GOOGLE_CLIENT_ID: '',
+        GOOGLE_CLIENT_SECRET: '',
+        S3_BUCKET_NAME: '',
+        AWS_ACCESS_KEY_ID: '',
+        AWS_SECRET_ACCESS_KEY: '',
+        AWS_REGION: '',
+        NEXTAUTH_SECRET: '',
+        NEXTAUTH_URL: '',
+        NEXT_PUBLIC_APP_URL: '',
+        ENCRYPTION_KEY: '',
+        SESSION_SECRET: '',
+    });
+    const [settingsChanges, setSettingsChanges] = useState<any>({});
+
     // Read + sync query params on mount and navigation
     useEffect(() => {
         const syncTab = () => setActiveTab(getTabFromQuery());
@@ -186,12 +204,80 @@ export default function AdminConsole() {
                 ...configData
             } = data;
             setConfigs(configData);
+            // Also fetch admin settings
+            fetchAdminSettings();
         } catch (error) {
             console.error(error);
             message.error("Failed to load configurations");
         } finally {
             setLoading(false);
         }
+    };
+
+    const fetchAdminSettings = async () => {
+        try {
+            const res = await fetch('/api/admin/settings');
+            if (res.ok) {
+                const data = await res.json();
+                setAdminSettings(data);
+            }
+        } catch (error) {
+            console.error("Failed to fetch admin settings:", error);
+        }
+    };
+
+    const handleSettingChange = (key: string, value: string) => {
+        setAdminSettings((prev: any) => ({
+            ...prev,
+            [key]: value
+        }));
+        setSettingsChanges((prev: any) => ({
+            ...prev,
+            [key]: value
+        }));
+    };
+
+    const saveAdminSettings = async () => {
+        if (Object.keys(settingsChanges).length === 0) {
+            message.info("No settings to save");
+            return;
+        }
+
+        Modal.confirm({
+            title: 'Confirm Save',
+            icon: <AlertTriangle className="text-amber-500 w-6 h-6 mr-2" />,
+            content: (
+                <div>
+                    <p>You are about to update admin settings.</p>
+                    <p className="text-sm text-slate-500 mt-2">
+                        Note: Updates to Gmail and Google OAuth credentials will affect email and calendar integrations immediately.
+                    </p>
+                </div>
+            ),
+            onOk: async () => {
+                try {
+                    setSaving(true);
+                    const res = await fetch('/api/admin/settings', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(settingsChanges)
+                    });
+
+                    if (!res.ok) {
+                        const data = await res.json();
+                        throw new Error(data.error || "Update failed");
+                    }
+
+                    message.success("Admin settings updated successfully");
+                    setSettingsChanges({});
+                } catch (error) {
+                    console.error(error);
+                    message.error("Failed to save admin settings");
+                } finally {
+                    setSaving(false);
+                }
+            }
+        });
     };
 
     const handleInputChange = (metadataType: string, record: any, newValue: any, field: string = 'Value__c') => {
@@ -437,25 +523,245 @@ export default function AdminConsole() {
                                         )}
 
                                         {activeTab === "admin" && (
-                                            <div>
-                                                <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
-                                                    <Settings className="w-5 h-5 text-blue-500" /> General Configurations
-                                                </h2>
-                                                <div className="grid grid-cols-1 gap-6">
-                                                    {configs.admin?.map((record: any) => (
-                                                        <div key={record.Id} className="group">
+                                            <div className="space-y-10">
+                                                {/* Salesforce Configurations */}
+                                                <div>
+                                                    <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                                                        <Settings className="w-5 h-5 text-blue-500" /> Salesforce Configurations
+                                                    </h3>
+                                                    <div className="grid grid-cols-1 gap-6">
+                                                        {configs.admin?.map((record: any) => (
+                                                            <div key={record.Id} className="group">
+                                                                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                                                    {record.MasterLabel}
+                                                                </label>
+                                                                <input
+                                                                    type="text"
+                                                                    value={record.Value__c || ''}
+                                                                    onChange={(e) => handleInputChange('Admin_Configurations__mdt', record, e.target.value)}
+                                                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition group-hover:bg-white"
+                                                                    placeholder={`Enter ${record.MasterLabel}`}
+                                                                />
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+
+                                                {/* Gmail and Google OAuth Settings */}
+                                                <div className="border-t pt-8">
+                                                    <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                                                        <Mail className="w-5 h-5 text-red-500" /> Gmail & Google OAuth Settings
+                                                    </h3>
+                                                    <div className="grid grid-cols-1 gap-6 bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                                                        <div className="group">
                                                             <label className="block text-sm font-semibold text-slate-700 mb-2">
-                                                                {record.MasterLabel}
+                                                                Gmail Username
+                                                            </label>
+                                                            <input
+                                                                type="email"
+                                                                value={adminSettings.INFO_USERNAME || ''}
+                                                                onChange={(e) => handleSettingChange('INFO_USERNAME', e.target.value)}
+                                                                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none transition group-hover:border-slate-300"
+                                                                placeholder="info@company.com"
+                                                            />
+                                                            <p className="text-xs text-slate-500 mt-1">Email address for sending system notifications</p>
+                                                        </div>
+
+                                                        <div className="group">
+                                                            <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                                                Gmail App Password
+                                                            </label>
+                                                            <input
+                                                                type="password"
+                                                                value={adminSettings.INFO_GMAIL_APP_PASSWORD || ''}
+                                                                onChange={(e) => handleSettingChange('INFO_GMAIL_APP_PASSWORD', e.target.value)}
+                                                                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none transition group-hover:border-slate-300"
+                                                                placeholder="••••••••••••••••"
+                                                            />
+                                                            <p className="text-xs text-slate-500 mt-1">16-character app password from Google Account</p>
+                                                        </div>
+
+                                                        <div className="group">
+                                                            <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                                                Google Client ID
                                                             </label>
                                                             <input
                                                                 type="text"
-                                                                value={record.Value__c || ''}
-                                                                onChange={(e) => handleInputChange('Admin_Configurations__mdt', record, e.target.value)}
-                                                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition group-hover:bg-white"
-                                                                placeholder={`Enter ${record.MasterLabel}`}
+                                                                value={adminSettings.GOOGLE_CLIENT_ID || ''}
+                                                                onChange={(e) => handleSettingChange('GOOGLE_CLIENT_ID', e.target.value)}
+                                                                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition group-hover:border-slate-300"
+                                                                placeholder="xxxx-xxxx.apps.googleusercontent.com"
                                                             />
+                                                            <p className="text-xs text-slate-500 mt-1">OAuth 2.0 Client ID from Google Cloud Console</p>
                                                         </div>
-                                                    ))}
+
+                                                        <div className="group">
+                                                            <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                                                Google Client Secret
+                                                            </label>
+                                                            <input
+                                                                type="password"
+                                                                value={adminSettings.GOOGLE_CLIENT_SECRET || ''}
+                                                                onChange={(e) => handleSettingChange('GOOGLE_CLIENT_SECRET', e.target.value)}
+                                                                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition group-hover:border-slate-300"
+                                                                placeholder="••••••••••••••••"
+                                                            />
+                                                            <p className="text-xs text-slate-500 mt-1">OAuth 2.0 Client Secret from Google Cloud Console</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* AWS S3 Configuration */}
+                                                <div className="border-t pt-8">
+                                                    <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                                                        <Package className="w-5 h-5 text-amber-500" /> AWS S3 Configuration
+                                                    </h3>
+                                                    <div className="grid grid-cols-1 gap-6 bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                                                        <div className="group">
+                                                            <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                                                S3 Bucket Name
+                                                            </label>
+                                                            <input
+                                                                type="text"
+                                                                value={adminSettings.S3_BUCKET_NAME || ''}
+                                                                onChange={(e) => handleSettingChange('S3_BUCKET_NAME', e.target.value)}
+                                                                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none transition group-hover:border-slate-300"
+                                                                placeholder="my-bucket-name"
+                                                            />
+                                                            <p className="text-xs text-slate-500 mt-1">AWS S3 bucket name for file uploads</p>
+                                                        </div>
+
+                                                        <div className="group">
+                                                            <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                                                AWS Access Key ID
+                                                            </label>
+                                                            <input
+                                                                type="password"
+                                                                value={adminSettings.AWS_ACCESS_KEY_ID || ''}
+                                                                onChange={(e) => handleSettingChange('AWS_ACCESS_KEY_ID', e.target.value)}
+                                                                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none transition group-hover:border-slate-300"
+                                                                placeholder="••••••••••••••••"
+                                                            />
+                                                            <p className="text-xs text-slate-500 mt-1">AWS IAM Access Key ID</p>
+                                                        </div>
+
+                                                        <div className="group">
+                                                            <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                                                AWS Secret Access Key
+                                                            </label>
+                                                            <input
+                                                                type="password"
+                                                                value={adminSettings.AWS_SECRET_ACCESS_KEY || ''}
+                                                                onChange={(e) => handleSettingChange('AWS_SECRET_ACCESS_KEY', e.target.value)}
+                                                                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none transition group-hover:border-slate-300"
+                                                                placeholder="••••••••••••••••"
+                                                            />
+                                                            <p className="text-xs text-slate-500 mt-1">AWS IAM Secret Access Key</p>
+                                                        </div>
+
+                                                        <div className="group">
+                                                            <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                                                AWS Region
+                                                            </label>
+                                                            <input
+                                                                type="text"
+                                                                value={adminSettings.AWS_REGION || ''}
+                                                                onChange={(e) => handleSettingChange('AWS_REGION', e.target.value)}
+                                                                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none transition group-hover:border-slate-300"
+                                                                placeholder="us-east-1"
+                                                            />
+                                                            <p className="text-xs text-slate-500 mt-1">AWS region (e.g., us-east-1, eu-west-1)</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Core Application Settings */}
+                                                <div className="border-t pt-8">
+                                                    <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                                                        <Settings className="w-5 h-5 text-indigo-500" /> Core Application Settings
+                                                    </h3>
+                                                    <div className="grid grid-cols-1 gap-6 bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                                                        <div className="group">
+                                                            <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                                                NextAuth URL
+                                                            </label>
+                                                            <input
+                                                                type="text"
+                                                                value={adminSettings.NEXTAUTH_URL || ''}
+                                                                onChange={(e) => handleSettingChange('NEXTAUTH_URL', e.target.value)}
+                                                                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition group-hover:border-slate-300"
+                                                                placeholder="https://yourdomain.com"
+                                                            />
+                                                            <p className="text-xs text-slate-500 mt-1">Base URL for authentication</p>
+                                                        </div>
+
+                                                        <div className="group">
+                                                            <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                                                NextAuth Secret
+                                                            </label>
+                                                            <input
+                                                                type="password"
+                                                                value={adminSettings.NEXTAUTH_SECRET || ''}
+                                                                onChange={(e) => handleSettingChange('NEXTAUTH_SECRET', e.target.value)}
+                                                                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition group-hover:border-slate-300"
+                                                                placeholder="••••••••••••••••"
+                                                            />
+                                                            <p className="text-xs text-slate-500 mt-1">Secret used to encrypt session tokens</p>
+                                                        </div>
+
+                                                        <div className="group">
+                                                            <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                                                App URL
+                                                            </label>
+                                                            <input
+                                                                type="text"
+                                                                value={adminSettings.NEXT_PUBLIC_APP_URL || ''}
+                                                                onChange={(e) => handleSettingChange('NEXT_PUBLIC_APP_URL', e.target.value)}
+                                                                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition group-hover:border-slate-300"
+                                                                placeholder="https://yourdomain.com"
+                                                            />
+                                                            <p className="text-xs text-slate-500 mt-1">Public base URL of the application</p>
+                                                        </div>
+
+                                                        <div className="group">
+                                                            <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                                                Encryption Key
+                                                            </label>
+                                                            <input
+                                                                type="password"
+                                                                value={adminSettings.ENCRYPTION_KEY || ''}
+                                                                onChange={(e) => handleSettingChange('ENCRYPTION_KEY', e.target.value)}
+                                                                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition group-hover:border-slate-300"
+                                                                placeholder="••••••••••••••••"
+                                                            />
+                                                            <p className="text-xs text-slate-500 mt-1">Key for encrypting sensitive data in database</p>
+                                                        </div>
+
+                                                        <div className="group">
+                                                            <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                                                Session Secret
+                                                            </label>
+                                                            <input
+                                                                type="password"
+                                                                value={adminSettings.SESSION_SECRET || ''}
+                                                                onChange={(e) => handleSettingChange('SESSION_SECRET', e.target.value)}
+                                                                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition group-hover:border-slate-300"
+                                                                placeholder="••••••••••••••••"
+                                                            />
+                                                            <p className="text-xs text-slate-500 mt-1">Secret used for signing session cookies</p>
+                                                        </div>
+
+                                                        {Object.keys(settingsChanges).length > 0 && (
+                                                            <button
+                                                                onClick={saveAdminSettings}
+                                                                disabled={saving}
+                                                                className="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-xl transition disabled:opacity-50 flex items-center justify-center gap-2"
+                                                            >
+                                                                {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                                                                {saving ? 'Saving...' : 'Save Settings'}
+                                                            </button>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
                                         )}
