@@ -99,7 +99,7 @@ export const getSalesforceConnection = async () => {
   const passWordToken = sfCredentials.password.trim().concat(sfCredentials.security_token.trim())
 
   await conn.login(sfCredentials.username, passWordToken);
-
+``
   // 5. Store new token in DynamoDB
   try {
     const putCmd = new PutCommand({

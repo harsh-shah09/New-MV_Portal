@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { verifyToken } from '@/lib/auth-utils'
+import { getDbSession } from '@/lib/dynamodb'
 
 export async function proxy(request: NextRequest) {
   const publicPaths = ['/auth/login', '/' , '/auth/change-password' , '/auth/welcome' , '/auth/reset-password' , '/welcome'];
@@ -8,7 +9,14 @@ export async function proxy(request: NextRequest) {
 
   // Check for session
   const sessionCookie = request.cookies.get('session')?.value;
-  const session = sessionCookie ? await verifyToken(sessionCookie) : null;
+  let session = sessionCookie ? await verifyToken(sessionCookie) : null;
+
+  if (session && session.employeeId && session.sessionId) {
+    const dbSession = await getDbSession(session.employeeId, session.sessionId);
+    if (!dbSession || dbSession.status !== 'active') {
+      session = null; // Invalidate session
+    }
+  }
 
   if (!session && !isPublic) {
     if (request.nextUrl.pathname.startsWith('/_next') || request.nextUrl.pathname.includes('.')) {

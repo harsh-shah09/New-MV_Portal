@@ -8,6 +8,7 @@ export interface SessionPayload {
   role : string;
   title? : string;
   name : string;
+  sessionId?: string;
 }
 
 export async function getKey() {

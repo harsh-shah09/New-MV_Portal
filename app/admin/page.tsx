@@ -938,7 +938,7 @@ export default function AdminConsole() {
                                                                                         size="small"
                                                                                         dropdownStyle={{ width: 'max-content'}}
                                                                                         value={user.Role || 'Employee'}
-                                                                                        onChange={(e) => updateUser(user.Id, { Role__c: e.target.value })}
+                                                                                        onChange={(e: any) => updateUser(user.Id, { Role__c: e })}
                                                                                         className="bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs font-medium focus:ring-2 focus:ring-indigo-500 outline-none"
                                                                                         options={[
                                                                                             { value: 'Employee', label: 'Employee (Standard)' },

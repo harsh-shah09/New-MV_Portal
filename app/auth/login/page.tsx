@@ -143,7 +143,7 @@ export default function LoginPage() {
                             <div className="bg-slate-50 rounded-xl p-4 text-sm text-slate-600 border border-slate-100">
                                 <p>Please contact your HR representative or IT support to resolve this issue.</p>
                                 <div className="mt-3 font-medium text-slate-800 bg-white py-2 px-3 rounded-lg border border-slate-200 inline-block">
-                                    support@mvportal.com
+                                    info@mvportal.com
                                 </div>
                             </div>
 

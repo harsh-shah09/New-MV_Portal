@@ -62,9 +62,15 @@ export async function POST(req: Request) {
         const allowedUpdates: any = {};
         if (updates.Role__c) allowedUpdates.Role__c = updates.Role__c;
         if (updates.Status__c) allowedUpdates.Status__c = updates.Status__c;
-        allowedUpdates.Active__c = updates.Active__c ?? true;
-        // Add other allowed fields here
+        if (updates.Active__c !== undefined) allowedUpdates.Active__c = updates.Active__c;
+
         await updateEmployee(employeeId, allowedUpdates);
+
+        // If explicitly set to false, revoke sessions
+        if (updates.Active__c === false) {
+            const { revokeAllDbSessions } = await import('@/lib/dynamodb');
+            await revokeAllDbSessions(employeeId);
+        }
 
         return NextResponse.json({ success: true });
 

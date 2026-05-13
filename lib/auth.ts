@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import crypto from "crypto";
 import { getKey, verifyToken, SessionPayload } from "./auth-utils";
 import { getAdminSettingValue } from "./admin-settings";
+import { createDbSession, getDbSession, deleteDbSession } from "./dynamodb";
 
 export { verifyToken, type SessionPayload };
 
@@ -24,6 +25,11 @@ export async function encrypt(payload: SessionPayload) {
 
 export async function createSession(payload: SessionPayload) {
   const expires = new Date(Date.now() + 60 * 60 * 1000); // 1 hr session
+  const sessionId = crypto.randomUUID();
+  payload.sessionId = sessionId;
+  
+  await createDbSession(payload.employeeId, sessionId, expires.getTime());
+
   const session = await encrypt(payload);
 
   const cookieStore = await cookies();
@@ -39,14 +45,32 @@ export async function createSession(payload: SessionPayload) {
 
 export async function verifySession() {
   const cookieStore = await cookies();
-  const session = cookieStore.get("session")?.value;
+  const sessionToken = cookieStore.get("session")?.value;
 
-  if (!session) return null;
-  return verifyToken(session);
+  if (!sessionToken) return null;
+  const payload = await verifyToken(sessionToken);
+  
+  if (!payload || !payload.employeeId || !payload.sessionId) return null;
+
+  const dbSession = await getDbSession(payload.employeeId, payload.sessionId);
+  if (!dbSession || dbSession.status !== 'active') {
+    return null;
+  }
+
+  return payload;
 }
 
 export async function logout() {
   const cookieStore = await cookies();
+  const sessionToken = cookieStore.get("session")?.value;
+  
+  if (sessionToken) {
+    const payload = await verifyToken(sessionToken);
+    if (payload && payload.employeeId && payload.sessionId) {
+      await deleteDbSession(payload.employeeId, payload.sessionId);
+    }
+  }
+
   cookieStore.delete("session");
 }
 
@@ -63,6 +87,12 @@ export async function refreshSession() {
 
   if (!session) return;
 
+  const oldSessionId = session.sessionId;
+
   // Re-create session with new expiry
   await createSession(session);
+  
+  if (oldSessionId) {
+    await deleteDbSession(session.employeeId, oldSessionId);
+  }
 }
