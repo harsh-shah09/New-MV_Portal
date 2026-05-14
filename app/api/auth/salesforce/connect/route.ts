@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { Connection } from 'jsforce';
 import chromium from '@sparticuz/chromium';
 import { chromium as playwright } from 'playwright-core';
 
@@ -54,7 +55,24 @@ export async function POST(req: Request) {
   const { action } = body;
 
   try {
-    if (action === 'start') {
+    if (action === 'test_login') {
+      const { envUrl, username, password, token } = body;
+      let url = envUrl;
+      if (!url.startsWith('http')) {
+        url = `https://${url}`;
+      }
+      
+      try {
+        const conn = new Connection({
+          loginUrl: url,
+          version: '50.0'
+        });
+        await conn.login(username, password + token);
+        return NextResponse.json({ success: true });
+      } catch (err: any) {
+        return NextResponse.json({ error: err.message || 'Invalid login or security token' }, { status: 400 });
+      }
+    } else if (action === 'start') {
       const { envUrl, username, password } = body;
       const sessionId = Date.now().toString();
 

@@ -23,6 +23,7 @@ export default function LoginPage() {
   const [authType, setAuthType] = useState<'otp' | 'mobile'>('otp')
   const [connectLoading, setConnectLoading] = useState(false)
   const [connectError, setConnectError] = useState("")
+  const [showPlaywrightOption, setShowPlaywrightOption] = useState(false)
   
   const [sfEnv, setSfEnv] = useState("login.salesforce.com")
   const [sfUser, setSfUser] = useState("")
@@ -68,6 +69,35 @@ export default function LoginPage() {
 
   const handleConnectStart = async (e: React.FormEvent) => {
     e.preventDefault();
+    setConnectLoading(true);
+    setConnectError("");
+    setShowPlaywrightOption(false);
+    
+    try {
+      const res = await fetch('/api/auth/salesforce/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'test_login', envUrl: sfEnv, username: sfUser, password: sfPass, token: sfToken })
+      });
+      const data = await res.json();
+      
+      if (!res.ok) {
+        throw new Error(data.error || 'Login failed');
+      }
+      
+      await saveSalesforceCredentials(sfUser, sfPass, sfToken);
+      setIsConfigured(true);
+      setShowConnectModal(false);
+      
+    } catch (err: any) {
+      setConnectError(`${err.message}. If your security token is invalid or missing, you can generate a new one below.`);
+      setShowPlaywrightOption(true);
+    } finally {
+      setConnectLoading(false);
+    }
+  };
+
+  const handlePlaywrightStart = async () => {
     setConnectLoading(true);
     setConnectError("");
     try {
@@ -156,7 +186,7 @@ export default function LoginPage() {
         <div className="absolute top-6 right-6 z-50">
           <button 
             onClick={() => setShowConnectModal(true)}
-            className="flex items-center gap-2 bg-white text-slate-800 px-4 py-2 rounded-xl shadow-lg border border-slate-200 hover:bg-slate-50 transition-colors font-medium text-sm"
+            className="flex items-center gap-2 bg-white text-slate-800 px-4 py-2 rounded-xl shadow-lg border border-slate-200 hover:bg-slate-50 transition-colors font-medium text-sm cursor-pointer"
           >
             <Plug className="w-4 h-4 text-blue-600" />
             Connect Salesforce
@@ -246,14 +276,41 @@ export default function LoginPage() {
                         className="w-full border border-[#d8dde6] rounded-[4px] px-3 py-2.5 text-[14px] focus:border-[#1b96ff] focus:ring-1 focus:ring-[#1b96ff] outline-none text-[#16325c] bg-white transition-all"
                       />
                     </div>
+                    <div>
+                      <label htmlFor="sfTokenStep1" className="block text-[13px] text-[#3e3e3c] mb-1.5">Security Token</label>
+                      <input 
+                        id="sfTokenStep1"
+                        name="token"
+                        type="text" 
+                        value={sfToken} 
+                        onChange={e => setSfToken(e.target.value)}
+                        placeholder="Paste your security token (optional if generating new)"
+                        className="w-full border border-[#d8dde6] rounded-[4px] px-3 py-2.5 text-[14px] focus:border-[#1b96ff] focus:ring-1 focus:ring-[#1b96ff] outline-none text-[#16325c] bg-white transition-all"
+                      />
+                    </div>
                     <button 
                       type="submit" 
                       disabled={connectLoading}
                       className="w-full bg-[#0070d2] hover:bg-[#005fb2] text-white font-medium py-3 px-4 rounded-[4px] flex justify-center items-center gap-2 mt-6 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
                     >
-                      {connectLoading && <Loader2 className="w-4 h-4 animate-spin" />}
-                      Log In
+                      {connectLoading && !showPlaywrightOption && <Loader2 className="w-4 h-4 animate-spin" />}
+                      Log In & Save
                     </button>
+                    
+                    {showPlaywrightOption && (
+                        <div className="mt-4 pt-4 border-t border-slate-100 text-center">
+                            <p className="text-[13px] text-[#3e3e3c] mb-3">Need to generate a new security token?</p>
+                            <button 
+                              type="button" 
+                              onClick={handlePlaywrightStart}
+                              disabled={connectLoading}
+                              className="w-full bg-white border border-[#d8dde6] hover:bg-slate-50 text-[#0070d2] font-medium py-2.5 px-4 rounded-[4px] flex justify-center items-center gap-2 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+                            >
+                              {connectLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+                              Generate New Security Token
+                            </button>
+                        </div>
+                    )}
                   </form>
                 )}
 

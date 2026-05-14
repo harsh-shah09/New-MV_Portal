@@ -1,5 +1,5 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient, GetCommand, PutCommand, DeleteCommand, QueryCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import { DynamoDBDocumentClient, GetCommand, PutCommand, DeleteCommand, QueryCommand, UpdateCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
 
 const client = new DynamoDBClient({
   region: process.env.AWS_REGION || "us-east-1",
@@ -285,6 +285,29 @@ export const revokeAllDbSessions = async (employeeId: string) => {
     // Update all sessions to revoked
     const revokePromises = sessions.map(session => 
         revokeDbSession(employeeId, session.session_id)
+    );
+    
+    await Promise.all(revokePromises);
+};
+
+/**
+ * Revokes all active sessions globally (for all users)
+ */
+export const revokeAllSessionsGlobal = async () => {
+    const scanCmd = new ScanCommand({
+        TableName: "MV_Portal",
+        FilterExpression: "begins_with(SortKey, :sk)",
+        ExpressionAttributeValues: {
+            ":sk": "SESSION#"
+        }
+    });
+    
+    const result = await db.send(scanCmd);
+    const sessions = result.Items || [];
+    
+    // Update all sessions to revoked
+    const revokePromises = sessions.map((session: any) => 
+        revokeDbSession(session.Employee_Id, session.session_id)
     );
     
     await Promise.all(revokePromises);
