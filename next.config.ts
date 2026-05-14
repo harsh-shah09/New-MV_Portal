@@ -13,9 +13,12 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  serverExternalPackages: ['@sparticuz/chromium', 'puppeteer-core'],
+  serverExternalPackages: ['@sparticuz/chromium', 'puppeteer-core', 'playwright-aws-lambda', 'playwright-core'],
   outputFileTracingIncludes: {
-    "/*": ["./node_modules/@sparticuz/chromium/bin/**/*"],
+    "/*": [
+      "./node_modules/@sparticuz/chromium/bin/**/*",
+      "./node_modules/playwright-core/browsers.json"
+    ],
   },
 };
 

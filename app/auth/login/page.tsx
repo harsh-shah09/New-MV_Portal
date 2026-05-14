@@ -1,11 +1,10 @@
 "use client"
-
-import { loginAction, forgotPasswordAction, verify2FAAndLogin } from "./actions"
+import { loginAction, forgotPasswordAction, verify2FAAndLogin, checkSalesforceConfigured, saveSalesforceCredentials } from "./actions"
 import { useEffect, useState, useActionState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Image from "next/image"
-import { motion } from "framer-motion"
-import { Mail, Lock, ArrowRight, Loader2, CheckCircle2, Ban } from "lucide-react"
+import { motion, AnimatePresence } from "framer-motion"
+import { Mail, Lock, ArrowRight, Loader2, CheckCircle2, Ban, Plug } from "lucide-react"
 
 export default function LoginPage() {
   const [state, action, pending] = useActionState(loginAction, {})
@@ -17,6 +16,25 @@ export default function LoginPage() {
   const [resetStatus, setResetStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null)
   const [isResetting, setIsResetting] = useState(false)
   const searchParams = useSearchParams()
+
+  const [isConfigured, setIsConfigured] = useState<boolean | null>(null)
+  const [showConnectModal, setShowConnectModal] = useState(false)
+  const [connectStep, setConnectStep] = useState(1) // 1: Credentials, 2: 2FA, 3: Security Token
+  const [authType, setAuthType] = useState<'otp' | 'mobile'>('otp')
+  const [connectLoading, setConnectLoading] = useState(false)
+  const [connectError, setConnectError] = useState("")
+  
+  const [sfEnv, setSfEnv] = useState("login.salesforce.com")
+  const [sfUser, setSfUser] = useState("")
+  const [sfPass, setSfPass] = useState("")
+  const [sfSessionId, setSfSessionId] = useState("")
+  const [sfCode, setSfCode] = useState("")
+  const [sfToken, setSfToken] = useState("")
+
+  useEffect(() => {
+    checkSalesforceConfigured().then(res => setIsConfigured(res))
+  }, [])
+
   useEffect(() => {
     if (state.success || verifyState.success) {
         const redirectUrl = searchParams.get('redirect') || '/dashboard';
@@ -48,8 +66,288 @@ export default function LoginPage() {
     }
   }
 
+  const handleConnectStart = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setConnectLoading(true);
+    setConnectError("");
+    try {
+      const res = await fetch('/api/auth/salesforce/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'start', envUrl: sfEnv, username: sfUser, password: sfPass })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Connection failed');
+      
+      if (data.requires2FA) {
+        setSfSessionId(data.sessionId);
+        setAuthType(data.type || 'otp');
+        setConnectStep(2);
+      } else {
+        setConnectStep(3);
+      }
+    } catch (err: any) {
+      setConnectError(err.message);
+    } finally {
+      setConnectLoading(false);
+    }
+  };
+
+  const handleConnectVerify = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setConnectLoading(true);
+    setConnectError("");
+    try {
+      const res = await fetch('/api/auth/salesforce/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'verify', sessionId: sfSessionId, code: sfCode })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Verification failed');
+      
+      setConnectStep(3);
+    } catch (err: any) {
+      setConnectError(err.message);
+    } finally {
+      setConnectLoading(false);
+    }
+  };
+
+  const handleMobileAuthCheck = async () => {
+    setConnectLoading(true);
+    setConnectError("");
+    try {
+      const res = await fetch('/api/auth/salesforce/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'wait_for_mobile_auth', sessionId: sfSessionId })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Verification failed');
+      
+      setConnectStep(3);
+    } catch (err: any) {
+      setConnectError(err.message);
+    } finally {
+      setConnectLoading(false);
+    }
+  };
+
+  const handleConnectSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setConnectLoading(true);
+    setConnectError("");
+    try {
+      await saveSalesforceCredentials(sfUser, sfPass, sfToken);
+      setIsConfigured(true);
+      setShowConnectModal(false);
+    } catch (err: any) {
+      setConnectError('Failed to save credentials');
+    } finally {
+      setConnectLoading(false);
+    }
+  };
+
   return (
-    <div className="min-h-screen w-full flex overflow-hidden bg-slate-50 flex-row-reverse">
+    <div className="min-h-screen w-full flex overflow-hidden bg-slate-50 flex-row-reverse relative">
+      {/* Top Right Connect Button */}
+      {isConfigured === false && (
+        <div className="absolute top-6 right-6 z-50">
+          <button 
+            onClick={() => setShowConnectModal(true)}
+            className="flex items-center gap-2 bg-white text-slate-800 px-4 py-2 rounded-xl shadow-lg border border-slate-200 hover:bg-slate-50 transition-colors font-medium text-sm"
+          >
+            <Plug className="w-4 h-4 text-blue-600" />
+            Connect Salesforce
+          </button>
+        </div>
+      )}
+
+      {/* Connect Modal */}
+      <AnimatePresence>
+        {showConnectModal && (
+          <motion.div 
+            initial={{ opacity: 0 }} 
+            animate={{ opacity: 1 }} 
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-[#16325c]/80 backdrop-blur-sm p-4"
+          >
+            <motion.div 
+              initial={{ scale: 0.95 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.95 }}
+              className="bg-white rounded-[4px] shadow-2xl w-full max-w-[400px] relative overflow-hidden"
+            >
+              {/* Close Button */}
+              <button 
+                onClick={() => setShowConnectModal(false)} 
+                className="absolute top-4 right-4 text-[#706e6b] hover:text-[#080707] z-10 transition-colors"
+                aria-label="Close"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+
+              <div className="p-8 pb-10">
+                <div className="flex justify-center mb-8 mt-2">
+                  <Image src="/logo214.svg" alt="Salesforce" width={160} height={112} className="h-14 w-auto" />
+                </div>
+
+                {connectError && (
+                  <div className="mb-6 p-3 bg-[#fff1f1] text-[#c23934] rounded-[4px] text-sm border border-[#c23934]/30">
+                    {connectError}
+                  </div>
+                )}
+
+                {connectStep === 1 && (
+                  <form onSubmit={handleConnectStart} className="space-y-5">
+                    <div>
+                      <label htmlFor="sfEnv" className="block text-[13px] text-[#3e3e3c] mb-1.5">Environment URL</label>
+                      <input 
+                        id="sfEnv"
+                        name="url"
+                        type="text" 
+                        required 
+                        value={sfEnv} 
+                        onChange={e => setSfEnv(e.target.value)}
+                        placeholder="login.salesforce.com"
+                        pattern="^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+                        title="Please enter a valid Salesforce environment URL (e.g. login.salesforce.com)"
+                        autoComplete="url"
+                        className="w-full border border-[#d8dde6] rounded-[4px] px-3 py-2.5 text-[14px] focus:border-[#1b96ff] focus:ring-1 focus:ring-[#1b96ff] outline-none text-[#16325c] bg-white transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="sfUser" className="block text-[13px] text-[#3e3e3c] mb-1.5">Username</label>
+                      <input 
+                        id="sfUser"
+                        name="username"
+                        type="email" 
+                        required 
+                        value={sfUser} 
+                        onChange={e => setSfUser(e.target.value)}
+                        placeholder="name@company.com"
+                        autoComplete="username"
+                        className="w-full border border-[#d8dde6] rounded-[4px] px-3 py-2.5 text-[14px] focus:border-[#1b96ff] focus:ring-1 focus:ring-[#1b96ff] outline-none text-[#16325c] bg-white transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="sfPass" className="block text-[13px] text-[#3e3e3c] mb-1.5">Password</label>
+                      <input 
+                        id="sfPass"
+                        name="password"
+                        type="password" 
+                        required 
+                        value={sfPass} 
+                        onChange={e => setSfPass(e.target.value)}
+                        placeholder="Password"
+                        minLength={8}
+                        autoComplete="current-password"
+                        className="w-full border border-[#d8dde6] rounded-[4px] px-3 py-2.5 text-[14px] focus:border-[#1b96ff] focus:ring-1 focus:ring-[#1b96ff] outline-none text-[#16325c] bg-white transition-all"
+                      />
+                    </div>
+                    <button 
+                      type="submit" 
+                      disabled={connectLoading}
+                      className="w-full bg-[#0070d2] hover:bg-[#005fb2] text-white font-medium py-3 px-4 rounded-[4px] flex justify-center items-center gap-2 mt-6 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+                    >
+                      {connectLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+                      Log In
+                    </button>
+                  </form>
+                )}
+
+                {connectStep === 2 && (
+                  <form onSubmit={handleConnectVerify} className="space-y-5">
+                    {authType === 'mobile' ? (
+                      <div className="text-center">
+                        <h2 className="text-[20px] font-normal text-[#16325c] mb-4">Check Your Mobile Device</h2>
+                        <p className="text-[14px] text-[#3e3e3c] mb-6">
+                          Salesforce is requesting approval from your Authenticator app. 
+                          Please open your mobile device and approve the login request.
+                        </p>
+                        <button 
+                          type="button" 
+                          onClick={handleMobileAuthCheck}
+                          disabled={connectLoading}
+                          className="w-full bg-[#0070d2] hover:bg-[#005fb2] text-white font-medium py-3 px-4 rounded-[4px] flex justify-center items-center gap-2 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+                        >
+                          {connectLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+                          I Have Approved It
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="text-center">
+                        <h2 className="text-[20px] font-normal text-[#16325c] mb-4">Verify Your Identity</h2>
+                        <p className="text-[14px] text-[#3e3e3c] mb-6">
+                          We've sent you a verification code. Please enter it below.
+                        </p>
+                        <div className="text-left mb-6">
+                          <label className="block text-[13px] text-[#3e3e3c] mb-1.5">Verification Code</label>
+                          <input 
+                            type="text" 
+                            required 
+                            value={sfCode} 
+                            onChange={e => setSfCode(e.target.value.replace(/\D/g, ''))}
+                            pattern="\d{5,6}"
+                            title="Please enter a valid 5 or 6 digit verification code"
+                            className="w-full border border-[#d8dde6] rounded-[4px] px-3 py-2.5 text-[14px] focus:border-[#1b96ff] focus:ring-1 focus:ring-[#1b96ff] outline-none text-[#16325c] bg-white transition-all text-center tracking-widest"
+                            placeholder="000000"
+                            maxLength={6}
+                          />
+                        </div>
+                        <button 
+                          type="submit" 
+                          disabled={connectLoading}
+                          className="w-full bg-[#0070d2] hover:bg-[#005fb2] text-white font-medium py-3 px-4 rounded-[4px] flex justify-center items-center gap-2 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+                        >
+                          {connectLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+                          Verify
+                        </button>
+                      </div>
+                    )}
+                  </form>
+                )}
+
+                {connectStep === 3 && (
+                  <form onSubmit={handleConnectSave} className="space-y-5">
+                    <div className="text-center">
+                      <div className="w-12 h-12 rounded-full bg-[#e8f5e9] flex items-center justify-center mx-auto mb-4">
+                        <CheckCircle2 className="w-6 h-6 text-[#2e844a]" />
+                      </div>
+                      <h2 className="text-[20px] font-normal text-[#16325c] mb-2">Setup Almost Complete</h2>
+                      <p className="text-[14px] text-[#3e3e3c] mb-6">
+                        Salesforce has sent a new security token to your email. Enter it below to finish setup.
+                      </p>
+                    </div>
+                    <div className="text-left mb-6">
+                      <label className="block text-[13px] text-[#3e3e3c] mb-1.5">Security Token</label>
+                      <input 
+                        type="text" 
+                        required 
+                        value={sfToken} 
+                        onChange={e => setSfToken(e.target.value)}
+                        minLength={10}
+                        className="w-full border border-[#d8dde6] rounded-[4px] px-3 py-2.5 text-[14px] focus:border-[#1b96ff] focus:ring-1 focus:ring-[#1b96ff] outline-none text-[#16325c] bg-white transition-all"
+                        placeholder="Paste your security token"
+                      />
+                    </div>
+                    <button 
+                      type="submit" 
+                      disabled={connectLoading}
+                      className="w-full bg-[#0070d2] hover:bg-[#005fb2] text-white font-medium py-3 px-4 rounded-[4px] flex justify-center items-center gap-2 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+                    >
+                      {connectLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+                      Save Connection
+                    </button>
+                  </form>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Left Side - Visual Showcase */}
       <div className="hidden lg:flex lg:w-1/2 relative bg-slate-900 overflow-hidden items-center justify-center">
         <div className="absolute inset-0 z-0">
