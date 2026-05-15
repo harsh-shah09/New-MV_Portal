@@ -5,6 +5,9 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Lock, Eye, EyeOff, CheckCircle2, XCircle, AlertCircle, RefreshCw, Shield, ShieldCheck, ShieldAlert } from 'lucide-react';
 
+const MIN_PASSWORD_LENGTH = 8;
+const MAX_PASSWORD_LENGTH = 64;
+
 function ChangePasswordContent() {
   const searchParams = useSearchParams();
   const id = searchParams.get('id');
@@ -97,8 +100,12 @@ function ChangePasswordContent() {
       setErrorMessage("Passwords don't match");
       return;
     }
-    if (password.length < 6) {
-      setErrorMessage("Password must be at least 6 characters");
+    if (password.length < MIN_PASSWORD_LENGTH) {
+      setErrorMessage(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`);
+      return;
+    }
+    if (password.length > MAX_PASSWORD_LENGTH) {
+      setErrorMessage(`Password must be at most ${MAX_PASSWORD_LENGTH} characters`);
       return;
     }
 
@@ -195,6 +202,7 @@ function ChangePasswordContent() {
                       type={showPassword ? "text" : "password"}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
+                      maxLength={MAX_PASSWORD_LENGTH}
                       className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all dark:text-white"
                       placeholder="••••••••"
                       required
@@ -261,10 +269,11 @@ function ChangePasswordContent() {
 
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Confirm Password</label>
-                  <input
+                    <input
                     type={showPassword ? "text" : "password"}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
+                      maxLength={MAX_PASSWORD_LENGTH}
                     className={`w-full px-4 py-3 rounded-xl border outline-none transition-all dark:text-white ${confirmPassword && password !== confirmPassword
                         ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20 focus:ring-2 focus:ring-red-500'
                         : confirmPassword && password === confirmPassword
@@ -293,7 +302,7 @@ function ChangePasswordContent() {
 
                 <button
                   type="submit"
-                  disabled={submitting || password !== confirmPassword || (strength && strength.score < 3)}
+                  disabled={submitting || password !== confirmPassword || ((strength?.score ?? 0) < 3)}
                   className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl shadow-lg shadow-blue-500/25 font-medium transition-all transform active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed flex justify-center items-center gap-2"
                 >
                   {submitting ? (

@@ -3,6 +3,9 @@ import { getSalesforceConnection } from '@/lib/salesforce';
 import crypto, { hash } from 'crypto';
 import { hashPassword} from '@/lib/auth';
 
+const MIN_PASSWORD_LENGTH = 8;
+const MAX_PASSWORD_LENGTH = 64;
+
 interface EmployeeRecord {
   Id: string;
   Pass_Reset_Active__c: boolean;
@@ -61,6 +64,20 @@ export async function POST(req: Request) {
     if (!id || !password) {
       return NextResponse.json(
         { error: 'Missing required fields' },
+        { status: 400 }
+      );
+    }
+
+    if (password.length < MIN_PASSWORD_LENGTH) {
+      return NextResponse.json(
+        { error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` },
+        { status: 400 }
+      );
+    }
+
+    if (password.length > MAX_PASSWORD_LENGTH) {
+      return NextResponse.json(
+        { error: `Password must be at most ${MAX_PASSWORD_LENGTH} characters` },
         { status: 400 }
       );
     }
