@@ -1,6 +1,8 @@
 
 import { NextResponse } from 'next/server';
 import { getAllEmployees, getEmployeeById, updateEmployee, getEmployeesByTeamLead,getSalesforceConnection } from '@/lib/salesforce';
+import { verifySession } from '@/lib/auth';
+
 async function getRolePicklistOptions() {
   try {
     const conn = await getSalesforceConnection();
@@ -26,7 +28,9 @@ export async function GET(
 ) {
   try {
      const { id } = await params;
-    const employee = await getEmployeeById(id);
+     const session = await verifySession();
+     const isAdmin = session?.role === 'Admin';
+    const employee = await getEmployeeById(id, isAdmin);
     const roleOptions = await getRolePicklistOptions();
     if (!employee) {
       return NextResponse.json({ error: 'Employee not found' }, { status: 404 });

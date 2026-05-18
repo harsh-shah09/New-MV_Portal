@@ -274,7 +274,7 @@ export function Sidebar({
           <div className="relative h-10 w-10 shrink-0">
             <div className="relative h-full w-full rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500 overflow-hidden">
               {user?.profilePhoto ? (
-                <Image key={user?.id} src={user.profilePhoto} width={40} height={40} className="w-full h-full object-cover" alt="Profile" />
+                <img src={user.profilePhoto} width={40} height={40} className="w-full h-full object-cover" alt="Profile" />
               ) : (
                 <User size={20} />
               )}

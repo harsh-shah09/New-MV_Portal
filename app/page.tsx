@@ -1,10 +1,12 @@
-'use client'
-
 import { redirect } from 'next/navigation'
-import { useEffect } from 'react'
-export default function LandingPage() {
+import { verifySession } from '@/lib/auth'
 
-  useEffect(() => {
+export default async function LandingPage() {
+  const session = await verifySession()
+
+  if (session) {
+    redirect('/dashboard')
+  } else {
     redirect('/auth/login')
-  }, [])
+  }
 }

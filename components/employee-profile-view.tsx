@@ -1454,7 +1454,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                     <div className="relative group shrink-0">
                         <div className="w-24 h-24 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-full border-[3px] border-white/80 shadow-xl bg-white/20 backdrop-blur-md flex items-center justify-center overflow-hidden">
                             {employee.Profile_Photo__c && !uploadMutation.isPending ? (
-                                <Image key={employee.Profile_Photo__c} src={employee.Profile_Photo__c} alt="Profile" width={96} height={96} className="w-full h-full object-cover" />
+                                <img src={employee.Profile_Photo__c} alt="Profile" width={96} height={96} className="w-full h-full object-cover" />
                             ) : uploadMutation.isPending ? (
                                 <Spin size="small" />
                             ) : (
@@ -2119,7 +2119,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                         { label: 'HR', value: 'HR' },
                                                         { label: 'IT', value: 'IT' },
                                                         { label: 'Finance', value: 'Finance' },
-                                                        { label: 'Marketing', value: 'Marketing' },
+                                                        { label: 'UI/UX', value: 'UI/UX' },
                                                         { label: 'Admin', value: 'Admin' },
                                                     ]}
                                                 />
@@ -2133,12 +2133,12 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                     error={errors.Role__c}
                                                     type="select"
                                                     options={(
-                                                        formData.Department__c === 'HR' ? ['HR', 'Manager', 'Intern'] :
-                                                        formData.Department__c === 'IT' ? ['Developer', 'Intern' , 'QA'] :
+                                                        formData.Department__c === 'HR' ? ['HR', 'Intern'] :
+                                                        formData.Department__c === 'IT' ? ['Developer', 'Intern' , 'QA' , 'SEO'] :
                                                         formData.Department__c === 'Finance' ? ['Manager', 'Intern'] :
-                                                        formData.Department__c === 'Marketing' ? ['Marketing', 'BDE', 'Manager', 'Intern'] :
-                                                        formData.Department__c === 'Admin' ? ['Admin', 'Manager', 'Intern'] :
-                                                        (roleOptions.length > 0 ? roleOptions : ['Intern', 'Developer', 'Manager', 'HR', 'Admin', 'BDE', 'Marketing', 'Finance' , 'QA'])
+                                                        formData.Department__c === 'UI/UX' ? ['UI/UX', 'Intern' ] :
+                                                        formData.Department__c === 'Admin' ? ['Admin'] :
+                                                        (roleOptions.length > 0 ? roleOptions : ['Intern', 'Developer', 'Manager', 'HR', 'Admin', 'BDE', 'UI/UX', 'Finance' , 'QA' , 'SEO'])
                                                     ).map((r: string) => ({ label: r, value: r }))}
                                                 />
                                                 <Field

@@ -804,7 +804,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                 return (
                     <div className="py-4">
                         <p className="mb-4 text-gray-500">Current Address</p>
-                        <Form.Item name="street" label="Street Address" rules={[{ required: true, message: 'Street address is required' } , {pattern: /^[A-Za-z]*$/, message: 'Street address should contain only alphabets'} ,
+                        <Form.Item name="street" label="Street Address" rules={[{ required: true, message: 'Street address is required' } ,
                             { max: 100, message: 'Street address should not exceed 100 characters'} ,
                             { min: 2, message: 'Street address should be at least 2 characters long'}
                         ]}>
