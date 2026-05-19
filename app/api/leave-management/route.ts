@@ -2165,72 +2165,57 @@ export async function PATCH(request: NextRequest) {
           const employeeName = emp.Employee_Name__c || emp.Name || 'Employee';
           const employeeRole = emp.Role__c;
           const employeeTitle = emp.Title__c;
+          const teamLeadEmail = emp.Team_Lead__r?.Company_Email__c;
 
           const notificationRecipients: string[] = [];
 
-          // Send notification to HR for all employees except Admin
-          if (employeeRole !== 'Admin') {
-            const hrQuery = await conn.query<any>(`
-              SELECT Id, Company_Email__c
-              FROM Employee__c
-              WHERE Role__c = 'HR' AND Active__c = true
-              LIMIT 1
-            `);
+          const hrQuery = await conn.query<any>(`
+            SELECT Id, Company_Email__c
+            FROM Employee__c
+            WHERE Role__c = 'HR' AND Active__c = true
+            LIMIT 1
+          `);
 
-            const hr = hrQuery.records?.[0];
-            if (hr?.Id) {
-              notificationRecipients.push(hr.Id);
-            }
+          const adminQuery = await conn.query<any>(`
+            SELECT Id, Company_Email__c
+            FROM Employee__c
+            WHERE Role__c = 'Admin'
+            LIMIT 1
+          `);
 
-            const hrRecipientEmail = hr?.Company_Email__c || hrEmail;
-            if (hrRecipientEmail) {
-              const emailData = await withdrawalRequestToHR({
-                recipientName: 'HR Team',
-                employeeName: employeeName,
-                leaveType: leave.Leave_Type__c || leave.Leave_Category__c,
-                startDate: dayjs(leave.Start_Date__c).format('DD MMM YYYY'),
-                endDate: dayjs(leave.End_Date__c).format('DD MMM YYYY'),
-                duration: leave.Total_Days__c
-              });
-              sendEmailAsync({
-                to: hrRecipientEmail,
-                subject: emailData.subject,
-                body: emailData.html,
-                senderEmployeeId: employeeId,
-              });
-            }
+          const hr = hrQuery.records?.[0];
+          const admin = adminQuery.records?.[0];
+          const adminEmail = admin?.Company_Email__c;
+
+          if (hr?.Id) {
+            notificationRecipients.push(hr.Id);
           }
 
-          // Send notification to Admin if employee is HR
-          if (employeeRole === 'HR') {
-            const adminQuery = await conn.query<any>(`
-              SELECT Id, Company_Email__c
-              FROM Employee__c
-              WHERE Role__c = 'Admin'
-              LIMIT 1
-            `);
-            if (adminQuery.records && adminQuery.records.length > 0) {
-              const admin = adminQuery.records[0];
-              notificationRecipients.push(admin.Id);
+          if (admin?.Id) {
+            notificationRecipients.push(admin.Id);
+          }
 
-              // Send email to Admin
-              if (admin.Company_Email__c) {
-                const emailData = await withdrawalRequestToHR({
-                  recipientName: 'Admin',
-                  employeeName: employeeName,
-                  leaveType: leave.Leave_Type__c || leave.Leave_Category__c,
-                  startDate: dayjs(leave.Start_Date__c).format('DD MMM YYYY'),
-                  endDate: dayjs(leave.End_Date__c).format('DD MMM YYYY'),
-                  duration: leave.Total_Days__c
-                });
-                sendEmailAsync({
-                  to: admin.Company_Email__c,
-                  subject: emailData.subject,
-                  body: emailData.html,
-                  senderEmployeeId: employeeId,
-                });
-              }
-            }
+          const hrRecipientEmail = hr?.Company_Email__c || hrEmail;
+          const ccRecipients = [teamLeadEmail, adminEmail]
+            .filter(Boolean)
+            .filter((value, index, array) => array.indexOf(value) === index);
+
+          if (hrRecipientEmail) {
+            const emailData = await withdrawalRequestToHR({
+              recipientName: 'HR Team',
+              employeeName: employeeName,
+              leaveType: leave.Leave_Type__c || leave.Leave_Category__c,
+              startDate: dayjs(leave.Start_Date__c).format('DD MMM YYYY'),
+              endDate: dayjs(leave.End_Date__c).format('DD MMM YYYY'),
+              duration: leave.Total_Days__c
+            });
+            sendEmailAsync({
+              to: hrRecipientEmail,
+              cc: ccRecipients.length > 0 ? ccRecipients : undefined,
+              subject: emailData.subject,
+              body: emailData.html,
+              senderEmployeeId: employeeId,
+            });
           }
 
           // Send in-app notifications
@@ -2254,8 +2239,12 @@ export async function PATCH(request: NextRequest) {
               endDate: dayjs(leave.End_Date__c).format('DD MMM YYYY'),
               duration: leave.Total_Days__c
             });
+            const ccRecipients = [teamLeadEmail, adminEmail]
+              .filter(Boolean)
+              .filter((value, index, array) => array.indexOf(value) === index);
             sendEmailAsync({
               to: emp.Company_Email__c,
+              cc: ccRecipients.length > 0 ? ccRecipients : undefined,
               subject: emailData.subject,
               body: emailData.html,
               senderEmployeeId: employeeId,
@@ -2569,6 +2558,15 @@ export async function PATCH(request: NextRequest) {
           const employeeName = emp.Employee_Name__c || emp.Name || 'Employee';
           const employeeRole = emp.Role__c;
           const employeeTitle = emp.Title__c;
+          const teamLeadEmail = emp.Team_Lead__r?.Company_Email__c;
+
+          const adminQuery = await conn.query<any>(`
+            SELECT Company_Email__c
+            FROM Employee__c
+            WHERE Role__c = 'Admin'
+            LIMIT 1
+          `);
+          const adminEmail = adminQuery.records?.[0]?.Company_Email__c;
 
           const notificationRecipients: string[] = [];
 
@@ -2584,8 +2582,12 @@ export async function PATCH(request: NextRequest) {
               duration: leave.Total_Days__c,
               approverTitle: approverTitle
             });
+            const ccRecipients = [teamLeadEmail, adminEmail]
+              .filter(Boolean)
+              .filter((value, index, array) => array.indexOf(value) === index);
             sendEmailAsync({
               to: emp.Company_Email__c,
+              cc: ccRecipients.length > 0 ? ccRecipients : undefined,
               subject: emailData.subject,
               body: emailData.html,
               senderEmployeeId: employeeId,
@@ -2685,7 +2687,7 @@ export async function PATCH(request: NextRequest) {
       try {
         const empData = await conn.query<any>(`
           SELECT Id, Name, Employee_Id__c, Company_Email__c, Employee_Name__c, Role__c, Title__c,
-                 Team_Lead__c, Team_Lead__r.Employee_Name__c
+                 Team_Lead__c, Team_Lead__r.Employee_Name__c, Team_Lead__r.Company_Email__c
           FROM Employee__c
           WHERE Id = '${leave.Employee__c}'
           LIMIT 1
@@ -2694,6 +2696,15 @@ export async function PATCH(request: NextRequest) {
         if (empData.records && empData.records.length > 0) {
           const emp = empData.records[0];
           const employeeName = emp.Employee_Name__c || emp.Name || 'Employee';
+          const teamLeadEmail = emp.Team_Lead__r?.Company_Email__c;
+
+          const adminQuery = await conn.query<any>(`
+            SELECT Company_Email__c
+            FROM Employee__c
+            WHERE Role__c = 'Admin'
+            LIMIT 1
+          `);
+          const adminEmail = adminQuery.records?.[0]?.Company_Email__c;
 
           // Send email to employee
           if (emp.Company_Email__c) {
@@ -2707,8 +2718,12 @@ export async function PATCH(request: NextRequest) {
               approverTitle: approverTitle,
               reason: reason || 'No reason provided'
             });
+            const ccRecipients = [teamLeadEmail, adminEmail]
+              .filter(Boolean)
+              .filter((value, index, array) => array.indexOf(value) === index);
             sendEmailAsync({
               to: emp.Company_Email__c,
+              cc: ccRecipients.length > 0 ? ccRecipients : undefined,
               subject: emailData.subject,
               body: emailData.html,
               senderEmployeeId: employeeId,
