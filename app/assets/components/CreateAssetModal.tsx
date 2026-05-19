@@ -16,6 +16,7 @@ interface CreateAssetModalProps {
 export function CreateAssetModal({ visible, onCancel, onSuccess }: CreateAssetModalProps) {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
+  const [isLoading , setisLoading ] = useState(false)
   const [products, setProducts] = useState<SalesforceProduct[]>([]);
 
   useEffect(() => {
@@ -27,10 +28,13 @@ export function CreateAssetModal({ visible, onCancel, onSuccess }: CreateAssetMo
 
   const loadProducts = async () => {
     try {
+        setisLoading(true)
       const data = await getProducts();
       setProducts(data);
     } catch (e) {
       console.error("Failed to load products", e);
+    } finally {
+        setisLoading(false)
     }
   };
 
@@ -70,6 +74,7 @@ export function CreateAssetModal({ visible, onCancel, onSuccess }: CreateAssetMo
       onCancel={onCancel}
       footer={null}
       destroyOnHidden
+      loading={isLoading}
     >
       <Form
         form={form}

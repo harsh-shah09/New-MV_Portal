@@ -22,6 +22,7 @@ import {
   withdrawalRejected,
 } from "@/lib/email-templates";
 import type { LeaveRequest } from "@/types";
+import { getAdminSettingValue } from "@/lib/admin-settings";
 
 /**
  * Leave Configuration Interface
@@ -1114,6 +1115,7 @@ export async function POST(request: NextRequest) {
             seenCcEmails.add(normalizedCcEmail);
             return true;
           });
+          const appUrl = await getAdminSettingValue('NEXT_PUBLIC_APP_URL');
 
           const autoApprovedTemplate = await leaveAutoApproved({
             recipientName: employeeName,
@@ -1123,6 +1125,7 @@ export async function POST(request: NextRequest) {
             startDate: parsedStart.format('YYYY-MM-DD'),
             endDate: parsedEnd.format('YYYY-MM-DD'),
             duration: fullDayDuration,
+            setupLink: appUrl,
           });
 
           logLeaveEmailDispatch('apply-for-others-auto-approval-to-employee', employeeEmail, ccRecipients, autoApprovedTemplate.subject);
@@ -1904,14 +1907,16 @@ export async function POST(request: NextRequest) {
             LIMIT 1
           `);
           const adminEmail = adminQuery.records?.[0]?.Company_Email__c;
-
+          const appUrl = await getAdminSettingValue('NEXT_PUBLIC_APP_URL');
+          
           const emailTemplate = await teamLeadLeaveRequestToHRWithAdminCC({
             recipientName: 'HR Team',
             employeeName,
             leaveType: leaveType || 'N/A',
             startDate: start.format('YYYY-MM-DD'),
             endDate: end.format('YYYY-MM-DD'),
-            duration: duration
+            duration: duration,
+            setupLink : appUrl
           });
           logLeaveEmailDispatch('team-lead-leave-request-to-hr', hrEmail, adminEmail, emailTemplate.subject);
           sendEmailAsync({
@@ -1954,6 +1959,7 @@ export async function POST(request: NextRequest) {
               LIMIT 1
             `);
             const adminEmail = adminQuery.records?.[0]?.Company_Email__c;
+             const appUrl = await getAdminSettingValue('NEXT_PUBLIC_APP_URL');
 
             const emailTemplate = await employeeLeaveRequestToHR({
               recipientName: 'HR Team',
@@ -1962,7 +1968,8 @@ export async function POST(request: NextRequest) {
               startDate: start.format('YYYY-MM-DD'),
               endDate: end.format('YYYY-MM-DD'),
               duration: duration,
-              reason: reason || 'N/A'
+              reason: reason || 'N/A',
+              setupLink: appUrl,
             });
 
             const ccRecipients = [teamLeadEmail, adminEmail].filter(Boolean) as string[];

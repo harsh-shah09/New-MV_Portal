@@ -10,11 +10,10 @@ const LOCAL_CHROME_PATH: Record<string, string> = {
 }
 
 export async function generateNDAPDF(htmlContent: string , isPayslip: boolean = false) {
-  const isVercel = !!process.env.VERCEL_ENV
-
+  const isProduction = process.env.NODE_ENV === 'production'
   const browser = await puppeteer.launch({
-    args: isVercel ? chromium.args : ['--no-sandbox', '--disable-setuid-sandbox'],
-    executablePath: isVercel
+    args: isProduction ? chromium.args : ['--no-sandbox', '--disable-setuid-sandbox'],
+    executablePath: isProduction
       ? await chromium.executablePath()
       : LOCAL_CHROME_PATH[process.platform],
     headless: true,

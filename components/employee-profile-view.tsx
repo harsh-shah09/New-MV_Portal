@@ -2669,9 +2669,15 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                                 {(currentUserRole === 'HR' || currentUserRole === 'Admin') && !bank.Primary_Account__c && bank.Status__c === 'Verified' && (
                                                                     <button
                                                                         onClick={() => {
-                                                                            if (confirm("Are you sure you want to set this as the primary bank account?")) {
-                                                                                setPrimaryBankMutation.mutate(bank.Id)
-                                                                            }
+                                                                            Modal.confirm({
+                                                                                title: "Confirm Primary Bank Account",
+                                                                                content: "Are you sure you want to set this as the primary bank account?",
+                                                                                okText: "Set as Primary",
+                                                                                cancelText: "Cancel",
+                                                                                onOk: () => {
+                                                                                    setPrimaryBankMutation.mutate(bank.Id)
+                                                                                }
+                                                                            })
                                                                         }}
                                                                         disabled={setPrimaryBankMutation.isPending}
                                                                         className="text-xs px-2 py-1 rounded-md border border-blue-100 text-blue-600 hover:bg-blue-50 disabled:opacity-50"
