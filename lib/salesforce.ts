@@ -195,7 +195,7 @@ export const getAllEmployees = async (): Promise<any[]> => {
   if (!conn) return [];
 
   const query = `
-    SELECT Id, Name, Joining_Date__c, Status__c, Profile_Photo__c, Active__c,
+    SELECT Id, Name, Joining_Date__c, Status__c, Profile_Photo__c, Active__c,Company_Email__c,
            Employee_Name__c, Employee_Email__c, Employee_Phone__c, 
            Department__c, Role__c, Title__c, Employee_ID__c
     FROM Employee__c

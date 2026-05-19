@@ -58,7 +58,7 @@ export async function PATCH(req: Request) {
     const employeeId = doc.Employee__c;
     const personalEmail = doc.Employee__r?.Employee_Email__c;
     const active = doc.Employee__r?.Active__c ?? true;
-
+    const companyEmail = doc.Employee__r?.Company_Email__c;
     // Token carries step=4 so the re-opened wizard lands on Documents
     const data = {
       expirationtime: Date.now() + 48 * 60 * 60 * 1000,
@@ -91,6 +91,23 @@ export async function PATCH(req: Request) {
         setFirstTimeLogin(employeeId, true),        // re-enable wizard on next login
         setOnboardingCompleted(employeeId, false),  // remove completion flag
       ]);
+    } else if (active && action != 'approve') {
+      const settingsNextAuthUrl = await getAdminSettingValue('NEXTAUTH_URL');
+      const template = await loadTemplate('Document_Rejected', {
+        employeeEmail: companyEmail,
+        employeeId: name,
+        employeeName: empname,
+        endDate: Date.now().toLocaleString(),
+        recipientName: name,
+        appLink: (settingsNextAuthUrl || process.env.NEXTAUTH_URL) + `/employees/${employeeId}?tab=bank`,
+        documentName: doc.Document_Type__c,
+      });
+      await sendEmail({
+        isInfo: true,
+        to: companyEmail,
+        body: template,
+        subject: `Document Verification - ${doc.Document_Type__c} - ${action.toUpperCase()}ED`,
+      });
     }
 
     if (employeeRole === 'HR' && session.role !== 'Admin') {

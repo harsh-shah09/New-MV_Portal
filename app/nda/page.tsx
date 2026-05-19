@@ -3,12 +3,13 @@ import Link from "next/link"
 
 import { useState, useEffect, useRef } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { Select, Button, Spin, message, Card, Tabs, Empty, Input, Table, Tag, Modal, Upload, Form } from "antd"
+import { Select, Button, Spin, Card, Tabs, Empty, Input, Table, Tag, Modal, Upload, Form } from "antd"
 import { Download, FileText, User, Search, Printer, FileCheck, UploadCloud, RefreshCw, Maximize2, Minimize2, X, Settings2, Edit3, Check } from "lucide-react"
 import { UploadOutlined } from '@ant-design/icons'
 import { generateNDAPDF } from "./actions"
 import { RoleGuard } from "@/components/role-guard"
 import { PageHeader } from "@/components/page-header"
+import { showToast } from "../assets/components/toast"
 
 // Keys that are always auto-filled from employee data — never shown as manual inputs
 const AUTO_REPLACED_KEYS = new Set([
@@ -95,14 +96,17 @@ export default function NDAPage() {
     // Fetch Template Content
     useEffect(() => {
         const fetchTemplate = async () => {
-            if (!selectedTemplateFile) return;
+            if (!selectedTemplateFile) {
+                setTemplateContent("");
+                return;
+            }
             setLoadingTemplate(true)
             try {
                 const res = await fetch(`/templates/${selectedTemplateFile}`);
                 const text = await res.text();
                 setTemplateContent(text);
             } catch (e) {
-                message.error("Failed to load template");
+                showToast.error("Failed to load template");
             } finally {
                 setLoadingTemplate(false)
             }
@@ -165,7 +169,14 @@ export default function NDAPage() {
             const pk = emp.Employee_Id || emp.PartitionKey || emp.EmployeeId || emp.Id || null;
             setSelectedPartitionKey(pk);
             const contact = emp || {};
-            const address = JSON.parse(emp.Employee_Current_Address__c) || {};
+            let address = {street:"",city:"",state:"",postalCode:"",country:""};
+            try {
+                if (emp.Employee_Current_Address__c && emp.Employee_Current_Address__c !== "undefined") {
+                    address = JSON.parse(emp.Employee_Current_Address__c);
+                }
+            } catch (e) {
+                console.error("Invalid JSON in Employee_Current_Address__c", e);
+            }
 
             let html = templateContent;
 
@@ -248,12 +259,9 @@ export default function NDAPage() {
         const missingFields = dynamicManualKeys.filter(k => !manualValues[k]?.trim());
         if (missingFields.length > 0) {
             missingFields.forEach(k => {
-                message.warning({
-                    content: `"${toLabel(k)}" is empty. Fill it in for best results.`,
-                    duration: 3,
-                    style: { marginTop: '10px' }
-                });
-            });
+                showToast.warning(`"${toLabel(k)}" is empty. Fill it in for best results.`)
+            })
+            return;
         }
 
         const emp = employees.find((e: any) => e.Id === selectedEmpId);
@@ -267,7 +275,7 @@ export default function NDAPage() {
             const previewEl = document.getElementById(elementId);
             const contentToGenerate = previewEl?.innerHTML || previewContent;
             if (!contentToGenerate) {
-                message.error("No content to generate");
+                showToast.error("No content to generate");
                 return;
             }
             setLoadingTemplate(true);
@@ -290,10 +298,10 @@ export default function NDAPage() {
             document.body.removeChild(link);
             window.URL.revokeObjectURL(url);
 
-            message.success("PDF generated successfully");
+            showToast.success("PDF generated successfully");
         } catch (err) {
             console.error('PDF Generation Error', err);
-            message.error('Failed to generate PDF');
+            showToast.error('Failed to generate PDF');
         } finally {
             setSelectedEmpId(null)
             setSelectedPartitionKey(null);
@@ -301,6 +309,9 @@ export default function NDAPage() {
             setDynamicManualKeys([])
             setLoadingTemplate(false);
             setIsFullscreen(false);
+            setManualValues({});
+            setPreviewContent("");
+            setTemplateContent("");
         }
     }
 
@@ -324,16 +335,16 @@ export default function NDAPage() {
             });
             const data = await res.json();
             if (data.success) {
-                message.success("Document uploaded successfully");
+                showToast.success("Document uploaded successfully");
                 setIsUploadModalOpen(false);
                 setUploadFile(null);
                 setSelectedRequest(null);
                 refetchPending();
             } else {
-                message.error(data.error || "Upload failed");
+                showToast.error(data.error || "Upload failed");
             }
         } catch (e) {
-            message.error("Upload failed");
+            showToast.error("Upload failed");
         } finally {
             setUploading(false);
         }

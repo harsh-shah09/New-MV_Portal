@@ -585,8 +585,8 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
 
             const esi = formData.ESI_Number__c
             if (esi) {
-                if (!/^[0-9]{10}$/.test(esi)) {
-                    newErrors.ESI_Number__c = "ESI Number must be a 10-digit numeric code"
+                if (!/^[0-9A-Za-z]{10}$/.test(esi)) {
+                    newErrors.ESI_Number__c = "ESI Number must be a 10-digit alphanumeric code"
                 }
             }
 
@@ -2305,8 +2305,8 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                     formData={formData}
                                                     setFormData={setFormData}
                                                     error={errors.ESI_Number__c}
-                                                    placeholder="Enter 10 digit Number"
-                                                    maxLength={21}
+                                                    placeholder="Enter 10 digit Number e.g 1100123456"
+                                                    maxLength={10}
                                                 />
                                                 <Field
                                                     label="PF Number"
@@ -2316,7 +2316,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                     formData={formData}
                                                     setFormData={setFormData}
                                                     error={errors.PF_Number__c}
-                                                    placeholder="22-character alphanumeric code"
+                                                    placeholder="Enter 22-character alphanumeric code e.g U110012345678"
                                                     maxLength={22}
                                                 />
                                                 <Field
@@ -2327,7 +2327,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                     formData={formData}
                                                     setFormData={setFormData}
                                                     error={errors.UAN_Number__c}
-                                                    placeholder="12-digit numeric number"
+                                                    placeholder="Enter 12-digit numeric number e.g 101123456789"
                                                     maxLength={12}
                                                 />
                                             </div>
@@ -2635,7 +2635,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                                 </span>
                                                                 {(() => {
                                                                     const staged = getStagedAction('bank', bank.Id);
-                                                                    const canVerify = isHrUser && (!bank.Status__c || bank.Status__c === 'Pending');
+                                                                    const canVerify = (isHrUser || isAdminUser) && (!bank.Status__c || bank.Status__c === 'Pending');
                                                                     if (!canVerify) return null;
                                                                     return staged ? (
                                                                         <span
@@ -2666,7 +2666,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                                     );
                                                                 })()}
                                                                 {bank.Primary_Account__c && <span className="bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded-full font-medium">Primary</span>}
-                                                                {currentUserRole === 'HR' && !bank.Primary_Account__c && (
+                                                                {(currentUserRole === 'HR' || currentUserRole === 'Admin') && !bank.Primary_Account__c && bank.Status__c === 'Verified' && (
                                                                     <button
                                                                         onClick={() => {
                                                                             if (confirm("Are you sure you want to set this as the primary bank account?")) {
@@ -2926,7 +2926,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                                         </div>
                                                                         {/* Approve / Reject — top right (STAGED) */}
                                                                         {((doc.Status__c === 'Uploaded') &&
-                                                                            ((currentUserRole === 'HR' && employee.Role__c !== 'HR') || (currentUserRole === 'Admin' && employee.Role__c === 'HR'))) && (
+                                                                            ((currentUserRole === 'HR' && employee.Role__c !== 'HR') || (currentUserRole === 'Admin'))) && (
                                                                                 (() => {
                                                                                     const staged = getStagedAction('document', doc.Id);
                                                                                     return staged ? (
