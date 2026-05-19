@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Lock, Eye, EyeOff, CheckCircle2, XCircle, AlertCircle, RefreshCw, Shield, ShieldCheck, ShieldAlert } from 'lucide-react';
 
 const MIN_PASSWORD_LENGTH = 8;
-const MAX_PASSWORD_LENGTH = 64;
+const MAX_PASSWORD_LENGTH = 12;
 
 function ResetPasswordContent() {
   const searchParams = useSearchParams();
