@@ -778,6 +778,7 @@ export async function GET(request: NextRequest) {
           Id, 
           Employee__c,
           Employee__r.Employee_Name__c,
+          Employee__r.Employee_Id__c,
           Employee__r.Team_Lead__r.Employee_Name__c,
           Leave_Type__c,
           Leave_Category__c,
@@ -811,7 +812,7 @@ export async function GET(request: NextRequest) {
 
         return {
           id: record.Id,
-          employeeId: record.Employee__c,
+          employeeId: record.Employee__r.Employee_Id__c,
           employeeName: record.Employee__r?.Employee_Name__c || "Unknown",
           leaveType: record.Leave_Category__c === 'Extra Day Pay' ? 'Extra Day Pay' : (record.Leave_Type__c || ""),
           leaveCategory: record.Leave_Category__c,
@@ -2152,7 +2153,7 @@ export async function PATCH(request: NextRequest) {
       // Send notifications to HR for withdrawal approval
       try {
         const empData = await conn.query<any>(`
-           SELECT Id, Name,, Company_Email__c, Employee_Name__c, Role__c, Title__c,
+           SELECT Id, Name, Company_Email__c, Employee_Name__c, Role__c, Title__c,
              Team_Lead__c, Team_Lead__r.Employee_Name__c, Team_Lead__r.Company_Email__c
           FROM Employee__c
           WHERE Id = '${leave.Employee__c}'
@@ -2172,30 +2173,31 @@ export async function PATCH(request: NextRequest) {
             const hrQuery = await conn.query<any>(`
               SELECT Id, Company_Email__c
               FROM Employee__c
-              WHERE Role__c = 'HR' AND Active__c = true AND Title__c = 'Senior'
+              WHERE Role__c = 'HR' AND Active__c = true
               LIMIT 1
             `);
-            if (hrQuery.records && hrQuery.records.length > 0) {
-              const hr = hrQuery.records[0];
-              notificationRecipients.push(hr.Id);
 
-              // Send email to HR
-              if (hr.Company_Email__c) {
-                const emailData = await withdrawalRequestToHR({
-                  recipientName: 'HR Team',
-                  employeeName: employeeName,
-                  leaveType: leave.Leave_Type__c || leave.Leave_Category__c,
-                  startDate: dayjs(leave.Start_Date__c).format('DD MMM YYYY'),
-                  endDate: dayjs(leave.End_Date__c).format('DD MMM YYYY'),
-                  duration: leave.Total_Days__c
-                });
-                sendEmailAsync({
-                  to: hr.Company_Email__c,
-                  subject: emailData.subject,
-                  body: emailData.html,
-                  senderEmployeeId: employeeId,
-                });
-              }
+            const hr = hrQuery.records?.[0];
+            if (hr?.Id) {
+              notificationRecipients.push(hr.Id);
+            }
+
+            const hrRecipientEmail = hr?.Company_Email__c || hrEmail;
+            if (hrRecipientEmail) {
+              const emailData = await withdrawalRequestToHR({
+                recipientName: 'HR Team',
+                employeeName: employeeName,
+                leaveType: leave.Leave_Type__c || leave.Leave_Category__c,
+                startDate: dayjs(leave.Start_Date__c).format('DD MMM YYYY'),
+                endDate: dayjs(leave.End_Date__c).format('DD MMM YYYY'),
+                duration: leave.Total_Days__c
+              });
+              sendEmailAsync({
+                to: hrRecipientEmail,
+                subject: emailData.subject,
+                body: emailData.html,
+                senderEmployeeId: employeeId,
+              });
             }
           }
 

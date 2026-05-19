@@ -1233,7 +1233,7 @@ export default function LeavesPage() {
                           <div
                             key={leave.id}
                             className={`bg-gradient-to-r border rounded-lg hover:shadow-md transition-all ${
-                              isAdmin && isDoubtfulCase
+                              (isAdmin || isHR) && isDoubtfulCase
                                 ? 'from-red-50 to-orange-50 border-red-300 hover:border-red-400'
                                 : 'from-slate-50 to-blue-50 border-gray-200 hover:border-blue-300'
                             }`}
@@ -1255,7 +1255,7 @@ export default function LeavesPage() {
                                     }`}>
                                     {leave.isWithdrawalRequest ? 'Withdrawal Pending' : leave.status.charAt(0).toUpperCase() + leave.status.slice(1)}
                                   </span>
-                                  {isAdmin && isDoubtfulCase && (
+                                  {(isAdmin || isHR) && isDoubtfulCase && (
                                     <span className="px-4 py-2 rounded-full text-xs font-semibold border bg-red-100 text-red-700 border-red-200">
                                       Doubtful Case
                                     </span>

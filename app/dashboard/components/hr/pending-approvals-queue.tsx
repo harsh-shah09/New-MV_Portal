@@ -307,7 +307,7 @@ export function PendingApprovalsQueue({
       render: (text, record) => (
         <div>
           <div className="font-medium">{text}</div>
-          {canUseLeaveRulesPopup && record?.doubtfullCase === true && (
+          {record?.doubtfullCase === true && (
             <div className="text-xs text-red-600 font-medium">Doubtful Case</div>
           )}
           {/* <div className="text-xs text-gray-500">{record.employeeId}</div> */}
@@ -419,8 +419,8 @@ export function PendingApprovalsQueue({
               size="small"
               scroll={{ x: 980 }}
               rowClassName={(record) =>
-                canUseLeaveRulesPopup && record?.doubtfullCase === true
-                  ? 'bg-red-50/70'
+                record?.doubtfullCase === true
+                  ? '!bg-red-50 hover:!bg-red-100'
                   : ''
               }
             />
