@@ -1,6 +1,6 @@
 'use server'
 
-import puppeteer from 'puppeteer-core'
+import puppeteer, { Browser } from 'puppeteer-core'
 import chromium from '@sparticuz/chromium'
 
 const LOCAL_CHROME_PATH: Record<string, string> = {
@@ -9,18 +9,44 @@ const LOCAL_CHROME_PATH: Record<string, string> = {
   win32: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
 }
 
-export async function generateNDAPDF(htmlContent: string , isPayslip: boolean = false) {
+let cachedBrowser: Browser | null = null;
+let browserLaunchPromise: Promise<Browser> | null = null;
+
+async function getBrowser(): Promise<Browser> {
+  if (cachedBrowser && cachedBrowser.connected) {
+    return cachedBrowser;
+  }
+
+  if (browserLaunchPromise) {
+    return browserLaunchPromise;
+  }
+
   const isProduction = process.env.NODE_ENV === 'production'
-  const browser = await puppeteer.launch({
+  
+  browserLaunchPromise = puppeteer.launch({
     args: isProduction ? chromium.args : ['--no-sandbox', '--disable-setuid-sandbox'],
     executablePath: isProduction
       ? await chromium.executablePath()
       : LOCAL_CHROME_PATH[process.platform],
     headless: true,
-  })
+  }).then(browser => {
+    cachedBrowser = browser;
+    browserLaunchPromise = null;
+    return browser;
+  }).catch(error => {
+    browserLaunchPromise = null;
+    throw error;
+  });
 
+  return browserLaunchPromise;
+}
+
+export async function generateNDAPDF(htmlContent: string , isPayslip: boolean = false) {
+  const browser = await getBrowser()
+  let page;
+  
   try {
-    const page = await browser.newPage()
+    page = await browser.newPage()
     await page.setContent(htmlContent, { waitUntil: 'load' })
 
     const pdfBuffer = await page.pdf({
@@ -35,6 +61,8 @@ export async function generateNDAPDF(htmlContent: string , isPayslip: boolean = 
     console.error('PDF generation error:', error)
     throw new Error('Failed to generate PDF')
   } finally {
-    await browser.close()
+    if (page) {
+      await page.close().catch(console.error)
+    }
   }
 }

@@ -597,7 +597,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                 }
             }
 
-            const uan = formData.UAN_Number__c?.trim()
+            const uan = formData.UAN_Number__c
             if (uan) {
                 if (!/^\d{12}$/.test(uan)) {
                     newErrors.UAN_Number__c = "UAN must be a 12-digit numeric number"
@@ -2298,14 +2298,14 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                             </h2>
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                                                 <Field
-                                                    label="ESI Number"
+                                                    label="ESIC Number"
                                                     value={employee.ESI_Number__c}
                                                     fieldKey="ESI_Number__c"
                                                     isEditing={isEditing && ['HR', 'Admin'].includes(currentUserRole)}
                                                     formData={formData}
                                                     setFormData={setFormData}
                                                     error={errors.ESI_Number__c}
-                                                    placeholder="Enter 10 digit Number e.g 1100123456"
+                                                    placeholder="e.g 1100123456"
                                                     maxLength={10}
                                                 />
                                                 <Field
@@ -2316,7 +2316,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                     formData={formData}
                                                     setFormData={setFormData}
                                                     error={errors.PF_Number__c}
-                                                    placeholder="Enter 22-character alphanumeric code e.g U110012345678"
+                                                    placeholder="e.g U110012345678"
                                                     maxLength={22}
                                                 />
                                                 <Field
@@ -2327,7 +2327,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                     formData={formData}
                                                     setFormData={setFormData}
                                                     error={errors.UAN_Number__c}
-                                                    placeholder="Enter 12-digit numeric number e.g 101123456789"
+                                                    placeholder="e.g 101123456789"
                                                     maxLength={12}
                                                 />
                                             </div>
