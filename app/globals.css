@@ -187,9 +187,10 @@
     display: none !important;
   }
   
-  button:not([disabled]):hover {
-    cursor: pointer !important;
-    opacity: 0.9 !important;
+  button:hover {
+    cursor: pointer;
+    opacity: 0.9
+    ;
   }
   /* Ensure tables fit on page */
   table {
