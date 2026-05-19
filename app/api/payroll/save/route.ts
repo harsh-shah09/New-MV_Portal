@@ -33,6 +33,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Month, year, and employees are required" }, { status: 400 })
     }
 
+    const isAdminRole = (role?: string) => role?.toString().trim().toLowerCase().includes("admin")
+    const eligibleEmployees = employees.filter((emp: any) => !isAdminRole(emp.role || emp.Role__c))
+
+    if (!eligibleEmployees.length) {
+      return NextResponse.json({ error: "No eligible employees for payroll" }, { status: 400 })
+    }
+
     const monthIndex = [
       "January",
       "February",
@@ -118,7 +125,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 2) Create Payroll__c records for each employee
-    const payrollRecords = employees.map((emp: any) => {
+    const payrollRecords = eligibleEmployees.map((emp: any) => {
       // Extract adjustment details (only 1 adjustment allowed per employee)
       const adjustment = emp.adjustments && emp.adjustments.length > 0 ? emp.adjustments[0] : null
       
@@ -161,7 +168,7 @@ export async function POST(request: NextRequest) {
     const payrollSummaryTxtFileName = `Payroll_Summary_${month}_${year}.txt`
     try {
       const payrollResultsArray = Array.isArray(payrollResult) ? payrollResult : [payrollResult]
-      const successfulEmployees = employees.filter((_: any, index: number) => {
+      const successfulEmployees = eligibleEmployees.filter((_: any, index: number) => {
         const result = payrollResultsArray[index]
         return result?.success
       })
@@ -191,8 +198,8 @@ export async function POST(request: NextRequest) {
     const pdfUploadResults: any[] = []
     const CHUNK_SIZE = 5 // Process 5 employees concurrently
     
-    for (let i = 0; i < employees.length; i += CHUNK_SIZE) {
-      const chunk = employees.slice(i, i + CHUNK_SIZE);
+    for (let i = 0; i < eligibleEmployees.length; i += CHUNK_SIZE) {
+      const chunk = eligibleEmployees.slice(i, i + CHUNK_SIZE);
       const chunkPromises = chunk.map(async (emp: any, chunkIndex: number) => {
         const globalIndex = i + chunkIndex;
         const payrollRecord = Array.isArray(payrollResult) ? payrollResult[globalIndex] : payrollResult;
@@ -319,7 +326,7 @@ export async function POST(request: NextRequest) {
 
     // Send in-app notifications to all employees about payslip generation
     try {
-      const employeeIds = employees.map((emp: any) => emp.id).filter(Boolean);
+      const employeeIds = eligibleEmployees.map((emp: any) => emp.id).filter(Boolean);
       
       if (employeeIds.length > 0) {
         await sendInAppNotifications(

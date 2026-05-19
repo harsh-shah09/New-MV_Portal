@@ -1309,7 +1309,7 @@ export default function LeavesPage() {
                               </div>
 
                               {/* Details Grid */}
-                              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                              <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
                                 <div className="bg-white/70 rounded-md p-3 border border-gray-100">
                                   <p className="text-xs text-gray-500 mb-1">Leave Type</p>
                                   <p className="text-sm font-medium text-gray-900 capitalize">{leave.leaveType || leave.leaveCategory}</p>
@@ -1319,12 +1319,19 @@ export default function LeavesPage() {
                                     {hasRequestedWithdrawalRange ? 'Requested Duration' : 'Duration'}
                                   </p>
                                   <p className="text-sm font-medium text-gray-900">{displayDuration} {displayDuration === 1 ? 'Day' : 'Days'}</p>
+                                  
                                   {!hasRequestedWithdrawalRange && isHalfDaySession && (
                                     <p className="text-xs text-gray-500 mt-1">{sessionLabel}</p>
                                   )}
                                   {hasRequestedWithdrawalRange && (
                                     <p className="text-xs text-gray-500 mt-1">Original: {leave.duration} {leave.duration === 1 ? 'Day' : 'Days'}</p>
                                   )}
+                                </div>
+                                <div className="bg-white/70 rounded-md p-3 border border-gray-100">
+                                  <p className="text-xs text-gray-500 mb-1">Total Days (After Rules)</p>
+                                  <p className="text-sm font-medium text-gray-900">
+                                    {typeof leave.totalDaysAfterRule === 'number' && leave.totalDaysAfterRule > 0 ? leave.totalDaysAfterRule : '-'}
+                                  </p>
                                 </div>
                                 <div className="bg-white/70 rounded-md p-3 border border-gray-100">
                                   <p className="text-xs text-gray-500 mb-1">

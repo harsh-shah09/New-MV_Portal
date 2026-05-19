@@ -322,10 +322,17 @@ export function PendingApprovalsQueue({
       render: (text, record) => <span className="capitalize">{text || record.leaveCategory}</span>
     },
     {
-      title: 'Duration',
+      title: 'Actual Days',
       dataIndex: 'duration',
       key: 'duration',
       width: 110,
+      render: (duration) => `${duration} day(s)`
+    },
+    {
+      title: 'Total Days',
+      dataIndex: 'totalDaysAfterRule',
+      key: 'totalDaysAfterRule',
+      width: 150,
       render: (duration) => `${duration} day(s)`
     },
     {

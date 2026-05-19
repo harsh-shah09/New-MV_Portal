@@ -191,7 +191,14 @@ export async function POST(request: NextRequest) {
       ORDER BY Employee_Name__c
     `)
 
-    const employeeIds = (employeeRecords.records || []).map((employee: any) => employee.Id).filter(Boolean)
+    const isAdminRole = (role?: string) => role?.toString().trim().toLowerCase().includes("admin")
+    const eligibleEmployees = (employeeRecords.records || []).filter((employee: any) => !isAdminRole(employee.Role__c))
+
+    if (eligibleEmployees.length === 0) {
+      return NextResponse.json({ error: "No eligible employees for payroll" }, { status: 400 })
+    }
+
+    const employeeIds = eligibleEmployees.map((employee: any) => employee.Id).filter(Boolean)
     const bankByEmployeeId = new Map<string, { bankName: string; accountNumber: string }>()
 
     if (employeeIds.length > 0) {
@@ -619,7 +626,7 @@ export async function POST(request: NextRequest) {
     
     
     // Map employees with their salary and leave details
-    const employeePayrollData = employeeRecords.records.map((emp: any) => {
+    const employeePayrollData = eligibleEmployees.map((emp: any) => {
       const employeeLeaves = leavesByEmployee.get(emp.Id) || []
       const originalCTC = toNumber(emp.Salary_CTC__c)
       
