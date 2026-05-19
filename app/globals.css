@@ -187,6 +187,10 @@
     display: none !important;
   }
   
+  button:not([disabled]):hover {
+    cursor: pointer !important;
+    opacity: 0.9 !important;
+  }
   /* Ensure tables fit on page */
   table {
     page-break-inside: auto;
