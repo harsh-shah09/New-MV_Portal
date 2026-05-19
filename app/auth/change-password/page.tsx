@@ -5,8 +5,8 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Lock, Eye, EyeOff, CheckCircle2, XCircle, AlertCircle, RefreshCw, Shield, ShieldCheck, ShieldAlert } from 'lucide-react';
 
-const MIN_PASSWORD_LENGTH = 8;
-const MAX_PASSWORD_LENGTH = 12;
+const MIN_PASSWORD_LENGTH = 6;
+const MAX_PASSWORD_LENGTH = 10;
 
 function ChangePasswordContent() {
   const searchParams = useSearchParams();

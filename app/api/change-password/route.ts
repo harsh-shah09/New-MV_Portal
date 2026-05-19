@@ -3,8 +3,8 @@ import { getSalesforceConnection } from '@/lib/salesforce';
 import crypto, { hash } from 'crypto';
 import { hashPassword} from '@/lib/auth';
 
-const MIN_PASSWORD_LENGTH = 8;
-const MAX_PASSWORD_LENGTH = 12;
+const MIN_PASSWORD_LENGTH = 6;
+const MAX_PASSWORD_LENGTH = 10;
 
 interface EmployeeRecord {
   Id: string;
