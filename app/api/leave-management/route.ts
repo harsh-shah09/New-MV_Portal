@@ -2237,7 +2237,8 @@ export async function PATCH(request: NextRequest) {
               leaveType: leave.Leave_Type__c || leave.Leave_Category__c,
               startDate: dayjs(leave.Start_Date__c).format('DD MMM YYYY'),
               endDate: dayjs(leave.End_Date__c).format('DD MMM YYYY'),
-              duration: leave.Total_Days__c
+              duration: leave.Total_Days__c,
+              employeeName: employeeName,
             });
             const ccRecipients = [teamLeadEmail, adminEmail]
               .filter(Boolean)

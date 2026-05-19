@@ -1364,7 +1364,7 @@ export default function LeavesPage() {
                               )}
 
                               {/* Approval Status */}
-                              {(leave.tlApproved || leave.hrApproval) && (
+                              {((leave.tlApproved || leave.hrApproval) && (leave.status !== 'withdrawal pending')) && (
                                 <div className="flex items-center gap-4 mb-4 text-sm bg-white/70 rounded-md p-3 border border-gray-100">
                                   {leave.tlApproved && (
                                     <div className="flex items-center gap-2">
