@@ -1,7 +1,7 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { Modal, Select, Button, message, Table, Spin, Tag, Dropdown, Grid, Progress } from "antd"
+import { useState } from "react"
+import { Modal, Select, Button, message, Table, Spin, Tag, Dropdown, Grid } from "antd"
 import { PlusOutlined, DownOutlined } from "@ant-design/icons"
 import type { MenuProps } from "antd"
 import type { ColumnsType } from "antd/es/table"
@@ -43,8 +43,6 @@ export function GeneratePayrollModal({ open, onClose, onGenerate, onSavingChange
   const [selectedYear, setSelectedYear] = useState<number>(currentYear)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [progress, setProgress] = useState(0)
-  const [saveProgress, setSaveProgress] = useState(0)
   const [employeeData, setEmployeeData] = useState<PayrollEmployeeDetail[]>([])
   const [originalEmployeeData, setOriginalEmployeeData] = useState<PayrollEmployeeDetail[]>([])
   const [showResults, setShowResults] = useState(false)
@@ -52,44 +50,6 @@ export function GeneratePayrollModal({ open, onClose, onGenerate, onSavingChange
   const [bonusModalOpen, setBonusModalOpen] = useState(false)
   const [selectedEmployee, setSelectedEmployee] = useState<PayrollEmployeeDetail | null>(null)
   const [editMode, setEditMode] = useState(false)
-
-  useEffect(() => {
-    if (!loading) {
-      setProgress(0)
-      return
-    }
-
-    setProgress(5)
-    const intervalId = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 95) return prev
-        const remaining = 95 - prev
-        const step = Math.max(1, Math.round(remaining / 6))
-        return Math.min(prev + step, 95)
-      })
-    }, 450)
-
-    return () => clearInterval(intervalId)
-  }, [loading])
-
-  useEffect(() => {
-    if (!saving) {
-      setSaveProgress(0)
-      return
-    }
-
-    setSaveProgress(5)
-    const intervalId = setInterval(() => {
-      setSaveProgress((prev) => {
-        if (prev >= 95) return prev
-        const remaining = 95 - prev
-        const step = Math.max(1, Math.round(remaining / 5))
-        return Math.min(prev + step, 95)
-      })
-    }, 450)
-
-    return () => clearInterval(intervalId)
-  }, [saving])
 
   const formatCurrency = (value?: number | null) => {
     const rounded = Math.round(Number(value) || 0)
@@ -159,6 +119,9 @@ export function GeneratePayrollModal({ open, onClose, onGenerate, onSavingChange
     }
 
     setLoading(true)
+    setShowResults(true)
+    setEmployeeData([])
+    setOriginalEmployeeData([])
     try {
       const response = await fetch("/api/payroll/generate", {
         method: "POST",
@@ -181,11 +144,11 @@ export function GeneratePayrollModal({ open, onClose, onGenerate, onSavingChange
       setEmployeeData(normalizedEmployees)
       setOriginalEmployeeData(data.employees || [])
       setShowResults(true)
-      setProgress(100)
       message.success(`Payroll generated for ${selectedMonth} ${selectedYear} - ${data.totalEmployees} employees`)
     } catch (error: any) {
       console.error("Error generating payroll:", error)
       message.error(error?.message || "Failed to generate payroll. Please try again.")
+      setShowResults(false)
     } finally {
       setLoading(false)
     }
@@ -222,8 +185,6 @@ export function GeneratePayrollModal({ open, onClose, onGenerate, onSavingChange
       }
 
       const data = await res.json()
-
-      setSaveProgress(100)
 
       if (data?.payrollSummaryTxtContent) {
         const blob = new Blob([data.payrollSummaryTxtContent], { type: "text/plain;charset=utf-8" })
@@ -803,7 +764,7 @@ export function GeneratePayrollModal({ open, onClose, onGenerate, onSavingChange
         closable={!saving}
         maskClosable={!saving}
         keyboard={!saving}
-      width={saving ? "min(400px, calc(100vw - 12px))" : showResults ? "min(1540px, calc(100vw - 12px))" : "min(400px, calc(100vw - 12px))"}
+      width={showResults ? "min(1540px, calc(100vw - 12px))" : "min(400px, calc(100vw - 12px))"}
       centered
       styles={{ body: { maxHeight: "calc(100vh - 180px)", overflowY: "auto", overflowX: "hidden", padding: 8 } }}
       footer={
@@ -817,8 +778,8 @@ export function GeneratePayrollModal({ open, onClose, onGenerate, onSavingChange
                   key="confirm"
                   type="primary"
                   onClick={handleConfirmGeneration}
-                  loading={saving}
-                  disabled={saving}
+                  loading={saving || loading}
+                  disabled={saving || loading}
                   className="w-full sm:w-auto"
                 >
                   Confirm & Save Payroll
@@ -840,15 +801,9 @@ export function GeneratePayrollModal({ open, onClose, onGenerate, onSavingChange
       {!showResults ? (
         <div className="space-y-4 py-4">
           {loading ? (
-            <div className="space-y-3 rounded-lg border border-blue-100 bg-blue-50/60 p-4">
-              <div className="text-sm font-medium text-gray-700">Generating payroll...</div>
-              <div className="mx-auto w-full max-w-[280px]">
-                <Progress percent={progress} status={progress >= 100 ? "success" : "active"} showInfo />
+              <div className="flex justify-center items-center py-6">
+                <Spin size="large" />
               </div>
-              <div className="text-xs text-gray-500">
-                This may take a couple of minutes depending on employee count.
-              </div>
-            </div>
           ) : (
             <>
               <div>
@@ -882,75 +837,67 @@ export function GeneratePayrollModal({ open, onClose, onGenerate, onSavingChange
           )}
         </div>
       ) : (
-        <div className="py-1 min-w-0">
-          {loading ? (
-            <div className="flex justify-center items-center py-6">
-              <Spin size="large" />
-            </div>
-          ) : saving ? (
-            <div className="space-y-3 rounded-lg border border-green-100 bg-green-50/60 p-4">
-              <div className="text-sm font-medium text-gray-700">Saving payroll...</div>
-              <div className="mx-auto w-full max-w-[280px]">
-                <Progress percent={saveProgress} status={saveProgress >= 100 ? "success" : "active"} showInfo />
-              </div>
-              <div className="text-xs text-gray-500">
-                Finalizing payroll and generating summary file.
-              </div>
-            </div>
-          ) : (
-            <>
-              <div className="mb-2 p-2 bg-blue-50 rounded-lg">
-                <h3 className="font-semibold text-xs mb-1">Summary</h3>
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-[11px] leading-tight">
-                  <div>
-                    <p className="text-[11px] text-gray-600">Total Employees</p>
-                    <p className="text-sm font-bold">{employeeData.length}</p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] text-gray-600">Total Additions</p>
-                    <p className="text-sm font-bold text-green-600">
-                      {formatCurrency(employeeData.reduce((sum, emp) => sum + (emp.totalAdditions || 0), 0))}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] text-gray-600">Gross Income</p>
-                    <p className="text-sm font-bold text-blue-600">
-                      {formatCurrency(employeeData.reduce((sum, emp) => sum + (emp.grossIncome || 0), 0))}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] text-gray-600">Gross Deduction</p>
-                    <p className="text-sm font-bold text-orange-600">
-                      {formatCurrency(employeeData.reduce((sum, emp) => sum + (emp.pfDeduction || 0) + (emp.ptDeduction || 0) + (emp.esiDeduction || 0), 0))}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] text-gray-600">Net Payroll</p>
-                    <p className="text-sm font-bold">
-                      {formatCurrency(employeeData.reduce((sum, emp) => sum + (emp.netSalary || 0), 0))}
-                    </p>
-                  </div>
+        <div className="py-1 min-w-0 relative">
+          <div className={loading || saving ? "pointer-events-none blur-[1.5px]" : ""}>
+            <div className="mb-2 p-2 bg-blue-50 rounded-lg">
+              <h3 className="font-semibold text-xs mb-1">Summary</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-[11px] leading-tight">
+                <div>
+                  <p className="text-[11px] text-gray-600">Total Employees</p>
+                  <p className="text-sm font-bold">{employeeData.length}</p>
+                </div>
+                <div>
+                  <p className="text-[11px] text-gray-600">Total Additions</p>
+                  <p className="text-sm font-bold text-green-600">
+                    {formatCurrency(employeeData.reduce((sum, emp) => sum + (emp.totalAdditions || 0), 0))}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[11px] text-gray-600">Gross Income</p>
+                  <p className="text-sm font-bold text-blue-600">
+                    {formatCurrency(employeeData.reduce((sum, emp) => sum + (emp.grossIncome || 0), 0))}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[11px] text-gray-600">Gross Deduction</p>
+                  <p className="text-sm font-bold text-orange-600">
+                    {formatCurrency(employeeData.reduce((sum, emp) => sum + (emp.pfDeduction || 0) + (emp.ptDeduction || 0) + (emp.esiDeduction || 0), 0))}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[11px] text-gray-600">Net Payroll</p>
+                  <p className="text-sm font-bold">
+                    {formatCurrency(employeeData.reduce((sum, emp) => sum + (emp.netSalary || 0), 0))}
+                  </p>
                 </div>
               </div>
-              <div className="w-full min-w-0 overflow-x-auto">
-                <Table
-                  columns={columns}
-                  dataSource={employeeData}
-                  rowKey="id"
-                  pagination={{ pageSize: 10, size: "small" }}
-                  size="small"
-                  scroll={{ x: "max-content", y: 300 }}
-                  expandable={{
-                    expandedRowRender,
-                    rowExpandable: (record) => 
-                      !!(record.leaves && record.leaves.length > 0) || 
-                      !!(record.adjustments && record.adjustments.length > 0) ||
-                      !!(record.bonus && record.bonus > 0),
-                  }}
-                  className="bg-white rounded-lg"
-                />
+            </div>
+            <div className="w-full min-w-0 overflow-x-auto">
+              <Table
+                columns={columns}
+                dataSource={employeeData}
+                rowKey="id"
+                pagination={{ pageSize: 10, size: "small" }}
+                size="small"
+                scroll={{ x: "max-content", y: 300 }}
+                expandable={{
+                  expandedRowRender,
+                  rowExpandable: (record) => 
+                    !!(record.leaves && record.leaves.length > 0) || 
+                    !!(record.adjustments && record.adjustments.length > 0) ||
+                    !!(record.bonus && record.bonus > 0),
+                }}
+                className="bg-white rounded-lg"
+              />
+            </div>
+          </div>
+          {(loading || saving) && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="flex flex-col items-center gap-3 rounded-2xl bg-white px-8 py-6 shadow-xl">
+                <Spin size="large" />
+                <div className="text-base font-medium text-slate-700">Generating payroll...</div>
               </div>
-            </>
+            </div>
           )}
         </div>
       )}
