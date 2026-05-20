@@ -585,8 +585,8 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
 
             const esi = formData.ESI_Number__c
             if (esi) {
-                if (!/^[0-9]{10}$/.test(esi)) {
-                    newErrors.ESI_Number__c = "ESI Number must be a 10-digit numeric code"
+                if (!/^[0-9A-Za-z]{10}$/.test(esi)) {
+                    newErrors.ESI_Number__c = "ESI Number must be a 10-digit alphanumeric code"
                 }
             }
 
@@ -597,7 +597,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                 }
             }
 
-            const uan = formData.UAN_Number__c?.trim()
+            const uan = formData.UAN_Number__c
             if (uan) {
                 if (!/^\d{12}$/.test(uan)) {
                     newErrors.UAN_Number__c = "UAN must be a 12-digit numeric number"
@@ -1454,7 +1454,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                     <div className="relative group shrink-0">
                         <div className="w-24 h-24 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-full border-[3px] border-white/80 shadow-xl bg-white/20 backdrop-blur-md flex items-center justify-center overflow-hidden">
                             {employee.Profile_Photo__c && !uploadMutation.isPending ? (
-                                <Image key={employee.Profile_Photo__c} src={employee.Profile_Photo__c} alt="Profile" width={96} height={96} className="w-full h-full object-cover" />
+                                <img src={employee.Profile_Photo__c} alt="Profile" width={96} height={96} className="w-full h-full object-cover" />
                             ) : uploadMutation.isPending ? (
                                 <Spin size="small" />
                             ) : (
@@ -2119,7 +2119,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                         { label: 'HR', value: 'HR' },
                                                         { label: 'IT', value: 'IT' },
                                                         { label: 'Finance', value: 'Finance' },
-                                                        { label: 'Marketing', value: 'Marketing' },
+                                                        { label: 'UI/UX', value: 'UI/UX' },
                                                         { label: 'Admin', value: 'Admin' },
                                                     ]}
                                                 />
@@ -2133,12 +2133,12 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                     error={errors.Role__c}
                                                     type="select"
                                                     options={(
-                                                        formData.Department__c === 'HR' ? ['HR', 'Manager', 'Intern'] :
-                                                        formData.Department__c === 'IT' ? ['Developer', 'Intern' , 'QA'] :
+                                                        formData.Department__c === 'HR' ? ['HR', 'Intern'] :
+                                                        formData.Department__c === 'IT' ? ['Developer', 'Intern' , 'QA' , 'SEO'] :
                                                         formData.Department__c === 'Finance' ? ['Manager', 'Intern'] :
-                                                        formData.Department__c === 'Marketing' ? ['Marketing', 'BDE', 'Manager', 'Intern'] :
-                                                        formData.Department__c === 'Admin' ? ['Admin', 'Manager', 'Intern'] :
-                                                        (roleOptions.length > 0 ? roleOptions : ['Intern', 'Developer', 'Manager', 'HR', 'Admin', 'BDE', 'Marketing', 'Finance' , 'QA'])
+                                                        formData.Department__c === 'UI/UX' ? ['UI/UX', 'Intern' ] :
+                                                        formData.Department__c === 'Admin' ? ['Admin'] :
+                                                        (roleOptions.length > 0 ? roleOptions : ['Intern', 'Developer', 'Manager', 'HR', 'Admin', 'BDE', 'UI/UX', 'Finance' , 'QA' , 'SEO'])
                                                     ).map((r: string) => ({ label: r, value: r }))}
                                                 />
                                                 <Field
@@ -2298,15 +2298,15 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                             </h2>
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                                                 <Field
-                                                    label="ESI Number"
+                                                    label="ESIC Number"
                                                     value={employee.ESI_Number__c}
                                                     fieldKey="ESI_Number__c"
                                                     isEditing={isEditing && ['HR', 'Admin'].includes(currentUserRole)}
                                                     formData={formData}
                                                     setFormData={setFormData}
                                                     error={errors.ESI_Number__c}
-                                                    placeholder="Enter 10 digit Number"
-                                                    maxLength={21}
+                                                    placeholder="e.g 1100123456"
+                                                    maxLength={10}
                                                 />
                                                 <Field
                                                     label="PF Number"
@@ -2316,7 +2316,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                     formData={formData}
                                                     setFormData={setFormData}
                                                     error={errors.PF_Number__c}
-                                                    placeholder="22-character alphanumeric code"
+                                                    placeholder="e.g U110012345678"
                                                     maxLength={22}
                                                 />
                                                 <Field
@@ -2327,7 +2327,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                     formData={formData}
                                                     setFormData={setFormData}
                                                     error={errors.UAN_Number__c}
-                                                    placeholder="12-digit numeric number"
+                                                    placeholder="e.g 101123456789"
                                                     maxLength={12}
                                                 />
                                             </div>
@@ -2635,7 +2635,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                                 </span>
                                                                 {(() => {
                                                                     const staged = getStagedAction('bank', bank.Id);
-                                                                    const canVerify = isHrUser && (!bank.Status__c || bank.Status__c === 'Pending');
+                                                                    const canVerify = (isHrUser || isAdminUser) && (!bank.Status__c || bank.Status__c === 'Pending');
                                                                     if (!canVerify) return null;
                                                                     return staged ? (
                                                                         <span
@@ -2666,12 +2666,18 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                                     );
                                                                 })()}
                                                                 {bank.Primary_Account__c && <span className="bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded-full font-medium">Primary</span>}
-                                                                {currentUserRole === 'HR' && !bank.Primary_Account__c && (
+                                                                {(currentUserRole === 'HR' || currentUserRole === 'Admin') && !bank.Primary_Account__c && bank.Status__c === 'Verified' && (
                                                                     <button
                                                                         onClick={() => {
-                                                                            if (confirm("Are you sure you want to set this as the primary bank account?")) {
-                                                                                setPrimaryBankMutation.mutate(bank.Id)
-                                                                            }
+                                                                            Modal.confirm({
+                                                                                title: "Confirm Primary Bank Account",
+                                                                                content: "Are you sure you want to set this as the primary bank account?",
+                                                                                okText: "Set as Primary",
+                                                                                cancelText: "Cancel",
+                                                                                onOk: () => {
+                                                                                    setPrimaryBankMutation.mutate(bank.Id)
+                                                                                }
+                                                                            })
                                                                         }}
                                                                         disabled={setPrimaryBankMutation.isPending}
                                                                         className="text-xs px-2 py-1 rounded-md border border-blue-100 text-blue-600 hover:bg-blue-50 disabled:opacity-50"
@@ -2926,7 +2932,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                                         </div>
                                                                         {/* Approve / Reject — top right (STAGED) */}
                                                                         {((doc.Status__c === 'Uploaded') &&
-                                                                            ((currentUserRole === 'HR' && employee.Role__c !== 'HR') || (currentUserRole === 'Admin' && employee.Role__c === 'HR'))) && (
+                                                                            ((currentUserRole === 'HR' && employee.Role__c !== 'HR') || (currentUserRole === 'Admin'))) && (
                                                                                 (() => {
                                                                                     const staged = getStagedAction('document', doc.Id);
                                                                                     return staged ? (

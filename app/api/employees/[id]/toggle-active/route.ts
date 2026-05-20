@@ -5,6 +5,7 @@ import { updateEmployee, getEmployeeById } from '@/lib/salesforce';
 import { sendEmail } from '@/lib/email';
 import { welcomeEmail } from '@/lib/email-templates';
 import { getAdminSettingValue } from '@/lib/admin-settings';
+import { revokeAllDbSessions } from '@/lib/dynamodb';
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
@@ -19,6 +20,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             Active__c: active,
             Pass_Reset_Active__c: active // Enable password setup if activating
         });
+
+        if (!active) {
+            // Revoke all sessions if deactivated
+            await revokeAllDbSessions(id);
+        }
 
         // 2. If Activating, Send Welcome Email
         if (active) {

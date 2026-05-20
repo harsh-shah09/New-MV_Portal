@@ -21,7 +21,10 @@ import {
     Trash2,
     Package,
     ChevronLeft,
-    ChevronRight
+    ChevronRight,
+    Cloud,
+    Key,
+    Unplug
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { message, Modal, Select, Spin, Collapse, Input } from "antd";
@@ -34,19 +37,19 @@ const formatLabel = (str: string) => {
     return str.replace(/_/g, ' ').replace(/([A-Z])/g, ' $1').trim();
 };
 
-type AdminTab = "admin" | "documents" | "email" | "leave" | "users" | "integration" | "assets";
+type AdminTab = "salesforce" | "google" | "secrets" | "documents" | "email" | "leave" | "users" | "integration" | "assets";
 
-const VALID_TABS: AdminTab[] = ["admin", "documents", "leave", "users", "integration", "email", "assets"];
+const VALID_TABS: AdminTab[] = ["salesforce", "google", "secrets", "documents", "leave", "users", "integration", "email", "assets"];
 
 function getTabFromQuery(): AdminTab {
-    if (typeof window === "undefined") return "admin";
+    if (typeof window === "undefined") return "salesforce";
     const params = new URLSearchParams(window.location.search);
     const tab = params.get("tab") as AdminTab;
-    return VALID_TABS.includes(tab) ? tab : "admin";
+    return VALID_TABS.includes(tab) ? tab : "salesforce";
 }
 
 export default function AdminConsole() {
-    const [activeTab, setActiveTab] = useState<AdminTab>("admin");
+    const [activeTab, setActiveTab] = useState<AdminTab>("salesforce");
     const [configs, setConfigs] = useState<any>(null);
     const [roleOptions, setRoleOptions] = useState<string[]>([]);
     const [users, setUsers] = useState<any[]>([]);
@@ -150,6 +153,23 @@ export default function AdminConsole() {
         }
     }
 
+    const handleDisconnectSalesforce = async () => {
+        if (!confirm("Are you sure you want to disconnect the Salesforce org? This will clear the saved credentials AND instantly log out all active users from the portal.")) return;
+
+        try {
+            setSaving(true);
+            const res = await fetch('/api/admin/salesforce/disconnect', { method: 'POST' });
+            if (res.ok) {
+                message.success("Salesforce org disconnected successfully");
+            } else {
+                message.error("Failed to disconnect Salesforce org");
+            }
+        } catch (e) {
+            message.error("Failed to disconnect Salesforce org");
+        } finally {
+            setSaving(false);
+        }
+    }
 
 
     const fetchUsers = async () => {
@@ -192,7 +212,6 @@ export default function AdminConsole() {
             if (res.status === 401 || res.status === 403) {
                 message.error("Unauthorized access");
                 // Redirect or show error
-                window.location.href = '/dashboard';
                 return;
             }
             if (!res.ok) throw new Error("Failed to fetch configurations");
@@ -459,7 +478,9 @@ export default function AdminConsole() {
                         {/* Sidebar */}
                         <div className="lg:col-span-1 space-y-4">
                             <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-2 grid grid-cols-3 md:grid-cols-2 lg:grid-cols-1 gap-2">
-                                <TabButton id="admin" label="General Settings" icon={Settings} />
+                                <TabButton id="salesforce" label="Salesforce" icon={Cloud} />
+                                <TabButton id="google" label="Google Settings" icon={Mail} />
+                                <TabButton id="secrets" label="System Secrets" icon={Key} />
                                 <TabButton id="documents" label="Documents Config" icon={FileText} />
                                 <TabButton id="leave" label="Leave Rules" icon={Calendar} />
                                 <TabButton id="users" label="User Access" icon={Users} />
@@ -522,13 +543,23 @@ export default function AdminConsole() {
                                             </div>
                                         )}
 
-                                        {activeTab === "admin" && (
+                                        {activeTab === "salesforce" && (
                                             <div className="space-y-10">
                                                 {/* Salesforce Configurations */}
                                                 <div>
-                                                    <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
-                                                        <Settings className="w-5 h-5 text-blue-500" /> Salesforce Configurations
-                                                    </h3>
+                                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                                                        <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                                                            <Cloud className="w-5 h-5 text-blue-500" /> Salesforce Configurations
+                                                        </h3>
+                                                        <button 
+                                                            onClick={handleDisconnectSalesforce}
+                                                            disabled={saving}
+                                                            className="flex items-center justify-center gap-2 px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg text-sm font-medium transition-colors border border-red-200"
+                                                        >
+                                                            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Unplug className="w-4 h-4" />}
+                                                            Disconnect Org
+                                                        </button>
+                                                    </div>
                                                     <div className="grid grid-cols-1 gap-6">
                                                         {configs.admin?.map((record: any) => (
                                                             <div key={record.Id} className="group">
@@ -546,9 +577,13 @@ export default function AdminConsole() {
                                                         ))}
                                                     </div>
                                                 </div>
+                                            </div>
+                                        )}
 
+                                        {activeTab === "google" && (
+                                            <div className="space-y-10">
                                                 {/* Gmail and Google OAuth Settings */}
-                                                <div className="border-t pt-8">
+                                                <div>
                                                     <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
                                                         <Mail className="w-5 h-5 text-red-500" /> Gmail & Google OAuth Settings
                                                     </h3>
@@ -608,11 +643,25 @@ export default function AdminConsole() {
                                                             />
                                                             <p className="text-xs text-slate-500 mt-1">OAuth 2.0 Client Secret from Google Cloud Console</p>
                                                         </div>
+                                                        {Object.keys(settingsChanges).length > 0 && (
+                                                            <button
+                                                                onClick={saveAdminSettings}
+                                                                disabled={saving}
+                                                                className="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-xl transition disabled:opacity-50 flex items-center justify-center gap-2"
+                                                            >
+                                                                {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                                                                {saving ? 'Saving...' : 'Save Settings'}
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 </div>
+                                            </div>
+                                        )}
 
+                                        {activeTab === "secrets" && (
+                                            <div className="space-y-10">
                                                 {/* AWS S3 Configuration */}
-                                                <div className="border-t pt-8">
+                                                <div>
                                                     <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
                                                         <Package className="w-5 h-5 text-amber-500" /> AWS S3 Configuration
                                                     </h3>
@@ -939,7 +988,7 @@ export default function AdminConsole() {
                                                                                         size="small"
                                                                                         dropdownStyle={{ width: 'max-content'}}
                                                                                         value={user.Role || 'Employee'}
-                                                                                        onChange={(e) => updateUser(user.Id, { Role__c: e.target.value })}
+                                                                                        onChange={(e: any) => updateUser(user.Id, { Role__c: e })}
                                                                                         className="bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs font-medium focus:ring-2 focus:ring-indigo-500 outline-none"
                                                                                         options={[
                                                                                             { value: 'Employee', label: 'Employee (Standard)' },

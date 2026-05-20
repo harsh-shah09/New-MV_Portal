@@ -40,10 +40,10 @@ export function EmployeeTable({ employees, onEdit, onDelete, onView, loading, is
     },
     {
       title: 'Email',
-      dataIndex: 'email',
+      dataIndex: 'companyEmail',
       width : 260,
       align:'center',
-      key: 'email',
+      key: 'companyEmail',
       responsive: ['md'],
     },
     {

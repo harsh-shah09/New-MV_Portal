@@ -11,6 +11,45 @@ import { redirect } from 'next/navigation';
 import { getSpecificConfigurations } from '@/lib/admin-config';
 import { sendEmail } from '@/lib/email';
 import { getAdminSettingValue } from '@/lib/admin-settings';
+import { db } from '@/lib/dynamodb';
+import { GetCommand, PutCommand } from '@aws-sdk/lib-dynamodb';
+
+export async function checkSalesforceConfigured(): Promise<boolean> {
+  const TABLE_NAME = 'MV_Portal';
+  const CREDENTIALS_ID = 'Salesforce_Credentials';
+  try {
+    const credCmd = new GetCommand({
+      TableName: TABLE_NAME,
+      Key: {
+        Employee_Id: CREDENTIALS_ID,
+        SortKey: 'CREDENTIALS'
+      }
+    });
+    const credData = await db.send(credCmd);
+    if (!credData.Item) return false;
+    const creds = credData.Item;
+    if (!creds.username || !creds.password || !creds.security_token) return false;
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+export async function saveSalesforceCredentials(username: string, password: string, security_token: string) {
+  const TABLE_NAME = 'MV_Portal';
+  const CREDENTIALS_ID = 'Salesforce_Credentials';
+  const putCmd = new PutCommand({
+      TableName: TABLE_NAME,
+      Item: {
+          Employee_Id: CREDENTIALS_ID,
+          SortKey: 'CREDENTIALS',
+          username,
+          password,
+          security_token
+      }
+  });
+  await db.send(putCmd);
+}
 const loginSchema = z.object({
   identifier: z.string().min(1, 'Email or Employee ID is required'),
   password: z.string().min(1, 'Password is required'),

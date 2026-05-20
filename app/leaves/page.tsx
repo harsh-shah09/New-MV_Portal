@@ -1233,7 +1233,7 @@ export default function LeavesPage() {
                           <div
                             key={leave.id}
                             className={`bg-gradient-to-r border rounded-lg hover:shadow-md transition-all ${
-                              isAdmin && isDoubtfulCase
+                              (isAdmin || isHR) && isDoubtfulCase
                                 ? 'from-red-50 to-orange-50 border-red-300 hover:border-red-400'
                                 : 'from-slate-50 to-blue-50 border-gray-200 hover:border-blue-300'
                             }`}
@@ -1255,7 +1255,7 @@ export default function LeavesPage() {
                                     }`}>
                                     {leave.isWithdrawalRequest ? 'Withdrawal Pending' : leave.status.charAt(0).toUpperCase() + leave.status.slice(1)}
                                   </span>
-                                  {isAdmin && isDoubtfulCase && (
+                                  {(isAdmin || isHR) && isDoubtfulCase && (
                                     <span className="px-4 py-2 rounded-full text-xs font-semibold border bg-red-100 text-red-700 border-red-200">
                                       Doubtful Case
                                     </span>
@@ -1309,7 +1309,7 @@ export default function LeavesPage() {
                               </div>
 
                               {/* Details Grid */}
-                              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                              <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
                                 <div className="bg-white/70 rounded-md p-3 border border-gray-100">
                                   <p className="text-xs text-gray-500 mb-1">Leave Type</p>
                                   <p className="text-sm font-medium text-gray-900 capitalize">{leave.leaveType || leave.leaveCategory}</p>
@@ -1319,12 +1319,19 @@ export default function LeavesPage() {
                                     {hasRequestedWithdrawalRange ? 'Requested Duration' : 'Duration'}
                                   </p>
                                   <p className="text-sm font-medium text-gray-900">{displayDuration} {displayDuration === 1 ? 'Day' : 'Days'}</p>
+                                  
                                   {!hasRequestedWithdrawalRange && isHalfDaySession && (
                                     <p className="text-xs text-gray-500 mt-1">{sessionLabel}</p>
                                   )}
                                   {hasRequestedWithdrawalRange && (
                                     <p className="text-xs text-gray-500 mt-1">Original: {leave.duration} {leave.duration === 1 ? 'Day' : 'Days'}</p>
                                   )}
+                                </div>
+                                <div className="bg-white/70 rounded-md p-3 border border-gray-100">
+                                  <p className="text-xs text-gray-500 mb-1">Total Days (After Rules)</p>
+                                  <p className="text-sm font-medium text-gray-900">
+                                    {typeof leave.totalDaysAfterRule === 'number' && leave.totalDaysAfterRule > 0 ? leave.totalDaysAfterRule : '-'}
+                                  </p>
                                 </div>
                                 <div className="bg-white/70 rounded-md p-3 border border-gray-100">
                                   <p className="text-xs text-gray-500 mb-1">
@@ -1357,7 +1364,7 @@ export default function LeavesPage() {
                               )}
 
                               {/* Approval Status */}
-                              {(leave.tlApproved || leave.hrApproval) && (
+                              {((leave.tlApproved || leave.hrApproval) && (leave.status !== 'withdrawal pending')) && (
                                 <div className="flex items-center gap-4 mb-4 text-sm bg-white/70 rounded-md p-3 border border-gray-100">
                                   {leave.tlApproved && (
                                     <div className="flex items-center gap-2">

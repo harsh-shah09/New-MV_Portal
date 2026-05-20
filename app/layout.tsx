@@ -71,7 +71,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
     icons: {
       icon: '/favicon.ico',
-      apple: '/apple-icon.png',
+      apple: '/favicon.ico',
     },
 
     alternates: {
@@ -94,6 +94,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${geist.variable} ${geistMono.variable} font-sans antialiased`}>
+        <noscript>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', width: '100vw', backgroundColor: '#f8d7da', color: '#721c24', position: 'fixed', top: 0, left: 0, zIndex: 9999 }}>
+            <h1 style={{ fontSize: '2rem', marginBottom: '1rem', fontWeight: 'bold' }}>JavaScript is Disabled</h1>
+            <p style={{ fontSize: '1.25rem' }}>Please enable JavaScript in your browser settings to use this application.</p>
+          </div>
+        </noscript>
         <AntdStyledRegistry>
         <ActivityProvider>
           <Providers>

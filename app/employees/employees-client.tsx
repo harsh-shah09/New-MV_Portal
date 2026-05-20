@@ -78,6 +78,7 @@ export default function EmployeesClient({ role }: EmployeesClientProps) {
             firstName: record.Employee_Name__c?.split(' ')[0] || '',
             lastName: record.Employee_Name__c?.split(' ').slice(1).join(' ') || '',
             email: record.Employee_Email__c || '',
+            companyEmail : record.Company_Email__c || '',
             phone: record.Employee_Phone__c || '',
             department: record.Department__c || 'Un-Assigned',
             position: record.Role__c || '',

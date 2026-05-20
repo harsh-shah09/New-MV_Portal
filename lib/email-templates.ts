@@ -39,7 +39,6 @@ function normalizeTemplateKey(value: string): string {
 
 function applyTemplateData(template: string, data: LeaveEmailData): string {
   let html = template;
-
   html = html.replace(/{{recipientName}}/g, data.recipientName || 'Employee');
   html = html.replace(/{{employeeName}}/g, data.employeeName || 'Unknown');
   html = html.replace(/{{employeeId}}/g, data.employeeId || 'N/A');

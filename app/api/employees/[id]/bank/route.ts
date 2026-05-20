@@ -1,7 +1,7 @@
 
 import { NextResponse } from 'next/server';
 import { verifySession } from '@/lib/auth';
-import { createBankDetail, deleteBankDetail, updateBankDetail } from '@/lib/salesforce';
+import { createBankDetail, deleteBankDetail, getSalesforceConnection, updateBankDetail } from '@/lib/salesforce';
 import { sendEmail, getHREmail } from '@/lib/email';
 import { loadTemplate } from '@/lib/email-templates'; // We might need to export loadTemplate or just load it
 
@@ -30,6 +30,14 @@ export async function POST(
     await createBankDetail(bankData);
 
     const hrEmail = await getHREmail();
+    const conn = await getSalesforceConnection();
+    const adminQuery = await conn.query<any>(`
+      SELECT Id, Employee_Name__c, Company_Email__c
+      FROM Employee__c
+      WHERE Role__c = 'Admin'
+      LIMIT 1
+    `);
+    const adminEmail = adminQuery.records[0]?.Company_Email__c;
     if (hrEmail) {
         try {
             let bodyHtml = await loadTemplate('Bank-Approval-Pending', {
@@ -49,7 +57,8 @@ export async function POST(
                 subject: 'New Bank Account Added - Pending Verification',
                 body: bodyHtml,
                 contentType: 'text/html',
-                isInfo: true
+                isInfo: true,
+                cc : adminEmail
             });
         } catch (emailError) {
             console.error('Error sending Bank-Approval-Pending email:', emailError);

@@ -88,39 +88,43 @@ export function LeaveDetailsModal({ leave, visible, loading = false, onClose }: 
         {/* Employee Info Section */}
         <Card className="border border-blue-200 bg-gradient-to-br from-blue-50 to-white shadow-sm" bodyStyle={{ padding: "18px" }}>
           <Row gutter={[24, 16]}>
-            <Col xs={24} sm={12}>
-              <div className="space-y-2">
-                <div>
-                  <p className="text-xs text-gray-500 uppercase tracking-wide">Employee Name</p>
-                  <p className="text-xl font-semibold text-gray-900">{leave?.employeeName || "N/A"}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 uppercase tracking-wide">Employee Record Name</p>
-                  <p className="text-base font-medium text-gray-700">{leave?.employeeRecordName || "N/A"}</p>
-                </div>
-                <div className="flex flex-wrap gap-2 pt-1">
-                  <Tag color="purple" className="rounded-full px-2.5 py-0.5">{leave?.leaveCategory || "N/A"}</Tag>
-                  <Tag color="geekblue" className="rounded-full px-2.5 py-0.5">{calculatedDays} day(s)</Tag>
-                  {(leave?.sessionStart || leave?.sessionEnd || leave?.session) && <Tag color="cyan" className="rounded-full px-2.5 py-0.5">{sessionLabel}</Tag>}
-                </div>
+            <Col xs={24} md={8}>
+              <div>
+                <p className="text-xs text-gray-500 uppercase tracking-wide">Employee Name</p>
+                <p className="text-xl font-semibold text-gray-900">{leave?.employeeName || "N/A"}</p>
               </div>
             </Col>
-            <Col xs={24} sm={12}>
-              <div className="space-y-2">
-                <div>
-                  <p className="text-xs text-gray-500 uppercase tracking-wide">Current Status</p>
-                  <Tag color={getStatusColor(leave?.status || "pending")} className="capitalize text-base px-3 py-1">
-                    {isWithdrawalRequest ? "Withdrawal Request" : leave?.status}
-                  </Tag>
-                </div>
-                {leave?.teamLeadName && (
-                  <div>
-                    <p className="text-xs text-gray-500 uppercase tracking-wide">Team Lead</p>
-                    <p className="text-base font-medium text-gray-700">{leave?.teamLeadName}</p>
-                  </div>
-                )}
+            <Col xs={24} md={8}>
+              <div>
+                <p className="text-xs text-gray-500 uppercase tracking-wide">Employee Id</p>
+                <p className="text-base font-medium text-gray-700">{leave?.employeeRecordName || "N/A"}</p>
               </div>
             </Col>
+            <Col xs={24} md={8}>
+              <div>
+                <p className="text-xs text-gray-500 uppercase tracking-wide">Current Status</p>
+                <Tag color={getStatusColor(leave?.status || "pending")} className="capitalize text-base px-3 py-1">
+                  {isWithdrawalRequest ? "Withdrawal Request" : leave?.status}
+                </Tag>
+              </div>
+            </Col>
+          </Row>
+          <Row gutter={[24, 16]} className="mt-2">
+            <Col xs={24} md={16}>
+              <div className="flex flex-wrap gap-2 pt-1">
+                <Tag color="purple" className="rounded-full px-2.5 py-0.5">{leave?.leaveCategory || "N/A"}</Tag>
+                <Tag color="geekblue" className="rounded-full px-2.5 py-0.5">{calculatedDays} day(s)</Tag>
+                {(leave?.sessionStart || leave?.sessionEnd || leave?.session) && <Tag color="cyan" className="rounded-full px-2.5 py-0.5">{sessionLabel}</Tag>}
+              </div>
+            </Col>
+            {leave?.teamLeadName && (
+              <Col xs={24} md={8}>
+                <div>
+                  <p className="text-xs text-gray-500 uppercase tracking-wide">Team Lead</p>
+                  <p className="text-base font-medium text-gray-700">{leave?.teamLeadName}</p>
+                </div>
+              </Col>
+            )}
           </Row>
         </Card>
 
@@ -144,28 +148,10 @@ export function LeaveDetailsModal({ leave, visible, loading = false, onClose }: 
           </Row>
         </Card>
 
-        <Card className="border border-indigo-200 shadow-sm" bodyStyle={{ padding: "16px" }}>
-          <p className="text-sm font-semibold text-gray-900 mb-4">Leave Metrics</p>
-          <Row gutter={[16, 16]}>
-            <Col xs={24} sm={12}>
-              <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Total Days</p>
-                <p className="text-lg font-semibold text-gray-900">{leave?.duration ?? 0}</p>
-              </div>
-            </Col>
-            <Col xs={24} sm={12}>
-              <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Total Days After Rule</p>
-                <p className="text-lg font-semibold text-gray-900">{leave?.totalDaysAfterRule ?? leave?.duration ?? 0}</p>
-              </div>
-            </Col>
-          </Row>
-        </Card>
-
         {/* Date & Duration Section */}
         <Card className="border border-green-200 shadow-sm" bodyStyle={{ padding: "16px" }}>
           <Row gutter={[24, 16]}>
-            <Col xs={24} sm={8}>
+            <Col xs={24} sm={6}>
               <div>
                 <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">
                   {isWithdrawalRequest ? "Requested Start Date" : "Start Date"}
@@ -178,7 +164,7 @@ export function LeaveDetailsModal({ leave, visible, loading = false, onClose }: 
                 )}
               </div>
             </Col>
-            <Col xs={24} sm={8}>
+            <Col xs={24} sm={6}>
               <div>
                 <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">
                   {isWithdrawalRequest ? "Requested End Date" : "End Date"}
@@ -191,10 +177,21 @@ export function LeaveDetailsModal({ leave, visible, loading = false, onClose }: 
                 )}
               </div>
             </Col>
-            <Col xs={24} sm={8}>
+            <Col xs={24} sm={6}>
+              <div>
+                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Actual Days</p>
+                <p className="text-lg font-semibold text-gray-900">{leave?.duration ?? calculatedDays} day(s)</p>
+                {isHalfDaySession && (
+                  <p className="text-xs text-gray-600 mt-1">{sessionLabel}</p>
+                )}
+              </div>
+            </Col>
+            <Col xs={24} sm={6}>
               <div>
                 <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Total Days</p>
-                <p className="text-lg font-semibold text-gray-900">{calculatedDays} day(s)</p>
+                <p className="text-lg font-semibold text-gray-900">
+                  {(leave?.totalDaysAfterRule && leave.totalDaysAfterRule > 0 ? leave.totalDaysAfterRule : calculatedDays)} day(s)
+                </p>
                 {isHalfDaySession && (
                   <p className="text-xs text-gray-600 mt-1">{sessionLabel}</p>
                 )}

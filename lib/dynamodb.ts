@@ -1,5 +1,5 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient, GetCommand, PutCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
+import { DynamoDBDocumentClient, GetCommand, PutCommand, DeleteCommand, QueryCommand, UpdateCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
 
 const client = new DynamoDBClient({
   region: process.env.AWS_REGION || "us-east-1",
@@ -194,4 +194,121 @@ export const clearAppTourPendingGoogleAuth = async (employeeId: string) => {
         }
     });
     await db.send(deleteCmd);
+};
+
+// ─── Session Management ───────────────────────────────────────────────────────
+
+/**
+ * Creates a new session in DynamoDB
+ */
+export const createDbSession = async (employeeId: string, sessionId: string, expiresAt: number) => {
+    const putCmd = new PutCommand({
+        TableName: "MV_Portal",
+        Item: {
+            Employee_Id: employeeId,
+            SortKey: `SESSION#${sessionId}`,
+            session_id: sessionId,
+            status: 'active',
+            created_at: new Date().toISOString(),
+            expires_at: Math.floor(expiresAt / 1000), // DynamoDB TTL expects Unix timestamp in seconds
+        }
+    });
+    await db.send(putCmd);
+};
+
+/**
+ * Gets a session from DynamoDB
+ */
+export const getDbSession = async (employeeId: string, sessionId: string) => {
+    const getCmd = new GetCommand({
+        TableName: "MV_Portal",
+        Key: {
+            Employee_Id: employeeId,
+            SortKey: `SESSION#${sessionId}`
+        }
+    });
+    const result = await db.send(getCmd);
+    return result.Item;
+};
+
+/**
+ * Deletes a session from DynamoDB (Logout)
+ */
+export const deleteDbSession = async (employeeId: string, sessionId: string) => {
+    const deleteCmd = new DeleteCommand({
+        TableName: "MV_Portal",
+        Key: {
+            Employee_Id: employeeId,
+            SortKey: `SESSION#${sessionId}`
+        }
+    });
+    await db.send(deleteCmd);
+};
+
+/**
+ * Revokes a specific session
+ */
+export const revokeDbSession = async (employeeId: string, sessionId: string) => {
+    const updateCmd = new UpdateCommand({
+        TableName: "MV_Portal",
+        Key: {
+            Employee_Id: employeeId,
+            SortKey: `SESSION#${sessionId}`
+        },
+        UpdateExpression: "SET #status = :revoked",
+        ExpressionAttributeNames: {
+            "#status": "status"
+        },
+        ExpressionAttributeValues: {
+            ":revoked": "revoked"
+        }
+    });
+    await db.send(updateCmd);
+};
+
+/**
+ * Revokes all active sessions for an employee
+ */
+export const revokeAllDbSessions = async (employeeId: string) => {
+    const queryCmd = new QueryCommand({
+        TableName: "MV_Portal",
+        KeyConditionExpression: "Employee_Id = :eid AND begins_with(SortKey, :sk)",
+        ExpressionAttributeValues: {
+            ":eid": employeeId,
+            ":sk": "SESSION#"
+        }
+    });
+    
+    const result = await db.send(queryCmd);
+    const sessions = result.Items || [];
+    
+    // Update all sessions to revoked
+    const revokePromises = sessions.map(session => 
+        revokeDbSession(employeeId, session.session_id)
+    );
+    
+    await Promise.all(revokePromises);
+};
+
+/**
+ * Revokes all active sessions globally (for all users)
+ */
+export const revokeAllSessionsGlobal = async () => {
+    const scanCmd = new ScanCommand({
+        TableName: "MV_Portal",
+        FilterExpression: "begins_with(SortKey, :sk)",
+        ExpressionAttributeValues: {
+            ":sk": "SESSION#"
+        }
+    });
+    
+    const result = await db.send(scanCmd);
+    const sessions = result.Items || [];
+    
+    // Update all sessions to revoked
+    const revokePromises = sessions.map((session: any) => 
+        revokeDbSession(session.Employee_Id, session.session_id)
+    );
+    
+    await Promise.all(revokePromises);
 };

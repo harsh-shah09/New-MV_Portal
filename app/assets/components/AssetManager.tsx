@@ -103,7 +103,7 @@ export function AssetManager({ initialAssets }: AssetManagerProps) {
           active.AMS_Assigned_Person__r?.Name ||
           'Unknown';
         showToast.warning("Active Assignment Found", {
-          description: `This asset has an active assignment record (${active.Name} with ${assigneeName}). Please ensure the asset is returned before proceeding.`,
+          description: `This asset has an active assignment record with ${assigneeName}. Please ensure the asset is returned before proceeding.`,
         });
         return;
       }

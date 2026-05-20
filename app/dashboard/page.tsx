@@ -17,6 +17,7 @@ export default function DashboardPage() {
   const router = useRouter()
   const [role, setRole] = useState<string | null>(null)
   const [title, setTitle] = useState<string | null>(null)
+  const [sessionId, setSessionId] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<"default" | "hr">("default")
   
   useEffect(() => {
@@ -27,6 +28,7 @@ export default function DashboardPage() {
         if (mounted) {
           setRole(session?.role ?? null)
           setTitle(session?.title ?? null)
+          setSessionId(session?.sessionId ?? null)
         }
       } catch (err) {
         if (mounted) setRole(null)
@@ -70,7 +72,7 @@ export default function DashboardPage() {
   }
 
   const { data, isLoading } = useQuery({
-    queryKey: ["dashboard", role, viewMode],
+    queryKey: ["dashboard", role, viewMode, sessionId],
     queryFn: () => fetch(`/api/dashboard?view=${viewMode}&role=${role}`).then((res) => {
       if (!res.ok) {
         if (res.status === 401) {
@@ -84,6 +86,7 @@ export default function DashboardPage() {
     enabled: !!role,
     staleTime: 60 * 1000,
     gcTime: 5 * 60 * 1000,
+    refetchOnMount: "always",
     refetchOnWindowFocus: false,
     retry: 1,
   })

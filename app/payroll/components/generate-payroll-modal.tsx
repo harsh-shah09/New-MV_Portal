@@ -119,6 +119,9 @@ export function GeneratePayrollModal({ open, onClose, onGenerate, onSavingChange
     }
 
     setLoading(true)
+    setShowResults(true)
+    setEmployeeData([])
+    setOriginalEmployeeData([])
     try {
       const response = await fetch("/api/payroll/generate", {
         method: "POST",
@@ -145,6 +148,7 @@ export function GeneratePayrollModal({ open, onClose, onGenerate, onSavingChange
     } catch (error: any) {
       console.error("Error generating payroll:", error)
       message.error(error?.message || "Failed to generate payroll. Please try again.")
+      setShowResults(false)
     } finally {
       setLoading(false)
     }
@@ -760,7 +764,7 @@ export function GeneratePayrollModal({ open, onClose, onGenerate, onSavingChange
         closable={!saving}
         maskClosable={!saving}
         keyboard={!saving}
-      width={showResults ? "min(1540px, calc(100vw - 12px))" : "min(460px, calc(100vw - 12px))"}
+      width={showResults ? "min(1540px, calc(100vw - 12px))" : "min(400px, calc(100vw - 12px))"}
       centered
       styles={{ body: { maxHeight: "calc(100vh - 180px)", overflowY: "auto", overflowX: "hidden", padding: 8 } }}
       footer={
@@ -774,8 +778,8 @@ export function GeneratePayrollModal({ open, onClose, onGenerate, onSavingChange
                   key="confirm"
                   type="primary"
                   onClick={handleConfirmGeneration}
-                  loading={saving}
-                  disabled={saving}
+                  loading={saving || loading}
+                  disabled={saving || loading}
                   className="w-full sm:w-auto"
                 >
                   Confirm & Save Payroll
@@ -796,94 +800,112 @@ export function GeneratePayrollModal({ open, onClose, onGenerate, onSavingChange
     >
       {!showResults ? (
         <div className="space-y-4 py-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Select Month</label>
-            <Select
-              className="w-full"
-              placeholder="Select month"
-              value={selectedMonth || undefined}
-              onChange={(value) => setSelectedMonth(value)}
-              options={months.map((month) => ({
-                label: month,
-                value: month,
-              }))}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Select Year</label>
-            <Select
-              className="w-full"
-              placeholder="Select year"
-              value={selectedYear}
-              onChange={(value) => setSelectedYear(value)}
-              options={years.map((year) => ({
-                label: year,
-                value: year,
-              }))}
-            />
-          </div>
-        </div>
-      ) : (
-        <div className="py-1 min-w-0">
           {loading ? (
             <div className="flex justify-center items-center py-6">
-              <Spin size="large" />
+              <div className="flex flex-col items-center gap-3 rounded-2xl bg-white px-8 py-6 shadow-xl">
+                <Spin size="large" />
+                <div className="text-base font-medium text-slate-700">Generating payroll...</div>
+              </div>
             </div>
           ) : (
             <>
-              <div className="mb-2 p-2 bg-blue-50 rounded-lg">
-                <h3 className="font-semibold text-xs mb-1">Summary</h3>
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-[11px] leading-tight">
-                  <div>
-                    <p className="text-[11px] text-gray-600">Total Employees</p>
-                    <p className="text-sm font-bold">{employeeData.length}</p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] text-gray-600">Total Additions</p>
-                    <p className="text-sm font-bold text-green-600">
-                      {formatCurrency(employeeData.reduce((sum, emp) => sum + (emp.totalAdditions || 0), 0))}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] text-gray-600">Gross Income</p>
-                    <p className="text-sm font-bold text-blue-600">
-                      {formatCurrency(employeeData.reduce((sum, emp) => sum + (emp.grossIncome || 0), 0))}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] text-gray-600">Gross Deduction</p>
-                    <p className="text-sm font-bold text-orange-600">
-                      {formatCurrency(employeeData.reduce((sum, emp) => sum + (emp.pfDeduction || 0) + (emp.ptDeduction || 0) + (emp.esiDeduction || 0), 0))}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] text-gray-600">Net Payroll</p>
-                    <p className="text-sm font-bold">
-                      {formatCurrency(employeeData.reduce((sum, emp) => sum + (emp.netSalary || 0), 0))}
-                    </p>
-                  </div>
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Select Month</label>
+                <Select
+                  className="w-full"
+                  placeholder="Select month"
+                  value={selectedMonth || undefined}
+                  onChange={(value) => setSelectedMonth(value)}
+                  options={months.map((month) => ({
+                    label: month,
+                    value: month,
+                  }))}
+                />
               </div>
-              <div className="w-full min-w-0 overflow-x-auto">
-                <Table
-                  columns={columns}
-                  dataSource={employeeData}
-                  rowKey="id"
-                  pagination={{ pageSize: 10, size: "small" }}
-                  size="small"
-                  scroll={{ x: "max-content", y: 300 }}
-                  expandable={{
-                    expandedRowRender,
-                    rowExpandable: (record) => 
-                      !!(record.leaves && record.leaves.length > 0) || 
-                      !!(record.adjustments && record.adjustments.length > 0) ||
-                      !!(record.bonus && record.bonus > 0),
-                  }}
-                  className="bg-white rounded-lg"
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Select Year</label>
+                <Select
+                  className="w-full"
+                  placeholder="Select year"
+                  value={selectedYear}
+                  onChange={(value) => setSelectedYear(value)}
+                  options={years.map((year) => ({
+                    label: year,
+                    value: year,
+                  }))}
                 />
               </div>
             </>
+          )}
+        </div>
+      ) : (
+        <div className="py-1 min-w-0 relative">
+          <div className={loading || saving ? "pointer-events-none blur-[1.5px]" : ""}>
+            <div className="mb-2 p-2 bg-blue-50 rounded-lg">
+              <h3 className="font-semibold text-xs mb-1">Summary</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-[11px] leading-tight">
+                <div>
+                  <p className="text-[11px] text-gray-600">Total Employees</p>
+                  <p className="text-sm font-bold">{employeeData.length}</p>
+                </div>
+                <div>
+                  <p className="text-[11px] text-gray-600">Total Additions</p>
+                  <p className="text-sm font-bold text-green-600">
+                    {formatCurrency(employeeData.reduce((sum, emp) => sum + (emp.totalAdditions || 0), 0))}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[11px] text-gray-600">Gross Income</p>
+                  <p className="text-sm font-bold text-blue-600">
+                    {formatCurrency(employeeData.reduce((sum, emp) => sum + (emp.grossIncome || 0), 0))}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[11px] text-gray-600">Gross Deduction</p>
+                  <p className="text-sm font-bold text-orange-600">
+                    {formatCurrency(employeeData.reduce((sum, emp) => sum + (emp.pfDeduction || 0) + (emp.ptDeduction || 0) + (emp.esiDeduction || 0), 0))}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[11px] text-gray-600">Net Payroll</p>
+                  <p className="text-sm font-bold">
+                    {formatCurrency(employeeData.reduce((sum, emp) => sum + (emp.netSalary || 0), 0))}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="w-full min-w-0 overflow-x-auto">
+              <Table
+                columns={columns}
+                dataSource={employeeData}
+                rowKey="id"
+                pagination={{ pageSize: 10, size: "small" }}
+                size="small"
+                scroll={{ x: "max-content", y: 300 }}
+                expandable={{
+                  expandedRowRender,
+                  rowExpandable: (record) => 
+                    !!(record.leaves && record.leaves.length > 0) || 
+                    !!(record.adjustments && record.adjustments.length > 0) ||
+                    !!(record.bonus && record.bonus > 0),
+                }}
+                className="bg-white rounded-lg"
+              />
+            </div>
+          </div>
+          {loading && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <Spin size="large" />
+            </div>
+          )}
+          {saving && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="flex flex-col items-center gap-3 rounded-2xl bg-white px-8 py-6 shadow-xl">
+                <Spin size="large" />
+                <div className="text-base font-medium text-slate-700">Generating payroll...</div>
+              </div>
+            </div>
           )}
         </div>
       )}

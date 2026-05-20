@@ -21,6 +21,7 @@ export function AssetAssignmentModal({ visible, onCancel, onSuccess, asset, curr
   const [form] = Form.useForm();
   const [isAssigning, setIsAssigning] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isLoading , setisLoading ] = useState(false)
   const [employees, setEmployees] = useState<any[]>([]);
   const [history, setHistory] = useState<AssignmentHistory[]>([]);
 
@@ -57,21 +58,27 @@ export function AssetAssignmentModal({ visible, onCancel, onSuccess, asset, curr
 
   const loadEmployees = async () => {
     try {
+        setisLoading(true)
       const data = await getAllEmployeesForSelect();
       setEmployees(data);
     } catch (e) {
       console.error("Failed to load employees", e);
+    } finally {
+        setisLoading(false)
     }
   };
 
   const loadHistory = async (assetId: string) => {
       try {
+          setisLoading(true)
           const data = await getAssetById(assetId);
           if (data && data.history) {
               setHistory(data.history);
           }
       } catch (e) {
           console.error("Failed to load history", e);
+      } finally {
+          setisLoading(false)
       }
   }
 
@@ -129,6 +136,7 @@ export function AssetAssignmentModal({ visible, onCancel, onSuccess, asset, curr
       width="100%"
       style={{ maxHeight: 'calc(100vh - 120px)', top: 20 , overflowY : 'auto' , maxWidth : '80vw' , borderRadius : '10px' , scrollbarWidth : 'none'}}
       className="mobile-modal"
+      loading={isLoading}
     >
     <Spin spinning={loading} size="large" tip="Loading...">
       <div className="mb-4">

@@ -106,7 +106,7 @@ export function MobileHeader({ onMenuClick }: { onMenuClick: () => void }) {
                         >
                             <div className="relative h-8 w-8 rounded-full ring-2 ring-white shadow-sm overflow-hidden bg-slate-100">
                                 {user?.profilePhoto ? (
-                                    <Image src={user.profilePhoto} width={32} height={32} alt="Profile" className="object-cover w-full h-full" />
+                                    <img src={user.profilePhoto} width={32} height={32} alt="Profile" className="object-cover w-full h-full" />
                                 ) : (
                                     <div className="w-full h-full flex items-center justify-center text-slate-400">
                                         <UserIcon className="w-5 h-5" />
