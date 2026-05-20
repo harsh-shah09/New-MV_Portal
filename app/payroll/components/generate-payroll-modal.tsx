@@ -801,9 +801,12 @@ export function GeneratePayrollModal({ open, onClose, onGenerate, onSavingChange
       {!showResults ? (
         <div className="space-y-4 py-4">
           {loading ? (
-              <div className="flex justify-center items-center py-6">
+            <div className="flex justify-center items-center py-6">
+              <div className="flex flex-col items-center gap-3 rounded-2xl bg-white px-8 py-6 shadow-xl">
                 <Spin size="large" />
+                <div className="text-base font-medium text-slate-700">Generating payroll...</div>
               </div>
+            </div>
           ) : (
             <>
               <div>
@@ -891,7 +894,12 @@ export function GeneratePayrollModal({ open, onClose, onGenerate, onSavingChange
               />
             </div>
           </div>
-          {(loading || saving) && (
+          {loading && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <Spin size="large" />
+            </div>
+          )}
+          {saving && (
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="flex flex-col items-center gap-3 rounded-2xl bg-white px-8 py-6 shadow-xl">
                 <Spin size="large" />
