@@ -259,7 +259,7 @@ export default function NDAPage() {
         const missingFields = dynamicManualKeys.filter(k => !manualValues[k]?.trim());
         if (missingFields.length > 0) {
             missingFields.forEach(k => {
-                showToast.warning(`"${toLabel(k)}" is empty. Fill it in for best results.`)
+                showToast.error(`"${toLabel(k)}" is empty. Fill it in for best results.`)
             })
             return;
         }

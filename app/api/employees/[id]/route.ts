@@ -30,12 +30,18 @@ export async function GET(
      const { id } = await params;
      const session = await verifySession();
      const isAdmin = session?.role === 'Admin';
-    const employee = await getEmployeeById(id, isAdmin);
+     
+    let employee ;
     const roleOptions = await getRolePicklistOptions();
+    if(id === session?.employeeId){
+      employee = await getEmployeeById(id, true);
+    }else{
+      employee = await getEmployeeById(id, isAdmin);
+    }
+
     if (!employee) {
       return NextResponse.json({ error: 'Employee not found' }, { status: 404 });
     }
-
     // Parse Address for frontend convenience
     if (typeof employee.Employee_Current_Address__c === 'string') {
         try {
