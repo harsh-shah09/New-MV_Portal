@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { Modal, Select, Button, message, Table, Spin, Tag, Dropdown, Grid } from "antd"
+import { useEffect, useState } from "react"
+import { Modal, Select, Button, message, Table, Spin, Tag, Dropdown, Grid, Progress } from "antd"
 import { PlusOutlined, DownOutlined } from "@ant-design/icons"
 import type { MenuProps } from "antd"
 import type { ColumnsType } from "antd/es/table"
@@ -43,6 +43,8 @@ export function GeneratePayrollModal({ open, onClose, onGenerate, onSavingChange
   const [selectedYear, setSelectedYear] = useState<number>(currentYear)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [progress, setProgress] = useState(0)
+  const [saveProgress, setSaveProgress] = useState(0)
   const [employeeData, setEmployeeData] = useState<PayrollEmployeeDetail[]>([])
   const [originalEmployeeData, setOriginalEmployeeData] = useState<PayrollEmployeeDetail[]>([])
   const [showResults, setShowResults] = useState(false)
@@ -50,6 +52,44 @@ export function GeneratePayrollModal({ open, onClose, onGenerate, onSavingChange
   const [bonusModalOpen, setBonusModalOpen] = useState(false)
   const [selectedEmployee, setSelectedEmployee] = useState<PayrollEmployeeDetail | null>(null)
   const [editMode, setEditMode] = useState(false)
+
+  useEffect(() => {
+    if (!loading) {
+      setProgress(0)
+      return
+    }
+
+    setProgress(5)
+    const intervalId = setInterval(() => {
+      setProgress((prev) => {
+        if (prev >= 95) return prev
+        const remaining = 95 - prev
+        const step = Math.max(1, Math.round(remaining / 6))
+        return Math.min(prev + step, 95)
+      })
+    }, 450)
+
+    return () => clearInterval(intervalId)
+  }, [loading])
+
+  useEffect(() => {
+    if (!saving) {
+      setSaveProgress(0)
+      return
+    }
+
+    setSaveProgress(5)
+    const intervalId = setInterval(() => {
+      setSaveProgress((prev) => {
+        if (prev >= 95) return prev
+        const remaining = 95 - prev
+        const step = Math.max(1, Math.round(remaining / 5))
+        return Math.min(prev + step, 95)
+      })
+    }, 450)
+
+    return () => clearInterval(intervalId)
+  }, [saving])
 
   const formatCurrency = (value?: number | null) => {
     const rounded = Math.round(Number(value) || 0)
@@ -141,6 +181,7 @@ export function GeneratePayrollModal({ open, onClose, onGenerate, onSavingChange
       setEmployeeData(normalizedEmployees)
       setOriginalEmployeeData(data.employees || [])
       setShowResults(true)
+      setProgress(100)
       message.success(`Payroll generated for ${selectedMonth} ${selectedYear} - ${data.totalEmployees} employees`)
     } catch (error: any) {
       console.error("Error generating payroll:", error)
@@ -181,6 +222,8 @@ export function GeneratePayrollModal({ open, onClose, onGenerate, onSavingChange
       }
 
       const data = await res.json()
+
+      setSaveProgress(100)
 
       if (data?.payrollSummaryTxtContent) {
         const blob = new Blob([data.payrollSummaryTxtContent], { type: "text/plain;charset=utf-8" })
@@ -760,7 +803,7 @@ export function GeneratePayrollModal({ open, onClose, onGenerate, onSavingChange
         closable={!saving}
         maskClosable={!saving}
         keyboard={!saving}
-      width={showResults ? "min(1540px, calc(100vw - 12px))" : "min(460px, calc(100vw - 12px))"}
+      width={saving ? "min(400px, calc(100vw - 12px))" : showResults ? "min(1540px, calc(100vw - 12px))" : "min(400px, calc(100vw - 12px))"}
       centered
       styles={{ body: { maxHeight: "calc(100vh - 180px)", overflowY: "auto", overflowX: "hidden", padding: 8 } }}
       footer={
@@ -796,39 +839,63 @@ export function GeneratePayrollModal({ open, onClose, onGenerate, onSavingChange
     >
       {!showResults ? (
         <div className="space-y-4 py-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Select Month</label>
-            <Select
-              className="w-full"
-              placeholder="Select month"
-              value={selectedMonth || undefined}
-              onChange={(value) => setSelectedMonth(value)}
-              options={months.map((month) => ({
-                label: month,
-                value: month,
-              }))}
-            />
-          </div>
+          {loading ? (
+            <div className="space-y-3 rounded-lg border border-blue-100 bg-blue-50/60 p-4">
+              <div className="text-sm font-medium text-gray-700">Generating payroll...</div>
+              <div className="mx-auto w-full max-w-[280px]">
+                <Progress percent={progress} status={progress >= 100 ? "success" : "active"} showInfo />
+              </div>
+              <div className="text-xs text-gray-500">
+                This may take a couple of minutes depending on employee count.
+              </div>
+            </div>
+          ) : (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Select Month</label>
+                <Select
+                  className="w-full"
+                  placeholder="Select month"
+                  value={selectedMonth || undefined}
+                  onChange={(value) => setSelectedMonth(value)}
+                  options={months.map((month) => ({
+                    label: month,
+                    value: month,
+                  }))}
+                />
+              </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Select Year</label>
-            <Select
-              className="w-full"
-              placeholder="Select year"
-              value={selectedYear}
-              onChange={(value) => setSelectedYear(value)}
-              options={years.map((year) => ({
-                label: year,
-                value: year,
-              }))}
-            />
-          </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Select Year</label>
+                <Select
+                  className="w-full"
+                  placeholder="Select year"
+                  value={selectedYear}
+                  onChange={(value) => setSelectedYear(value)}
+                  options={years.map((year) => ({
+                    label: year,
+                    value: year,
+                  }))}
+                />
+              </div>
+            </>
+          )}
         </div>
       ) : (
         <div className="py-1 min-w-0">
           {loading ? (
             <div className="flex justify-center items-center py-6">
               <Spin size="large" />
+            </div>
+          ) : saving ? (
+            <div className="space-y-3 rounded-lg border border-green-100 bg-green-50/60 p-4">
+              <div className="text-sm font-medium text-gray-700">Saving payroll...</div>
+              <div className="mx-auto w-full max-w-[280px]">
+                <Progress percent={saveProgress} status={saveProgress >= 100 ? "success" : "active"} showInfo />
+              </div>
+              <div className="text-xs text-gray-500">
+                Finalizing payroll and generating summary file.
+              </div>
             </div>
           ) : (
             <>
