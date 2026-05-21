@@ -49,6 +49,11 @@ function buildSteps(role: string): Step[] {
     steps.push(s("[data-tour='nda']",       "Document Manager",  "Create, send, and manage NDAs and other employee documents digitally."));
   }
 
+  // HR only
+  if (role?.includes("HR")) {
+    steps.push(s("[data-tour='hr-console']", "HR Console",        "Manage email templates and document configurations for the organization."));
+  }
+
   // Admin only
   if (isAdmin) {
     steps.push(s("[data-tour='admin']",     "Admin Console",     "Full control over system configurations, email templates, leave rules, user access, and more."));

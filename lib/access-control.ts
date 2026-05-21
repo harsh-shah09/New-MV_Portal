@@ -61,6 +61,11 @@ export const PAGE_ACCESS: PageAccess[] = [
         label: 'Admin Console',
         roles: ['Admin']
     },
+    {
+        path: '/hr-console',
+        label: 'HR Console',
+        roles: ['HR']
+    },
     // Additional pages that might exist
     {
         path: '/training',
