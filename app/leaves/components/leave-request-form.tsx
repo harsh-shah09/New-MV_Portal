@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { Modal, Form, Input, Select, DatePicker, message, Button, Tooltip } from "antd"
+import { InfoCircleOutlined } from "@ant-design/icons"
 import dayjs from "dayjs"
 import { toast } from "sonner"
 import type { LeaveRequest } from "@/types"
@@ -57,7 +58,13 @@ export function LeaveRequestForm({ onSubmit, onCancel, isSubmitting, setIsSubmit
   const [holidays, setHolidays] = useState<Holiday[]>([])
   const [holidayMap, setHolidayMap] = useState<Map<string, string>>(new Map())
 
-  const calculateDuration = (start?: Dayjs, end?: Dayjs, startSession?: string, endSession?: string) => {
+  const calculateDuration = (
+    start?: Dayjs,
+    end?: Dayjs,
+    startSession?: string,
+    endSession?: string,
+    category?: string
+  ) => {
     if (!start || !end) {
       return 0
     }
@@ -67,34 +74,44 @@ export function LeaveRequestForm({ onSubmit, onCancel, isSubmitting, setIsSubmit
     }
 
     const sameDay = start.isSame(end, "day")
+    const isHalfDay =
+      sameDay
+      && startSession === endSession
+      && (startSession === "Session-1" || startSession === "Session-2")
 
-    if (sameDay) {
-      if (startSession === "Session-2" && endSession === "Session-1") {
-        return 0
+    const isWeekend = (date: Dayjs) => date.day() === 0 || date.day() === 6
+    const isHoliday = (date: Dayjs) => holidayMap.has(date.format("YYYY-MM-DD"))
+    const isNonWorking = (date: Dayjs) => isWeekend(date) || isHoliday(date)
+
+    const baseCalendarDays = end.diff(start, "day") + 1
+
+    let workingDaysInRange = 0
+    let cursor = start.clone()
+
+    while (cursor.isSame(end, "day") || cursor.isBefore(end, "day")) {
+      if (!isNonWorking(cursor)) {
+        workingDaysInRange++
       }
-
-      if (startSession === endSession && (startSession === "Session-1" || startSession === "Session-2")) {
-        return 0.5
-      }
-
-      if (startSession === "Session-1" && endSession === "Session-2") {
-        return 1
-      }
-
-      return 1
+      cursor = cursor.add(1, "day")
     }
 
-    let days = end.diff(start, "day") + 1
+    const isExtraDayPay = category === "extra-day-pay"
+    let rangeLeaveDays = isExtraDayPay ? baseCalendarDays : workingDaysInRange
 
-    if (startSession === "Session-2") {
-      days -= 0.5
+    if (isHalfDay) {
+      rangeLeaveDays = rangeLeaveDays * 0.5
     }
 
-    if (endSession === "Session-1") {
-      days -= 0.5
+    if (!sameDay) {
+      if (startSession && startSession !== "Session-1") {
+        rangeLeaveDays -= 0.5
+      }
+      if (endSession && endSession !== "Session-2") {
+        rangeLeaveDays -= 0.5
+      }
     }
 
-    return days > 0 ? days : 0
+    return rangeLeaveDays > 0 ? rangeLeaveDays : 0
   }
 
   // Fetch holidays on component mount
@@ -160,15 +177,17 @@ export function LeaveRequestForm({ onSubmit, onCancel, isSubmitting, setIsSubmit
     const end = allValues.endDate
     const sessionStart = allValues.sessionStart
     const sessionEnd = allValues.sessionEnd
+    const category = allValues.leaveCategory || leaveCategory
 
     if (start && end) {
-      const nextDuration = calculateDuration(start, end, sessionStart, sessionEnd)
+      const nextDuration = calculateDuration(start, end, sessionStart, sessionEnd, category)
       setDuration(nextDuration)
       debugLog("durationRecalculated", {
         startDate: start.format("YYYY-MM-DD"),
         endDate: end.format("YYYY-MM-DD"),
         sessionStart,
         sessionEnd,
+        leaveCategory: category,
         duration: nextDuration,
       })
     }
@@ -370,7 +389,7 @@ export function LeaveRequestForm({ onSubmit, onCancel, isSubmitting, setIsSubmit
     const sessionStart = values.sessionStart
     const sessionEnd = values.sessionEnd
     const today = dayjs()
-    const computedDuration = calculateDuration(startDate, endDate, sessionStart, sessionEnd)
+    const computedDuration = calculateDuration(startDate, endDate, sessionStart, sessionEnd, values.leaveCategory)
     let totalDeduction = computedDuration
     let penaltyDays = 0
 
@@ -525,7 +544,17 @@ export function LeaveRequestForm({ onSubmit, onCancel, isSubmitting, setIsSubmit
                 </Select>
               </Form.Item>
 
-              <Form.Item label="Duration" className="md:grid-span-2 mb-0">
+              <Form.Item
+                label={(
+                  <span className="inline-flex items-center gap-2">
+                    <span>Duration</span>
+                    <Tooltip title="Days before rules(Sandwich and 1+2)" placement="top">
+                      <InfoCircleOutlined className="text-gray-400" />
+                    </Tooltip>
+                  </span>
+                )}
+                className="md:grid-span-2 mb-0"
+              >
                 <Input value={`${duration} days`} disabled className="w-full bg-gray-50 text-gray-600 font-medium" />
               </Form.Item>
 
@@ -583,7 +612,17 @@ export function LeaveRequestForm({ onSubmit, onCancel, isSubmitting, setIsSubmit
 
         {leaveCategory === "extra-day-pay" && (
           <>
-            <Form.Item label="Duration" className="md:col-span-2 mb-0">
+            <Form.Item
+              label={(
+                <span className="inline-flex items-center gap-2">
+                  <span>Duration</span>
+                  <Tooltip title="Days before rules" placement="top">
+                    <InfoCircleOutlined className="text-gray-400" />
+                  </Tooltip>
+                </span>
+              )}
+              className="md:col-span-2 mb-0"
+            >
               <Input value={`${duration} days`} disabled className="w-full bg-gray-50 text-gray-600 font-medium" />
             </Form.Item>
 
