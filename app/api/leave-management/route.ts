@@ -310,7 +310,7 @@ function createRuleCalculationDetails(
   const requestedEndDate = endDate.format("YYYY-MM-DD");
   const baseCalendarDays = endDate.diff(startDate, "day") + 1;
   const isHalfDay = isHalfDaySessionRange(sessionStartValue, sessionEndValue, startDate, endDate);
-  
+
   // First, calculate working days in range
   let workingDaysInRange = 0;
   let nonWorkingDaysInRange = 0;
@@ -324,7 +324,7 @@ function createRuleCalculationDetails(
     }
     cursor = cursor.add(1, "day");
   }
-  
+
   // Check if start day is partial (doesn't start with Session-1) or end day is partial (doesn't end with Session-2)
   const startDayIsPartial = !!sessionStartValue && sessionStartValue !== "Session-1";
   const endDayIsPartial = !!sessionEndValue && sessionEndValue !== "Session-2";
@@ -340,12 +340,12 @@ function createRuleCalculationDetails(
     workingDaysInRange,
     nonWorkingDaysInRange,
   });
-  
+
   // Calculate the number of full working days (excluding partial days at start/end)
   let fullWorkingDaysInRange = workingDaysInRange;
   if (startDayIsPartial && !startDate.isSame(endDate, "day")) fullWorkingDaysInRange--;
   if (endDayIsPartial && !startDate.isSame(endDate, "day")) fullWorkingDaysInRange--;
-  
+
   const applyPolicyRules = typeof ruleSelection === "boolean" ? ruleSelection : true;
   const selectedSandwichRule =
     typeof ruleSelection === "object" && ruleSelection !== null
@@ -419,13 +419,13 @@ function createRuleCalculationDetails(
   const sandwichPolicy =
     sandwichDateList.length > 0
       ? calculateLeaveDays(sandwichDateList, {
-          allowedLeaveTypes: ["Planned Leave"],
-          allowedLeaveCategories: ["loss-of-pay", "loss of pay"],
-        })
+        allowedLeaveTypes: ["Planned Leave"],
+        allowedLeaveCategories: ["loss-of-pay", "loss of pay"],
+      })
       : {
-          sandwichApplied: false,
-          sandwichDates: [] as string[],
-        };
+        sandwichApplied: false,
+        sandwichDates: [] as string[],
+      };
 
   const sandwichDates = applySandwichRule ? sandwichPolicy.sandwichDates : [];
   const preSandwichDates = sandwichDates.filter((dateValue) => dayjs(dateValue).isBefore(startDate, "day"));
@@ -442,7 +442,7 @@ function createRuleCalculationDetails(
   if (isHalfDay) {
     rangeLeaveDays = rangeLeaveDays * 0.5;
   }
-  
+
   // Account for partial session days in multi-day leaves
   // Subtract 0.5 for each partial day at start and end
   if (!startDate.isSame(endDate, "day")) {
@@ -469,21 +469,21 @@ function createRuleCalculationDetails(
     };
 
     const penaltyMultiplier = leaveConfig.penaltyDaysPerDay;
-    
+
     // Only apply penalty to full working days, not to partial days
     let penaltyStartDate = startDate.clone();
     let penaltyEndDate = endDate.clone();
-    
+
     // Skip the first day if it's a partial day (doesn't start with Session-1)
     if (startDayIsPartial && !startDate.isSame(endDate, "day")) {
       penaltyStartDate = penaltyStartDate.add(1, "day");
     }
-    
+
     // If last day is partial (doesn't end with Session-2), don't apply penalty to it
     if (endDayIsPartial && !startDate.isSame(endDate, "day")) {
       penaltyEndDate = penaltyEndDate.subtract(1, "day");
     }
-    
+
     // Apply penalty only to full working days
     let cursorPenalty = penaltyStartDate.startOf("day");
     const endPenalty = penaltyEndDate.startOf("day");
@@ -1065,15 +1065,15 @@ export async function POST(request: NextRequest) {
 
       const createdEventId = calendarRange
         ? await createLeaveCalendarEventForEmployee({
-            employeeId: targetEmployeeId,
-            employeeName: targetEmployee.Employee_Name__c || 'Employee',
-            leaveType,
-            leaveCategory: approvedLeaveRecord.Leave_Category__c,
-            startDate: calendarRange.startDate,
-            endDate: calendarRange.endDate,
-            reason: reason || `Applied by ${approverTitle}`,
-            approvedBy: approverTitle,
-          })
+          employeeId: targetEmployeeId,
+          employeeName: targetEmployee.Employee_Name__c || 'Employee',
+          leaveType,
+          leaveCategory: approvedLeaveRecord.Leave_Category__c,
+          startDate: calendarRange.startDate,
+          endDate: calendarRange.endDate,
+          reason: reason || `Applied by ${approverTitle}`,
+          approvedBy: approverTitle,
+        })
         : null;
 
 
@@ -1103,9 +1103,9 @@ export async function POST(request: NextRequest) {
           const ccCandidates = isAdmin
             ? [teamLeadEmail, hrEmail]
             : [
-                teamLeadEmail,
-                ...adminRecipients.map((admin: { id: string; name: string; email: string }) => admin.email),
-              ];
+              teamLeadEmail,
+              ...adminRecipients.map((admin: { id: string; name: string; email: string }) => admin.email),
+            ];
 
           const seenCcEmails = new Set<string>();
           const normalizedEmployeeEmail = employeeEmail.trim().toLowerCase();
@@ -1602,16 +1602,16 @@ export async function POST(request: NextRequest) {
     }
     const mergeInfoForRules: RuleCalculationDetails["mergeInfo"] | undefined = mergeContext
       ? {
-          merged: true,
-          existingLeaveId: mergeContext.existingLeaveId,
-          previousStartDate: mergeContext.previousStartDate,
-          previousEndDate: mergeContext.previousEndDate,
-          newRequestStartDate: requestedStartDateStr,
-          newRequestEndDate: requestedEndDateStr,
-          mergedAt: new Date().toISOString(),
-          mergedBy: email || employeeId || name,
-          gapDates: mergeContext.gapDates,
-        }
+        merged: true,
+        existingLeaveId: mergeContext.existingLeaveId,
+        previousStartDate: mergeContext.previousStartDate,
+        previousEndDate: mergeContext.previousEndDate,
+        newRequestStartDate: requestedStartDateStr,
+        newRequestEndDate: requestedEndDateStr,
+        mergedAt: new Date().toISOString(),
+        mergedBy: email || employeeId || name,
+        gapDates: mergeContext.gapDates,
+      }
       : { merged: false };
 
     const recalculatedMetrics = createRuleCalculationDetails(
@@ -1814,14 +1814,14 @@ export async function POST(request: NextRequest) {
 
       const createdEventId = calendarRange
         ? await createLeaveCalendarEventForEmployee({
-            employeeId,
-            leaveType: leaveRecord.Leave_Type__c || leaveRecord.Leave_Category__c || 'Leave',
-            leaveCategory: leaveRecord.Leave_Category__c,
-            startDate: calendarRange.startDate,
-            endDate: calendarRange.endDate,
-            reason: leaveRecord.Reason__c,
-            approvedBy: 'Admin',
-          })
+          employeeId,
+          leaveType: leaveRecord.Leave_Type__c || leaveRecord.Leave_Category__c || 'Leave',
+          leaveCategory: leaveRecord.Leave_Category__c,
+          startDate: calendarRange.startDate,
+          endDate: calendarRange.endDate,
+          reason: leaveRecord.Reason__c,
+          approvedBy: 'Admin',
+        })
         : null;
 
       await persistLeaveEventId(conn, savedLeaveId, createdEventId || null, 'admin-auto-approval');
@@ -1915,7 +1915,7 @@ export async function POST(request: NextRequest) {
           `);
           const adminEmail = adminQuery.records?.[0]?.Company_Email__c;
           const appUrl = await getAdminSettingValue('NEXT_PUBLIC_APP_URL');
-          
+
           const emailTemplate = await teamLeadLeaveRequestToHRWithAdminCC({
             recipientName: 'HR Team',
             employeeName,
@@ -1923,7 +1923,7 @@ export async function POST(request: NextRequest) {
             startDate: start.format('YYYY-MM-DD'),
             endDate: end.format('YYYY-MM-DD'),
             duration: duration,
-            setupLink : appUrl
+            setupLink: appUrl
           });
           logLeaveEmailDispatch('team-lead-leave-request-to-hr', hrEmail, adminEmail, emailTemplate.subject);
           sendEmailAsync({
@@ -1966,7 +1966,7 @@ export async function POST(request: NextRequest) {
               LIMIT 1
             `);
             const adminEmail = adminQuery.records?.[0]?.Company_Email__c;
-             const appUrl = await getAdminSettingValue('NEXT_PUBLIC_APP_URL');
+            const appUrl = await getAdminSettingValue('NEXT_PUBLIC_APP_URL');
 
             const emailTemplate = await employeeLeaveRequestToHR({
               recipientName: 'HR Team',
@@ -2529,14 +2529,14 @@ export async function PATCH(request: NextRequest) {
 
           const recreatedEventId = calendarRange
             ? await createLeaveCalendarEventForEmployee({
-                employeeId: leave.Employee__c,
-                leaveType: leave.Leave_Type__c || leave.Leave_Category__c || 'Leave',
-                leaveCategory: leave.Leave_Category__c,
-                startDate: calendarRange.startDate,
-                endDate: calendarRange.endDate,
-                reason: leave.Reason__c,
-                approvedBy: isAdmin ? 'Admin' : 'HR',
-              })
+              employeeId: leave.Employee__c,
+              leaveType: leave.Leave_Type__c || leave.Leave_Category__c || 'Leave',
+              leaveCategory: leave.Leave_Category__c,
+              startDate: calendarRange.startDate,
+              endDate: calendarRange.endDate,
+              reason: leave.Reason__c,
+              approvedBy: isAdmin ? 'Admin' : 'HR',
+            })
             : null;
 
           await persistLeaveEventId(conn, leaveSlice.leaveId, recreatedEventId || null, 'withdrawal-recreate');
@@ -2577,6 +2577,7 @@ export async function PATCH(request: NextRequest) {
             const emailLeaveType = getDisplayLeaveType(leave.Leave_Type__c, leave.Leave_Category__c || "");
             const emailData = await withdrawalApproved({
               recipientName: employeeName,
+              employeeName: employeeName,
               leaveType: emailLeaveType,
               startDate: dayjs(leave.Start_Date__c).format('DD MMM YYYY'),
               endDate: dayjs(leave.End_Date__c).format('DD MMM YYYY'),
@@ -3017,14 +3018,14 @@ export async function PATCH(request: NextRequest) {
 
             const createdEventId = calendarRange
               ? await createLeaveCalendarEventForEmployee({
-                  employeeId: oldLeave.Employee__c,
-                  employeeName,
-                  leaveType: oldLeave.Leave_Type__c || oldLeave.Leave_Category__c || 'Leave',
-                  leaveCategory: oldLeave.Leave_Category__c,
-                  startDate: calendarRange.startDate,
-                  endDate: calendarRange.endDate,
-                  approvedBy: approverTitle,
-                })
+                employeeId: oldLeave.Employee__c,
+                employeeName,
+                leaveType: oldLeave.Leave_Type__c || oldLeave.Leave_Category__c || 'Leave',
+                leaveCategory: oldLeave.Leave_Category__c,
+                startDate: calendarRange.startDate,
+                endDate: calendarRange.endDate,
+                approvedBy: approverTitle,
+              })
               : null;
 
             await persistLeaveEventId(conn, oldLeave.Id, createdEventId || null, 'final-approval');
@@ -3202,16 +3203,16 @@ export async function PATCH(request: NextRequest) {
           if (isTeamLead && !oldLeave.TL_Approval__c) {
             // TL just rejected
             const emailTemplate = await teamLeadDecisionToHR({
-                recipientName: 'HR Team',
-                employeeName,
+              recipientName: 'HR Team',
+              employeeName,
               teamLeadName: 'Team Lead',
-                decisionStatus: 'Rejected',
-                leaveType: oldLeave.Leave_Type__c || 'N/A',
-                startDate: oldLeave.Start_Date__c || 'N/A',
-                endDate: oldLeave.End_Date__c || 'N/A',
-                duration: oldLeave.Total_Days__c || 0,
-                reason
-              });
+              decisionStatus: 'Rejected',
+              leaveType: oldLeave.Leave_Type__c || 'N/A',
+              startDate: oldLeave.Start_Date__c || 'N/A',
+              endDate: oldLeave.End_Date__c || 'N/A',
+              duration: oldLeave.Total_Days__c || 0,
+              reason
+            });
             const ccRecipients = [employeeEmail, adminEmail].filter(Boolean) as string[];
             logLeaveEmailDispatch('team-lead-decision-to-hr-rejected', hrEmail, ccRecipients, emailTemplate.subject);
             sendEmailAsync({
