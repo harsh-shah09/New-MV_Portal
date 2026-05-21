@@ -208,7 +208,7 @@ export async function teamLeadLeaveRequestToHRWithAdminCC(data: LeaveEmailData):
 export async function hrDecisionToTeamLead(data: LeaveEmailData): Promise<{ subject: string; html: string; text: string }> {
   const decision = (data.decisionStatus || 'Approved').toLowerCase();
   const decisionLabel = decision === 'rejected' ? 'Rejected' : 'Approved';
-  const html = await loadTemplate('hr-decision-to-team-lead', {
+  const html = await loadTemplate('hr-decision-to-employee', {
     ...data,
     decisionStatus: decisionLabel,
     decisionStatusClass: decision === 'rejected' ? 'rejected' : 'approved',
