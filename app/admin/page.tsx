@@ -37,9 +37,9 @@ const formatLabel = (str: string) => {
     return str.replace(/_/g, ' ').replace(/([A-Z])/g, ' $1').trim();
 };
 
-type AdminTab = "salesforce" | "google" | "secrets" | "documents" | "email" | "leave" | "users" | "integration" | "assets";
+type AdminTab = "salesforce" | "google" | "secrets" | "documents" | "email" | "leave" | "users" | "integration" | "assets" | "bank_details";
 
-const VALID_TABS: AdminTab[] = ["salesforce", "google", "secrets", "documents", "leave", "users", "integration", "email", "assets"];
+const VALID_TABS: AdminTab[] = ["salesforce", "google", "secrets", "documents", "leave", "users", "integration", "email", "assets", "bank_details"];
 
 function getTabFromQuery(): AdminTab {
     if (typeof window === "undefined") return "salesforce";
@@ -95,6 +95,9 @@ export default function AdminConsole() {
         NEXT_PUBLIC_APP_URL: '',
         ENCRYPTION_KEY: '',
         SESSION_SECRET: '',
+        companyBranchCode: '',
+        companyAccountNumber: '',
+        currencyCode: '',
     });
     const [settingsChanges, setSettingsChanges] = useState<any>({});
 
@@ -487,6 +490,7 @@ export default function AdminConsole() {
                                 <TabButton id="integration" label="Connected Users" icon={Workflow} />
                                 <TabButton id="email" label="Email Templates" icon={Mail} />
                                 <TabButton id="assets" label="Asset Settings" icon={Package} />
+                                <TabButton id="bank_details" label="Bank Details" icon={Settings} />
                             </div>
 
                             {unsavedChanges.length > 0 && (
@@ -540,6 +544,70 @@ export default function AdminConsole() {
                                                 {(!configs.assets || configs.assets.length === 0) && (
                                                     <div className="text-center p-8 text-slate-400">No asset configurations found.</div>
                                                 )}
+                                            </div>
+                                        )}
+
+                                        {activeTab === "bank_details" && (
+                                            <div className="space-y-10">
+                                                <div>
+                                                    <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                                                        <Settings className="w-5 h-5 text-emerald-500" /> Bank Details
+                                                    </h3>
+                                                    <div className="grid grid-cols-1 gap-6 bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                                                        <div className="group">
+                                                            <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                                                Company Branch Code
+                                                            </label>
+                                                            <input
+                                                                type="text"
+                                                                value={adminSettings.companyBranchCode || ''}
+                                                                onChange={(e) => handleSettingChange('companyBranchCode', e.target.value)}
+                                                                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition group-hover:border-slate-300"
+                                                                placeholder="1010"
+                                                            />
+                                                            <p className="text-xs text-slate-500 mt-1">Bank upload branch code</p>
+                                                        </div>
+
+                                                        <div className="group">
+                                                            <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                                                Company Account Number
+                                                            </label>
+                                                            <input
+                                                                type="text"
+                                                                value={adminSettings.companyAccountNumber || ''}
+                                                                onChange={(e) => handleSettingChange('companyAccountNumber', e.target.value)}
+                                                                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition group-hover:border-slate-300"
+                                                                placeholder="084507765489"
+                                                            />
+                                                            <p className="text-xs text-slate-500 mt-1">Source account number for payroll uploads</p>
+                                                        </div>
+
+                                                        <div className="group">
+                                                            <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                                                Currency Code
+                                                            </label>
+                                                            <input
+                                                                type="text"
+                                                                value={adminSettings.currencyCode || ''}
+                                                                onChange={(e) => handleSettingChange('currencyCode', e.target.value)}
+                                                                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition group-hover:border-slate-300"
+                                                                placeholder="INR"
+                                                            />
+                                                            <p className="text-xs text-slate-500 mt-1">Bank upload currency code</p>
+                                                        </div>
+
+                                                        {Object.keys(settingsChanges).length > 0 && (
+                                                            <button
+                                                                onClick={saveAdminSettings}
+                                                                disabled={saving}
+                                                                className="mt-4 w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 px-4 rounded-xl transition disabled:opacity-50 flex items-center justify-center gap-2"
+                                                            >
+                                                                {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                                                                {saving ? 'Saving...' : 'Save Settings'}
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
                                             </div>
                                         )}
 

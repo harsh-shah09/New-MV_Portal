@@ -199,12 +199,12 @@ export async function POST(request: NextRequest) {
     }
 
     const employeeIds = eligibleEmployees.map((employee: any) => employee.Id).filter(Boolean)
-    const bankByEmployeeId = new Map<string, { bankName: string; accountNumber: string }>()
+    const bankByEmployeeId = new Map<string, { bankName: string; accountNumber: string; ifscCode: string }>()
 
     if (employeeIds.length > 0) {
       const escapedEmployeeIds = employeeIds.map((id: string) => `'${String(id).replace(/'/g, "\\'")}'`).join(',')
       const bankRecords = await conn.query<any>(`
-        SELECT Employee__c, Name, Bank_Account_Number__c, Primary_Account__c
+        SELECT Employee__c, Name, Bank_Account_Number__c, IFSC__c, Primary_Account__c
         FROM Bank_Detail__c
         WHERE Employee__c IN (${escapedEmployeeIds})
         ORDER BY Primary_Account__c DESC, CreatedDate DESC
@@ -219,6 +219,7 @@ export async function POST(request: NextRequest) {
         bankByEmployeeId.set(employeeId, {
           bankName: bank.Name || '',
           accountNumber: bank.Bank_Account_Number__c || '',
+          ifscCode: bank.IFSC__c || '',
         })
       }
     }
@@ -787,6 +788,13 @@ export async function POST(request: NextRequest) {
         uanNumber: emp.UAN_Number__c || '',
         bankName: bankByEmployeeId.get(emp.Id)?.bankName || '',
         accountNumber: bankByEmployeeId.get(emp.Id)?.accountNumber || '',
+        ifscCode: bankByEmployeeId.get(emp.Id)?.ifscCode || '',
+        bankDetails: {
+          accountHolderName: emp.Employee_Name__c || "",
+          bankName: bankByEmployeeId.get(emp.Id)?.bankName || '',
+          accountNumber: bankByEmployeeId.get(emp.Id)?.accountNumber || '',
+          ifscCode: bankByEmployeeId.get(emp.Id)?.ifscCode || '',
+        },
         monthlyIncome: round2(adjustedMonthlyIncome),
         baseSalary: round2(adjustedMonthlyIncome),
         basicSalary: round2(adjustedMonthlyIncome),
