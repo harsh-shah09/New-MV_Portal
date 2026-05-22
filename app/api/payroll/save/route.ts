@@ -191,12 +191,12 @@ export async function POST(request: NextRequest) {
         const headerLine = `FHR|${companyBranchCode}|${companyAccountNumber}|${currencyCode}|${totalAmount}|${totalPayments}|${fileDateFormatted}|${monthYearFull}^`
 
         const detailLines = successfulEmployees.map((emp: any) => {
-          const employeeName = emp.employeeName || "Unknown"
-          const payableAmount = toRoundedAmount(emp.netSalary)
+          const employeeName = emp.employeeName || "NULL"
+          const payableAmount = toRoundedAmount(emp.netSalary) || "NULL"
           const bankDetails = emp.bankDetails || {}
-          const ifscCode = (bankDetails.ifscCode || emp.ifscCode || "").toString().toUpperCase()
-          const accountNumber = bankDetails.accountNumber || emp.accountNumber || ""
-          const bankName = (bankDetails.bankName || emp.bankName || "").toString().toLowerCase()
+          const ifscCode = (bankDetails.ifscCode || emp.ifscCode || "NULL").toString().toUpperCase()
+          const accountNumber = bankDetails.accountNumber || emp.accountNumber || "NULL"
+          const bankName = (bankDetails.bankName || emp.bankName || "NULL").toString().toLowerCase()
           const transferType = ifscCode.startsWith("ICIC") || bankName.includes("icici") ? "WIB" : "NFT"
           const monthEmployeeLabel = `${month} ${employeeName}`
           return `APO|${transferType}|${payableAmount}|${currencyCode}|${companyAccountNumber}|${companyBranchCode}|${ifscCode}|${accountNumber}|${companyBranchCode}|${employeeName}|${monthYearShort}|${monthEmployeeLabel}^`
