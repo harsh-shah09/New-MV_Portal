@@ -6,6 +6,7 @@
 
 import { getSalesforceConnection } from './salesforce';
 import { getAdminSettingValue } from './admin-settings';
+import dayjs from 'dayjs';
 
 interface LeaveEmailData {
   recipientName: string;
@@ -37,6 +38,19 @@ function normalizeTemplateKey(value: string): string {
   return (value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
+function formatLeaveTemplateDate(value?: string): string {
+  if (!value) {
+    return 'N/A';
+  }
+
+  const parsedDate = dayjs(value);
+  if (!parsedDate.isValid()) {
+    return value;
+  }
+
+  return parsedDate.format('DD MMM YYYY');
+}
+
 function applyTemplateData(template: string, data: LeaveEmailData): string {
   let html = template;
   html = html.replace(/{{recipientName}}/g, data.recipientName || 'Employee');
@@ -44,8 +58,8 @@ function applyTemplateData(template: string, data: LeaveEmailData): string {
   html = html.replace(/{{employeeId}}/g, data.employeeId || 'N/A');
   html = html.replace(/{{employeeEmail}}/g, data.employeeEmail || 'N/A');
   html = html.replace(/{{leaveType}}/g, data.leaveType || 'N/A');
-  html = html.replace(/{{startDate}}/g, data.startDate || 'N/A');
-  html = html.replace(/{{endDate}}/g, data.endDate || 'N/A');
+  html = html.replace(/{{startDate}}/g, formatLeaveTemplateDate(data.startDate));
+  html = html.replace(/{{endDate}}/g, formatLeaveTemplateDate(data.endDate));
   html = html.replace(/{{duration}}/g, String(data.duration || 0));
   html = html.replace(/{{Reason}}/g, String(data.reason || 'N/A'));
   html = html.replace(/{{approverName}}/g, data.approverName || 'HR Team');
@@ -130,7 +144,21 @@ export async function loadTemplate(templateName: string, data: LeaveEmailData): 
 export async function employeeLeaveRequestToHR(data: LeaveEmailData): Promise<{ subject: string; html: string; text: string }> {
   const subject = `Leave Request from ${data.employeeName}`;
   const html = await loadTemplate('employee-request-to-hr', data);
-  const text = `Dear ${data.recipientName},\n\n${data.employeeName} has submitted a new leave request.\n\nLeave Details:\n- Employee: ${data.employeeName}\n- Leave Type: ${data.leaveType}\n- Start Date: ${data.startDate}\n- End Date: ${data.endDate}\n- Duration: ${data.duration} day(s)\n\nCC: Team Lead, Admin\n\nRegards,\nHRMS System`;
+  const text = `Dear ${data.recipientName},\n\n${data.employeeName} has submitted a new leave request.\n\nLeave Details:\n- Employee: ${data.employeeName}\n- Leave Type: ${data.leaveType}\n- Start Date: ${formatLeaveTemplateDate(data.startDate)}\n- End Date: ${formatLeaveTemplateDate(data.endDate)}\n- Duration: ${data.duration} day(s)\n\nCC: Team Lead, Admin\n\nRegards,\nHRMS System`;
+
+  return { subject, html, text };
+}
+
+/**
+ * Template: Extra Day Pay Request
+ */
+export async function extraDayPayRequest(data: LeaveEmailData): Promise<{ subject: string; html: string; text: string }> {
+  const subject = `Extra Day Pay Request from ${data.employeeName}`;
+  const html = await loadTemplate('extra-day-pay-request', {
+    ...data,
+    leaveType: 'Extra Day Pay',
+  });
+  const text = `Dear ${data.recipientName},\n\n${data.employeeName} has submitted an Extra Day Pay request.\n\nRequest Details:\n- Employee: ${data.employeeName}\n- Request Type: Extra Day Pay\n- Start Date: ${formatLeaveTemplateDate(data.startDate)}\n- End Date: ${formatLeaveTemplateDate(data.endDate)}\n- Duration: ${data.duration} day(s)${data.reason ? `\n- Reason: ${data.reason}` : ''}\n\nRegards,\nHRMS System`;
 
   return { subject, html, text };
 }
@@ -158,7 +186,7 @@ export async function teamLeadDecisionToHR(data: LeaveEmailData): Promise<{ subj
     decisionStatusClass: decision === 'rejected' ? 'rejected' : 'approved',
   });
   const subject = `Team Lead ${decisionLabel} Leave - ${data.employeeName}`;
-  const text = `Dear ${data.recipientName},\n\nTeam Lead ${data.teamLeadName || ''} has ${decisionLabel.toLowerCase()} leave request for ${data.employeeName}.\n\nLeave Details:\n- Leave Type: ${data.leaveType}\n- Start Date: ${data.startDate}\n- End Date: ${data.endDate}\n- Duration: ${data.duration} day(s)${data.reason ? `\n- Reason: ${data.reason}` : ''}\n\nCC: Employee, Admin\n\nRegards,\nHRMS System`;
+  const text = `Dear ${data.recipientName},\n\nTeam Lead ${data.teamLeadName || ''} has ${decisionLabel.toLowerCase()} leave request for ${data.employeeName}.\n\nLeave Details:\n- Leave Type: ${data.leaveType}\n- Start Date: ${formatLeaveTemplateDate(data.startDate)}\n- End Date: ${formatLeaveTemplateDate(data.endDate)}\n- Duration: ${data.duration} day(s)${data.reason ? `\n- Reason: ${data.reason}` : ''}\n\nCC: Employee, Admin\n\nRegards,\nHRMS System`;
 
   return { subject, html, text };
 }
@@ -186,7 +214,25 @@ export async function hrDecisionToEmployee(data: LeaveEmailData): Promise<{ subj
     decisionStatusClass: decision === 'rejected' ? 'rejected' : 'approved',
   });
   const subject = `Leave Request ${decisionLabel} by HR`;
-  const text = `Dear ${data.recipientName},\n\nYour leave request has been ${decisionLabel.toLowerCase()} by HR.\n\nLeave Details:\n- Leave Type: ${data.leaveType}\n- Start Date: ${data.startDate}\n- End Date: ${data.endDate}\n- Duration: ${data.duration} day(s)${data.reason ? `\n- Reason: ${data.reason}` : ''}\n\nCC: Team Lead, Admin\n\nRegards,\nHRMS System`;
+  const text = `Dear ${data.recipientName},\n\nYour leave request has been ${decisionLabel.toLowerCase()} by HR.\n\nLeave Details:\n- Leave Type: ${data.leaveType}\n- Start Date: ${formatLeaveTemplateDate(data.startDate)}\n- End Date: ${formatLeaveTemplateDate(data.endDate)}\n- Duration: ${data.duration} day(s)${data.reason ? `\n- Reason: ${data.reason}` : ''}\n\nCC: Team Lead, Admin\n\nRegards,\nHRMS System`;
+
+  return { subject, html, text };
+}
+
+/**
+ * Template: Extra Day Pay Decision (Approved/Rejected)
+ */
+export async function extraDayPayDecision(data: LeaveEmailData): Promise<{ subject: string; html: string; text: string }> {
+  const decision = (data.decisionStatus || 'Approved').toLowerCase();
+  const decisionLabel = decision === 'rejected' ? 'Rejected' : 'Approved';
+  const html = await loadTemplate('extra-day-pay-decision', {
+    ...data,
+    decisionStatus: decisionLabel,
+    decisionStatusClass: decision === 'rejected' ? 'rejected' : 'approved',
+    leaveType: 'Extra Day Pay',
+  });
+  const subject = `Extra Day Pay ${decisionLabel} - ${data.employeeName || data.recipientName}`;
+  const text = `Dear ${data.recipientName},\n\nYour Extra Day Pay request has been ${decisionLabel.toLowerCase()}.\n\nRequest Details:\n- Start Date: ${formatLeaveTemplateDate(data.startDate)}\n- End Date: ${formatLeaveTemplateDate(data.endDate)}\n- Duration: ${data.duration} day(s)${data.reason ? `\n- Reason: ${data.reason}` : ''}\n\nRegards,\nHRMS System`;
 
   return { subject, html, text };
 }
@@ -197,7 +243,7 @@ export async function hrDecisionToEmployee(data: LeaveEmailData): Promise<{ subj
 export async function teamLeadLeaveRequestToHRWithAdminCC(data: LeaveEmailData): Promise<{ subject: string; html: string; text: string }> {
   const subject = `Leave Request from Team Lead - ${data.employeeName}`;
   const html = await loadTemplate('team-lead-request-to-hr-cc-admin', data);
-  const text = `Dear ${data.recipientName},\n\n${data.employeeName} (Team Lead) has submitted a leave request.\n\nLeave Details:\n- Leave Type: ${data.leaveType}\n- Start Date: ${data.startDate}\n- End Date: ${data.endDate}\n- Duration: ${data.duration} day(s)\n\nCC: Admin\n\nRegards,\nHRMS System`;
+  const text = `Dear ${data.recipientName},\n\n${data.employeeName} (Team Lead) has submitted a leave request.\n\nLeave Details:\n- Leave Type: ${data.leaveType}\n- Start Date: ${formatLeaveTemplateDate(data.startDate)}\n- End Date: ${formatLeaveTemplateDate(data.endDate)}\n- Duration: ${data.duration} day(s)\n\nCC: Admin\n\nRegards,\nHRMS System`;
 
   return { subject, html, text };
 }
@@ -213,8 +259,8 @@ export async function hrDecisionToTeamLead(data: LeaveEmailData): Promise<{ subj
     decisionStatus: decisionLabel,
     decisionStatusClass: decision === 'rejected' ? 'rejected' : 'approved',
   });
-  const subject = `Your Leave Request ${decisionLabel} by HR`;
-  const text = `Dear ${data.recipientName},\n\nYour leave request has been ${decisionLabel.toLowerCase()} by HR.\n\nLeave Details:\n- Leave Type: ${data.leaveType}\n- Start Date: ${data.startDate}\n- End Date: ${data.endDate}\n- Duration: ${data.duration} day(s)${data.reason ? `\n- Reason: ${data.reason}` : ''}\n\nCC: Admin\n\nRegards,\nHRMS System`;
+  const subject = `Leave Request ${decisionLabel} by HR ${data.recipientName ? ` - ${data.recipientName}` : ''}`;
+  const text = `Dear ${data.recipientName},\n\nYour leave request has been ${decisionLabel.toLowerCase()} by HR.\n\nLeave Details:\n- Leave Type: ${data.leaveType}\n- Start Date: ${formatLeaveTemplateDate(data.startDate)}\n- End Date: ${formatLeaveTemplateDate(data.endDate)}\n- Duration: ${data.duration} day(s)${data.reason ? `\n- Reason: ${data.reason}` : ''}\n\nCC: Admin\n\nRegards,\nHRMS System`;
 
   return { subject, html, text };
 }
@@ -230,8 +276,8 @@ export async function adminDecisionToHR(data: LeaveEmailData): Promise<{ subject
     decisionStatus: decisionLabel,
     decisionStatusClass: decision === 'rejected' ? 'rejected' : 'approved',
   });
-  const subject = `Your Leave Request ${decisionLabel} by Admin`;
-  const text = `Dear ${data.recipientName},\n\nYour leave request has been ${decisionLabel.toLowerCase()} by Admin.\n\nLeave Details:\n- Leave Type: ${data.leaveType}\n- Start Date: ${data.startDate}\n- End Date: ${data.endDate}\n- Duration: ${data.duration} day(s)${data.reason ? `\n- Reason: ${data.reason}` : ''}\n\nRegards,\nHRMS System`;
+  const subject = `Leave Request ${decisionLabel} by Admin`;
+  const text = `Dear ${data.recipientName},\n\nYour leave request has been ${decisionLabel.toLowerCase()} by Admin.\n\nLeave Details:\n- Leave Type: ${data.leaveType}\n- Start Date: ${formatLeaveTemplateDate(data.startDate)}\n- End Date: ${formatLeaveTemplateDate(data.endDate)}\n- Duration: ${data.duration} day(s)${data.reason ? `\n- Reason: ${data.reason}` : ''}\n\nRegards,\nHRMS System`;
 
   return { subject, html, text };
 }
@@ -240,9 +286,9 @@ export async function adminDecisionToHR(data: LeaveEmailData): Promise<{ subject
  * Template: Leave Auto-Approved (to Team Lead)
  */
 export async function leaveAutoApproved(data: LeaveEmailData): Promise<{ subject: string; html: string; text: string }> {
-  const subject = `Leave Auto-Approved for ${data.employeeName}`;
+  const subject = `Leave Approved for ${data.employeeName}`;
   const html = await loadTemplate('leave-auto-approved', data);
-  const text = `Dear ${data.recipientName},\n\n${data.approverTitle} has applied and auto-approved leave on behalf of ${data.employeeName}.\n\nLeave Details:\n- Type: ${data.leaveType}\n- Category: Loss of Pay\n- Start Date: ${data.startDate}\n- End Date: ${data.endDate}\n- Duration: ${data.duration} day(s)\n\nRegards,\nHRMS System`;
+  const text = `Dear ${data.recipientName},\n\n${data.approverTitle} has applied and auto-approved leave on behalf of ${data.employeeName}.\n\nLeave Details:\n- Type: ${data.leaveType}\n- Category: Loss of Pay\n- Start Date: ${formatLeaveTemplateDate(data.startDate)}\n- End Date: ${formatLeaveTemplateDate(data.endDate)}\n- Duration: ${data.duration} day(s)\n\nRegards,\nHRMS System`;
 
   return { subject, html, text };
 }
@@ -253,7 +299,7 @@ export async function leaveAutoApproved(data: LeaveEmailData): Promise<{ subject
 export async function withdrawalRequestSubmitted(data: LeaveEmailData): Promise<{ subject: string; html: string; text: string }> {
   const subject = `Withdrawal Request Submitted - Pending HR Approval`;
   const html = await loadTemplate('withdrawal-request-submitted', data);
-  const text = `Dear ${data.recipientName},\n\nYour request to withdraw the approved leave has been successfully submitted and is now pending HR approval.\n\nLeave Details:\n- Leave Type: ${data.leaveType}\n- Start Date: ${data.startDate}\n- End Date: ${data.endDate}\n- Duration: ${data.duration} day(s)\n\nYou will be notified once HR reviews your request.\n\nRegards,\nHRMS System`;
+  const text = `Dear ${data.recipientName},\n\nYour request to withdraw the approved leave has been successfully submitted and is now pending HR approval.\n\nLeave Details:\n- Leave Type: ${data.leaveType}\n- Start Date: ${formatLeaveTemplateDate(data.startDate)}\n- End Date: ${formatLeaveTemplateDate(data.endDate)}\n- Duration: ${data.duration} day(s)\n\nYou will be notified once HR reviews your request.\n\nRegards,\nHRMS System`;
   
   return { subject, html, text };
 }
@@ -262,9 +308,9 @@ export async function withdrawalRequestSubmitted(data: LeaveEmailData): Promise<
  * Template: Withdrawal Request to HR
  */
 export async function withdrawalRequestToHR(data: LeaveEmailData): Promise<{ subject: string; html: string; text: string }> {
-  const subject = `Withdrawal Request: ${data.employeeName} - Leave from ${data.startDate} to ${data.endDate}`;
+  const subject = `Withdrawal Request: ${data.employeeName} - Leave from ${formatLeaveTemplateDate(data.startDate)} to ${formatLeaveTemplateDate(data.endDate)}`;
   const html = await loadTemplate('withdrawal-request-to-hr', data);
-  const text = `Dear HR Team,\n\n${data.employeeName} has requested to withdraw their approved leave.\n\nLeave Details:\n- Employee: ${data.employeeName}\n- Leave Type: ${data.leaveType}\n- Start Date: ${data.startDate}\n- End Date: ${data.endDate}\n- Duration: ${data.duration} day(s)\n\nPlease review and approve or reject this withdrawal request through the MV portal.\n\nRegards,\nHRMS System`;
+  const text = `Dear HR Team,\n\n${data.employeeName} has requested to withdraw their approved leave.\n\nLeave Details:\n- Employee: ${data.employeeName}\n- Leave Type: ${data.leaveType}\n- Start Date: ${formatLeaveTemplateDate(data.startDate)}\n- End Date: ${formatLeaveTemplateDate(data.endDate)}\n- Duration: ${data.duration} day(s)\n\nPlease review and approve or reject this withdrawal request through the MV portal.\n\nRegards,\nHRMS System`;
   
   return { subject, html, text };
 }
@@ -273,9 +319,9 @@ export async function withdrawalRequestToHR(data: LeaveEmailData): Promise<{ sub
  * Template: Withdrawal Approved (to Employee)
  */
 export async function withdrawalApproved(data: LeaveEmailData): Promise<{ subject: string; html: string; text: string }> {
-  const subject = `Withdrawal Approved - Leave from ${data.startDate} to ${data.endDate}`;
+  const subject = `Withdrawal Approved ${data.recipientName ? ` - ${data.recipientName}` : ''}`;
   const html = await loadTemplate('withdrawal-approved', data);
-  const text = `Dear ${data.recipientName},\n\nYour withdrawal request has been approved by ${data.approverTitle}. The leave has been successfully withdrawn and your leave balance has been restored.\n\nLeave Details:\n- Leave Type: ${data.leaveType}\n- Start Date: ${data.startDate}\n- End Date: ${data.endDate}\n- Duration: ${data.duration} day(s)\n\nRegards,\nHRMS System`;
+  const text = `Dear ${data.recipientName},\n\nYour withdrawal request has been approved by ${data.approverTitle}. The leave has been successfully withdrawn and your leave balance has been restored.\n\nLeave Details:\n- Leave Type: ${data.leaveType}\n- Start Date: ${formatLeaveTemplateDate(data.startDate)}\n- End Date: ${formatLeaveTemplateDate(data.endDate)}\n- Duration: ${data.duration} day(s)\n\nRegards,\nHRMS System`;
   
   return { subject, html, text };
 }
@@ -284,9 +330,9 @@ export async function withdrawalApproved(data: LeaveEmailData): Promise<{ subjec
  * Template: Withdrawal Rejected (to Employee)
  */
 export async function withdrawalRejected(data: LeaveEmailData): Promise<{ subject: string; html: string; text: string }> {
-  const subject = `Withdrawal Rejected - Leave from ${data.startDate} to ${data.endDate}`;
+  const subject = `Withdrawal Rejected ${data.recipientName ? ` - ${data.recipientName}` : ''}`;
   const html = await loadTemplate('withdrawal-rejected', data);
-  const text = `Dear ${data.recipientName},\n\nYour withdrawal request has been rejected by ${data.approverTitle}. Your leave remains approved and active.\n\n${data.reason ? `Reason: ${data.reason}\n\n` : ''}Leave Details:\n- Leave Type: ${data.leaveType}\n- Start Date: ${data.startDate}\n- End Date: ${data.endDate}\n- Duration: ${data.duration} day(s)\n\nRegards,\nHRMS System`;
+  const text = `Dear ${data.recipientName},\n\nYour withdrawal request has been rejected by ${data.approverTitle}. Your leave remains approved and active.\n\n${data.reason ? `Reason: ${data.reason}\n\n` : ''}Leave Details:\n- Leave Type: ${data.leaveType}\n- Start Date: ${formatLeaveTemplateDate(data.startDate)}\n- End Date: ${formatLeaveTemplateDate(data.endDate)}\n- Duration: ${data.duration} day(s)\n\nRegards,\nHRMS System`;
   
   return { subject, html, text };
 }
@@ -297,7 +343,7 @@ export async function withdrawalRejected(data: LeaveEmailData): Promise<{ subjec
 export async function doubtfulLeaveMarkedToAdmin(data: LeaveEmailData): Promise<{ subject: string; html: string; text: string }> {
   const subject = `Doubtful Leave Review Required - ${data.employeeName}`;
   const html = await loadTemplate('doubtful-leave-to-admin', data);
-  const text = `Dear ${data.recipientName},\n\n${data.approverTitle || 'HR'} ${data.approverName || ''} has marked a leave request as doubtful and it requires Admin review.\n\nLeave Details:\n- Employee: ${data.employeeName}\n- Leave Type: ${data.leaveType}\n- Start Date: ${data.startDate}\n- End Date: ${data.endDate}\n- Duration: ${data.duration} day(s)${data.reason ? `\n- Reason: ${data.reason}` : ''}\n\nPlease review this request in the MV portal.\n\nRegards,\nHRMS System`;
+  const text = `Dear ${data.recipientName},\n\n${data.approverTitle || 'HR'} ${data.approverName || ''} has marked a leave request as doubtful and it requires Admin review.\n\nLeave Details:\n- Employee: ${data.employeeName}\n- Leave Type: ${data.leaveType}\n- Start Date: ${formatLeaveTemplateDate(data.startDate)}\n- End Date: ${formatLeaveTemplateDate(data.endDate)}\n- Duration: ${data.duration} day(s)${data.reason ? `\n- Reason: ${data.reason}` : ''}\n\nPlease review this request in the MV portal.\n\nRegards,\nHRMS System`;
 
   return { subject, html, text };
 }

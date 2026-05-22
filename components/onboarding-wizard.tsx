@@ -720,7 +720,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                 setCurrentStep(6)
             }
             setShowConfetti(true)
-            showToast.success("Onboarding Completed! 🎉")
+            showToast.success("Onboarding Completed!")
             // Start tour globally after confetti delay (only for internal mode)
             setTimeout(() => {
                 setShowConfetti(false)

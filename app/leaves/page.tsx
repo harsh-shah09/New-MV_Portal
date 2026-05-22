@@ -627,7 +627,7 @@ export default function LeavesPage() {
             { id: toastId, duration: 5000 }
           )
         } else {
-          toast.success("Leave request submitted successfully! 🎉", { id: toastId })
+          toast.success("Leave request submitted successfully!", { id: toastId })
         }
       } catch (error) {
         console.error("Error submitting leave request:", error)
@@ -914,7 +914,7 @@ export default function LeavesPage() {
 
       // Refetch to update the list
       refetch()
-      toast.success("Leave rejected. ✉️ Email notification sent to employee.", { id: toastId, duration: 4000 })
+      toast.success("Leave rejected. Email notification sent to employee.", { id: toastId, duration: 4000 })
     } catch (error) {
       console.error("Error rejecting leave:", error)
       toast.error("Failed to reject leave. Please try again.", { id: toastId })
@@ -966,7 +966,7 @@ export default function LeavesPage() {
           }
 
           refetch()
-          toast.success("Withdrawal approved successfully! ✅ Leave balance restored.", { id: toastId, duration: 4000 })
+          toast.success("Withdrawal approved successfully! \nLeave balance restored.", { id: toastId, duration: 4000 })
         } catch (error) {
           console.error("Error approving withdrawal:", error)
           toast.error("Failed to approve withdrawal. Please try again.", { id: toastId })
