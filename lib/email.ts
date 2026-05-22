@@ -23,6 +23,22 @@ interface GoogleIntegrationItem {
   token_type?: string;
 }
 
+const isEmailDebugEnabled = () => {
+  const raw = (process.env.NODE_ENV === 'production').toString();
+  return ['1', 'true', 'yes', 'on'].includes(raw.toLowerCase());
+};
+
+const logEmailDebug = (message: string, meta?: Record<string, unknown>) => {
+  if (!isEmailDebugEnabled()) {
+    return;
+  }
+  if (meta) {
+    console.log(`[email] ${message}`, meta);
+    return;
+  }
+  console.log(`[email] ${message}`);
+};
+
 /**
  * Create nodemailer transporter for Gmail
  */
@@ -31,6 +47,11 @@ async function createInfoTransporter() {
   const settings = await getAdminSettings();
   const infoUser = settings.INFO_USERNAME || process.env.INFO_USER;
   const gmailAppPassword = settings.INFO_GMAIL_APP_PASSWORD || process.env.INFO_GMAIL_APP_PASSWORD;
+
+  logEmailDebug('Creating info transporter', {
+    hasInfoUser: Boolean(infoUser),
+    hasAppPassword: Boolean(gmailAppPassword),
+  });
 
   return nodemailer.createTransport({
     service: 'gmail',
@@ -49,13 +70,19 @@ async function createOAuth2Client() {
   const redirectUri = `${baseUrl}/api/integrations/google/callback`;
 
   if (!clientId || !clientSecret) {
+    logEmailDebug('OAuth2 client missing configuration', {
+      hasClientId: Boolean(clientId),
+      hasClientSecret: Boolean(clientSecret),
+    });
     return null;
   }
 
+  logEmailDebug('OAuth2 client created', { redirectUri });
   return new google.auth.OAuth2(clientId, clientSecret, redirectUri);
 }
 
 async function getGoogleIntegration(employeeId: string): Promise<GoogleIntegrationItem | null> {
+  logEmailDebug('Fetching Google integration', { employeeId });
   const result = await db.send(new GetCommand({
     TableName: 'MV_Portal',
     Key: {
@@ -65,13 +92,22 @@ async function getGoogleIntegration(employeeId: string): Promise<GoogleIntegrati
   }));
 
   if (!result.Item) {
+    logEmailDebug('No Google integration record found', { employeeId });
     return null;
   }
 
+  logEmailDebug('Google integration record found', { employeeId, hasAccessToken: Boolean((result.Item as any)?.access_token), hasRefreshToken: Boolean((result.Item as any)?.refresh_token) });
   return result.Item as GoogleIntegrationItem;
 }
 
 async function persistGoogleIntegration(employeeId: string, integration: GoogleIntegrationItem): Promise<void> {
+  logEmailDebug('Persisting Google integration', {
+    employeeId,
+    hasAccessToken: Boolean(integration.access_token),
+    hasRefreshToken: Boolean(integration.refresh_token),
+    expiryDate: integration.expiry_date || null,
+    tokenType: integration.token_type || null,
+  });
   await db.send(new UpdateCommand({
     TableName: 'MV_Portal',
     Key: {
@@ -112,6 +148,12 @@ async function sendWithCurrentCredentials(oauth2Client: any, params: EmailParams
   const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
   const raw = encodeGmailMessage(params.to, params.cc, params.subject, params.body);
 
+  logEmailDebug('Sending Gmail message with current credentials', {
+    to: params.to,
+    cc: params.cc ? (Array.isArray(params.cc) ? params.cc.length : 1) : 0,
+    subject: params.subject,
+  });
+
   await gmail.users.messages.send({
     userId: 'me',
     requestBody: { raw },
@@ -120,6 +162,7 @@ async function sendWithCurrentCredentials(oauth2Client: any, params: EmailParams
 
 function encodeGmailMessage(to: string, cc: string | string[] | undefined, subject: string, html: string): string {
   const ccString = Array.isArray(cc) ? cc.filter(Boolean).join(', ') : cc || '';
+  logEmailDebug('Encoding email message', { to, cc: ccString, subject, bodyLength: html?.length || 0 });
   
   const headers = [
     `To: ${to}`,
@@ -141,11 +184,13 @@ function encodeGmailMessage(to: string, cc: string | string[] | undefined, subje
 
 async function sendViaUserGoogleAccount(params: EmailParams): Promise<boolean> {
   if (!params.senderEmployeeId) {
+    logEmailDebug('Sender employee ID missing; skipping Google send');
     return false;
   }
 
   const integration = await getGoogleIntegration(params.senderEmployeeId);
   if (!integration?.access_token && !integration?.refresh_token) {
+    console.warn('No Google integration found for employee:', params.senderEmployeeId);
     return false;
   }
 
@@ -164,6 +209,7 @@ async function sendViaUserGoogleAccount(params: EmailParams): Promise<boolean> {
 
   try {
     await sendWithCurrentCredentials(oauth2Client, params);
+    logEmailDebug('Email sent with existing credentials', { employeeId: params.senderEmployeeId });
     return true;
   } catch (error) {
     if (!isAuthError(error) || !integration.refresh_token) {
@@ -189,7 +235,7 @@ async function sendViaUserGoogleAccount(params: EmailParams): Promise<boolean> {
       });
 
       await sendWithCurrentCredentials(oauth2Client, params);
-      
+      console.info('Email sent successfully after token refresh for employee:', params.senderEmployeeId);
       return true;
     } catch (refreshError) {
       console.warn('Google token refresh/send retry failed:', refreshError);
@@ -208,10 +254,19 @@ export async function hasGoogleWorkspaceIntegration(employeeId: string): Promise
  */
 export async function sendEmail({ to, cc, subject, body, contentType = 'text/plain', senderEmployeeId, isInfo = false }: EmailParams): Promise<void> {
   try {
-    
+    logEmailDebug('Send email invoked', {
+      to,
+      ccCount: cc ? (Array.isArray(cc) ? cc.length : 1) : 0,
+      subject,
+      contentType,
+      senderEmployeeId: senderEmployeeId || null,
+      isInfo,
+      bodyLength: body?.length || 0,
+    });
 
     // If isInfo is true, use nodemailer with Gmail app password
     if (isInfo) {
+      logEmailDebug('Using info transporter flow');
       const transporter = await createInfoTransporter();
       const settings = await getAdminSettings();
       const infoUser = settings.INFO_USERNAME || process.env.INFO_USER;
@@ -227,16 +282,20 @@ export async function sendEmail({ to, cc, subject, body, contentType = 'text/pla
         mailOptions.cc = cc;
       }
 
+      logEmailDebug('Sending via nodemailer info account', { to, cc: mailOptions.cc ? true : false, subject });
       await transporter.sendMail(mailOptions);
+      logEmailDebug('Info email sent successfully', { to, subject });
 
       return;
     }
 
     const wasSentViaGoogle = await sendViaUserGoogleAccount({ to, cc, subject, body, contentType, senderEmployeeId });
     if (wasSentViaGoogle) {
-
+      logEmailDebug('Email sent via Google integration', { senderEmployeeId });
       return;
     }
+
+    logEmailDebug('Email not sent via Google integration; no fallback configured', { senderEmployeeId });
 
   } catch (error) {
     console.error('❌ Error sending email:', error);
@@ -250,6 +309,12 @@ export async function sendEmail({ to, cc, subject, body, contentType = 'text/pla
 export function sendEmailAsync(params: EmailParams): void {
   // Run in next tick to avoid blocking
   setImmediate(() => {
+    logEmailDebug('Async email queued', {
+      to: params.to,
+      subject: params.subject,
+      senderEmployeeId: params.senderEmployeeId || null,
+      isInfo: params.isInfo || false,
+    });
     sendEmail(params).catch(err => {
       console.error('Async email error:', err);
     });

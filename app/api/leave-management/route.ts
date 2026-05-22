@@ -8,11 +8,13 @@ import { createLeaveCalendarEventForEmployee, deleteLeaveCalendarEventForEmploye
 import { calculateLeaveDays, type LeaveDateInput } from "@/lib/leave-policy";
 import {
   employeeLeaveRequestToHR,
+  extraDayPayRequest,
   teamLeadDecisionToHR,
   hrDecisionToEmployee,
   teamLeadLeaveRequestToHRWithAdminCC,
   hrDecisionToTeamLead,
   adminDecisionToHR,
+  extraDayPayDecision,
   hrLeaveRequestToAdmin,
   doubtfulLeaveMarkedToAdmin,
   leaveAutoApproved,
@@ -310,7 +312,7 @@ function createRuleCalculationDetails(
   const requestedEndDate = endDate.format("YYYY-MM-DD");
   const baseCalendarDays = endDate.diff(startDate, "day") + 1;
   const isHalfDay = isHalfDaySessionRange(sessionStartValue, sessionEndValue, startDate, endDate);
-  
+
   // First, calculate working days in range
   let workingDaysInRange = 0;
   let nonWorkingDaysInRange = 0;
@@ -324,7 +326,7 @@ function createRuleCalculationDetails(
     }
     cursor = cursor.add(1, "day");
   }
-  
+
   // Check if start day is partial (doesn't start with Session-1) or end day is partial (doesn't end with Session-2)
   const startDayIsPartial = !!sessionStartValue && sessionStartValue !== "Session-1";
   const endDayIsPartial = !!sessionEndValue && sessionEndValue !== "Session-2";
@@ -340,12 +342,12 @@ function createRuleCalculationDetails(
     workingDaysInRange,
     nonWorkingDaysInRange,
   });
-  
+
   // Calculate the number of full working days (excluding partial days at start/end)
   let fullWorkingDaysInRange = workingDaysInRange;
   if (startDayIsPartial && !startDate.isSame(endDate, "day")) fullWorkingDaysInRange--;
   if (endDayIsPartial && !startDate.isSame(endDate, "day")) fullWorkingDaysInRange--;
-  
+
   const applyPolicyRules = typeof ruleSelection === "boolean" ? ruleSelection : true;
   const selectedSandwichRule =
     typeof ruleSelection === "object" && ruleSelection !== null
@@ -419,13 +421,13 @@ function createRuleCalculationDetails(
   const sandwichPolicy =
     sandwichDateList.length > 0
       ? calculateLeaveDays(sandwichDateList, {
-          allowedLeaveTypes: ["Planned Leave"],
-          allowedLeaveCategories: ["loss-of-pay", "loss of pay"],
-        })
+        allowedLeaveTypes: ["Planned Leave"],
+        allowedLeaveCategories: ["loss-of-pay", "loss of pay"],
+      })
       : {
-          sandwichApplied: false,
-          sandwichDates: [] as string[],
-        };
+        sandwichApplied: false,
+        sandwichDates: [] as string[],
+      };
 
   const sandwichDates = applySandwichRule ? sandwichPolicy.sandwichDates : [];
   const preSandwichDates = sandwichDates.filter((dateValue) => dayjs(dateValue).isBefore(startDate, "day"));
@@ -442,7 +444,7 @@ function createRuleCalculationDetails(
   if (isHalfDay) {
     rangeLeaveDays = rangeLeaveDays * 0.5;
   }
-  
+
   // Account for partial session days in multi-day leaves
   // Subtract 0.5 for each partial day at start and end
   if (!startDate.isSame(endDate, "day")) {
@@ -469,21 +471,21 @@ function createRuleCalculationDetails(
     };
 
     const penaltyMultiplier = leaveConfig.penaltyDaysPerDay;
-    
+
     // Only apply penalty to full working days, not to partial days
     let penaltyStartDate = startDate.clone();
     let penaltyEndDate = endDate.clone();
-    
+
     // Skip the first day if it's a partial day (doesn't start with Session-1)
     if (startDayIsPartial && !startDate.isSame(endDate, "day")) {
       penaltyStartDate = penaltyStartDate.add(1, "day");
     }
-    
+
     // If last day is partial (doesn't end with Session-2), don't apply penalty to it
     if (endDayIsPartial && !startDate.isSame(endDate, "day")) {
       penaltyEndDate = penaltyEndDate.subtract(1, "day");
     }
-    
+
     // Apply penalty only to full working days
     let cursorPenalty = penaltyStartDate.startOf("day");
     const endPenalty = penaltyEndDate.startOf("day");
@@ -779,6 +781,7 @@ export async function GET(request: NextRequest) {
           Employee__c,
           Employee__r.Employee_Name__c,
           Employee__r.Employee_Id__c,
+          Employee__r.Team_Lead__c,
           Employee__r.Team_Lead__r.Employee_Name__c,
           Leave_Type__c,
           Leave_Category__c,
@@ -798,7 +801,7 @@ export async function GET(request: NextRequest) {
           Reason__c,
           Rule_Calculation_Details__c
         FROM Leave__c
-        WHERE Employee__r.Team_Lead__r.Employee_Name__c = '${name}'
+        WHERE Employee__r.Team_Lead__c = '${employeeId}'
         AND Status__c IN ('Applied', 'Withdrawal Pending')
         ORDER BY Start_Date__c ASC
       `);
@@ -1065,15 +1068,15 @@ export async function POST(request: NextRequest) {
 
       const createdEventId = calendarRange
         ? await createLeaveCalendarEventForEmployee({
-            employeeId: targetEmployeeId,
-            employeeName: targetEmployee.Employee_Name__c || 'Employee',
-            leaveType,
-            leaveCategory: approvedLeaveRecord.Leave_Category__c,
-            startDate: calendarRange.startDate,
-            endDate: calendarRange.endDate,
-            reason: reason || `Applied by ${approverTitle}`,
-            approvedBy: approverTitle,
-          })
+          employeeId: targetEmployeeId,
+          employeeName: targetEmployee.Employee_Name__c || 'Employee',
+          leaveType,
+          leaveCategory: approvedLeaveRecord.Leave_Category__c,
+          startDate: calendarRange.startDate,
+          endDate: calendarRange.endDate,
+          reason: reason || `Applied by ${approverTitle}`,
+          approvedBy: approverTitle,
+        })
         : null;
 
 
@@ -1103,9 +1106,9 @@ export async function POST(request: NextRequest) {
           const ccCandidates = isAdmin
             ? [teamLeadEmail, hrEmail]
             : [
-                teamLeadEmail,
-                ...adminRecipients.map((admin: { id: string; name: string; email: string }) => admin.email),
-              ];
+              teamLeadEmail,
+              ...adminRecipients.map((admin: { id: string; name: string; email: string }) => admin.email),
+            ];
 
           const seenCcEmails = new Set<string>();
           const normalizedEmployeeEmail = employeeEmail.trim().toLowerCase();
@@ -1602,16 +1605,16 @@ export async function POST(request: NextRequest) {
     }
     const mergeInfoForRules: RuleCalculationDetails["mergeInfo"] | undefined = mergeContext
       ? {
-          merged: true,
-          existingLeaveId: mergeContext.existingLeaveId,
-          previousStartDate: mergeContext.previousStartDate,
-          previousEndDate: mergeContext.previousEndDate,
-          newRequestStartDate: requestedStartDateStr,
-          newRequestEndDate: requestedEndDateStr,
-          mergedAt: new Date().toISOString(),
-          mergedBy: email || employeeId || name,
-          gapDates: mergeContext.gapDates,
-        }
+        merged: true,
+        existingLeaveId: mergeContext.existingLeaveId,
+        previousStartDate: mergeContext.previousStartDate,
+        previousEndDate: mergeContext.previousEndDate,
+        newRequestStartDate: requestedStartDateStr,
+        newRequestEndDate: requestedEndDateStr,
+        mergedAt: new Date().toISOString(),
+        mergedBy: email || employeeId || name,
+        gapDates: mergeContext.gapDates,
+      }
       : { merged: false };
 
     const recalculatedMetrics = createRuleCalculationDetails(
@@ -1814,14 +1817,14 @@ export async function POST(request: NextRequest) {
 
       const createdEventId = calendarRange
         ? await createLeaveCalendarEventForEmployee({
-            employeeId,
-            leaveType: leaveRecord.Leave_Type__c || leaveRecord.Leave_Category__c || 'Leave',
-            leaveCategory: leaveRecord.Leave_Category__c,
-            startDate: calendarRange.startDate,
-            endDate: calendarRange.endDate,
-            reason: leaveRecord.Reason__c,
-            approvedBy: 'Admin',
-          })
+          employeeId,
+          leaveType: leaveRecord.Leave_Type__c || leaveRecord.Leave_Category__c || 'Leave',
+          leaveCategory: leaveRecord.Leave_Category__c,
+          startDate: calendarRange.startDate,
+          endDate: calendarRange.endDate,
+          reason: leaveRecord.Reason__c,
+          approvedBy: 'Admin',
+        })
         : null;
 
       await persistLeaveEventId(conn, savedLeaveId, createdEventId || null, 'admin-auto-approval');
@@ -1873,15 +1876,25 @@ export async function POST(request: NextRequest) {
             notificationRecipients.push(admin.Id);
 
             if (adminEmail) {
-              const emailTemplate = await hrLeaveRequestToAdmin({
-                recipientName: adminName,
-                employeeName,
-                leaveType: leaveType || 'N/A',
-                startDate: start.format('YYYY-MM-DD'),
-                endDate: end.format('YYYY-MM-DD'),
-                duration: duration
-              });
-              logLeaveEmailDispatch('hr-leave-request-to-admin', adminEmail, undefined, emailTemplate.subject);
+              const isExtraDayPay = leaveCategory === 'extra-day-pay';
+              const emailTemplate = isExtraDayPay
+                ? await extraDayPayRequest({
+                  recipientName: adminName,
+                  employeeName,
+                  startDate: start.format('YYYY-MM-DD'),
+                  endDate: end.format('YYYY-MM-DD'),
+                  duration: duration,
+                  reason: reason || 'N/A',
+                })
+                : await hrLeaveRequestToAdmin({
+                  recipientName: adminName,
+                  employeeName,
+                  leaveType: leaveType || 'N/A',
+                  startDate: start.format('YYYY-MM-DD'),
+                  endDate: end.format('YYYY-MM-DD'),
+                  duration: duration
+                });
+              logLeaveEmailDispatch(isExtraDayPay ? 'extra-day-pay-request-to-admin' : 'hr-leave-request-to-admin', adminEmail, undefined, emailTemplate.subject);
               sendEmailAsync({
                 to: adminEmail,
                 subject: emailTemplate.subject,
@@ -1915,17 +1928,28 @@ export async function POST(request: NextRequest) {
           `);
           const adminEmail = adminQuery.records?.[0]?.Company_Email__c;
           const appUrl = await getAdminSettingValue('NEXT_PUBLIC_APP_URL');
-          
-          const emailTemplate = await teamLeadLeaveRequestToHRWithAdminCC({
-            recipientName: 'HR Team',
-            employeeName,
-            leaveType: leaveType || 'N/A',
-            startDate: start.format('YYYY-MM-DD'),
-            endDate: end.format('YYYY-MM-DD'),
-            duration: duration,
-            setupLink : appUrl
-          });
-          logLeaveEmailDispatch('team-lead-leave-request-to-hr', hrEmail, adminEmail, emailTemplate.subject);
+          const isExtraDayPay = leaveCategory === 'extra-day-pay';
+
+          const emailTemplate = isExtraDayPay
+            ? await extraDayPayRequest({
+              recipientName: 'HR Team',
+              employeeName,
+              startDate: start.format('YYYY-MM-DD'),
+              endDate: end.format('YYYY-MM-DD'),
+              duration: duration,
+              reason: reason || 'N/A',
+              setupLink: appUrl,
+            })
+            : await teamLeadLeaveRequestToHRWithAdminCC({
+              recipientName: 'HR Team',
+              employeeName,
+              leaveType: leaveType || 'N/A',
+              startDate: start.format('YYYY-MM-DD'),
+              endDate: end.format('YYYY-MM-DD'),
+              duration: duration,
+              setupLink: appUrl
+            });
+          logLeaveEmailDispatch(isExtraDayPay ? 'team-lead-extra-day-pay-request-to-hr' : 'team-lead-leave-request-to-hr', hrEmail, adminEmail, emailTemplate.subject);
           sendEmailAsync({
             to: hrEmail,
             cc: adminEmail,
@@ -1966,21 +1990,32 @@ export async function POST(request: NextRequest) {
               LIMIT 1
             `);
             const adminEmail = adminQuery.records?.[0]?.Company_Email__c;
-             const appUrl = await getAdminSettingValue('NEXT_PUBLIC_APP_URL');
+            const appUrl = await getAdminSettingValue('NEXT_PUBLIC_APP_URL');
+            const isExtraDayPay = leaveCategory === 'extra-day-pay';
 
-            const emailTemplate = await employeeLeaveRequestToHR({
-              recipientName: 'HR Team',
-              employeeName,
-              leaveType: leaveType || 'N/A',
-              startDate: start.format('YYYY-MM-DD'),
-              endDate: end.format('YYYY-MM-DD'),
-              duration: duration,
-              reason: reason || 'N/A',
-              setupLink: appUrl,
-            });
+            const emailTemplate = isExtraDayPay
+              ? await extraDayPayRequest({
+                recipientName: 'HR Team',
+                employeeName,
+                startDate: start.format('YYYY-MM-DD'),
+                endDate: end.format('YYYY-MM-DD'),
+                duration: duration,
+                reason: reason || 'N/A',
+                setupLink: appUrl,
+              })
+              : await employeeLeaveRequestToHR({
+                recipientName: 'HR Team',
+                employeeName,
+                leaveType: leaveType || 'N/A',
+                startDate: start.format('YYYY-MM-DD'),
+                endDate: end.format('YYYY-MM-DD'),
+                duration: duration,
+                reason: reason || 'N/A',
+                setupLink: appUrl,
+              });
 
             const ccRecipients = [teamLeadEmail, adminEmail].filter(Boolean) as string[];
-            logLeaveEmailDispatch('employee-leave-request-to-hr', hrEmail, ccRecipients, emailTemplate.subject);
+            logLeaveEmailDispatch(isExtraDayPay ? 'extra-day-pay-request-to-hr' : 'employee-leave-request-to-hr', hrEmail, ccRecipients, emailTemplate.subject);
             sendEmailAsync({
               to: hrEmail,
               cc: ccRecipients,
@@ -2240,12 +2275,8 @@ export async function PATCH(request: NextRequest) {
               duration: leave.Total_Days__c,
               employeeName: employeeName,
             });
-            const ccRecipients = [teamLeadEmail, adminEmail]
-              .filter(Boolean)
-              .filter((value, index, array) => array.indexOf(value) === index);
             sendEmailAsync({
               to: emp.Company_Email__c,
-              cc: ccRecipients.length > 0 ? ccRecipients : undefined,
               subject: emailData.subject,
               body: emailData.html,
               senderEmployeeId: employeeId,
@@ -2529,14 +2560,14 @@ export async function PATCH(request: NextRequest) {
 
           const recreatedEventId = calendarRange
             ? await createLeaveCalendarEventForEmployee({
-                employeeId: leave.Employee__c,
-                leaveType: leave.Leave_Type__c || leave.Leave_Category__c || 'Leave',
-                leaveCategory: leave.Leave_Category__c,
-                startDate: calendarRange.startDate,
-                endDate: calendarRange.endDate,
-                reason: leave.Reason__c,
-                approvedBy: isAdmin ? 'Admin' : 'HR',
-              })
+              employeeId: leave.Employee__c,
+              leaveType: leave.Leave_Type__c || leave.Leave_Category__c || 'Leave',
+              leaveCategory: leave.Leave_Category__c,
+              startDate: calendarRange.startDate,
+              endDate: calendarRange.endDate,
+              reason: leave.Reason__c,
+              approvedBy: isAdmin ? 'Admin' : 'HR',
+            })
             : null;
 
           await persistLeaveEventId(conn, leaveSlice.leaveId, recreatedEventId || null, 'withdrawal-recreate');
@@ -2577,6 +2608,7 @@ export async function PATCH(request: NextRequest) {
             const emailLeaveType = getDisplayLeaveType(leave.Leave_Type__c, leave.Leave_Category__c || "");
             const emailData = await withdrawalApproved({
               recipientName: employeeName,
+              employeeName: employeeName,
               leaveType: emailLeaveType,
               startDate: dayjs(leave.Start_Date__c).format('DD MMM YYYY'),
               endDate: dayjs(leave.End_Date__c).format('DD MMM YYYY'),
@@ -2961,6 +2993,7 @@ export async function PATCH(request: NextRequest) {
           const adminEmail = adminQuery.records?.[0]?.Company_Email__c;
 
           if (isTeamLead && !oldLeave.TL_Approval__c) {
+            const isExtraDayPay = oldLeave.Leave_Category__c === 'Extra Day Pay';
             // Send in-app notification to employee
             await sendInAppNotifications(
               [oldLeave.Employee__c],
@@ -2970,16 +3003,25 @@ export async function PATCH(request: NextRequest) {
             );
 
             // TL decision email to HR with CC Employee and Admin
-            const emailTemplateHR = await teamLeadDecisionToHR({
-              recipientName: 'HR Team',
-              employeeName,
-              teamLeadName,
-              decisionStatus: 'Approved',
-              leaveType: oldLeave.Leave_Type__c || 'N/A',
-              startDate: oldLeave.Start_Date__c || 'N/A',
-              endDate: oldLeave.End_Date__c || 'N/A',
-              duration: oldLeave.Total_Days__c || 0
-            });
+            const emailTemplateHR = isExtraDayPay
+              ? await extraDayPayDecision({
+                recipientName: 'HR Team',
+                employeeName,
+                decisionStatus: 'Approved',
+                startDate: oldLeave.Start_Date__c || 'N/A',
+                endDate: oldLeave.End_Date__c || 'N/A',
+                duration: oldLeave.Total_Days__c || 0,
+              })
+              : await teamLeadDecisionToHR({
+                recipientName: 'HR Team',
+                employeeName,
+                teamLeadName,
+                decisionStatus: 'Approved',
+                leaveType: oldLeave.Leave_Type__c || 'N/A',
+                startDate: oldLeave.Start_Date__c || 'N/A',
+                endDate: oldLeave.End_Date__c || 'N/A',
+                duration: oldLeave.Total_Days__c || 0
+              });
             const ccRecipients = [employeeEmail, adminEmail].filter(Boolean) as string[];
             logLeaveEmailDispatch('team-lead-decision-to-hr-approved', hrEmail, ccRecipients, emailTemplateHR.subject);
             sendEmailAsync({
@@ -3017,28 +3059,38 @@ export async function PATCH(request: NextRequest) {
 
             const createdEventId = calendarRange
               ? await createLeaveCalendarEventForEmployee({
-                  employeeId: oldLeave.Employee__c,
-                  employeeName,
-                  leaveType: oldLeave.Leave_Type__c || oldLeave.Leave_Category__c || 'Leave',
-                  leaveCategory: oldLeave.Leave_Category__c,
-                  startDate: calendarRange.startDate,
-                  endDate: calendarRange.endDate,
-                  approvedBy: approverTitle,
-                })
+                employeeId: oldLeave.Employee__c,
+                employeeName,
+                leaveType: oldLeave.Leave_Type__c || oldLeave.Leave_Category__c || 'Leave',
+                leaveCategory: oldLeave.Leave_Category__c,
+                startDate: calendarRange.startDate,
+                endDate: calendarRange.endDate,
+                approvedBy: approverTitle,
+              })
               : null;
 
             await persistLeaveEventId(conn, oldLeave.Id, createdEventId || null, 'final-approval');
 
             if (employeeEmail) {
+              const isExtraDayPay = oldLeave.Leave_Category__c === 'Extra Day Pay';
               if (isAdmin && employeeRole === 'HR') {
-                const emailTemplate = await adminDecisionToHR({
-                  recipientName: employeeName,
-                  decisionStatus: 'Approved',
-                  leaveType: oldLeave.Leave_Type__c || 'N/A',
-                  startDate: oldLeave.Start_Date__c || 'N/A',
-                  endDate: oldLeave.End_Date__c || 'N/A',
-                  duration: oldLeave.Total_Days__c || 0
-                });
+                const emailTemplate = isExtraDayPay
+                  ? await extraDayPayDecision({
+                    recipientName: employeeName,
+                    employeeName,
+                    decisionStatus: 'Approved',
+                    startDate: oldLeave.Start_Date__c || 'N/A',
+                    endDate: oldLeave.End_Date__c || 'N/A',
+                    duration: oldLeave.Total_Days__c || 0,
+                  })
+                  : await adminDecisionToHR({
+                    recipientName: employeeName,
+                    decisionStatus: 'Approved',
+                    leaveType: oldLeave.Leave_Type__c || 'N/A',
+                    startDate: oldLeave.Start_Date__c || 'N/A',
+                    endDate: oldLeave.End_Date__c || 'N/A',
+                    duration: oldLeave.Total_Days__c || 0
+                  });
                 logLeaveEmailDispatch('admin-decision-to-hr-approved', employeeEmail, undefined, emailTemplate.subject);
                 sendEmailAsync({
                   to: employeeEmail,
@@ -3047,14 +3099,23 @@ export async function PATCH(request: NextRequest) {
                   senderEmployeeId: employeeId,
                 });
               } else if (isHR && employeeRole === 'Developer' && employeeTitle === 'Team Lead') {
-                const emailTemplate = await hrDecisionToTeamLead({
-                  recipientName: employeeName,
-                  decisionStatus: 'Approved',
-                  leaveType: oldLeave.Leave_Type__c || 'N/A',
-                  startDate: oldLeave.Start_Date__c || 'N/A',
-                  endDate: oldLeave.End_Date__c || 'N/A',
-                  duration: oldLeave.Total_Days__c || 0
-                });
+                const emailTemplate = isExtraDayPay
+                  ? await extraDayPayDecision({
+                    recipientName: employeeName,
+                    employeeName,
+                    decisionStatus: 'Approved',
+                    startDate: oldLeave.Start_Date__c || 'N/A',
+                    endDate: oldLeave.End_Date__c || 'N/A',
+                    duration: oldLeave.Total_Days__c || 0,
+                  })
+                  : await hrDecisionToTeamLead({
+                    recipientName: employeeName,
+                    decisionStatus: 'Approved',
+                    leaveType: oldLeave.Leave_Type__c || 'N/A',
+                    startDate: oldLeave.Start_Date__c || 'N/A',
+                    endDate: oldLeave.End_Date__c || 'N/A',
+                    duration: oldLeave.Total_Days__c || 0
+                  });
                 logLeaveEmailDispatch('hr-decision-to-team-lead-approved', employeeEmail, adminEmail, emailTemplate.subject);
                 sendEmailAsync({
                   to: employeeEmail,
@@ -3064,14 +3125,23 @@ export async function PATCH(request: NextRequest) {
                   senderEmployeeId: employeeId,
                 });
               } else {
-                const emailTemplate = await hrDecisionToEmployee({
-                  recipientName: employeeName,
-                  decisionStatus: 'Approved',
-                  leaveType: oldLeave.Leave_Type__c || 'N/A',
-                  startDate: oldLeave.Start_Date__c || 'N/A',
-                  endDate: oldLeave.End_Date__c || 'N/A',
-                  duration: oldLeave.Total_Days__c || 0
-                });
+                const emailTemplate = isExtraDayPay
+                  ? await extraDayPayDecision({
+                    recipientName: employeeName,
+                    employeeName,
+                    decisionStatus: 'Approved',
+                    startDate: oldLeave.Start_Date__c || 'N/A',
+                    endDate: oldLeave.End_Date__c || 'N/A',
+                    duration: oldLeave.Total_Days__c || 0,
+                  })
+                  : await hrDecisionToEmployee({
+                    recipientName: employeeName,
+                    decisionStatus: 'Approved',
+                    leaveType: oldLeave.Leave_Type__c || 'N/A',
+                    startDate: oldLeave.Start_Date__c || 'N/A',
+                    endDate: oldLeave.End_Date__c || 'N/A',
+                    duration: oldLeave.Total_Days__c || 0
+                  });
                 const ccRecipients = [teamLeadEmail, adminEmail].filter(Boolean) as string[];
                 logLeaveEmailDispatch('hr-decision-to-employee-approved', employeeEmail, ccRecipients, emailTemplate.subject);
                 sendEmailAsync({
@@ -3145,7 +3215,7 @@ export async function PATCH(request: NextRequest) {
       }
 
       const leaveRecordQuery = await conn.query<any>(`
-        SELECT Id, Status__c, Employee__c, Employee__r.Role__c, HR_Approval__c, TL_Approval__c, Leave_Type__c, Total_Days__c, Start_Date__c, End_Date__c
+        SELECT Id, Status__c, Employee__c, Employee__r.Role__c, HR_Approval__c, TL_Approval__c, Leave_Type__c, Leave_Category__c, Total_Days__c, Start_Date__c, End_Date__c
         FROM Leave__c
         WHERE Id = '${leaveId}'
         LIMIT 1
@@ -3201,10 +3271,21 @@ export async function PATCH(request: NextRequest) {
 
           if (isTeamLead && !oldLeave.TL_Approval__c) {
             // TL just rejected
-            const emailTemplate = await teamLeadDecisionToHR({
+            const isExtraDayPay = oldLeave.Leave_Category__c === 'Extra Day Pay';
+            const emailTemplate = isExtraDayPay
+              ? await extraDayPayDecision({
                 recipientName: 'HR Team',
                 employeeName,
-              teamLeadName: 'Team Lead',
+                decisionStatus: 'Rejected',
+                startDate: oldLeave.Start_Date__c || 'N/A',
+                endDate: oldLeave.End_Date__c || 'N/A',
+                duration: oldLeave.Total_Days__c || 0,
+                reason,
+              })
+              : await teamLeadDecisionToHR({
+                recipientName: 'HR Team',
+                employeeName,
+                teamLeadName: 'Team Lead',
                 decisionStatus: 'Rejected',
                 leaveType: oldLeave.Leave_Type__c || 'N/A',
                 startDate: oldLeave.Start_Date__c || 'N/A',
@@ -3248,17 +3329,28 @@ export async function PATCH(request: NextRequest) {
           } else if ((isHR || isAdmin) && !oldLeave.HR_Approval__c) {
             // HR or Admin just rejected
             if (employeeEmail) {
+              const isExtraDayPay = oldLeave.Leave_Category__c === 'Extra Day Pay';
               const approverTitle = isAdmin ? 'Admin' : 'HR';
               if (isAdmin && employeeRole === 'HR') {
-                const emailTemplate = await adminDecisionToHR({
-                  recipientName: employeeName,
-                  decisionStatus: 'Rejected',
-                  leaveType: oldLeave.Leave_Type__c || 'N/A',
-                  startDate: oldLeave.Start_Date__c || 'N/A',
-                  endDate: oldLeave.End_Date__c || 'N/A',
-                  duration: oldLeave.Total_Days__c || 0,
-                  reason
-                });
+                const emailTemplate = isExtraDayPay
+                  ? await extraDayPayDecision({
+                    recipientName: employeeName,
+                    employeeName,
+                    decisionStatus: 'Rejected',
+                    startDate: oldLeave.Start_Date__c || 'N/A',
+                    endDate: oldLeave.End_Date__c || 'N/A',
+                    duration: oldLeave.Total_Days__c || 0,
+                    reason,
+                  })
+                  : await adminDecisionToHR({
+                    recipientName: employeeName,
+                    decisionStatus: 'Rejected',
+                    leaveType: oldLeave.Leave_Type__c || 'N/A',
+                    startDate: oldLeave.Start_Date__c || 'N/A',
+                    endDate: oldLeave.End_Date__c || 'N/A',
+                    duration: oldLeave.Total_Days__c || 0,
+                    reason
+                  });
                 logLeaveEmailDispatch('admin-decision-to-hr-rejected', employeeEmail, undefined, emailTemplate.subject);
                 sendEmailAsync({
                   to: employeeEmail,
@@ -3267,15 +3359,25 @@ export async function PATCH(request: NextRequest) {
                   senderEmployeeId: employeeId,
                 });
               } else if (isHR && employeeRole === 'Developer' && employeeTitle === 'Team Lead') {
-                const emailTemplate = await hrDecisionToTeamLead({
-                  recipientName: employeeName,
-                  decisionStatus: 'Rejected',
-                  leaveType: oldLeave.Leave_Type__c || 'N/A',
-                  startDate: oldLeave.Start_Date__c || 'N/A',
-                  endDate: oldLeave.End_Date__c || 'N/A',
-                  duration: oldLeave.Total_Days__c || 0,
-                  reason
-                });
+                const emailTemplate = isExtraDayPay
+                  ? await extraDayPayDecision({
+                    recipientName: employeeName,
+                    employeeName,
+                    decisionStatus: 'Rejected',
+                    startDate: oldLeave.Start_Date__c || 'N/A',
+                    endDate: oldLeave.End_Date__c || 'N/A',
+                    duration: oldLeave.Total_Days__c || 0,
+                    reason,
+                  })
+                  : await hrDecisionToTeamLead({
+                    recipientName: employeeName,
+                    decisionStatus: 'Rejected',
+                    leaveType: oldLeave.Leave_Type__c || 'N/A',
+                    startDate: oldLeave.Start_Date__c || 'N/A',
+                    endDate: oldLeave.End_Date__c || 'N/A',
+                    duration: oldLeave.Total_Days__c || 0,
+                    reason
+                  });
                 logLeaveEmailDispatch('hr-decision-to-team-lead-rejected', employeeEmail, adminEmail, emailTemplate.subject);
                 sendEmailAsync({
                   to: employeeEmail,
@@ -3285,15 +3387,25 @@ export async function PATCH(request: NextRequest) {
                   senderEmployeeId: employeeId,
                 });
               } else {
-                const emailTemplate = await hrDecisionToEmployee({
-                  recipientName: employeeName,
-                  decisionStatus: 'Rejected',
-                  leaveType: oldLeave.Leave_Type__c || 'N/A',
-                  startDate: oldLeave.Start_Date__c || 'N/A',
-                  endDate: oldLeave.End_Date__c || 'N/A',
-                  duration: oldLeave.Total_Days__c || 0,
-                  reason
-                });
+                const emailTemplate = isExtraDayPay
+                  ? await extraDayPayDecision({
+                    recipientName: employeeName,
+                    employeeName,
+                    decisionStatus: 'Rejected',
+                    startDate: oldLeave.Start_Date__c || 'N/A',
+                    endDate: oldLeave.End_Date__c || 'N/A',
+                    duration: oldLeave.Total_Days__c || 0,
+                    reason,
+                  })
+                  : await hrDecisionToEmployee({
+                    recipientName: employeeName,
+                    decisionStatus: 'Rejected',
+                    leaveType: oldLeave.Leave_Type__c || 'N/A',
+                    startDate: oldLeave.Start_Date__c || 'N/A',
+                    endDate: oldLeave.End_Date__c || 'N/A',
+                    duration: oldLeave.Total_Days__c || 0,
+                    reason
+                  });
                 const ccRecipients = [teamLeadEmail, adminEmail].filter(Boolean) as string[];
                 logLeaveEmailDispatch('hr-decision-to-employee-rejected', employeeEmail, ccRecipients, emailTemplate.subject);
                 sendEmailAsync({

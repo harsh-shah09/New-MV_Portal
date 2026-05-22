@@ -81,6 +81,10 @@ export function Sidebar({
   if (user?.role?.includes('Admin')) {
     navItems.push({ href: "/admin", label: "Admin Console", icon: Settings });
   }
+  // Add HR Console for HR only
+  if (user?.role?.includes('HR')) {
+    navItems.push({ href: "/hr-console", label: "HR Console", icon: Settings });
+  }
   const { data: notifications } = useQuery({
     queryKey: ['notifications'],
     queryFn: async () => {

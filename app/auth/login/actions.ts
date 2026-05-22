@@ -93,10 +93,6 @@ export async function loginAction(
     }
 
     // Verify password
-    // Prompt says: "if logins from email Password is stored in hashes using ENCRYPTION_KEY"
-    // We'll apply this to all logins to be safe, assuming the password field is populated.
-    // If the employee record doesn't have a password set, we might need to handle that.
-    // For now, we assume Password__c exists and matches the hash.
     
     const hashedPassword = await hashPassword(password);
     // In a real scenario, use constant-time comparison.

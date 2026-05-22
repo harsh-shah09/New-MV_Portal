@@ -10,7 +10,7 @@ import type { LeaveRequest } from "@/types"
 import { useQuery } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { Modal, Select, Input, Card, Row, Col, Spin, DatePicker, Button, Form, Checkbox } from "antd"
-import { SearchOutlined } from "@ant-design/icons"
+import { QuestionCircleOutlined, SearchOutlined } from "@ant-design/icons"
 import { PageContainer } from "@/components/page-container"
 import { PageHeader } from "@/components/page-header"
 import { RefreshButton } from "@/components/refresh-button"
@@ -76,6 +76,8 @@ export default function LeavesPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [showForm, setShowForm] = useState(false)
+  const [showHowToUse, setShowHowToUse] = useState(false)
+  const [leaveGuideUrl, setLeaveGuideUrl] = useState<string>("")
   const [isSubmittingLeaveRequest, setIsSubmittingLeaveRequest] = useState(false)
   const [selectedTab, setSelectedTab] = useState<LeaveTab>("my-requests")
   const [currentUser, setCurrentUser] = useState<{ employeeId: string; email?: string; recordId: string; role?: string; title?: string } | null>(null)
@@ -284,6 +286,18 @@ export default function LeavesPage() {
   useEffect(() => {
     fetchAllLeaves()
   }, [currentUser])
+
+  // Fetch the leave guide URL from admin settings
+  useEffect(() => {
+    fetch('/api/admin/settings')
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => {
+        if (data?.leaveGuideUrl) {
+          setLeaveGuideUrl(data.leaveGuideUrl)
+        }
+      })
+      .catch(() => {})
+  }, [])
 
   const handleMyRequestsRefresh = async () => {
     setFilters(DEFAULT_LEAVE_FILTERS)
@@ -627,7 +641,7 @@ export default function LeavesPage() {
             { id: toastId, duration: 5000 }
           )
         } else {
-          toast.success("Leave request submitted successfully! 🎉", { id: toastId })
+          toast.success("Leave request submitted successfully!", { id: toastId })
         }
       } catch (error) {
         console.error("Error submitting leave request:", error)
@@ -753,7 +767,7 @@ export default function LeavesPage() {
       }
 
       refetch()
-      toast.success("Leave approved successfully!",{ id: toastId, duration: 4000 })
+      toast.success("Leave approved successfully!", { id: toastId, duration: 4000 })
     } catch (error) {
       console.error("Error approving leave:", error)
       toast.error("Failed to approve leave. Please try again.", { id: toastId })
@@ -914,7 +928,7 @@ export default function LeavesPage() {
 
       // Refetch to update the list
       refetch()
-      toast.success("Leave rejected. ✉️ Email notification sent to employee.", { id: toastId, duration: 4000 })
+      toast.success("Leave rejected. Email notification sent to employee.", { id: toastId, duration: 4000 })
     } catch (error) {
       console.error("Error rejecting leave:", error)
       toast.error("Failed to reject leave. Please try again.", { id: toastId })
@@ -966,7 +980,7 @@ export default function LeavesPage() {
           }
 
           refetch()
-          toast.success("Withdrawal approved successfully! ✅ Leave balance restored.", { id: toastId, duration: 4000 })
+          toast.success("Withdrawal approved successfully! \nLeave balance restored.", { id: toastId, duration: 4000 })
         } catch (error) {
           console.error("Error approving withdrawal:", error)
           toast.error("Failed to approve withdrawal. Please try again.", { id: toastId })
@@ -1035,6 +1049,9 @@ export default function LeavesPage() {
       setRejectReason("")
     }
   }
+  const handleHowToUse = () => {
+    setShowHowToUse(true);
+  };
 
   if (isLoading) {
     return (
@@ -1057,6 +1074,15 @@ export default function LeavesPage() {
           subtitle="Manage leave requests and approvals"
         >
           <div className="flex items-center gap-2">
+            <Button
+              type='primary'
+              size="large"
+              onClick={handleHowToUse}
+              icon={<QuestionCircleOutlined size={16} />}
+            >
+              How to use
+            </Button>
+
             {canRequestLeave && (
               <Button
                 type='primary'
@@ -1232,11 +1258,10 @@ export default function LeavesPage() {
                         return (
                           <div
                             key={leave.id}
-                            className={`bg-gradient-to-r border rounded-lg hover:shadow-md transition-all ${
-                              (isAdmin || isHR) && isDoubtfulCase
-                                ? 'from-red-50 to-orange-50 border-red-300 hover:border-red-400'
-                                : 'from-slate-50 to-blue-50 border-gray-200 hover:border-blue-300'
-                            }`}
+                            className={`bg-gradient-to-r border rounded-lg hover:shadow-md transition-all ${(isAdmin || isHR) && isDoubtfulCase
+                              ? 'from-red-50 to-orange-50 border-red-300 hover:border-red-400'
+                              : 'from-slate-50 to-blue-50 border-gray-200 hover:border-blue-300'
+                              }`}
                           >
                             <div className="p-5">
                               {/* Header */}
@@ -1319,7 +1344,7 @@ export default function LeavesPage() {
                                     {hasRequestedWithdrawalRange ? 'Requested Duration' : 'Duration'}
                                   </p>
                                   <p className="text-sm font-medium text-gray-900">{displayDuration} {displayDuration === 1 ? 'Day' : 'Days'}</p>
-                                  
+
                                   {!hasRequestedWithdrawalRange && isHalfDaySession && (
                                     <p className="text-xs text-gray-500 mt-1">{sessionLabel}</p>
                                   )}
@@ -1546,9 +1571,9 @@ export default function LeavesPage() {
                 {/* Leave Table */}
                 <div className="mt-4">
                   {filteredLeaves.length > 0 ? (
-                    <LeaveTable 
-                      leaves={filteredLeaves} 
-                      onWithdraw={handleWithdraw} 
+                    <LeaveTable
+                      leaves={filteredLeaves}
+                      onWithdraw={handleWithdraw}
                       showActions={false}
                       onViewDetails={handleViewLeaveDetails}
                     />
@@ -1574,6 +1599,31 @@ export default function LeavesPage() {
             setIsSubmitting={setIsSubmittingLeaveRequest}
             employeeName={currentUser?.email || "Current Employee"}
           />
+        )}
+        {showHowToUse && (
+          <Modal
+            title="Leave Request User Guide"
+            open={showHowToUse}
+            onCancel={() => setShowHowToUse(false)}
+            footer={null}
+            width={1500}
+            height={"auto"}
+          >
+            {leaveGuideUrl ? (
+              <iframe
+                src={leaveGuideUrl}
+                height={700}
+                width="100%"
+                style={{ border: 'none', borderRadius: 8 }}
+                title="Leave User Guide"
+              />
+            ) : (
+              <div className="flex flex-col items-center justify-center py-16 text-slate-500 gap-3">
+                <p className="text-base font-medium">No user guide configured.</p>
+                <p className="text-sm text-slate-400">Please ask your admin to set the Leave User Guide URL in the Admin Console → Leave settings.</p>
+              </div>
+            )}
+          </Modal>
         )}
 
         <Modal
@@ -1689,18 +1739,18 @@ export default function LeavesPage() {
           <div className="space-y-3">
             <p className="mb-1 font-medium text-gray-800">Select which rules to apply before approval.</p>
             <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 space-y-2">
-            {ruleChoiceLeave?.sandwichRuleApplicable === true && (
-              <div className="flex items-center justify-between rounded-md border border-gray-200 bg-white px-3 py-2">
-                <span className="text-sm font-medium text-gray-700">Apply Sandwich Rule</span>
-                <Checkbox checked={applySandwichSelection} onChange={(e) => setApplySandwichSelection(e.target.checked)} />
-              </div>
-            )}
-            {ruleChoiceLeave?.onePlusTwoRuleApplicable === true && (
-              <div className="flex items-center justify-between rounded-md border border-gray-200 bg-white px-3 py-2">
-                <span className="text-sm font-medium text-gray-700">Apply 1+2 Rule</span>
-                <Checkbox checked={applyOnePlusTwoSelection} onChange={(e) => setApplyOnePlusTwoSelection(e.target.checked)} />
-              </div>
-            )}
+              {ruleChoiceLeave?.sandwichRuleApplicable === true && (
+                <div className="flex items-center justify-between rounded-md border border-gray-200 bg-white px-3 py-2">
+                  <span className="text-sm font-medium text-gray-700">Apply Sandwich Rule</span>
+                  <Checkbox checked={applySandwichSelection} onChange={(e) => setApplySandwichSelection(e.target.checked)} />
+                </div>
+              )}
+              {ruleChoiceLeave?.onePlusTwoRuleApplicable === true && (
+                <div className="flex items-center justify-between rounded-md border border-gray-200 bg-white px-3 py-2">
+                  <span className="text-sm font-medium text-gray-700">Apply 1+2 Rule</span>
+                  <Checkbox checked={applyOnePlusTwoSelection} onChange={(e) => setApplyOnePlusTwoSelection(e.target.checked)} />
+                </div>
+              )}
             </div>
             <p className="text-sm text-gray-600">Only applicable rules are shown.</p>
           </div>

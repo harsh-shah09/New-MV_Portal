@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { cookies } from "next/headers"
 import { verifyToken } from "@/lib/auth-utils"
 import { getSalesforceConnection, sendInAppNotifications } from "@/lib/salesforce"
+import { getAdminSettings } from "@/lib/admin-settings"
 import { generatePayslipPDF } from "@/lib/pdf-generator"
 import { uploadPayslipToS3 } from "@/lib/s3"
 
@@ -163,7 +164,7 @@ export async function POST(request: NextRequest) {
     
    
 
-    // Generate payroll TXT summary (Employee Name + Net Salary) for direct download
+    // Generate payroll TXT summary for bank upload
     let payrollSummaryTxtContent: string | null = null
     const payrollSummaryTxtFileName = `Payroll_Summary_${month}_${year}.txt`
     try {
@@ -174,17 +175,34 @@ export async function POST(request: NextRequest) {
       })
 
       if (successfulEmployees.length > 0) {
-        const txtLines = [
-          `Payroll Summary - ${month} ${year}`,
-          "Employee Name\tAmount",
-          ...successfulEmployees.map((emp: any) => {
-            const employeeName = emp.employeeName || "Unknown"
-            const netSalary = Number(emp.netSalary || 0).toFixed(2)
-            return `${employeeName}\t${netSalary}`
-          }),
-        ]
+        const adminSettings = await getAdminSettings()
+        const companyBranchCode = adminSettings.companyBranchCode || "NA"
+        const companyAccountNumber = adminSettings.companyAccountNumber || "NA"
+        const currencyCode = adminSettings.currencyCode || "INR"
+        const fileDate = new Date()
+        const fileDateFormatted = `${String(fileDate.getMonth() + 1).padStart(2, "0")}/${String(fileDate.getDate()).padStart(2, "0")}/${fileDate.getFullYear()}`
+        const monthYearFull = `${month} ${year}`
+        const monthYearShort = `${month} ${String(year).slice(-2)}`
+        const toRoundedAmount = (value: any) => Math.round(Number(value) || 0)
 
-        payrollSummaryTxtContent = txtLines.join("\n")
+        const totalAmount = successfulEmployees.reduce((sum: number, emp: any) => sum + toRoundedAmount(emp.netSalary), 0)
+        const totalPayments = successfulEmployees.length
+
+        const headerLine = `FHR|${companyBranchCode}|${companyAccountNumber}|${currencyCode}|${totalAmount}|${totalPayments}|${fileDateFormatted}|${monthYearFull}^`
+
+        const detailLines = successfulEmployees.map((emp: any) => {
+          const employeeName = emp.employeeName || "NULL"
+          const payableAmount = toRoundedAmount(emp.netSalary) || "NULL"
+          const bankDetails = emp.bankDetails || {}
+          const ifscCode = (bankDetails.ifscCode || emp.ifscCode || "NULL").toString().toUpperCase()
+          const accountNumber = bankDetails.accountNumber || emp.accountNumber || "NULL"
+          const bankName = (bankDetails.bankName || emp.bankName || "NULL").toString().toLowerCase()
+          const transferType = ifscCode.startsWith("ICIC") || bankName.includes("icici") ? "WIB" : "NFT"
+          const monthEmployeeLabel = `${month} ${employeeName}`
+          return `APO|${transferType}|${payableAmount}|${currencyCode}|${companyAccountNumber}|${companyBranchCode}|${ifscCode}|${accountNumber}|${companyBranchCode}|${employeeName}|${monthYearShort}|${monthEmployeeLabel}^`
+        })
+
+        payrollSummaryTxtContent = [headerLine, ...detailLines].join("\n")
         
       }
     } catch (txtError: any) {

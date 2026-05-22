@@ -36,12 +36,12 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { 
-      INFO_USERNAME, INFO_GMAIL_APP_PASSWORD, GOOGLE_CLIENT_ID, 
-      GOOGLE_CLIENT_SECRET, S3_BUCKET_NAME, AWS_ACCESS_KEY_ID, 
-      AWS_SECRET_ACCESS_KEY, AWS_REGION, NEXTAUTH_SECRET, 
-      NEXTAUTH_URL, NEXT_PUBLIC_APP_URL, ENCRYPTION_KEY, 
-      SESSION_SECRET 
+    const {
+      INFO_USERNAME, INFO_GMAIL_APP_PASSWORD, GOOGLE_CLIENT_ID,
+      GOOGLE_CLIENT_SECRET, S3_BUCKET_NAME, AWS_ACCESS_KEY_ID,
+      AWS_SECRET_ACCESS_KEY, AWS_REGION, NEXTAUTH_SECRET,
+      NEXTAUTH_URL, NEXT_PUBLIC_APP_URL, ENCRYPTION_KEY,
+      SESSION_SECRET, companyBranchCode, companyAccountNumber, currencyCode, leaveGuideUrl
     } = body;
 
     // Validate that at least one field is being updated
@@ -58,7 +58,11 @@ export async function POST(req: Request) {
       NEXTAUTH_URL === undefined &&
       NEXT_PUBLIC_APP_URL === undefined &&
       ENCRYPTION_KEY === undefined &&
-      SESSION_SECRET === undefined
+      SESSION_SECRET === undefined &&
+      companyBranchCode === undefined &&
+      companyAccountNumber === undefined &&
+      currencyCode === undefined &&
+      leaveGuideUrl === undefined
     ) {
       return NextResponse.json({ error: 'No fields to update' }, { status: 400 });
     }
@@ -77,6 +81,10 @@ export async function POST(req: Request) {
       NEXT_PUBLIC_APP_URL,
       ENCRYPTION_KEY,
       SESSION_SECRET,
+      companyBranchCode,
+      companyAccountNumber,
+      currencyCode,
+      leaveGuideUrl
     });
 
     return NextResponse.json({ success: true, message: 'Settings updated successfully' });

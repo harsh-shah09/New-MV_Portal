@@ -15,6 +15,10 @@ export interface AdminSettings {
   NEXT_PUBLIC_APP_URL?: string;
   ENCRYPTION_KEY?: string;
   SESSION_SECRET?: string;
+  companyBranchCode?: string;
+  companyAccountNumber?: string;
+  currencyCode?: string;
+  leaveGuideUrl?: string;
   updated_at?: string;
 }
 
@@ -54,6 +58,10 @@ export async function getAdminSettings(): Promise<AdminSettings> {
       NEXT_PUBLIC_APP_URL: item.NEXT_PUBLIC_APP_URL,
       ENCRYPTION_KEY: item.ENCRYPTION_KEY,
       SESSION_SECRET: item.SESSION_SECRET,
+      companyBranchCode: item.companyBranchCode,
+      companyAccountNumber: item.companyAccountNumber,
+      currencyCode: item.currencyCode,
+      leaveGuideUrl: item.leaveGuideUrl,
       updated_at: item.updated_at,
     };
   } catch (error) {
@@ -148,6 +156,30 @@ export async function updateAdminSettings(settings: AdminSettings): Promise<void
     if (settings.SESSION_SECRET !== undefined) {
       updateExpression.push(`SESSION_SECRET = :attr${attrIndex}`);
       expressionAttributeValues[`:attr${attrIndex}`] = settings.SESSION_SECRET;
+      attrIndex++;
+    }
+
+    if (settings.companyBranchCode !== undefined) {
+      updateExpression.push(`companyBranchCode = :attr${attrIndex}`);
+      expressionAttributeValues[`:attr${attrIndex}`] = settings.companyBranchCode;
+      attrIndex++;
+    }
+
+    if (settings.companyAccountNumber !== undefined) {
+      updateExpression.push(`companyAccountNumber = :attr${attrIndex}`);
+      expressionAttributeValues[`:attr${attrIndex}`] = settings.companyAccountNumber;
+      attrIndex++;
+    }
+
+    if (settings.currencyCode !== undefined) {
+      updateExpression.push(`currencyCode = :attr${attrIndex}`);
+      expressionAttributeValues[`:attr${attrIndex}`] = settings.currencyCode;
+      attrIndex++;
+    }
+
+    if (settings.leaveGuideUrl !== undefined) {
+      updateExpression.push(`leaveGuideUrl = :attr${attrIndex}`);
+      expressionAttributeValues[`:attr${attrIndex}`] = settings.leaveGuideUrl;
       attrIndex++;
     }
 

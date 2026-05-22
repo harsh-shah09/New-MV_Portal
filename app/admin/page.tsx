@@ -24,7 +24,8 @@ import {
     ChevronRight,
     Cloud,
     Key,
-    Unplug
+    Unplug,
+    Info
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { message, Modal, Select, Spin, Collapse, Input } from "antd";
@@ -37,9 +38,9 @@ const formatLabel = (str: string) => {
     return str.replace(/_/g, ' ').replace(/([A-Z])/g, ' $1').trim();
 };
 
-type AdminTab = "salesforce" | "google" | "secrets" | "documents" | "email" | "leave" | "users" | "integration" | "assets";
+type AdminTab = "salesforce" | "google" | "secrets" | "documents" | "email" | "leave" | "users" | "integration" | "assets" | "bank_details";
 
-const VALID_TABS: AdminTab[] = ["salesforce", "google", "secrets", "documents", "leave", "users", "integration", "email", "assets"];
+const VALID_TABS: AdminTab[] = ["salesforce", "google", "secrets", "documents", "leave", "users", "integration", "email", "assets", "bank_details"];
 
 function getTabFromQuery(): AdminTab {
     if (typeof window === "undefined") return "salesforce";
@@ -95,6 +96,10 @@ export default function AdminConsole() {
         NEXT_PUBLIC_APP_URL: '',
         ENCRYPTION_KEY: '',
         SESSION_SECRET: '',
+        companyBranchCode: '',
+        companyAccountNumber: '',
+        currencyCode: '',
+        leaveGuideUrl: '',
     });
     const [settingsChanges, setSettingsChanges] = useState<any>({});
 
@@ -374,47 +379,88 @@ export default function AdminConsole() {
     };
 
     const saveChanges = async () => {
-        if (unsavedChanges.length === 0) {
+        const hasSettingsChanges = Object.keys(settingsChanges).length > 0;
+        const hasConfigChanges = unsavedChanges.length > 0;
+
+        if (!hasSettingsChanges && !hasConfigChanges) {
             message.info("No changes to save");
             return;
         }
+
+        const totalCount = (hasSettingsChanges ? 1 : 0) + unsavedChanges.length;
+
+        const summaryLines: string[] = [];
+        if (hasSettingsChanges) summaryLines.push(`${Object.keys(settingsChanges).length} admin setting(s)`);
+        if (hasConfigChanges) summaryLines.push(`${unsavedChanges.length} configuration(s)`);
 
         Modal.confirm({
             title: 'Confirm Save',
             icon: <AlertTriangle className="text-amber-500 w-6 h-6 mr-2" />,
             content: (
-                <div>
-                    <p>You are about to update {unsavedChanges.length} configuration(s).</p>
-                    <p className="text-sm text-slate-500 mt-2">
-                        Note: Updates to Email Templates or core configurations will affect the entire portal immediately.
-                    </p>
+                <div className="space-y-2">
+                    <p>You are about to save: <strong>{summaryLines.join(' and ')}</strong>.</p>
+                    {hasSettingsChanges && (
+                        <p className="text-sm text-amber-600">
+                            ⚠️ Changes to credentials (Gmail, Google OAuth, AWS) will take effect immediately across the portal.
+                        </p>
+                    )}
+                    {hasConfigChanges && (
+                        <p className="text-sm text-slate-500">
+                            Configuration updates (Leave rules, Email templates, etc.) will apply immediately.
+                        </p>
+                    )}
                 </div>
             ),
+            okText: `Save ${totalCount > 1 ? `(${totalCount})` : ''}`.trim(),
             onOk: async () => {
                 try {
                     setSaving(true);
-                    const res = await fetch('/api/admin/configurations', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ updates: unsavedChanges })
-                    });
 
-                    const data = await res.json();
+                    const promises: Promise<Response>[] = [];
 
-                    if (!res.ok) throw new Error(data.error || "Update failed");
+                    if (hasSettingsChanges) {
+                        promises.push(
+                            fetch('/api/admin/settings', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(settingsChanges),
+                            })
+                        );
+                    }
 
-                    message.success("Configurations updated successfully");
-                    setUnsavedChanges([]);
+                    if (hasConfigChanges) {
+                        promises.push(
+                            fetch('/api/admin/configurations', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ updates: unsavedChanges }),
+                            })
+                        );
+                    }
 
-                    // Refetch configurations to ensure UI is in sync
-                    await fetchConfigs();
-                } catch (error) {
+                    const results = await Promise.all(promises);
+
+                    for (const res of results) {
+                        if (!res.ok) {
+                            const data = await res.json();
+                            throw new Error(data.error || 'Save failed');
+                        }
+                    }
+
+                    message.success('All changes saved successfully');
+
+                    if (hasSettingsChanges) setSettingsChanges({});
+                    if (hasConfigChanges) {
+                        setUnsavedChanges([]);
+                        await fetchConfigs();
+                    }
+                } catch (error: any) {
                     console.error(error);
-                    message.error("Failed to save changes");
+                    message.error(error?.message || 'Failed to save changes');
                 } finally {
                     setSaving(false);
                 }
-            }
+            },
         });
     };
 
@@ -441,8 +487,8 @@ export default function AdminConsole() {
                 setActiveTab(id);
             }}
             className={`w-full flex flex-col lg:flex-row items-center justify-center lg:justify-start gap-1 lg:gap-3 px-2 lg:px-4 py-3 rounded-xl font-medium transition-all duration-200 text-center lg:text-left ${activeTab === id
-                    ? "bg-blue-600 text-white shadow-lg shadow-blue-500/30"
-                    : "text-slate-600 hover:bg-slate-100"
+                ? "bg-blue-600 text-white shadow-lg shadow-blue-500/30"
+                : "text-slate-600 hover:bg-slate-100"
                 }`}
         >
             <Icon className={`w-5 h-5 lg:w-5 lg:h-5 shrink-0 ${activeTab === id ? "text-white" : "text-slate-400"}`} />
@@ -463,14 +509,14 @@ export default function AdminConsole() {
                         </div>
                         <button
                             onClick={saveChanges}
-                            disabled={unsavedChanges.length === 0 || saving}
-                            className={`flex w-full md:w-auto items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold transition shadow-lg ${unsavedChanges.length > 0
+                            disabled={(unsavedChanges.length === 0 && Object.keys(settingsChanges).length === 0) || saving}
+                            className={`flex w-full md:w-auto items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold transition shadow-lg ${(unsavedChanges.length > 0 || Object.keys(settingsChanges).length > 0)
                                 ? "bg-blue-600 text-white hover:bg-blue-700 shadow-blue-500/20"
                                 : "bg-slate-100 text-slate-400 cursor-not-allowed"
                                 }`}
                         >
                             {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-                            Save Changes {unsavedChanges.length > 0 ? `(${unsavedChanges.length})` : ''}
+                            Save Changes {(unsavedChanges.length > 0 || Object.keys(settingsChanges).length > 0) ? `(${unsavedChanges.length + Object.keys(settingsChanges).length})` : ''}
                         </button>
                     </div>
 
@@ -487,6 +533,7 @@ export default function AdminConsole() {
                                 <TabButton id="integration" label="Connected Users" icon={Workflow} />
                                 <TabButton id="email" label="Email Templates" icon={Mail} />
                                 <TabButton id="assets" label="Asset Settings" icon={Package} />
+                                <TabButton id="bank_details" label="Bank Details" icon={Settings} />
                             </div>
 
                             {unsavedChanges.length > 0 && (
@@ -543,6 +590,70 @@ export default function AdminConsole() {
                                             </div>
                                         )}
 
+                                        {activeTab === "bank_details" && (
+                                            <div className="space-y-10">
+                                                <div>
+                                                    <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                                                        <Settings className="w-5 h-5 text-emerald-500" /> Bank Details
+                                                    </h3>
+                                                    <div className="grid grid-cols-1 gap-6 bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                                                        <div className="group">
+                                                            <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                                                Company Branch Code
+                                                            </label>
+                                                            <input
+                                                                type="text"
+                                                                value={adminSettings.companyBranchCode || ''}
+                                                                onChange={(e) => handleSettingChange('companyBranchCode', e.target.value)}
+                                                                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition group-hover:border-slate-300"
+                                                                placeholder="1010"
+                                                            />
+                                                            <p className="text-xs text-slate-500 mt-1">Bank upload branch code</p>
+                                                        </div>
+
+                                                        <div className="group">
+                                                            <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                                                Company Account Number
+                                                            </label>
+                                                            <input
+                                                                type="text"
+                                                                value={adminSettings.companyAccountNumber || ''}
+                                                                onChange={(e) => handleSettingChange('companyAccountNumber', e.target.value)}
+                                                                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition group-hover:border-slate-300"
+                                                                placeholder="084507765489"
+                                                            />
+                                                            <p className="text-xs text-slate-500 mt-1">Source account number for payroll uploads</p>
+                                                        </div>
+
+                                                        <div className="group">
+                                                            <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                                                Currency Code
+                                                            </label>
+                                                            <input
+                                                                type="text"
+                                                                value={adminSettings.currencyCode || ''}
+                                                                onChange={(e) => handleSettingChange('currencyCode', e.target.value)}
+                                                                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition group-hover:border-slate-300"
+                                                                placeholder="INR"
+                                                            />
+                                                            <p className="text-xs text-slate-500 mt-1">Bank upload currency code</p>
+                                                        </div>
+
+                                                        {Object.keys(settingsChanges).length > 0 && (
+                                                            <button
+                                                                onClick={saveAdminSettings}
+                                                                disabled={saving}
+                                                                className="mt-4 w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 px-4 rounded-xl transition disabled:opacity-50 flex items-center justify-center gap-2"
+                                                            >
+                                                                {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                                                                {saving ? 'Saving...' : 'Save Settings'}
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
                                         {activeTab === "salesforce" && (
                                             <div className="space-y-10">
                                                 {/* Salesforce Configurations */}
@@ -551,7 +662,7 @@ export default function AdminConsole() {
                                                         <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
                                                             <Cloud className="w-5 h-5 text-blue-500" /> Salesforce Configurations
                                                         </h3>
-                                                        <button 
+                                                        <button
                                                             onClick={handleDisconnectSalesforce}
                                                             disabled={saving}
                                                             className="flex items-center justify-center gap-2 px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg text-sm font-medium transition-colors border border-red-200"
@@ -887,42 +998,78 @@ export default function AdminConsole() {
                                         )}
 
                                         {activeTab === "leave" && (
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                                {configs.leave?.map((record: any) => (
-                                                    <div key={record.Id} className="group">
-                                                        <label className="block text-sm font-semibold text-slate-700 mb-2">
-                                                            {record.MasterLabel}
-                                                        </label>
-                                                        {['One_plus_two_rule', 'Sandwich_Rule'].includes(record.DeveloperName) ? (
-                                                            <Select
-                                                                value={record.Value__c || 'false'}
-                                                                onChange={(value) => handleInputChange('Leave_Configurations__mdt', record, value)}
-                                                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-                                                                options={[
-                                                                    { value: 'true', label: 'Enabled' },
-                                                                    { value: 'false', label: 'Disabled' }
-                                                                ]}
-                                                            />
-                                                        ) : ['Sandwich_Rule_Applies_to', 'One_Two_Applies_to'].includes(record.DeveloperName) ? (
-                                                            <Select
-                                                                mode="multiple"
-                                                                allowClear
-                                                                value={(record.Value__c || '').split(',').map((role: string) => role.trim()).filter(Boolean)}
-                                                                onChange={(values) => handleInputChange('Leave_Configurations__mdt', record, values.join(','))}
-                                                                options={roleOptions.map((role) => ({ value: role, label: role }))}
-                                                                placeholder="Select roles"
-                                                                className="w-full bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-                                                            />
-                                                        ) : (
+                                            <div className="space-y-6">
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                    {configs.leave?.map((record: any) => (
+                                                        <div key={record.Id} className="group">
+                                                            <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                                                {record.MasterLabel}
+                                                            </label>
+                                                            {['One_plus_two_rule', 'Sandwich_Rule'].includes(record.DeveloperName) ? (
+                                                                <Select
+                                                                    value={record.Value__c || 'false'}
+                                                                    onChange={(value) => handleInputChange('Leave_Configurations__mdt', record, value)}
+                                                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                                                                    options={[
+                                                                        { value: 'true', label: 'Enabled' },
+                                                                        { value: 'false', label: 'Disabled' }
+                                                                    ]}
+                                                                />
+                                                            ) : ['Sandwich_Rule_Applies_to', 'One_Two_Applies_to'].includes(record.DeveloperName) ? (
+                                                                <Select
+                                                                    mode="multiple"
+                                                                    allowClear
+                                                                    value={(record.Value__c || '').split(',').map((role: string) => role.trim()).filter(Boolean)}
+                                                                    onChange={(values) => handleInputChange('Leave_Configurations__mdt', record, values.join(','))}
+                                                                    options={roleOptions.map((role) => ({ value: role, label: role }))}
+                                                                    placeholder="Select roles"
+                                                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                                                                />
+                                                            ) : (
+                                                                <input
+                                                                    type="text"
+                                                                    value={record.Value__c || ''}
+                                                                    onChange={(e) => handleInputChange('Leave_Configurations__mdt', record, e.target.value)}
+                                                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition group-hover:bg-white"
+                                                                />
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                    <div className="rounded-2xl bg-white p-1">
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                            <p className="text-sm font-semibold text-slate-800">Leave User Guide</p>
+
+                                                            <div className="relative group">
+                                                                <div className="w-5 h-5 flex items-center justify-center text-slate-400 hover:text-slate-500 cursor-help transition">
+                                                                    <Info className="w-4 h-4" />
+                                                                </div>
+
+                                                                {/* Tooltip */}
+                                                                <div className="absolute left-0 top-6 hidden group-hover:block w-80 bg-slate-800 text-white text-sm rounded-xl p-3 shadow-lg z-50">
+                                                                    Set the URL for the "How to Apply Leave" guide document (PDF or web page).
+                                                                    This URL will be shown to employees in an embedded viewer on the Leaves page.
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex flex-col gap-1 items-center">
                                                             <input
-                                                                type="text"
-                                                                value={record.Value__c || ''}
-                                                                onChange={(e) => handleInputChange('Leave_Configurations__mdt', record, e.target.value)}
-                                                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition group-hover:bg-white"
+                                                                type="url"
+                                                                value={adminSettings.leaveGuideUrl || ''}
+                                                                onChange={(e) => handleSettingChange('leaveGuideUrl', e.target.value)}
+                                                                placeholder="https://example.com/leave-guide.pdf"
+                                                                className="flex-1 w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition hover:bg-white text-sm"
                                                             />
-                                                        )}
+                                                            {/* <button
+                                                                onClick={saveAdminSettings}
+                                                                disabled={saving}
+                                                                className="flex items-center gap-2 px-5 py-3 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition disabled:opacity-50"
+                                                            >
+                                                                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                                                                Save URL
+                                                            </button> */}
+                                                        </div>
                                                     </div>
-                                                ))}
+                                                </div>
                                             </div>
                                         )}
 
@@ -986,7 +1133,7 @@ export default function AdminConsole() {
                                                                                 <td className="px-6 py-4">
                                                                                     <Select
                                                                                         size="small"
-                                                                                        dropdownStyle={{ width: 'max-content'}}
+                                                                                        dropdownStyle={{ width: 'max-content' }}
                                                                                         value={user.Role || 'Employee'}
                                                                                         onChange={(e: any) => updateUser(user.Id, { Role__c: e })}
                                                                                         className="bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs font-medium focus:ring-2 focus:ring-indigo-500 outline-none"
@@ -1018,7 +1165,7 @@ export default function AdminConsole() {
                                                                                                 const data = {
                                                                                                     Active__c: user.Active__c ? false : true
                                                                                                 }
-                                                                                                                                                                                     updateUser(user.Id, data)
+                                                                                                updateUser(user.Id, data)
                                                                                             }}
                                                                                             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${user.Active__c
                                                                                                 ? "bg-green-100 text-green-700 hover:bg-green-200"
@@ -1069,7 +1216,7 @@ export default function AdminConsole() {
                                                                             onClick={() => setCurrentPageUsers(prev => prev - 1)}
                                                                             className="px-1 py-1.5 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                                                         >
-                                                                            <ChevronLeft size={16}/>
+                                                                            <ChevronLeft size={16} />
                                                                         </button>
                                                                         <span className="text-sm px-3 text-cyan-500 border border-border rounded-lg border-cyan-500 px-2 py-1 font-bold">
                                                                             {currentPageUsers}
@@ -1079,7 +1226,7 @@ export default function AdminConsole() {
                                                                             onClick={() => setCurrentPageUsers(prev => prev + 1)}
                                                                             className="px-1 py-1.5 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                                                         >
-                                                                            <ChevronRight size={16}/>
+                                                                            <ChevronRight size={16} />
                                                                         </button>
                                                                     </div>
                                                                 </div>
@@ -1210,13 +1357,13 @@ export default function AdminConsole() {
                                                                             }
 
                                                                             return (
-                                                                            <tr>
-                                                                                <td colSpan={5} className="px-6 py-12 text-center text-slate-400 italic">
-                                                                                    {integrationSearch
-                                                                                        ? `No connected users match "${integrationSearch}".`
-                                                                                        : 'No users have connected their Google Workspace account yet.'}
-                                                                                </td>
-                                                                            </tr>
+                                                                                <tr>
+                                                                                    <td colSpan={5} className="px-6 py-12 text-center text-slate-400 italic">
+                                                                                        {integrationSearch
+                                                                                            ? `No connected users match "${integrationSearch}".`
+                                                                                            : 'No users have connected their Google Workspace account yet.'}
+                                                                                    </td>
+                                                                                </tr>
                                                                             );
                                                                         })()}
                                                                     </tbody>
@@ -1254,7 +1401,7 @@ export default function AdminConsole() {
                                                                                 onClick={() => setCurrentPageIntegrations(prev => prev - 1)}
                                                                                 className="px-1 py-1.5 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                                                             >
-                                                                                <ChevronLeft size={16}/>
+                                                                                <ChevronLeft size={16} />
                                                                             </button>
                                                                             <span className="px-3 text-cyan-500 border border-border rounded-lg border-cyan-500 px-2 py-1 font-bold">
                                                                                 {currentPageIntegrations}
@@ -1264,7 +1411,7 @@ export default function AdminConsole() {
                                                                                 onClick={() => setCurrentPageIntegrations(prev => prev + 1)}
                                                                                 className="px-1 py-1.5 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                                                             >
-                                                                                <ChevronRight size={16}/>
+                                                                                <ChevronRight size={16} />
                                                                             </button>
                                                                         </div>
                                                                     </div>
@@ -1291,7 +1438,7 @@ export default function AdminConsole() {
                                             }) || [];
 
                                             function narrowedDocumentCheck(name: string) {
-                                              return name.includes('document');
+                                                return name.includes('document');
                                             }
 
                                             const renderTemplateGrid = (items: any[]) => (

@@ -213,6 +213,8 @@ export interface PayrollEmployeeDetail {
   uanNumber?: string
   bankName?: string
   accountNumber?: string
+  ifscCode?: string
+  bankDetails?: BankDetails
   year?: number
   monthlyIncome?: number
   basicSalary?: number
