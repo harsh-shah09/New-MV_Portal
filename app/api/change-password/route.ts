@@ -4,7 +4,7 @@ import crypto, { hash } from 'crypto';
 import { hashPassword} from '@/lib/auth';
 
 const MIN_PASSWORD_LENGTH = 6;
-const MAX_PASSWORD_LENGTH = 10;
+const MAX_PASSWORD_LENGTH = 64;
 
 interface EmployeeRecord {
   Id: string;
