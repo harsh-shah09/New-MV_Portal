@@ -59,7 +59,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
     const [existingDocuments, setExistingDocuments] = useState<any[]>([])
     const [isExpired, setIsExpired] = useState(false)
     // Track last successfully saved personal-info payload to skip unchanged API calls
-    const [disabledsteps , setDisabledSteps] = useState<number[]>([])
+    const [disabledsteps, setDisabledSteps] = useState<number[]>([])
     const lastSavedPersonalData = useRef<string | null>(null)
     const { useBreakpoint } = Grid;
     const screens = useBreakpoint();
@@ -193,7 +193,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                     bankName: bank.Name || '',
                                     bankbranch: bank.Bank_Branch_Name__c || '',
                                     accountNumber: bank.Bank_Account_Number__c || '',
-                                    accountHolder: emp.Employee_Name__c || '',
+                                    accountHolder: emp.Account_Holder_Name__c || '',
                                     ifscCode: bank.IFSC__c || '',
                                 });
                             }
@@ -214,18 +214,18 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
             .catch(err => console.error(err))
             .finally(() => {
                 setPageLoading(false)
-                if(!firsttime){
-                    if(step === 1){
+                if (!firsttime) {
+                    if (step === 1) {
                         setDisabledSteps([])
                     }
-                    if(step === 2){
+                    if (step === 2) {
                         setDisabledSteps([1])
                     }
-                    if(step === 3){
-                        setDisabledSteps([1,2])
+                    if (step === 3) {
+                        setDisabledSteps([1, 2])
                     }
-                    if(step === 4){
-                        setDisabledSteps([1,2,3])
+                    if (step === 4) {
+                        setDisabledSteps([1, 2, 3])
                     }
                 }
             })
@@ -537,15 +537,15 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                         setLoading(false);
                         return;
                     }
-                    if(values.ifscCode){
-                        if(!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(values.ifscCode)){
+                    if (values.ifscCode) {
+                        if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(values.ifscCode)) {
                             showToast.error("IFSC code format: 4 letters + 0 + 6 alphanumeric (e.g., SBIN0001234).");
                             setLoading(false);
                             return;
                         }
                     }
-                    if(values.bankbranch){
-                        if(values.bankbranch.length > 50){
+                    if (values.bankbranch) {
+                        if (values.bankbranch.length > 50) {
                             customErrors.bankbranch = 'Bank Branch name cannot exceed 50 characters.'
                             showToast.error("Bank Branch name cannot exceed 50 characters.");
                             setLoading(false);
@@ -644,7 +644,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
 
     const handleDocumentUpload = async (options: any, doc: any) => {
         const { file, onSuccess, onError } = options
-         // 5 MB client-side limit
+        // 5 MB client-side limit
         if (file.size > 5 * 1024 * 1024) {
             showToast.error(`File size exceeds 5MB limit.`)
             onError({ event: new Error('File too large') })
@@ -743,12 +743,12 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                 return (
                     <div className="py-8 text-center flex flex-col items-center">
                         <p className="mb-6 text-gray-500">Upload a professional profile picture.</p>
-                        <ImgCrop rotationSlider cropShape="round" showGrid aspect={1} quality={0.6} modalTitle="Crop Image" beforeCrop={(file)=>{
-                            if(!file.type.includes('image/')) {
+                        <ImgCrop rotationSlider cropShape="round" showGrid aspect={1} quality={0.6} modalTitle="Crop Image" beforeCrop={(file) => {
+                            if (!file.type.includes('image/')) {
                                 showToast.error('Only image files are allowed')
                                 return false
                             }
-                            if(file.size > 1.1*1024*1024) {
+                            if (file.size > 1.1 * 1024 * 1024) {
                                 showToast.error('File size should be less than 1MB')
 
                                 return false
@@ -761,16 +761,16 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                 showUploadList={false}
                                 beforeUpload={(file) => {
 
-                                    if(file.size > 1.1*1024*1024) {
+                                    if (file.size > 1.1 * 1024 * 1024) {
                                         return false
                                     }
-                                    if(!file.type.includes('image/')) {
+                                    if (!file.type.includes('image/')) {
                                         return false
                                     }
                                     setProfileFile(file)
                                     return false
                                 }}
-                                disabled = {documentsUploading || disabledsteps.includes(1)}
+                                disabled={documentsUploading || disabledsteps.includes(1)}
                                 className="avatar-uploader group border-dashed"
                             >
                                 {profileFile ? (
@@ -804,9 +804,9 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                 return (
                     <div className="py-4">
                         <p className="mb-4 text-gray-500">Current Address</p>
-                        <Form.Item name="street" label="Street Address" rules={[{ required: true, message: 'Street address is required' } ,
-                            { max: 100, message: 'Street address should not exceed 100 characters'} ,
-                            { min: 2, message: 'Street address should be at least 2 characters long'}
+                        <Form.Item name="street" label="Street Address" rules={[{ required: true, message: 'Street address is required' },
+                        { max: 100, message: 'Street address should not exceed 100 characters' },
+                        { min: 2, message: 'Street address should be at least 2 characters long' }
                         ]}>
                             <Input placeholder="123 Main St" disabled={disabledsteps.includes(2)} />
                         </Form.Item>
@@ -832,9 +832,9 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                     const countryCode = Country.getAllCountries().find(c => c.name === countryVal)?.isoCode;
                                     const states = countryCode ? State.getStatesOfCountry(countryCode) : [];
                                     return (
-                                        <Form.Item 
-                                            name="state" 
-                                            label="State" 
+                                        <Form.Item
+                                            name="state"
+                                            label="State"
                                             rules={[{ required: true, message: 'State is required' }]}
                                         >
                                             <Select
@@ -859,9 +859,9 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                     const stateCode = State.getStatesOfCountry(countryCode || '').find(s => s.name === stateVal)?.isoCode;
                                     const cities = (countryCode && stateCode) ? City.getCitiesOfState(countryCode, stateCode) : [];
                                     return (
-                                        <Form.Item 
-                                            name="city" 
-                                            label="City" 
+                                        <Form.Item
+                                            name="city"
+                                            label="City"
                                             rules={[{ required: true, message: 'City is required' }]}
                                         >
                                             <Select
@@ -875,15 +875,15 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                     );
                                 }}
                             </Form.Item>
-                            <Form.Item 
-                                name="postalCode" 
-                                label="Postal Code" 
+                            <Form.Item
+                                name="postalCode"
+                                label="Postal Code"
                                 rules={[
                                     { required: true, message: 'Postal code is required' },
                                     { pattern: /^[0-9]{5,10}$/, message: 'Postal code should contain 5-10 digits' }
                                 ]}
                             >
-                                <Input 
+                                <Input
                                     disabled={disabledsteps.includes(2)}
                                     onChange={(e) => {
                                         const onlyDigits = e.target.value.replace(/\D/g, '').slice(0, 10);
@@ -912,10 +912,10 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
 
                                 return (
                                     <>
-                                        <Form.Item name="permanentstreet" label="Street Address" rules={[{ required: true, message: 'Street address is required' } , {pattern: /^[A-Za-z]*$/, message: 'Street address should contain only alphabets'} ,
-                            { max: 100, message: 'Street address should not exceed 100 characters'} ,
-                            { min: 2, message: 'Street address should be at least 2 characters long'}
-                        ]}>
+                                        <Form.Item name="permanentstreet" label="Street Address" rules={[{ required: true, message: 'Street address is required' }, { pattern: /^[A-Za-z]*$/, message: 'Street address should contain only alphabets' },
+                                        { max: 100, message: 'Street address should not exceed 100 characters' },
+                                        { min: 2, message: 'Street address should be at least 2 characters long' }
+                                        ]}>
                                             <Input placeholder="123 Main St" disabled={disabledsteps.includes(2)} />
                                         </Form.Item>
 
@@ -938,9 +938,9 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                                     const countryCode = Country.getAllCountries().find(c => c.name === countryVal)?.isoCode;
                                                     const states = countryCode ? State.getStatesOfCountry(countryCode) : [];
                                                     return (
-                                                        <Form.Item 
-                                                            name="permanentstate" 
-                                                            label="State" 
+                                                        <Form.Item
+                                                            name="permanentstate"
+                                                            label="State"
                                                             rules={[{ required: true, message: 'State is required' }]}
                                                         >
                                                             <Select
@@ -966,9 +966,9 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                                     const stateCode = State.getStatesOfCountry(countryCode || '').find(s => s.name === stateVal)?.isoCode;
                                                     const cities = (countryCode && stateCode) ? City.getCitiesOfState(countryCode, stateCode) : [];
                                                     return (
-                                                        <Form.Item 
-                                                            name="permanentcity" 
-                                                            label="City" 
+                                                        <Form.Item
+                                                            name="permanentcity"
+                                                            label="City"
                                                             rules={[{ required: true, message: 'City is required' }]}
                                                         >
                                                             <Select
@@ -982,20 +982,20 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                                     );
                                                 }}
                                             </Form.Item>
-                                            <Form.Item 
-                                                name="permanentpostalCode" 
-                                                label="Postal Code" 
+                                            <Form.Item
+                                                name="permanentpostalCode"
+                                                label="Postal Code"
                                                 rules={[
                                                     { required: true, message: 'Postal code is required' },
                                                     { pattern: /^[0-9]{5,10}$/, message: 'Postal code should contain 5-10 digits' }
                                                 ]}
                                             >
-                                                <Input 
+                                                <Input
                                                     disabled={disabledsteps.includes(2)}
                                                     onChange={(e) => {
                                                         const onlyDigits = e.target.value.replace(/\D/g, '').slice(0, 10);
                                                         form.setFieldValue('permanentpostalCode', onlyDigits);
-                                                        form.validateFields(['permanentpostalCode']);    
+                                                        form.validateFields(['permanentpostalCode']);
                                                     }}
                                                 />
                                             </Form.Item>
@@ -1006,26 +1006,26 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                             }}
                         </Form.Item>
                         <Divider />
-                        <Form.Item 
-                            name="emergencyContact" 
-                            label="Emergency Contact Name" 
+                        <Form.Item
+                            name="emergencyContact"
+                            label="Emergency Contact Name"
                             rules={[
                                 { required: true, message: 'Emergency contact name is required' },
                                 { pattern: /^[a-zA-Z\s-]*$/, message: 'Name cannot contain numbers or special characters' },
-                                { max:100, message: 'Emergency contact name cannot exceed 100 characters' },
-                                { min:3, message: 'Emergency contact name cannot be less than 3 characters' },
+                                { max: 100, message: 'Emergency contact name cannot exceed 100 characters' },
+                                { min: 3, message: 'Emergency contact name cannot be less than 3 characters' },
                             ]}
-                            
+
                         >
                             <Input disabled={disabledsteps.includes(2)} placeholder="Enter emergency contact name" />
                         </Form.Item>
-                        <Form.Item 
-                            name="emergencyRelation" 
-                            label="Emergency Contact Relation" 
+                        <Form.Item
+                            name="emergencyRelation"
+                            label="Emergency Contact Relation"
                             rules={[
                                 { required: true, message: 'Emergency contact relation is required' },
                                 { pattern: /^[a-zA-Z\s-]*$/, message: 'Relation cannot contain numbers or special characters' },
-                                { max:100, message: 'Emergency contact relation cannot exceed 100 characters' }
+                                { max: 100, message: 'Emergency contact relation cannot exceed 100 characters' }
                             ]}
                         >
                             <Input disabled={disabledsteps.includes(2)} placeholder="e.g. Spouse, Parent, Sibling" />
@@ -1039,37 +1039,37 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                 ]}
                             >
                                 <Select
-                                                    showSearch
-                                                    disabled={disabledsteps.includes(2)}
-                                                    placeholder="Select country code"
-                                                    options={dynamicCountryOptions.map(c => ({
-                                                        value: c.value,
-                                                        label: c.label
-                                                    }))}
-                                                    optionFilterProp="label"
-                                                    status={formErrors.emergencyCountryCode ? 'error' : ''}
-                                                    onChange={(value) => {
-                                                        const phone = form.getFieldValue('emergencyPhoneNumber')
-                                                    
-                                                        if (phone) {
-                                                          const isValid = validateEmergencyPhone(value, phone)
-                                                    
-                                                          if (!isValid) {
-                                                            setFormErrors(prev => ({
-                                                                ...prev,
-                                                                emergencyPhoneNumber: 'Please enter a valid phone number for the selected country'
-                                                            }))
-                                                        } else {
-                                                            setFormErrors(prev => ({
-                                                                ...prev,
-                                                                emergencyPhoneNumber: ''
-                                                            }))
-                                                        }
-                                                        } else {
-                                                          setFormErrors({})
-                                                        }
-                                                      }}
-                                                />
+                                    showSearch
+                                    disabled={disabledsteps.includes(2)}
+                                    placeholder="Select country code"
+                                    options={dynamicCountryOptions.map(c => ({
+                                        value: c.value,
+                                        label: c.label
+                                    }))}
+                                    optionFilterProp="label"
+                                    status={formErrors.emergencyCountryCode ? 'error' : ''}
+                                    onChange={(value) => {
+                                        const phone = form.getFieldValue('emergencyPhoneNumber')
+
+                                        if (phone) {
+                                            const isValid = validateEmergencyPhone(value, phone)
+
+                                            if (!isValid) {
+                                                setFormErrors(prev => ({
+                                                    ...prev,
+                                                    emergencyPhoneNumber: 'Please enter a valid phone number for the selected country'
+                                                }))
+                                            } else {
+                                                setFormErrors(prev => ({
+                                                    ...prev,
+                                                    emergencyPhoneNumber: ''
+                                                }))
+                                            }
+                                        } else {
+                                            setFormErrors({})
+                                        }
+                                    }}
+                                />
                             </Form.Item>
 
                             <Form.Item noStyle shouldUpdate={(prev, current) => prev.emergencyCountryCode !== current.emergencyCountryCode}>
@@ -1156,10 +1156,10 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                 { required: true, message: 'Bank name is required' },
                                 { min: 2, message: 'Bank name must be at least 2 characters' },
                                 { max: 50, message: 'Bank name must not exceed 50 characters' },
-                                { 
-                                    pattern: /^[a-zA-Z\s]+$/, 
-                                    message: 'Bank name can only contain letters.' 
-                                  }
+                                {
+                                    pattern: /^[a-zA-Z\s]+$/,
+                                    message: 'Bank name can only contain letters.'
+                                }
                             ]}
                         >
                             <Input
@@ -1297,11 +1297,10 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                     handlePassbookUpload(file)
                                     return false
                                 }}
-                                className={`!bg-gray-50 hover:!bg-blue-50 transition rounded-lg ${
-                                    passbookError
-                                        ? '!border !border-red-500 !shadow-[0_0_0_2px_rgba(239,68,68,0.2)]'
-                                        : ''
-                                }`}                                
+                                className={`!bg-gray-50 hover:!bg-blue-50 transition rounded-lg ${passbookError
+                                    ? '!border !border-red-500 !shadow-[0_0_0_2px_rgba(239,68,68,0.2)]'
+                                    : ''
+                                    }`}
                                 disabled={passbookUploading || disabledsteps.includes(3)}
                                 accept=".pdf,.jpg,.jpeg,.png"
                             >

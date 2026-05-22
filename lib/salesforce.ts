@@ -27,11 +27,11 @@ interface StoredCredentials {
 export const getSalesforceConnection = async () => {
   // 1. Return in-memory connection if active
   if (connection) {
-      try {
-           return connection;
-      } catch(e) {
-          connection = null;
-      }
+    try {
+      return connection;
+    } catch (e) {
+      connection = null;
+    }
   }
 
   // 2. Try to get invalid/expired token logic is handled by "try to use it, if fail, login"
@@ -40,12 +40,12 @@ export const getSalesforceConnection = async () => {
     const getCmd = new GetCommand({
       TableName: TABLE_NAME,
       Key: {
-          Employee_Id: TOKEN_ID,
-          SortKey: "TOKEN"
-        }
+        Employee_Id: TOKEN_ID,
+        SortKey: "TOKEN"
+      }
     });
     const data = await db.send(getCmd);
-  
+
     if (data.Item) {
       const stored = data.Item as StoredToken;
       // Initialize connection with stored token
@@ -99,22 +99,20 @@ export const getSalesforceConnection = async () => {
   const passWordToken = sfCredentials.password.trim().concat(sfCredentials.security_token.trim())
 
   await conn.login(sfCredentials.username, passWordToken);
-``
+  ``
   // 5. Store new token in DynamoDB
   try {
     const putCmd = new PutCommand({
-    TableName: TABLE_NAME,
-    Item: {
-      Employee_Id: TOKEN_ID,
-      SortKey: "TOKEN",
-      access_token: conn.accessToken,
-      instance_url: conn.instanceUrl,
-      updated_time: new Date().toISOString()
-    }
-  });
-  console.log('here' , putCmd)
+      TableName: TABLE_NAME,
+      Item: {
+        Employee_Id: TOKEN_ID,
+        SortKey: "TOKEN",
+        access_token: conn.accessToken,
+        instance_url: conn.instanceUrl,
+        updated_time: new Date().toISOString()
+      }
+    });
     await db.send(putCmd);
-    console.log('there')
   } catch (error) {
     console.error('Failed to save token to DynamoDB:', error);
     // Don't fail the request just because caching failed, but log it
@@ -155,20 +153,20 @@ export interface Employee {
   PF__c?: number;
   PT__c?: number;
   ESI__c?: number;
-  
+
   // Standard fields
   Name?: string; // Standard name field often exists, but we rely on Employee_Name__c
 }
 
 export interface DashboardData {
-    kpiStats: any[],
-    recentActivities: any[],
-    statsOverview: any[],
+  kpiStats: any[],
+  recentActivities: any[],
+  statsOverview: any[],
 }
 
 export const findEmployee = async (identifier: string): Promise<Employee | null> => {
   const conn = await getSalesforceConnection();
-  if(!conn) return null;
+  if (!conn) return null;
 
   // Search by Company_Email__c OR Employee_Id__c
   const isEmail = identifier.includes('@');
@@ -181,12 +179,12 @@ export const findEmployee = async (identifier: string): Promise<Employee | null>
     WHERE ${isEmail ? 'Company_Email__c' : 'Employee_Id__c'} = '${escapedIdentifier}' 
     LIMIT 1
   `;
-  
+
   // Login accepts email or employee ID.
-  
+
   const result = await conn.query(query);
 
-  if (result.records.length === 0) return null; 
+  if (result.records.length === 0) return null;
   return result.records[0] as unknown as Employee;
 };
 
@@ -226,14 +224,14 @@ export const getDashboardData = async (): Promise<DashboardData> => {
   // 1️⃣ Employee totals + department-wise count (single query using WITH ROLLUP)
   // Updated group by Department__c on Employee__c
   // const employeeAgg = await conn.query<any>(`SELECT Department__c dept, COUNT(Id) cnt FROM Employee__c GROUP BY ROLLUP(Department__c)`);
-  const employeeAgg = { records : []}
+  const employeeAgg = { records: [] }
   let totalEmployees = 0;
 
   // Mock budget distribution
   const getRandomBudget = (employees: number) => {
-     const base = employees * 50000; // $50k per employee
-     const variance = Math.floor(Math.random() * 20000);
-     return base + variance;
+    const base = employees * 50000; // $50k per employee
+    const variance = Math.floor(Math.random() * 20000);
+    return base + variance;
   };
 
   const departmentItems = employeeAgg.records
@@ -258,7 +256,7 @@ export const getDashboardData = async (): Promise<DashboardData> => {
   //   WHERE Status__c IN ('Approved','Applied')
   //   GROUP BY Status__c
   // `);
-  const leaveAgg = {records:[]}
+  const leaveAgg = { records: [] }
   let activeLeaves = 0;
   let pendingApprovals = 0;
 
@@ -275,10 +273,10 @@ export const getDashboardData = async (): Promise<DashboardData> => {
   //   ORDER BY CreatedDate ASC
   // `;
   // const leaveTrendsRaw = await conn.query<any>(leaveTrendQuery);
-  
+
   const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const trendsMap = new Map<string, { month: string, approved: number, pending: number, rejected: number }>();
-  
+
   // Initialize current year months
   monthNames.forEach(m => trendsMap.set(m, { month: m, approved: 0, pending: 0, rejected: 0 }));
 
@@ -292,7 +290,7 @@ export const getDashboardData = async (): Promise<DashboardData> => {
   //         else if (r.Status__c === 'Rejected') stat.rejected++;
   //     }
   // });
-  
+
   const currentMonthIndex = new Date().getMonth();
   const leaveTrends = Array.from(trendsMap.values()).slice(0, currentMonthIndex + 1);
 
@@ -305,12 +303,12 @@ export const getDashboardData = async (): Promise<DashboardData> => {
     LIMIT 5
   `;
   // const recentLeaves = await conn.query<any>(recentLeavesQuery);
-  const recentLeaves = {records:[]}
+  const recentLeaves = { records: [] }
   const recentActivities = recentLeaves.records.map((r: any) => ({
-      title: `${r.Employee__r?.Employee_Name__c || 'Employee'} - ${r.Status__c}`,
-      value: new Date(r.CreatedDate).toLocaleDateString(),
-      icon: 'Activity',
-      color: r.Status__c === 'Approved' ? 'green' : (r.Status__c === 'Rejected' ? 'red' : 'amber')
+    title: `${r.Employee__r?.Employee_Name__c || 'Employee'} - ${r.Status__c}`,
+    value: new Date(r.CreatedDate).toLocaleDateString(),
+    icon: 'Activity',
+    color: r.Status__c === 'Approved' ? 'green' : (r.Status__c === 'Rejected' ? 'red' : 'amber')
   }));
 
   // 5️⃣ Build final object
@@ -326,8 +324,8 @@ export const getDashboardData = async (): Promise<DashboardData> => {
         items: departmentItems,
       },
       {
-          title: 'Leave Trends',
-          items: leaveTrends
+        title: 'Leave Trends',
+        items: leaveTrends
       }
     ],
     recentActivities: recentActivities,
@@ -336,44 +334,44 @@ export const getDashboardData = async (): Promise<DashboardData> => {
 
 
 export const getEmployeeById = async (id: string, includeSalary: boolean = false): Promise<any | null> => {
-    const conn = await getSalesforceConnection();
-    if (!conn) return null;
+  const conn = await getSalesforceConnection();
+  if (!conn) return null;
 
-    const baseFields = `Id, Name, Employee_Id__c, Employee_Name__c, Employee_Email__c, Joining_Date__c, Onboarding_Date__c, Status__c, Active__c, Profile_Photo__c, Team_Lead__c, Is2FAEnabled__c, Employee_Phone__c, Birthdate__c, Gender__c, Employee_Current_Address__c, Emergency_Contact_Name__c, Emergency_Contact_Number__c, Emergency_Contact_Relation__c, Experience__c, Department__c, Role__c, Title__c, Company_Email__c, Technology__c, Enrollment_Number__c, ESI_Number__c, PF_Number__c, UAN_Number__c`;
-    
-    const salaryFields = `, Basic_Console__c, HRA__c, CONV__c, S_All__c, PF_Basic__c, PF__c, PT__c, ESI__c, Salary_CTC__c`;
-    const queryFields = includeSalary ? baseFields + salaryFields : baseFields;
+  const baseFields = `Id, Name, Employee_Id__c, Employee_Name__c, Employee_Email__c, Joining_Date__c, Onboarding_Date__c, Status__c, Active__c, Profile_Photo__c, Team_Lead__c, Is2FAEnabled__c, Employee_Phone__c, Birthdate__c, Gender__c, Employee_Current_Address__c, Emergency_Contact_Name__c, Emergency_Contact_Number__c, Emergency_Contact_Relation__c, Experience__c, Department__c, Role__c, Title__c, Company_Email__c, Technology__c, Enrollment_Number__c, ESI_Number__c, PF_Number__c, UAN_Number__c`;
 
-    // 1. Fetch Employee Details (All component fields directly)
-    const empQuery = `
+  const salaryFields = `, Basic_Console__c, HRA__c, CONV__c, S_All__c, PF_Basic__c, PF__c, PT__c, ESI__c, Salary_CTC__c`;
+  const queryFields = includeSalary ? baseFields + salaryFields : baseFields;
+
+  // 1. Fetch Employee Details (All component fields directly)
+  const empQuery = `
            SELECT ${queryFields}
       FROM Employee__c 
       WHERE Id = '${id}'
       LIMIT 1
     `;
-    const empResult = await conn.query(empQuery);
-    if (empResult.records.length === 0) return null;
+  const empResult = await conn.query(empQuery);
+  if (empResult.records.length === 0) return null;
 
-    const empRecord: any = empResult.records[0];
+  const empRecord: any = empResult.records[0];
 
-    // 2. Fetch Bank Details
-    const bankQuery = `
-      SELECT Id, Name, Bank_Branch_Name__c, Bank_Account_Number__c, IFSC__c, Primary_Account__c, Status__c
+  // 2. Fetch Bank Details
+  const bankQuery = `
+      SELECT Id, Name, Bank_Branch_Name__c, Bank_Account_Number__c, IFSC__c, Primary_Account__c, Status__c,Account_Holder_Name__c
       FROM Bank_Detail__c
       WHERE Employee__c = '${id}'
     `;
-    const bankResult = await conn.query(bankQuery);
+  const bankResult = await conn.query(bankQuery);
 
-    // 3. Fetch Documents
-    const docQuery = `
+  // 3. Fetch Documents
+  const docQuery = `
       SELECT Id, Document_Type__c, Document_Category__c, File_URL__c, Status__c
       FROM Document__c
       WHERE Employee__c = '${id}'
     `;
-    const docResult = await conn.query(docQuery);
+  const docResult = await conn.query(docQuery);
 
-    // 4. Fetch Asset Assignment History (Current & Past)
-    const historyQuery = `
+  // 4. Fetch Asset Assignment History (Current & Past)
+  const historyQuery = `
       SELECT Id, AMS_Assigned_Date__c, AMS_Returned_Date__c, 
              AMS_Asset__r.Name, AMS_Asset__r.AMS_Asset_Serial_Number__c, 
              AMS_Asset__r.AMS_Product__r.Name, AMS_Asset__r.AMS_Product__r.AMS_Category__c, 
@@ -382,32 +380,32 @@ export const getEmployeeById = async (id: string, includeSalary: boolean = false
       WHERE AMS_Assigned_Person__c = '${id}'
       ORDER BY AMS_Assigned_Date__c DESC
     `;
-    const historyResult = await conn.query(historyQuery);
+  const historyResult = await conn.query(historyQuery);
 
-    // Map to a clean structure
-    return {
-        ...empRecord, 
-        // No more separate contact object, everything is on top level
-        bankDetails: bankResult.records,
-        documents: docResult.records,
-        assetHistory: historyResult.records
-    };
+  // Map to a clean structure
+  return {
+    ...empRecord,
+    // No more separate contact object, everything is on top level
+    bankDetails: bankResult.records,
+    documents: docResult.records,
+    assetHistory: historyResult.records
+  };
 };
 
 export const updateEmployee = async (id: string, data: any) => {
-    const conn = await getSalesforceConnection();
-    if (!conn) throw new Error("No Salesforce connection");
-    const updateData: any = { Id: id, ...data };
-  
-    delete updateData.contactId;
+  const conn = await getSalesforceConnection();
+  if (!conn) throw new Error("No Salesforce connection");
+  const updateData: any = { Id: id, ...data };
 
-    await conn.sobject("Employee__c").update(updateData);
+  delete updateData.contactId;
+
+  await conn.sobject("Employee__c").update(updateData);
 };
 
 export const createDocumentRecord = async (docData: any) => {
-    const conn = await getSalesforceConnection();
-    if (!conn) throw new Error("No Salesforce connection");
-    return await conn.sobject("Document__c").create(docData);
+  const conn = await getSalesforceConnection();
+  if (!conn) throw new Error("No Salesforce connection");
+  return await conn.sobject("Document__c").create(docData);
 };
 
 /**
@@ -418,45 +416,45 @@ export const createDocumentRecord = async (docData: any) => {
  * This prevents duplicate rows when a user re-uploads the same document type.
  */
 export const upsertDocumentRecord = async (docData: {
-    Name: string;
-    Document_Type__c: string;
-    File_URL__c: string;
-    Status__c: string;
-    Employee__c: string;
+  Name: string;
+  Document_Type__c: string;
+  File_URL__c: string;
+  Status__c: string;
+  Employee__c: string;
 }) => {
-    const conn = await getSalesforceConnection();
-    if (!conn) throw new Error("No Salesforce connection");
+  const conn = await getSalesforceConnection();
+  if (!conn) throw new Error("No Salesforce connection");
 
-    const { Employee__c, Document_Type__c } = docData;
+  const { Employee__c, Document_Type__c } = docData;
 
-    // Check for an existing record of the same type for this employee
-    const existingQuery = `
+  // Check for an existing record of the same type for this employee
+  const existingQuery = `
       SELECT Id
       FROM Document__c
       WHERE Employee__c = '${Employee__c}'
         AND Document_Type__c = '${Document_Type__c}'
       LIMIT 1
     `;
-    const existingResult = await conn.query(existingQuery);
+  const existingResult = await conn.query(existingQuery);
 
-    if (existingResult.records.length > 0) {
-        const existingId = (existingResult.records[0] as any).Id;
-        // Update the existing record with the new file info
-        return await conn.sobject("Document__c").update({
-            Id: existingId,
-            Name: docData.Name,
-            File_URL__c: docData.File_URL__c,
-            Status__c: docData.Status__c,
-        });
-    } else {
-        // No existing record – create a fresh one
-        return await conn.sobject("Document__c").create(docData);
-    }
+  if (existingResult.records.length > 0) {
+    const existingId = (existingResult.records[0] as any).Id;
+    // Update the existing record with the new file info
+    return await conn.sobject("Document__c").update({
+      Id: existingId,
+      Name: docData.Name,
+      File_URL__c: docData.File_URL__c,
+      Status__c: docData.Status__c,
+    });
+  } else {
+    // No existing record – create a fresh one
+    return await conn.sobject("Document__c").create(docData);
+  }
 };
 
 export const createBankDetail = async (bankData: any) => {
-    const conn = await getSalesforceConnection();
-    if (!conn) throw new Error("No Salesforce connection");
+  const conn = await getSalesforceConnection();
+  if (!conn) throw new Error("No Salesforce connection");
 
   if (bankData?.Primary_Account__c === true && bankData?.Employee__c) {
     const existingPrimaryQuery = `
@@ -477,7 +475,7 @@ export const createBankDetail = async (bankData: any) => {
     }
   }
 
-    return await conn.sobject("Bank_Detail__c").create(bankData);
+  return await conn.sobject("Bank_Detail__c").create(bankData);
 };
 
 /**
@@ -486,46 +484,47 @@ export const createBankDetail = async (bankData: any) => {
  * This prevents duplicate records when 'Next' is pressed multiple times.
  */
 export const upsertBankDetail = async (bankData: any) => {
-    const conn = await getSalesforceConnection();
-    if (!conn) throw new Error("No Salesforce connection");
+  const conn = await getSalesforceConnection();
+  if (!conn) throw new Error("No Salesforce connection");
 
-    const employeeId = bankData?.Employee__c;
-    if (!employeeId) return await conn.sobject("Bank_Detail__c").create(bankData);
+  const employeeId = bankData?.Employee__c;
+  if (!employeeId) return await conn.sobject("Bank_Detail__c").create(bankData);
 
-    // Check if a bank record already exists for this employee
-    const existingQuery = `
+  // Check if a bank record already exists for this employee
+  const existingQuery = `
       SELECT Id
       FROM Bank_Detail__c
       WHERE Employee__c = '${employeeId}'
       LIMIT 1
     `;
-    const existingResult = await conn.query(existingQuery);
+  const existingResult = await conn.query(existingQuery);
 
-    if (existingResult.records.length > 0) {
-        const existingId = (existingResult.records[0] as any).Id;
-        // Update existing record
-        return await conn.sobject("Bank_Detail__c").update({
-            Id: existingId,
-            Name: bankData.Name,
-            Bank_Branch_Name__c: bankData.Bank_Branch_Name__c,
-            Bank_Account_Number__c: bankData.Bank_Account_Number__c,
-            IFSC__c: bankData.IFSC__c,
-            Primary_Account__c: bankData.Primary_Account__c,
-            Status__c : bankData.Status__c
-        });
-    } else {
-        // No record yet – create new
-        return await conn.sobject("Bank_Detail__c").create(bankData);
-    }
+  if (existingResult.records.length > 0) {
+    const existingId = (existingResult.records[0] as any).Id;
+    // Update existing record
+    return await conn.sobject("Bank_Detail__c").update({
+      Id: existingId,
+      Name: bankData.Name,
+      Bank_Branch_Name__c: bankData.Bank_Branch_Name__c,
+      Bank_Account_Number__c: bankData.Bank_Account_Number__c,
+      IFSC__c: bankData.IFSC__c,
+      Primary_Account__c: bankData.Primary_Account__c,
+      Status__c: bankData.Status__c,
+      Account_Holder_Name__c: bankData.Account_Holder_Name__c,
+    });
+  } else {
+    // No record yet – create new
+    return await conn.sobject("Bank_Detail__c").create(bankData);
+  }
 };
 
 
 export const updateBankDetail = async (bankData: any) => {
-    const conn = await getSalesforceConnection();
-    if (!conn) throw new Error("No Salesforce connection");
+  const conn = await getSalesforceConnection();
+  if (!conn) throw new Error("No Salesforce connection");
 
-    if (bankData?.Primary_Account__c === true && bankData?.Employee__c && bankData?.Id) {
-      const existingPrimaryQuery = `
+  if (bankData?.Primary_Account__c === true && bankData?.Employee__c && bankData?.Id) {
+    const existingPrimaryQuery = `
         SELECT Id
         FROM Bank_Detail__c
         WHERE Employee__c = '${bankData.Employee__c}'
@@ -533,33 +532,33 @@ export const updateBankDetail = async (bankData: any) => {
           AND Id != '${bankData.Id}'
       `;
 
-      const existingPrimaryResult = await conn.query(existingPrimaryQuery);
+    const existingPrimaryResult = await conn.query(existingPrimaryQuery);
 
-      if (existingPrimaryResult.records.length > 0) {
-        const updates = existingPrimaryResult.records.map((record: any) => ({
-          Id: record.Id,
-          Primary_Account__c: false
-        }));
+    if (existingPrimaryResult.records.length > 0) {
+      const updates = existingPrimaryResult.records.map((record: any) => ({
+        Id: record.Id,
+        Primary_Account__c: false
+      }));
 
-        await conn.sobject("Bank_Detail__c").update(updates);
-      }
+      await conn.sobject("Bank_Detail__c").update(updates);
     }
+  }
 
-    return await conn.sobject("Bank_Detail__c").update(bankData);
+  return await conn.sobject("Bank_Detail__c").update(bankData);
 };
 
 export const deleteBankDetail = async (bankId: string) => {
-    const conn = await getSalesforceConnection();
-    if (!conn) throw new Error("No Salesforce connection");
-    return await conn.sobject("Bank_Detail__c").destroy(bankId);
+  const conn = await getSalesforceConnection();
+  if (!conn) throw new Error("No Salesforce connection");
+  return await conn.sobject("Bank_Detail__c").destroy(bankId);
 };
 
 // --- Notifications ---
 
 export const createNotification = async (notifData: any) => {
-    const conn = await getSalesforceConnection();
-    if (!conn) throw new Error("No Salesforce connection");
-    return await conn.sobject("MV_Notification__c").create(notifData);
+  const conn = await getSalesforceConnection();
+  if (!conn) throw new Error("No Salesforce connection");
+  return await conn.sobject("MV_Notification__c").create(notifData);
 }
 
 /**
@@ -570,70 +569,70 @@ export const createNotification = async (notifData: any) => {
  * @param actionRequired - Whether action is required from recipient
  */
 export const sendInAppNotifications = async (
-    recipients: string[],
-    message: string,
-    type: string = 'General',
-    actionRequired: boolean = false
+  recipients: string[],
+  message: string,
+  type: string = 'General',
+  actionRequired: boolean = false
 ) => {
-    try {
-        const conn = await getSalesforceConnection();
-        if (!conn) {
-            console.error("No Salesforce connection for sending notifications");
-            return;
-        }
-
-        // Filter out null/undefined recipients
-        const validRecipients = recipients.filter(r => r);
-        
-        if (validRecipients.length === 0) {
-            console.warn("No valid recipients for notification");
-            return;
-        }
-
-        const notifications = validRecipients.map(employeeId => ({
-            Employee__c: employeeId,
-            Message__c: message,
-            Notification_Type__c: type,
-            Action_Required__c: actionRequired,
-            Is_Read__c: false,
-            Status__c: 'Unread'
-        }));
-
-        await conn.sobject("MV_Notification__c").create(notifications);
-      
-    } catch (error) {
-        console.error('Error sending in-app notifications:', error);
-        // Don't throw error to prevent breaking the main flow
+  try {
+    const conn = await getSalesforceConnection();
+    if (!conn) {
+      console.error("No Salesforce connection for sending notifications");
+      return;
     }
+
+    // Filter out null/undefined recipients
+    const validRecipients = recipients.filter(r => r);
+
+    if (validRecipients.length === 0) {
+      console.warn("No valid recipients for notification");
+      return;
+    }
+
+    const notifications = validRecipients.map(employeeId => ({
+      Employee__c: employeeId,
+      Message__c: message,
+      Notification_Type__c: type,
+      Action_Required__c: actionRequired,
+      Is_Read__c: false,
+      Status__c: 'Unread'
+    }));
+
+    await conn.sobject("MV_Notification__c").create(notifications);
+
+  } catch (error) {
+    console.error('Error sending in-app notifications:', error);
+    // Don't throw error to prevent breaking the main flow
+  }
 }
 
 // --- Documents ---
 
 export const getDocumentsByEmployee = async (employeeId: string) => {
-    const conn = await getSalesforceConnection();
-    if (!conn) throw new Error("No Salesforce connection");
-    const query = `
+  const conn = await getSalesforceConnection();
+  if (!conn) throw new Error("No Salesforce connection");
+  const query = `
       SELECT Id, Name, Document_Type__c, Document_Category__c, File_URL__c, Status__c, CreatedDate
       FROM Document__c
       WHERE Employee__c = '${employeeId}'
       ORDER BY CreatedDate DESC
     `;
-    const result = await conn.query(query);
-    return result.records;
+  const result = await conn.query(query);
+  return result.records;
 }
 
 export const getPendingDocuments = async (reviewerRole?: string) => {
-    const conn = await getSalesforceConnection();
-    if (!conn) throw new Error("No Salesforce connection");
-    // Fetch pending and uploaded documents and include related Employee Name
-    const query = `
+  const conn = await getSalesforceConnection();
+  if (!conn) throw new Error("No Salesforce connection");
+  // Fetch pending and uploaded documents and include related Employee Name
+  const query = `
       SELECT Id, Name, Document_Type__c, Document_Category__c, File_URL__c, Status__c, CreatedDate,
        Employee__c, Employee__r.Employee_Name__c, Employee__r.Role__c
       FROM Document__c
       WHERE Status__c IN ('Pending', 'Uploaded')
       ORDER BY CreatedDate DESC
     `;
-    const result = await conn.query(query);
+  const result = await conn.query(query);
 
   const docs = result.records as any[];
 
@@ -658,106 +657,106 @@ export const getPendingDocuments = async (reviewerRole?: string) => {
 }
 
 export const updateDocument = async (docData: any) => {
-    const conn = await getSalesforceConnection();
-    if (!conn) throw new Error("No Salesforce connection");
-    return await conn.sobject("Document__c").update(docData);
+  const conn = await getSalesforceConnection();
+  if (!conn) throw new Error("No Salesforce connection");
+  return await conn.sobject("Document__c").update(docData);
 }
 
 export const deleteDocument = async (docId: string) => {
-    const conn = await getSalesforceConnection();
-    if (!conn) throw new Error("No Salesforce connection");
-    return await conn.sobject("Document__c").destroy(docId);
+  const conn = await getSalesforceConnection();
+  if (!conn) throw new Error("No Salesforce connection");
+  return await conn.sobject("Document__c").destroy(docId);
 }
 
 export const getHandbookDocuments = async () => {
-    const conn = await getSalesforceConnection();
-    if (!conn) throw new Error("No Salesforce connection");
-    
-    // Fetch documents with Category 'Handbook'
-    const query = `
+  const conn = await getSalesforceConnection();
+  if (!conn) throw new Error("No Salesforce connection");
+
+  // Fetch documents with Category 'Handbook'
+  const query = `
       SELECT Id, Name, Document_Type__c, Document_Category__c, File_URL__c, Status__c, CreatedDate
       FROM Document__c
       WHERE Document_Category__c = 'Handbook'
       ORDER BY CreatedDate DESC
     `;
-    const result = await conn.query(query);
-    return result.records;
+  const result = await conn.query(query);
+  return result.records;
 }
 
 export const getNotifications = async (employeeId: string) => {
-    const conn = await getSalesforceConnection();
-    if (!conn) throw new Error("No Salesforce connection");
-    
-    const query = `
+  const conn = await getSalesforceConnection();
+  if (!conn) throw new Error("No Salesforce connection");
+
+  const query = `
       SELECT Id, Employee__c, Message__c, Status__c, Notification_Type__c, Is_Read__c, CreatedDate
       FROM MV_Notification__c
       WHERE Employee__c = '${employeeId}'
       ORDER BY CreatedDate DESC
       LIMIT 100
     `;
-    const result = await conn.query(query);
-    return result.records;
+  const result = await conn.query(query);
+  return result.records;
 }
 
 
 export const updateEmployee2FAStatus = async (id: string, enabled: boolean) => {
-    const conn = await getSalesforceConnection();
-    if (!conn) throw new Error("No Salesforce connection");
-    
-    await conn.sobject("Employee__c").update({
-        Id: id,
-        Is2FAEnabled__c: enabled
-    });
+  const conn = await getSalesforceConnection();
+  if (!conn) throw new Error("No Salesforce connection");
+
+  await conn.sobject("Employee__c").update({
+    Id: id,
+    Is2FAEnabled__c: enabled
+  });
 };
 
 export const saveTwoFactorSecret = async (employeeId: string, secret: string) => {
-    const putCmd = new PutCommand({
-        TableName: TABLE_NAME,
-        Item: {
-            Employee_Id: employeeId,
-            SortKey: "2FA_SECRET",
-            Secret: secret,
-            updated_time: new Date().toISOString()
-        }
-    });
-    await db.send(putCmd);
+  const putCmd = new PutCommand({
+    TableName: TABLE_NAME,
+    Item: {
+      Employee_Id: employeeId,
+      SortKey: "2FA_SECRET",
+      Secret: secret,
+      updated_time: new Date().toISOString()
+    }
+  });
+  await db.send(putCmd);
 };
 
 export const getTwoFactorSecret = async (employeeId: string) => {
-    const getCmd = new GetCommand({
-        TableName: TABLE_NAME,
-        Key: {
-            Employee_Id: employeeId,
-            SortKey: "2FA_SECRET"
-        }
-    });
-    const result = await db.send(getCmd);
-    return result.Item?.Secret;
+  const getCmd = new GetCommand({
+    TableName: TABLE_NAME,
+    Key: {
+      Employee_Id: employeeId,
+      SortKey: "2FA_SECRET"
+    }
+  });
+  const result = await db.send(getCmd);
+  return result.Item?.Secret;
 };
 
 export const addTrustedDevice = async (employeeId: string, deviceId: string) => {
-    const putCmd = new PutCommand({
-        TableName: TABLE_NAME,
-        Item: {
-            Employee_Id: employeeId,
-            SortKey: `TRUSTED_DEVICE#${deviceId}`,
-            Trusted: true,
-            updated_time: new Date().toISOString()
-        }
-    });
-    await db.send(putCmd);
+  const putCmd = new PutCommand({
+    TableName: TABLE_NAME,
+    Item: {
+      Employee_Id: employeeId,
+      SortKey: `TRUSTED_DEVICE#${deviceId}`,
+      Trusted: true,
+      updated_time: new Date().toISOString()
+    }
+  });
+  await db.send(putCmd);
 };
 
 export const isTrustedDevice = async (employeeId: string, deviceId: string) => {
-    const getCmd = new GetCommand({
-        TableName: TABLE_NAME,
-        Key: {
-            Employee_Id: employeeId,
-            SortKey: `TRUSTED_DEVICE#${deviceId}`
-        }
-    });
-    const result = await db.send(getCmd);
-    return !!result.Item;
+  const getCmd = new GetCommand({
+    TableName: TABLE_NAME,
+    Key: {
+      Employee_Id: employeeId,
+      SortKey: `TRUSTED_DEVICE#${deviceId}`
+    }
+  });
+  const result = await db.send(getCmd);
+  return !!result.Item;
 };
 
 export interface SalaryHistoryRecord {
@@ -784,10 +783,10 @@ export interface SalaryHistoryRecord {
 }
 
 export const getSalaryHistoryByEmployee = async (employeeId: string): Promise<SalaryHistoryRecord[]> => {
-    const conn = await getSalesforceConnection();
-    if (!conn) throw new Error("No Salesforce connection");
+  const conn = await getSalesforceConnection();
+  if (!conn) throw new Error("No Salesforce connection");
 
-    const query = `
+  const query = `
       SELECT Id, Employee__c, Current_Salary__c, Previous_Salary__c, Security_Deposite__c, Basic_Console__c, CONV__c, ESI__c, HRA__c, PF__c, PT__c, SP_All__c, Increment_Amount__c, Increment_Percent__c,
              Effective_Date__c, End_Date__c, Is_Current__c, Change_Type__c, Description__c, CreatedDate
       FROM Salary_History_Tracking__c
@@ -795,31 +794,31 @@ export const getSalaryHistoryByEmployee = async (employeeId: string): Promise<Sa
       ORDER BY Effective_Date__c DESC
     `;
 
-    const result = await conn.query<SalaryHistoryRecord>(query);
-    return result.records;
+  const result = await conn.query<SalaryHistoryRecord>(query);
+  return result.records;
 }
 
 export const createSalaryHistoryRecord = async (record: SalaryHistoryRecord) => {
-    const conn = await getSalesforceConnection();
-    if (!conn) throw new Error("No Salesforce connection");
-    return await conn.sobject("Salary_History_Tracking__c").create(record);
+  const conn = await getSalesforceConnection();
+  if (!conn) throw new Error("No Salesforce connection");
+  return await conn.sobject("Salary_History_Tracking__c").create(record);
 }
 
 export async function getSalaryHistoryChangeTypeOptions(): Promise<Array<{ label: string; value: string }>> {
-    const conn = await getSalesforceConnection();
-    if (!conn) throw new Error("No Salesforce connection");
+  const conn = await getSalesforceConnection();
+  if (!conn) throw new Error("No Salesforce connection");
 
-    const describe = await conn.sobject('Salary_History_Tracking__c').describe() as {
-      fields?: Array<{ name: string; picklistValues?: Array<{ active: boolean; value: string; label: string }> }>;
-    };
+  const describe = await conn.sobject('Salary_History_Tracking__c').describe() as {
+    fields?: Array<{ name: string; picklistValues?: Array<{ active: boolean; value: string; label: string }> }>;
+  };
 
-    const changeTypeField = describe.fields?.find((field) => field.name === 'Change_Type__c');
-    if (!changeTypeField?.picklistValues) return [];
+  const changeTypeField = describe.fields?.find((field) => field.name === 'Change_Type__c');
+  if (!changeTypeField?.picklistValues) return [];
 
-    return changeTypeField.picklistValues
-      .filter((option) => option.active)
-      .map((option) => ({
-        label: option.label,
-        value: option.value
-      }));
+  return changeTypeField.picklistValues
+    .filter((option) => option.active)
+    .map((option) => ({
+      label: option.label,
+      value: option.value
+    }));
 }

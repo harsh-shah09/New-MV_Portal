@@ -18,6 +18,7 @@ export interface AdminSettings {
   companyBranchCode?: string;
   companyAccountNumber?: string;
   currencyCode?: string;
+  leaveGuideUrl?: string;
   updated_at?: string;
 }
 
@@ -60,6 +61,7 @@ export async function getAdminSettings(): Promise<AdminSettings> {
       companyBranchCode: item.companyBranchCode,
       companyAccountNumber: item.companyAccountNumber,
       currencyCode: item.currencyCode,
+      leaveGuideUrl: item.leaveGuideUrl,
       updated_at: item.updated_at,
     };
   } catch (error) {
@@ -172,6 +174,12 @@ export async function updateAdminSettings(settings: AdminSettings): Promise<void
     if (settings.currencyCode !== undefined) {
       updateExpression.push(`currencyCode = :attr${attrIndex}`);
       expressionAttributeValues[`:attr${attrIndex}`] = settings.currencyCode;
+      attrIndex++;
+    }
+
+    if (settings.leaveGuideUrl !== undefined) {
+      updateExpression.push(`leaveGuideUrl = :attr${attrIndex}`);
+      expressionAttributeValues[`:attr${attrIndex}`] = settings.leaveGuideUrl;
       attrIndex++;
     }
 

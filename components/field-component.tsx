@@ -47,7 +47,8 @@ export const Field = ({
   const inputType = isPasswordType ? (showPassword ? "text" : "password") : type
   const isTelType = type === 'tel';
   const isDateType = type === 'date';
-  const currentValue = formData[fieldKey] !== undefined ? formData[fieldKey] : (value || "")
+  const hasValue = value !== undefined && value !== null && value !== "";
+  const currentValue = formData[fieldKey] !== undefined ? formData[fieldKey] : (hasValue ? value : "")
   
   const handleChange = (val: any) => {
       setFormData({ ...formData, [fieldKey]: val })
@@ -181,9 +182,9 @@ export const Field = ({
       ) : (
          <p className="font-medium text-slate-800 text-sm break-words py-1 relative inline-block">
              {/* Mask confidential data if not editing */
-               (isPasswordType && value) 
+               (isPasswordType && hasValue) 
                  ? "•".repeat(8)
-                 : isNumberType && value
+                 : isNumberType && hasValue
                  ? (
                    <span className="flex items-center gap-2">
                      <span>{showNumber ? value : "****"}</span>
@@ -196,7 +197,7 @@ export const Field = ({
                        {showNumber ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                      </button>
                    </span>
-                 ) : isDateType && value ? dayjs(value).format("DD/MM/YYYY") : (value || <span className="text-slate-400 italic">Not set</span>)
+                 ) : isDateType && hasValue ? dayjs(value).format("DD/MM/YYYY") : (hasValue ? value : <span className="text-slate-400 italic">Not set</span>)
              }
          </p>
       )}
