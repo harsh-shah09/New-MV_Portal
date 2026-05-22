@@ -144,7 +144,7 @@ function CustomTooltip(props: any) {
             {...primaryProps}
             className="px-5 py-2 text-sm font-semibold rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:opacity-90 transition shadow-md shadow-blue-200"
           >
-            {isLastStep ? "Finish 🎉" : "Next →"}
+            {isLastStep ? "Finish" : "Next →"}
           </button>
         </div>
       </div>
