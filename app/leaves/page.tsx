@@ -633,7 +633,7 @@ export default function LeavesPage() {
           const t = result.totals
           toast.success(
             <div className="space-y-1">
-              <div className="font-semibold">Leave request submitted successfully! 🎉</div>
+              <div className="font-semibold">Leave request submitted successfully!</div>
               <div className="text-sm text-gray-600">
                 Total days: {t.finalTotalAfterRules} {t.sandwichApplied || t.onePlusTwoRuleApplied ? "(with penalties)" : ""}
               </div>
