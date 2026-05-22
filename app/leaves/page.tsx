@@ -296,7 +296,7 @@ export default function LeavesPage() {
           setLeaveGuideUrl(data.leaveGuideUrl)
         }
       })
-      .catch(() => {})
+      .catch(() => { })
   }, [])
 
   const handleMyRequestsRefresh = async () => {
@@ -1606,15 +1606,20 @@ export default function LeavesPage() {
             open={showHowToUse}
             onCancel={() => setShowHowToUse(false)}
             footer={null}
-            width={1500}
-            height={"auto"}
+            width="95vw"
+            style={{ top: '3vh', maxWidth: '1400px' }}
+            bodyStyle={{ padding: '12px 16px 12px', overflow: 'hidden' }}
           >
             {leaveGuideUrl ? (
               <iframe
                 src={leaveGuideUrl}
-                height={700}
-                width="100%"
-                style={{ border: 'none', borderRadius: 8 }}
+                style={{
+                  display: 'block',
+                  width: '100%',
+                  height: 'calc(88vh - 90px)',
+                  border: 'none',
+                  borderRadius: 8,
+                }}
                 title="Leave User Guide"
               />
             ) : (
