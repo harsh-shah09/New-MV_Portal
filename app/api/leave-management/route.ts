@@ -1877,6 +1877,8 @@ export async function POST(request: NextRequest) {
 
             if (adminEmail) {
               const isExtraDayPay = leaveCategory === 'extra-day-pay';
+              const settingsAppUrl = await getAdminSettingValue('NEXT_PUBLIC_APP_URL');
+              const setupLink = (settingsAppUrl || process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_BASE_URL || '').replace(/\/$/, '');
               const emailTemplate = isExtraDayPay
                 ? await extraDayPayRequest({
                   recipientName: adminName,
@@ -1885,6 +1887,7 @@ export async function POST(request: NextRequest) {
                   endDate: end.format('YYYY-MM-DD'),
                   duration: duration,
                   reason: reason || 'N/A',
+                  setupLink,
                 })
                 : await hrLeaveRequestToAdmin({
                   recipientName: adminName,
@@ -1892,7 +1895,8 @@ export async function POST(request: NextRequest) {
                   leaveType: leaveType || 'N/A',
                   startDate: start.format('YYYY-MM-DD'),
                   endDate: end.format('YYYY-MM-DD'),
-                  duration: duration
+                  duration: duration,
+                  setupLink,
                 });
               logLeaveEmailDispatch(isExtraDayPay ? 'extra-day-pay-request-to-admin' : 'hr-leave-request-to-admin', adminEmail, undefined, emailTemplate.subject);
               sendEmailAsync({
