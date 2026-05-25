@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { createHash, randomBytes } from "crypto";
 import { verifyToken } from "@/lib/auth-utils";
 import { getSalesforceConnection } from "@/lib/salesforce";
 
@@ -10,6 +11,19 @@ const isValidDateString = (date: unknown): date is string => {
 };
 
 const normalizeDate = (date: string) => date.slice(0, 10);
+
+const buildHolidaySettingName = (date: string, holidayName: string) => {
+  const normalizedDate = isValidDateString(date)
+    ? normalizeDate(date).replace(/-/g, "")
+    : new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  const nameHash = createHash("sha1")
+    .update(`${holidayName.trim().toLowerCase()}|${normalizedDate}`)
+    .digest("hex")
+    .slice(0, 6);
+  const uniqueSuffix = randomBytes(3).toString("hex");
+
+  return `holiday-${normalizedDate}-${nameHash}-${uniqueSuffix}`;
+};
 
 const findDuplicateDate = (dates: string[]) => {
   const seen = new Set<string>();
@@ -256,7 +270,7 @@ export async function POST(request: NextRequest) {
 
       // Prepare bulk insert data
       const holidayRecords = holidays.map(h => ({
-        Name: `${h.name}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        Name: buildHolidaySettingName(h.date, h.name),
         Holiday_Name__c: h.name,
         Date__c: h.date,
         Day__c: h.day,
@@ -340,7 +354,7 @@ export async function POST(request: NextRequest) {
 
       // Create holiday record
       const result = await conn.sobject('Holidays_List__c').create({
-        Name: `${name}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        Name: buildHolidaySettingName(date, name),
         Holiday_Name__c: name,
         Date__c: date,
         Day__c: day,
@@ -443,7 +457,7 @@ export async function PATCH(request: NextRequest) {
     };
 
     if (name) {
-      updateData.Name = `${name}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      updateData.Name = date ? buildHolidaySettingName(date, name) : buildHolidaySettingName(new Date().toISOString(), name);
       updateData.Holiday_Name__c = name;
     }
     if (date) updateData.Date__c = date;
