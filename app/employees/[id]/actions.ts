@@ -192,7 +192,7 @@ export async function sendWelcomeEmailAction(employeeId: string, email: string, 
         const token = { expirationtime: Date.now() + 48 * 60 * 60 * 1000, firsttime: true };
         const encryptedToken = btoa(JSON.stringify(token));
         const settingsAppUrl2 = await getAdminSettingValue('NEXT_PUBLIC_APP_URL');
-        const setupLink = `${settingsAppUrl2 || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/welcome?id=${employeeId}&token=${encryptedToken}`;
+        const setupLink = `${settingsAppUrl2 || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/welcome?token=${encryptedToken}&id=${employeeId}`;
         let { subject, html } = await onboardingMail({ recipientName: name, setupLink });
 
         if (empName) {

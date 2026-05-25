@@ -79,17 +79,17 @@ function WelcomeContent() {
             </div>
         )
     }
-    if (isNotFound) {
-        return (
-            <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-                <div className="bg-white rounded-3xl shadow-xl border border-slate-100 max-w-lg w-full p-10 text-center">
-                    <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-6" />
-                    <h2 className="text-2xl font-bold text-slate-800 mb-4">Not Found</h2>
-                    <p className="text-slate-500 mt-2">The employee record could not be found.</p>
-                </div>
-            </div>
-        )
-    }
+    // if (isNotFound) {
+    //     return (
+    //         <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+    //             <div className="bg-white rounded-3xl shadow-xl border border-slate-100 max-w-lg w-full p-10 text-center">
+    //                 <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-6" />
+    //                 <h2 className="text-2xl font-bold text-slate-800 mb-4">Not Found</h2>
+    //                 <p className="text-slate-500 mt-2">The employee record could not be found.</p>
+    //             </div>
+    //         </div>
+    //     )
+    // }
     if (isExpired || !id) {
         return (
             <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
