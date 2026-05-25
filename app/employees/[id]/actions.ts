@@ -26,10 +26,10 @@ export async function generate2FASecretAction(employeeId: string) {
     // Ideally check session here to ensure user is editing their own profile or is admin
     const employee = await getEmployeeById(employeeId);
     if (!employee) return { error: "Employee not found" };
-    
+
     const { secret, otpauth } = generateTwoFactorSecret(employee.Employee_Email__c || employee.Employee_Name__c);
     const qrCode = await generateQRCode(otpauth);
-    
+
     return { secret, qrCode };
 }
 
@@ -64,7 +64,7 @@ import { deleteBankDetail, deleteDocument } from '@/lib/salesforce';
 import { setOnboardingStep, setFirstTimeLogin, setOnboardingCompleted } from '@/lib/dynamodb';
 import { getAdminSettingValue } from '@/lib/admin-settings';
 
-export async function sendWelcomeEmailAction(employeeId: string, email: string, name: string , empName : string) {
+export async function sendWelcomeEmailAction(employeeId: string, email: string, name: string, empName: string) {
     try {
         // 1. Fetch employee to check for rejected documents/banks
         const employee = await getEmployeeById(employeeId);
@@ -108,25 +108,25 @@ export async function sendWelcomeEmailAction(employeeId: string, email: string, 
                     </thead>
                     <tbody>
                         ${[
-                            ...rejectedBanks.map((b: any) => ({
-                                type: 'Bank',
-                                name: `${b.Name || 'Bank'} — ${maskAccountNumber(b.Bank_Account_Number__c)}`,
-                                reason: b.Rejection_Reason__c || '-'
-                            })),
-                            ...rejectedDocs.map((d: any) => ({
-                                type: 'Document',
-                                name: d.Document_Type__c || 'Document',
-                                reason: d.Rejection_Reason__c || '-'
-                            })),
-                        ]
-                            .map((item) => `
+                    ...rejectedBanks.map((b: any) => ({
+                        type: 'Bank',
+                        name: `${b.Name || 'Bank'} — ${maskAccountNumber(b.Bank_Account_Number__c)}`,
+                        reason: b.Rejection_Reason__c || '-'
+                    })),
+                    ...rejectedDocs.map((d: any) => ({
+                        type: 'Document',
+                        name: d.Document_Type__c || 'Document',
+                        reason: d.Rejection_Reason__c || '-'
+                    })),
+                ]
+                    .map((item) => `
                                 <tr>
                                     <td style="padding:6px 8px;border:1px solid #fecaca;font-size:12px;">${item.type}</td>
                                     <td style="padding:6px 8px;border:1px solid #fecaca;font-size:12px;">${item.name}</td>
                                     <td style="padding:6px 8px;border:1px solid #fecaca;font-size:12px;">${item.reason}</td>
                                 </tr>
                             `)
-                            .join('')}
+                    .join('')}
                     </tbody>
                 </table>
             `.trim();
@@ -149,7 +149,14 @@ export async function sendWelcomeEmailAction(employeeId: string, email: string, 
             const settingsAppUrl = await getAdminSettingValue('NEXT_PUBLIC_APP_URL');
             const settingsNextAuthUrl = await getAdminSettingValue('NEXTAUTH_URL');
             const appLink = `${settingsAppUrl || settingsNextAuthUrl || process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || 'http://localhost:3000'}/welcome?id=${employeeId}&token=${encodedToken}`;
-
+            const conn = await getSalesforceConnection();
+            const adminQuery = await conn.query<any>(`
+            SELECT Id, Employee_Name__c, Company_Email__c
+            FROM Employee__c
+            WHERE Role__c = 'Admin'
+            LIMIT 1
+            `);
+            const adminEmail = adminQuery.records[0]?.Company_Email__c;
             let html = await loadTemplate('Document_Rejected', {
                 employeeEmail: email,
                 employeeId: empName || employeeId,
@@ -168,6 +175,7 @@ export async function sendWelcomeEmailAction(employeeId: string, email: string, 
                 body: html,
                 contentType: 'text/html',
                 isInfo: true,
+                cc: adminEmail
             });
 
             // Reset onboarding state so the wizard re-opens
@@ -181,12 +189,12 @@ export async function sendWelcomeEmailAction(employeeId: string, email: string, 
         }
 
         // 3. Otherwise, if all are verified (or nothing is rejected), send normal welcome email
-        const token = { expirationtime : Date.now() + 48 * 60 * 60 * 1000 , firsttime : true };
+        const token = { expirationtime: Date.now() + 48 * 60 * 60 * 1000, firsttime: true };
         const encryptedToken = btoa(JSON.stringify(token));
         const settingsAppUrl2 = await getAdminSettingValue('NEXT_PUBLIC_APP_URL');
         const setupLink = `${settingsAppUrl2 || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/welcome?id=${employeeId}&token=${encryptedToken}`;
         let { subject, html } = await onboardingMail({ recipientName: name, setupLink });
-        
+
         if (empName) {
             html = html.replace(/{{Employee_Id}}/g, empName);
         }
