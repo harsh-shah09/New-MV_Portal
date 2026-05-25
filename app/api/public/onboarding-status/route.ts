@@ -39,29 +39,32 @@ export async function GET(req: Request) {
    const firsttime = searchParams.get('firsttime');
    if (!employeeId) return NextResponse.json({ error: 'Missing employee ID' }, { status: 400 });
 
-   // Priority 1: completed flag – never re-show the wizard once finished
-   // Priority 1: completed flag – never re-show the wizard once finished
-   const isCompleted = await getOnboardingCompleted(employeeId);
-   if (isCompleted) return NextResponse.json({ showOnboarding: false, isCompleted: true });
-
-   // Priority 2: first-time login flag (or ?firsttime=true override)
-   const isFirstTime = await getIsFirstTimeLogin(employeeId);
-   if (!isFirstTime && !firsttime) return NextResponse.json({ showOnboarding: false });
-
-   // Priority 3: resolve step from DynamoDB
-   const rawStep = await getOnboardingStep(employeeId);
-   // Step beyond total → all saved, treat as completed
-   if (rawStep > TOTAL_STEPS) {
-       return NextResponse.json({ showOnboarding: false, isCompleted: true });
-   }
-   const currentStep = rawStep > 0 ? rawStep : 1;
-
    let employeeData = null;
    try {
        employeeData = await getEmployeeById(employeeId);
    } catch(e) {
        console.error("Error fetching employee details for prefill", e);
    }
+
+   if (!employeeData) {
+       return NextResponse.json({ error: 'Employee not found', employeeData: null }, { status: 404 });
+   }
+
+   // Priority 1: completed flag – never re-show the wizard once finished
+   const isCompleted = await getOnboardingCompleted(employeeId);
+   if (isCompleted) return NextResponse.json({ showOnboarding: false, isCompleted: true, employeeData });
+
+   // Priority 2: first-time login flag (or ?firsttime=true override)
+   const isFirstTime = await getIsFirstTimeLogin(employeeId);
+   if (!isFirstTime && !firsttime) return NextResponse.json({ showOnboarding: false, employeeData });
+
+   // Priority 3: resolve step from DynamoDB
+   const rawStep = await getOnboardingStep(employeeId);
+   // Step beyond total → all saved, treat as completed
+   if (rawStep > TOTAL_STEPS) {
+       return NextResponse.json({ showOnboarding: false, isCompleted: true, employeeData });
+   }
+   const currentStep = rawStep > 0 ? rawStep : 1;
 
    return NextResponse.json({ showOnboarding: true, currentStep, employeeData });
 }

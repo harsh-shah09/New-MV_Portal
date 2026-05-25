@@ -33,7 +33,7 @@ export interface OnboardingWizardProps {
 
 export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = false, step = 1 }: OnboardingWizardProps = {}) {
     const [open, setOpen] = useState(publicMode ? true : false)
-    const [currentStep, setCurrentStep] = useState(4)
+    const [currentStep, setCurrentStep] = useState(step)
     const [loading, setLoading] = useState(false)
     const [pageLoading, setPageLoading] = useState(true)
     const [form] = Form.useForm()
@@ -193,7 +193,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                     bankName: bank.Name || '',
                                     bankbranch: bank.Bank_Branch_Name__c || '',
                                     accountNumber: bank.Bank_Account_Number__c || '',
-                                    accountHolder: emp.Account_Holder_Name__c || '',
+                                    accountHolder: bank.Account_Holder_Name__c || '',
                                     ifscCode: bank.IFSC__c || '',
                                 });
                             }
@@ -207,7 +207,11 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                     }
                 } else {
                     if (publicMode) {
-                        setIsExpired(true);
+                        if (data.isCompleted) {
+                            setCurrentStep(5);
+                        } else {
+                            setIsExpired(true);
+                        }
                     }
                 }
             })
@@ -1427,22 +1431,22 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
         )
     };
 
-    // if (publicMode && isExpired) {
-    //     return (
-    //         <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-    //             <div className="bg-white rounded-3xl shadow-xl border border-slate-100 max-w-lg w-full p-10 text-center">
-    //                 <AlertCircle className="w-16 h-16 text-amber-500 mx-auto mb-6" />
-    //                 <h2 className="text-2xl font-bold text-gray-800 mb-4">Link Expired</h2>
-    //                 <p className="text-gray-500 text-lg mb-8">This onboarding link is no longer valid or you have already completed the onboarding process.</p>
+    if (publicMode && isExpired) {
+        return (
+            <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+                <div className="bg-white rounded-3xl shadow-xl border border-slate-100 max-w-lg w-full p-10 text-center">
+                    <AlertCircle className="w-16 h-16 text-amber-500 mx-auto mb-6" />
+                    <h2 className="text-2xl font-bold text-gray-800 mb-4">Link Expired</h2>
+                    <p className="text-gray-500 text-lg mb-8">This onboarding link is no longer valid or has expired.</p>
 
-    //                 <div className="mt-8 flex justify-center items-center gap-3 border-t border-slate-100 pt-8 opacity-80">
-    //                     <img src="/mv_logo1.png" alt="MV Clouds" className="h-8 drop-shadow-sm" />
-    //                     <span className="font-bold text-slate-800 tracking-tight">MV Clouds</span>
-    //                 </div>
-    //             </div>
-    //         </div>
-    //     )
-    // }
+                    <div className="mt-8 flex justify-center items-center gap-3 border-t border-slate-100 pt-8 opacity-80">
+                        <img src="/mv_logo1.png" alt="MV Clouds" className="h-8 drop-shadow-sm" />
+                        <span className="font-bold text-slate-800 tracking-tight">MV Clouds</span>
+                    </div>
+                </div>
+            </div>
+        )
+    }
 
     if (publicMode && currentStep > stepItems.length) {
         return (
