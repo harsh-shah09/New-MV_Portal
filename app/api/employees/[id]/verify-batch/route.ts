@@ -14,6 +14,7 @@ type VerificationItem = {
     bankName?: string;
     bankAccountNumber?: string;
     documentName?: string;
+    rejectionReason?: string;
 };
 
 /** Mask bank account: ****1234 */
@@ -49,6 +50,9 @@ export async function POST(
 
             if (item.type === 'bank') {
                 const updateData: any = { Id: item.id, Status__c: status };
+                if (item.action === 'reject' && item.rejectionReason) {
+                    updateData.Rejection_Reason__c = item.rejectionReason;
+                }
                 if (item.action === 'approve') {
                     updateData.Primary_Account__c = true;
                     updateData.Employee__c = employeeId;
@@ -63,10 +67,14 @@ export async function POST(
                     Action_Required__c: false,
                     Status__c: 'Unread',
                     Action_Taken__c: status,
-                    Comments__c: '',
+                    Comments__c: item.rejectionReason || '',
                 });
             } else {
-                await updateDocument({ Id: item.id, Status__c: status });
+                const documentUpdate: any = { Id: item.id, Status__c: status };
+                if (item.action === 'reject' && item.rejectionReason) {
+                    documentUpdate.Rejection_Reason__c = item.rejectionReason;
+                }
+                await updateDocument(documentUpdate);
 
                 // Notify employee
                 await createNotification({
@@ -76,7 +84,7 @@ export async function POST(
                     Action_Required__c: false,
                     Status__c: 'Unread',
                     Action_Taken__c: status,
-                    Comments__c: '',
+                    Comments__c: item.rejectionReason || '',
                 });
             }
         }
@@ -112,19 +120,41 @@ export async function POST(
                 const rejectedBanks = allBanks.filter((b: any) => b.Status__c === 'Rejected');
                 const rejectedDocs = allDocs.filter((d: any) => d.Status__c === 'Rejected');
 
-                // Build masked bank detail lines
-                const bankLines = rejectedBanks
-                    .map((b: any) => `${b.Name || 'Bank'} — ${maskAccountNumber(b.Bank_Account_Number__c)}`)
-                    .join('<br/>');
+                const rejectedDocsTable = `
+                    <table width="100%" style="border-collapse: collapse;">
+                        <thead>
+                            <tr>
+                                <th style="text-align:left;padding:6px 8px;border:1px solid #fecaca;background:#fee2e2;font-size:12px;">Type</th>
+                                <th style="text-align:left;padding:6px 8px;border:1px solid #fecaca;background:#fee2e2;font-size:12px;">Name</th>
+                                <th style="text-align:left;padding:6px 8px;border:1px solid #fecaca;background:#fee2e2;font-size:12px;">Reason</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${[
+                                ...rejectedBanks.map((b: any) => ({
+                                    type: 'Bank',
+                                    name: `${b.Name || 'Bank'} — ${maskAccountNumber(b.Bank_Account_Number__c)}`,
+                                    reason: b.Rejection_Reason__c || '-'
+                                })),
+                                ...rejectedDocs.map((d: any) => ({
+                                    type: 'Document',
+                                    name: d.Document_Type__c || 'Document',
+                                    reason: d.Rejection_Reason__c || '-'
+                                })),
+                            ]
+                                .map((item) => `
+                                    <tr>
+                                        <td style="padding:6px 8px;border:1px solid #fecaca;font-size:12px;">${item.type}</td>
+                                        <td style="padding:6px 8px;border:1px solid #fecaca;font-size:12px;">${item.name}</td>
+                                        <td style="padding:6px 8px;border:1px solid #fecaca;font-size:12px;">${item.reason}</td>
+                                    </tr>
+                                `)
+                                .join('')}
+                        </tbody>
+                    </table>
+                `.trim();
 
-                const docLines = rejectedDocs
-                    .map((d: any) => d.Document_Type__c || 'Document')
-                    .join('<br/>');
-
-                const rejectionSummary = [
-                    bankLines && `<br/><strong>Bank Accounts:</strong><br/>${bankLines}`,
-                    docLines && `<br/><strong>Documents:</strong><br/>${docLines}`,
-                ]
+                const rejectionSummary = [rejectedDocsTable]
                     .filter(Boolean)
                     .join('<br/><br/>');
 
@@ -145,7 +175,7 @@ export async function POST(
                     const settingsNextAuthUrl = await getAdminSettingValue('NEXTAUTH_URL');
                     const appLink = `${settingsNextAuthUrl || process.env.NEXTAUTH_URL || ''}/welcome?id=${employeeId}&token=${encodedToken}`;
 
-                    // Re-use Document_Rejected template; replace {{BankDetails}} placeholder
+                    // Re-use Document_Rejected template; replace table placeholders
                     let html = await loadTemplate('Document_Rejected', {
                         employeeEmail: personalEmail,
                         employeeId: employee.Employee_Id__c || employeeId,
@@ -156,8 +186,8 @@ export async function POST(
                         documentName: rejectionSummary,
                     });
 
-                    // Extra token replacement for bank details block
-                    html = html.replace(/\{\{BankDetails\}\}/gi, bankLines || '-');
+                    // Extra token replacement for table block
+                    html = html.replace(/\{\{RejectedDocumentsTable\}\}/gi, rejectedDocsTable);
 
                     await sendEmail({
                         to: personalEmail,

@@ -70,6 +70,7 @@ function applyTemplateData(template: string, data: LeaveEmailData): string {
   html = html.replace(/{{setupLink}}/g, data.setupLink || '');
   html = html.replace(/{{appLink}}/g, data.appLink || '');
   html = html.replace(/{{documentName}}/g, data.documentName || '');
+  html = html.replace(/{{RejectedDocumentsTable}}/gi, data.documentName || '');
   html = html.replace(/{{year}}/g, new Date().getFullYear().toString());
 
   if (data.reason) {

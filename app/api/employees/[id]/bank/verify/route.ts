@@ -20,7 +20,7 @@ export async function PATCH(
 
     const { id } = await params;
     const body = await request.json();
-    const { bankId, action } = body as { bankId: string; action: 'approve' | 'reject' };
+    const { bankId, action, reason } = body as { bankId: string; action: 'approve' | 'reject'; reason?: string };
 
     if (!bankId || !action) {
       return NextResponse.json({ error: 'Bank ID and action are required' }, { status: 400 });
@@ -32,6 +32,10 @@ export async function PATCH(
       Id: bankId,
       Status__c: status,
     };
+
+    if (action === 'reject' && reason) {
+      updateData.Rejection_Reason__c = reason;
+    }
     
     // Automatically make it primary if approved, and ensure other accounts are demoted
     if (action === 'approve') {
