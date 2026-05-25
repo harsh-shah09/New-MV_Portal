@@ -2998,6 +2998,7 @@ export async function PATCH(request: NextRequest) {
 
           if (isTeamLead && !oldLeave.TL_Approval__c) {
             const isExtraDayPay = oldLeave.Leave_Category__c === 'Extra Day Pay';
+            const appUrl = await getAdminSettingValue('NEXT_PUBLIC_APP_URL');
             // Send in-app notification to employee
             await sendInAppNotifications(
               [oldLeave.Employee__c],
@@ -3015,6 +3016,7 @@ export async function PATCH(request: NextRequest) {
                 startDate: oldLeave.Start_Date__c || 'N/A',
                 endDate: oldLeave.End_Date__c || 'N/A',
                 duration: oldLeave.Total_Days__c || 0,
+                setupLink: appUrl,
               })
               : await teamLeadDecisionToHR({
                 recipientName: 'HR Team',
@@ -3024,7 +3026,8 @@ export async function PATCH(request: NextRequest) {
                 leaveType: oldLeave.Leave_Type__c || 'N/A',
                 startDate: oldLeave.Start_Date__c || 'N/A',
                 endDate: oldLeave.End_Date__c || 'N/A',
-                duration: oldLeave.Total_Days__c || 0
+                duration: oldLeave.Total_Days__c || 0,
+                setupLink: appUrl,
               });
             const ccRecipients = [employeeEmail, adminEmail].filter(Boolean) as string[];
             logLeaveEmailDispatch('team-lead-decision-to-hr-approved', hrEmail, ccRecipients, emailTemplateHR.subject);
