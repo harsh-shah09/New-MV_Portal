@@ -16,6 +16,7 @@ export interface SalesforceAsset {
   };
   AMS_Status__c: 'Assigned' | 'Un-Assigned' | 'Discarded';
   AMS_Status_Formula__c?: string;
+  Internal_Serial_Number__c?: string;
 }
 
 export interface SalesforceProduct {

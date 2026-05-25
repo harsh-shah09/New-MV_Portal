@@ -72,7 +72,8 @@ export async function getAssets() {
            AMS_Asset_Serial_Number__c, AMS_Purchase_Condition__c, AMS_Status__c,
            AMS_Status_Formula__c,
            AMS_Product__c, AMS_Product__r.Name, 
-           AMS_Assigned_To__c, AMS_Assigned_To__r.Name, AMS_Assigned_To__r.Employee_Name__c
+           AMS_Assigned_To__c, AMS_Assigned_To__r.Name, AMS_Assigned_To__r.Employee_Name__c,
+           Internal_Serial_Number__c
     FROM MVC_Internal_Asset__c
     ORDER BY Name DESC
   `;
@@ -90,7 +91,8 @@ export async function getAssetById(id: string) {
            AMS_Asset_Serial_Number__c, AMS_Purchase_Condition__c, AMS_Status__c,
            AMS_Status_Formula__c,
            AMS_Product__c, AMS_Product__r.Name, AMS_Product__r.AMS_Model_Number__c,
-           AMS_Assigned_To__c, AMS_Assigned_To__r.Name, AMS_Assigned_To__r.Employee_Name__c
+           AMS_Assigned_To__c, AMS_Assigned_To__r.Name, AMS_Assigned_To__r.Employee_Name__c,
+           Internal_Serial_Number__c
     FROM MVC_Internal_Asset__c
     WHERE Id = '${id}'
     LIMIT 1
@@ -192,6 +194,88 @@ export async function createProduct(data: Partial<SalesforceProduct>) {
         throw new Error("Failed to create Product: " + JSON.stringify(result.errors));
     }
     return result;
+}
+
+export async function updateProduct(id: string, data: Partial<SalesforceProduct>) {
+    const conn = await getSalesforceConnection();
+    if (!conn) throw new Error("Salesforce connection failed");
+
+    const { Id, ...rest } = data as any;
+
+    const result = (await conn.sobject('Product2').update({
+        Id: id,
+        ...rest
+    })) as any;
+    if (!result.success) {
+        throw new Error("Failed to update Product: " + JSON.stringify(result.errors));
+    }
+    return result;
+}
+
+export async function deleteProduct(id: string) {
+    const conn = await getSalesforceConnection();
+    if (!conn) throw new Error("Salesforce connection failed");
+
+    const assetQuery = `SELECT Id FROM MVC_Internal_Asset__c WHERE AMS_Product__c = '${id}' LIMIT 1`;
+    const assetResult = await conn.query(assetQuery);
+    if (assetResult.records.length > 0) {
+        throw new Error("Cannot delete product: This product is associated with registered assets.");
+    }
+
+    const result = (await conn.sobject('Product2').destroy(id)) as any;
+    if (!result.success) {
+        throw new Error("Failed to delete Product: " + JSON.stringify(result.errors));
+    }
+    return result;
+}
+
+function escapeRegExp(string: string) {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+export async function getNextInternalSerialNumber(category: string): Promise<string> {
+  const conn = await getSalesforceConnection();
+  if (!conn) throw new Error("Salesforce connection failed");
+
+  if (!category) return "";
+
+  const prefix = category.trim().toUpperCase();
+
+  const query = `
+    SELECT Internal_Serial_Number__c 
+    FROM MVC_Internal_Asset__c 
+    WHERE AMS_Category__c = '${category}' 
+      AND Internal_Serial_Number__c != null
+  `;
+
+  try {
+    const result = await conn.query(query);
+    const records = result.records as any[];
+    
+    let maxNum = 0;
+    const escapedPrefix = escapeRegExp(prefix);
+    const regex = new RegExp(`^${escapedPrefix}-(\\d+)$`, 'i');
+
+    for (const record of records) {
+      const serial = record.Internal_Serial_Number__c;
+      if (serial) {
+        const match = serial.match(regex);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (num > maxNum) {
+            maxNum = num;
+          }
+        }
+      }
+    }
+
+    const nextNum = maxNum + 1;
+    const paddedNum = String(nextNum).padStart(2, '0');
+    return `${prefix}-${paddedNum}`;
+  } catch (e: any) {
+    console.error("Error generating next internal serial number:", e);
+    throw new Error("Failed to generate internal serial number: " + e.message);
+  }
 }
 
 export async function createAsset(data: Partial<SalesforceAsset>) {

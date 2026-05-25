@@ -1408,6 +1408,19 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
         employeesList?.find((emp: any) => normalizeSfId(emp.Id) === normalizeSfId(currentUserEmployeeId))?.Title__c || ''
     ).trim().toLowerCase()
     const isHrTeamLead = isHrUser && currentUserTitleNormalized === 'team lead'
+
+    const canAccess = isOwnProfile || isAdminUser || isHrUser;
+    if (!canAccess) {
+        return (
+            <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+                <div className="bg-white rounded-3xl shadow-xl border border-slate-100 max-w-lg w-full p-10 text-center">
+                    <AlertTriangle className="w-16 h-16 text-red-500 mx-auto mb-6 animate-bounce" />
+                    <h2 className="text-2xl font-bold text-slate-800 mb-4">Access Denied</h2>
+                    <p className="text-slate-500 mt-2">You do not have permission to view this employee's profile.</p>
+                </div>
+            </div>
+        )
+    }
     const selectedDepartment = `${formData.Department__c ?? employee.Department__c ?? ''}`.trim().toLowerCase()
     const selectedRole = `${formData.Role__c ?? employee.Role__c ?? ''}`.trim().toLowerCase()
     const currentEmployeeCode = `${formData.Employee_Id__c ?? employee.Employee_Id__c ?? ''}`.trim()

@@ -9,12 +9,13 @@ function WelcomeContent() {
     const searchParams = useSearchParams()
     const id = searchParams.get('id')
     const token = searchParams.get('token')
-    const [firsttime , setFirsttime] = useState(false)
+    const [firsttime, setFirsttime] = useState(false)
     const [isExpired, setIsExpired] = useState(false)
     const [isCompleted, setIsCompleted] = useState(false)
+    const [isNotFound, setIsNotFound] = useState(false)
     const [isValidating, setIsValidating] = useState(true)
-    const [step , setStep] = useState(1);
-    
+    const [step, setStep] = useState(1);
+
     useEffect(() => {
         const checkStatusAndToken = async () => {
 
@@ -31,15 +32,17 @@ function WelcomeContent() {
 
                 setFirsttime(decoded.firsttime)
                 setStep(decoded.step ?? step)
-                
-                if (decoded.expirationtime && decoded.expirationtime < Date.now()) {
+                console.log(Number(decoded.expirationtime), Date.now(), Number(decoded.expirationtime) <= Date.now())
+                if (decoded.expirationtime && Number(decoded.expirationtime) <= Date.now()) {
                     setIsExpired(true)
                 } else {
                     // Check completion status from DB
                     try {
                         const res = await fetch(`/api/public/onboarding-status?id=${id}&firsttime=${decoded.firsttime}`);
                         const data = await res.json();
-                        if (data.isCompleted) {
+                        if (!data.employeeData) {
+                            setIsNotFound(true);
+                        } else if (data.isCompleted) {
                             setIsCompleted(true);
                         }
                     } catch (fetchErr) {
@@ -50,10 +53,10 @@ function WelcomeContent() {
                 setIsExpired(true)
 
             }
-            
+
             setIsValidating(false)
         };
-        
+
         checkStatusAndToken();
     }, [id, token])
 
@@ -64,31 +67,42 @@ function WelcomeContent() {
             </div>
         )
     }
-    
+
     if (isCompleted) {
         return (
-             <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-                 <div className="bg-white rounded-3xl shadow-xl border border-slate-100 max-w-lg w-full p-10 text-center">
-                     <CheckCircle className="w-16 h-16 text-emerald-500 mx-auto mb-6" />
-                     <h2 className="text-2xl font-bold text-slate-800 mb-4">Onboarding Completed</h2>
-                     <p className="text-slate-500 mt-2">Your onboarding process is already complete. You can close this window.</p>
-                 </div>
-             </div>
+            <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+                <div className="bg-white rounded-3xl shadow-xl border border-slate-100 max-w-lg w-full p-10 text-center">
+                    <CheckCircle className="w-16 h-16 text-emerald-500 mx-auto mb-6" />
+                    <h2 className="text-2xl font-bold text-slate-800 mb-4">Onboarding Completed</h2>
+                    <p className="text-slate-500 mt-2">Your onboarding process is already complete. You can close this window.</p>
+                </div>
+            </div>
+        )
+    }
+    if (isNotFound) {
+        return (
+            <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+                <div className="bg-white rounded-3xl shadow-xl border border-slate-100 max-w-lg w-full p-10 text-center">
+                    <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-6" />
+                    <h2 className="text-2xl font-bold text-slate-800 mb-4">Not Found</h2>
+                    <p className="text-slate-500 mt-2">The employee record could not be found.</p>
+                </div>
+            </div>
         )
     }
     if (isExpired || !id) {
         return (
-             <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-                 <div className="bg-white rounded-3xl shadow-xl border border-slate-100 max-w-lg w-full p-10 text-center">
-                     <AlertCircle className="w-16 h-16 text-amber-500 mx-auto mb-6" />
-                     <h2 className="text-2xl font-bold text-slate-800 mb-4">Link Expired</h2>
-                     <p className="text-slate-500 mt-2">This onboarding link is no longer valid or has expired.</p>
-                 </div>
-             </div>
+            <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+                <div className="bg-white rounded-3xl shadow-xl border border-slate-100 max-w-lg w-full p-10 text-center">
+                    <AlertCircle className="w-16 h-16 text-amber-500 mx-auto mb-6" />
+                    <h2 className="text-2xl font-bold text-slate-800 mb-4">Link Expired</h2>
+                    <p className="text-slate-500 mt-2">This onboarding link is no longer valid or has expired.</p>
+                </div>
+            </div>
         )
     }
 
-    return <OnboardingWizard publicMode={true} publicEmpId={id} firsttime={firsttime} step = {step}/>
+    return <OnboardingWizard publicMode={true} publicEmpId={id} firsttime={firsttime} step={step} />
 }
 
 export default function WelcomePage() {
