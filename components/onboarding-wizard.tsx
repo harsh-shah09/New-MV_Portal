@@ -912,8 +912,8 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
 
                                 return (
                                     <>
-                                        <Form.Item name="permanentstreet" label="Street Address" rules={[{ required: true, message: 'Street address is required' }, { pattern: /^[A-Za-z]*$/, message: 'Street address should contain only alphabets' },
-                                        { max: 100, message: 'Street address should not exceed 100 characters' },
+                                        <Form.Item name="permanentstreet" label="Street Address" rules={[{ required: true, message: 'Street address is required' },
+                                        { max: 255, message: 'Street address should not exceed 255 characters' },
                                         { min: 2, message: 'Street address should be at least 2 characters long' }
                                         ]}>
                                             <Input placeholder="123 Main St" disabled={disabledsteps.includes(2)} />
@@ -1451,7 +1451,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                 <div className="bg-white rounded-3xl shadow-xl border border-slate-100 max-w-lg w-full p-10 text-center">
                     <CheckCircleOutlined className="text-6xl text-green-500 mb-6" />
                     <h2 className="text-3xl font-bold text-gray-800 mb-4">You're All Set!</h2>
-                    <p className="text-gray-500 text-lg mb-8">You have successfully completed the onboarding process. Your data is being securely processed by the HR team.</p>
+                    <p className="text-gray-500 text-lg mb-8">Thank you for completing your onboarding. Your information has been securely recorded and is now under HR review.</p>
 
                     <div className="mt-8 flex justify-center items-center gap-3 border-t border-slate-100 pt-8 opacity-80">
                         <img src="/mv_logo1.png" alt="MV Clouds" className="h-8 drop-shadow-sm" />

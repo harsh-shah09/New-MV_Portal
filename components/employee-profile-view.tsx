@@ -83,9 +83,16 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
         bankName?: string;
         bankAccountNumber?: string;
         documentName?: string;
+        rejectionReason?: string;
     };
     const [pendingVerifications, setPendingVerifications] = useState<PendingVerification[]>([]);
     const [isSavingVerifications, setIsSavingVerifications] = useState(false);
+    const [rejectDocModalVisible, setRejectDocModalVisible] = useState(false);
+    const [rejectingDoc, setRejectingDoc] = useState<any | null>(null);
+    const [rejectReason, setRejectReason] = useState('');
+    const [rejectBankModalVisible, setRejectBankModalVisible] = useState(false);
+    const [rejectingBank, setRejectingBank] = useState<any | null>(null);
+    const [rejectBankReason, setRejectBankReason] = useState('');
 
     // Warn on browser refresh/close when there are unsaved changes
     useEffect(() => {
@@ -100,7 +107,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
     }, [pendingVerifications.length]);
 
     /** Stage a bank verification without immediately calling the API */
-    const stageBankVerification = (bank: any, action: 'approve' | 'reject') => {
+    const stageBankVerification = (bank: any, action: 'approve' | 'reject', rejectionReason?: string) => {
         setPendingVerifications(prev => {
             const filtered = prev.filter(p => !(p.type === 'bank' && p.id === bank.Id));
             return [...filtered, {
@@ -109,12 +116,13 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                 action,
                 bankName: bank.Name,
                 bankAccountNumber: bank.Bank_Account_Number__c,
+                rejectionReason: action === 'reject' ? rejectionReason?.trim() || '' : undefined,
             }];
         });
     };
 
     /** Stage a document verification without immediately calling the API */
-    const stageDocVerification = (doc: any, action: 'approve' | 'reject') => {
+    const stageDocVerification = (doc: any, action: 'approve' | 'reject', rejectionReason?: string) => {
         setPendingVerifications(prev => {
             const filtered = prev.filter(p => !(p.type === 'document' && p.id === doc.Id));
             return [...filtered, {
@@ -122,8 +130,47 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                 id: doc.Id,
                 action,
                 documentName: doc.Document_Type__c,
+                rejectionReason: action === 'reject' ? rejectionReason?.trim() || '' : undefined,
             }];
         });
+    };
+
+    const openDocRejectModal = (doc: any) => {
+        setRejectingDoc(doc);
+        setRejectReason('');
+        setRejectDocModalVisible(true);
+    };
+
+    const handleDocRejectConfirm = () => {
+        const trimmedReason = rejectReason.trim();
+        if (!trimmedReason) {
+            message.warning('Please provide a rejection reason');
+            return;
+        }
+        if (!rejectingDoc) return;
+        stageDocVerification(rejectingDoc, 'reject', trimmedReason);
+        setRejectDocModalVisible(false);
+        setRejectingDoc(null);
+        setRejectReason('');
+    };
+
+    const openBankRejectModal = (bank: any) => {
+        setRejectingBank(bank);
+        setRejectBankReason('');
+        setRejectBankModalVisible(true);
+    };
+
+    const handleBankRejectConfirm = () => {
+        const trimmedReason = rejectBankReason.trim();
+        if (!trimmedReason) {
+            message.warning('Please provide a rejection reason');
+            return;
+        }
+        if (!rejectingBank) return;
+        stageBankVerification(rejectingBank, 'reject', trimmedReason);
+        setRejectBankModalVisible(false);
+        setRejectingBank(null);
+        setRejectBankReason('');
     };
 
     /** Get staged action for a given item (undefined = not staged) */
@@ -333,7 +380,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
             label: `${regionNames.of(c)} (+${getCountryCallingCode(c)})`,
             dialCode: `+${getCountryCallingCode(c)}`,
         })).sort((a, b) => a.label.localeCompare(b.label))
-    , [regionNames])
+        , [regionNames])
 
     const getPhonePlaceholder = (isoCode: CountryCode) => {
         try {
@@ -441,7 +488,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
         // Personal tab validations
         if (tabsToValidate.includes('personal')) {
             // Always validate personal fields when validating all or when active
-        
+
             const employeeName = formData.Employee_Name__c?.trim()
             const email = formData.Employee_Email__c?.trim()
             const phone = formData.Employee_Phone__c?.trim()
@@ -532,7 +579,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                 }
             }
 
-            if(employeeCode) {
+            if (employeeCode) {
                 // employee code should start with MV and followed by maximum of 5 digits
                 const employeeCodePattern = /^MV\d{0,5}$/g
                 if (!employeeCodePattern.test(employeeCode)) {
@@ -545,9 +592,9 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                     newErrors.Joining_Date__c = "Joining date cannot be before birth date"
                 }
             }
-            if(!companyEmail){
+            if (!companyEmail) {
                 newErrors.Company_Email__c = "Company Email is required"
-            }else if(companyEmail && !companyEmail.includes('mvclouds.com')){
+            } else if (companyEmail && !companyEmail.includes('mvclouds.com')) {
                 newErrors.Company_Email__c = "Company Email should include mvclouds.com"
             }
             if (formData.Joining_Date__c && formData.Onboarding_Date__c) {
@@ -681,8 +728,8 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                         if (parsed) {
                             setEmployeeCountryCode(parsed.country as CountryCode || 'IN')
                             return parsed.formatNational().startsWith('0') ? parsed.formatNational().slice(1) : parsed.formatNational()
-                        }   
-                    } catch {}
+                        }
+                    } catch { }
                     // Fallback: strip leading dialcode if stored as +CC-NUMBER
                     const match = raw.match(/^\+(\d{1,3})[- ]?(\d+)$/)
                     if (match) return match[2]
@@ -714,7 +761,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                             setEmergencyCountryCode(parsed.country as CountryCode || 'IN')
                             return parsed.formatNational().startsWith('0') ? parsed.formatNational().slice(1) : parsed.formatNational()
                         }
-                    } catch {}
+                    } catch { }
                     // Fallback: strip leading dialcode if stored as +CC-NUMBER
                     const match = raw.match(/^\+(\d{1,3})[- ]?(\d+)$/)
                     if (match) return match[2]
@@ -1408,6 +1455,19 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
         employeesList?.find((emp: any) => normalizeSfId(emp.Id) === normalizeSfId(currentUserEmployeeId))?.Title__c || ''
     ).trim().toLowerCase()
     const isHrTeamLead = isHrUser && currentUserTitleNormalized === 'team lead'
+
+    const canAccess = isOwnProfile || isAdminUser || isHrUser;
+    if (!canAccess) {
+        return (
+            <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+                <div className="bg-white rounded-3xl shadow-xl border border-slate-100 max-w-lg w-full p-10 text-center">
+                    <AlertTriangle className="w-16 h-16 text-red-500 mx-auto mb-6 animate-bounce" />
+                    <h2 className="text-2xl font-bold text-slate-800 mb-4">Access Denied</h2>
+                    <p className="text-slate-500 mt-2">You do not have permission to view this employee's profile.</p>
+                </div>
+            </div>
+        )
+    }
     const selectedDepartment = `${formData.Department__c ?? employee.Department__c ?? ''}`.trim().toLowerCase()
     const selectedRole = `${formData.Role__c ?? employee.Role__c ?? ''}`.trim().toLowerCase()
     const currentEmployeeCode = `${formData.Employee_Id__c ?? employee.Employee_Id__c ?? ''}`.trim()
@@ -1547,7 +1607,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                         }
                                     });
                                 }}
-                                disabled={!employee.Active__c && (!currentEmployeeCode || !employee.Company_Email__c || !employee.Role__c || !employee.Title__c || !employee.Department__c || !isAllDocumentsVerified) || !employee.Employee_Current_Address__c ||  !employee.Emergency_Contact_Name__c || !employee.Emergency_Contact_Number__c || !employee.Employee_Id__c}
+                                disabled={!employee.Active__c && (!currentEmployeeCode || !employee.Company_Email__c || !employee.Role__c || !employee.Title__c || !employee.Department__c || !isAllDocumentsVerified) || !employee.Employee_Current_Address__c || !employee.Emergency_Contact_Name__c || !employee.Emergency_Contact_Number__c || !employee.Employee_Id__c}
                                 className={cn(
                                     'flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all border shadow-lg',
                                     (!employee.Active__c && (!currentEmployeeCode || !employee.Company_Email__c || !employee.Role__c || !employee.Title__c || !employee.Department__c || !isAllDocumentsVerified) || !employee.Employee_Current_Address__c || !employee.Emergency_Contact_Name__c || !employee.Emergency_Contact_Number__c || !employee.Employee_Id__c) && 'opacity-50 cursor-not-allowed',
@@ -1559,7 +1619,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                 <Power className="w-4 h-4" />
                                 {employee.Active__c ? 'Deactivate' : 'Activate'}
                             </button>
-                        </div> 
+                        </div>
                     )}
                 </div>
             </div>
@@ -1786,7 +1846,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                             <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">Country</label>
                                                             <div className="relative">
                                                                 <select
-                                                                defaultValue={'IN'}
+                                                                    defaultValue={'IN'}
                                                                     value={formData.Employee_Address__CountryCode__s || ''}
                                                                     onChange={(e) => {
                                                                         const newCountry = e.target.value;
@@ -2011,7 +2071,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                         <div className="flex flex-wrap gap-2">
                                                             <div className="relative w-fit h-full">
                                                                 <select
-                                                                defaultValue={'IN'}
+                                                                    defaultValue={'IN'}
                                                                     value={emergencyCountryCode}
                                                                     onChange={(e) => {
                                                                         setEmergencyCountryCode(e.target.value as CountryCode)
@@ -2135,11 +2195,11 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                     type="select"
                                                     options={(
                                                         formData.Department__c === 'HR' ? ['HR', 'Intern'] :
-                                                        formData.Department__c === 'IT' ? ['Developer', 'Intern' , 'QA' , 'SEO'] :
-                                                        formData.Department__c === 'Finance' ? ['Manager', 'Intern'] :
-                                                        formData.Department__c === 'UI/UX' ? ['UI/UX', 'Intern' ] :
-                                                        formData.Department__c === 'Admin' ? ['Admin'] :
-                                                        (roleOptions.length > 0 ? roleOptions : ['Intern', 'Developer', 'Manager', 'HR', 'Admin', 'BDE', 'UI/UX', 'Finance' , 'QA' , 'SEO'])
+                                                            formData.Department__c === 'IT' ? ['Developer', 'Intern', 'QA', 'SEO'] :
+                                                                formData.Department__c === 'Finance' ? ['Manager', 'Intern'] :
+                                                                    formData.Department__c === 'UI/UX' ? ['UI/UX', 'Intern'] :
+                                                                        formData.Department__c === 'Admin' ? ['Admin'] :
+                                                                            (roleOptions.length > 0 ? roleOptions : ['Intern', 'Developer', 'Manager', 'HR', 'Admin', 'BDE', 'UI/UX', 'Finance', 'QA', 'SEO'])
                                                     ).map((r: string) => ({ label: r, value: r }))}
                                                 />
                                                 <Field
@@ -2186,8 +2246,8 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                                         }
                                                                     }}
                                                                     onChange={(e) => {
-                                                                        if(e.target.value.length > 3){
-                                                                           return;
+                                                                        if (e.target.value.length > 3) {
+                                                                            return;
                                                                         }
                                                                         let y = parseInt(e.target.value, 10) || 0
 
@@ -2447,7 +2507,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                             <div className="mb-6 p-6 bg-slate-50 border border-blue-100 rounded-xl animate-in fade-in slide-in-from-top-2">
                                                 <h3 className="font-semibold text-slate-800 mb-4 flex items-center gap-2"><CreditCard className="w-4 h-4" /> Account Details</h3>
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                                                    <Field label="Bank Name" value={bankFormData.Name} fieldKey="Name" isEditing={true} formData={bankFormData} setFormData={setBankFormData} placeholder="e.g. HDFC Bank" error={bankErrors.Name} required maxLength={100}/>
+                                                    <Field label="Bank Name" value={bankFormData.Name} fieldKey="Name" isEditing={true} formData={bankFormData} setFormData={setBankFormData} placeholder="e.g. HDFC Bank" error={bankErrors.Name} required maxLength={100} />
 
                                                     {/* Branch Name with inline validation */}
                                                     <div className="space-y-1.5">
@@ -2578,7 +2638,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                             )}
                                                         </label>
                                                         {passbookFile && (
-                                                            <button 
+                                                            <button
                                                                 type="button"
                                                                 onClick={(e) => { e.preventDefault(); setPassbookFile(null); }}
                                                                 className="absolute top-2 right-2 bg-white rounded-full p-1 shadow-sm text-slate-400 hover:text-red-500 border border-slate-200"
@@ -2641,8 +2701,8 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                                     return staged ? (
                                                                         <span
                                                                             className={`text-xs px-2 py-0.5 rounded-full font-semibold border animate-pulse ${staged === 'approve'
-                                                                                    ? 'bg-green-50 text-green-700 border-green-300'
-                                                                                    : 'bg-red-50 text-red-700 border-red-300'
+                                                                                ? 'bg-green-50 text-green-700 border-green-300'
+                                                                                : 'bg-red-50 text-red-700 border-red-300'
                                                                                 }`}
                                                                         >
                                                                             ⏳ Staged: {staged === 'approve' ? 'Approve' : 'Reject'}
@@ -2657,7 +2717,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                                                 Verify
                                                                             </button>
                                                                             <button
-                                                                                onClick={() => stageBankVerification(bank, 'reject')}
+                                                                                onClick={() => openBankRejectModal(bank)}
                                                                                 className="text-xs px-2 py-1 rounded-md border border-red-200 text-red-600 hover:bg-red-50"
                                                                                 title="Stage Reject"
                                                                             >
@@ -2723,6 +2783,33 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                 </div>
                                             )
                                         )}
+
+                                        {/* Bank Rejection Reason Modal */}
+                                        <Modal
+                                            title="Rejection Reason"
+                                            open={rejectBankModalVisible}
+                                            onOk={handleBankRejectConfirm}
+                                            onCancel={() => {
+                                                setRejectBankModalVisible(false)
+                                                setRejectingBank(null)
+                                                setRejectBankReason("")
+                                            }}
+                                            okText="Save"
+                                            cancelText="Cancel"
+                                            centered
+                                        >
+                                            <div className="space-y-3">
+                                                <p className="text-sm text-slate-600">
+                                                    Please provide a reason for rejecting this bank detail.
+                                                </p>
+                                                <Input.TextArea
+                                                    value={rejectBankReason}
+                                                    onChange={(e) => setRejectBankReason(e.target.value)}
+                                                    rows={4}
+                                                    placeholder="Enter rejection reason..."
+                                                />
+                                            </div>
+                                        </Modal>
 
                                         {/* Display uploaded passbook */}
                                         {(() => {
@@ -2939,8 +3026,8 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                                                     return staged ? (
                                                                                         <span
                                                                                             className={`text-xs font-semibold px-2 py-1 rounded-lg border shrink-0 animate-pulse ${staged === 'approve'
-                                                                                                    ? 'bg-green-50 text-green-700 border-green-300'
-                                                                                                    : 'bg-red-50 text-red-700 border-red-300'
+                                                                                                ? 'bg-green-50 text-green-700 border-green-300'
+                                                                                                : 'bg-red-50 text-red-700 border-red-300'
                                                                                                 }`}
                                                                                         >
                                                                                             ⏳ {staged === 'approve' ? 'Approved' : 'Rejected'}
@@ -2954,7 +3041,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                                                                 Approve
                                                                                             </button>
                                                                                             <button
-                                                                                                onClick={() => stageDocVerification(doc, 'reject')}
+                                                                                                onClick={() => openDocRejectModal(doc)}
                                                                                                 className="bg-white border border-amber-200 text-amber-600 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-amber-50 transition"
                                                                                             >
                                                                                                 Reject
@@ -3019,7 +3106,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                                     onChange={(page) => setCurrentPage(page)}
                                                                     showSizeChanger={false}
                                                                     className="ant-pagination-custom"
-                                                                    
+
                                                                 />
                                                             </div>
                                                         )}
@@ -3033,6 +3120,33 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                             })()}
 
                                         </div>
+
+                                        {/* Document Rejection Reason Modal */}
+                                        <Modal
+                                            title="Rejection Reason"
+                                            open={rejectDocModalVisible}
+                                            onOk={handleDocRejectConfirm}
+                                            onCancel={() => {
+                                                setRejectDocModalVisible(false)
+                                                setRejectingDoc(null)
+                                                setRejectReason("")
+                                            }}
+                                            okText="Save"
+                                            cancelText="Cancel"
+                                            centered
+                                        >
+                                            <div className="space-y-3">
+                                                <p className="text-sm text-slate-600">
+                                                    Please provide a reason for rejecting this document.
+                                                </p>
+                                                <Input.TextArea
+                                                    value={rejectReason}
+                                                    onChange={(e) => setRejectReason(e.target.value)}
+                                                    rows={4}
+                                                    placeholder="Enter rejection reason..."
+                                                />
+                                            </div>
+                                        </Modal>
 
                                         {/* Custom Document Upload Modal */}
                                         <Modal

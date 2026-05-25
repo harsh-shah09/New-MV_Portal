@@ -2,6 +2,7 @@ import { getProductById, getAssets } from '../../actions';
 import { Card, Descriptions, Tag, Button, Tabs, Table } from 'antd';
 import { DatabaseOutlined, BarcodeOutlined, UserOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import { BackButton } from '@/components/back-button';
+import { ProductDetailActions } from '../../components/ProductDetailActions';
 import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
@@ -139,8 +140,11 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
                     </div>
                     
                     {/* Placeholder for Product Image or Icon */}
-                    <div className="w-20 h-20 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl shadow-lg flex items-center justify-center text-white text-3xl font-bold">
-                        {product.Name.charAt(0)}
+                    <div className="flex items-center gap-4">
+                        <ProductDetailActions product={product} />
+                        <div className="w-20 h-20 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl shadow-lg flex items-center justify-center text-white text-3xl font-bold">
+                            {product.Name.charAt(0)}
+                        </div>
                     </div>
                 </div>
             </div>

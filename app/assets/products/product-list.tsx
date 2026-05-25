@@ -1,11 +1,14 @@
 "use client"
 
-import { Table, Input, Tag, Button, Card, Tooltip } from 'antd';
-import { SearchOutlined, PlusOutlined, DatabaseOutlined, ReloadOutlined } from '@ant-design/icons';
+import { Table, Input, Tag, Button, Card, Tooltip, Modal } from 'antd';
+import { SearchOutlined, PlusOutlined, DatabaseOutlined, ReloadOutlined, EditOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { useState } from 'react';
 import Link from 'next/link';
 import { SalesforceProduct } from '../types';
 import { CreateProductModal } from '../components/CreateProductModal';
+import { EditProductModal } from '../components/EditProductModal';
+import { deleteProduct } from '../actions';
+import { showToast } from '../components/toast';
 import { useRouter } from 'next/navigation';
 import { RefreshButton } from '@/components/refresh-button';
 
@@ -13,6 +16,8 @@ export function ProductList({ products: initialProducts }: { products: Salesforc
     const router = useRouter();
     const [searchText, setSearchText] = useState('');
     const [isCreateModalVisible, setIsCreateModalVisible] = useState(false);
+    const [isEditModalVisible, setIsEditModalVisible] = useState(false);
+    const [selectedProduct, setSelectedProduct] = useState<SalesforceProduct | null>(null);
     
     // Simple filter
     const filtered = initialProducts.filter(p => 
@@ -20,6 +25,30 @@ export function ProductList({ products: initialProducts }: { products: Salesforc
         (p.AMS_Model_Number__c || '').toLowerCase().includes(searchText.toLowerCase()) ||
         (p.AMS_Category__c || '').toLowerCase().includes(searchText.toLowerCase())
     );
+
+    const handleDelete = (product: SalesforceProduct) => {
+        Modal.confirm({
+            title: 'Confirm Delete',
+            icon: <ExclamationCircleOutlined className="text-red-500" />,
+            content: `Are you sure you want to delete product "${product.Name}"? This action cannot be undone.`,
+            okText: 'Yes, Delete',
+            okType: 'danger',
+            cancelText: 'No',
+            onOk: async () => {
+                try {
+                    await deleteProduct(product.Id);
+                    showToast.success('Product Deleted', {
+                        description: `Product "${product.Name}" deleted successfully.`
+                    });
+                    router.refresh();
+                } catch (err: any) {
+                    showToast.error('Delete Failed', { 
+                        description: err.message || 'Failed to delete product' 
+                    });
+                }
+            }
+        });
+    }
 
     const columns = [
         {
@@ -58,6 +87,35 @@ export function ProductList({ products: initialProducts }: { products: Salesforc
             key: 'AMS_Description__c',
             responsive: ['lg'] as any,
             render: (text: string) => <span className="text-gray-500 truncate block max-w-xs">{text}</span>
+        },
+        {
+            title: 'Action',
+            key: 'action',
+            width: 120,
+            render: (_: any, r: SalesforceProduct) => (
+                <div className="flex gap-2">
+                    <Tooltip title="Edit Product">
+                        <Button 
+                            icon={<EditOutlined />} 
+                            type="primary" 
+                            ghost 
+                            size="small"
+                            onClick={() => {
+                                setSelectedProduct(r);
+                                setIsEditModalVisible(true);
+                            }}
+                        />
+                    </Tooltip>
+                    <Tooltip title="Delete Product">
+                        <Button 
+                            icon={<DeleteOutlined />} 
+                            danger
+                            size="small"
+                            onClick={() => handleDelete(r)}
+                        />
+                    </Tooltip>
+                </div>
+            )
         }
     ];
 
@@ -103,10 +161,7 @@ export function ProductList({ products: initialProducts }: { products: Salesforc
                     columns={columns} 
                     pagination={{ 
                         position: ['bottomRight'],
-                        // showSizeChanger: true,
-                        // pageSizeOptions: ['10', '25', '50', '100'],
                         defaultPageSize: 10,
-                        // showTotal: (total, range) => `${total} products`,
                     }}
                     scroll={{ x: 800 }}
                     size='large'
@@ -121,6 +176,20 @@ export function ProductList({ products: initialProducts }: { products: Salesforc
                     setIsCreateModalVisible(false);
                     router.refresh();
                 }} 
+            />
+
+            <EditProductModal
+                visible={isEditModalVisible}
+                onCancel={() => {
+                    setIsEditModalVisible(false);
+                    setSelectedProduct(null);
+                }}
+                onSuccess={() => {
+                    setIsEditModalVisible(false);
+                    setSelectedProduct(null);
+                    router.refresh();
+                }}
+                product={selectedProduct}
             />
         </div>
     )

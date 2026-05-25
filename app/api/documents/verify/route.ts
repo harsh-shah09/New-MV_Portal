@@ -119,10 +119,14 @@ export async function PATCH(req: Request) {
 
     const nextStatus = action === 'approve' ? 'Verified' : 'Rejected';
 
-    await updateDocument({
+    const documentUpdate: any = {
       Id: documentId,
       Status__c: nextStatus,
-    });
+    };
+    if (action === 'reject' && reason) {
+      documentUpdate.Rejection_Reason__c = reason;
+    }
+    await updateDocument(documentUpdate);
     if (!active && action === 'reject') {
       await deleteDocument(documentId);
     }

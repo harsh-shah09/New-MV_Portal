@@ -356,7 +356,7 @@ export const getEmployeeById = async (id: string, includeSalary: boolean = false
 
   // 2. Fetch Bank Details
   const bankQuery = `
-      SELECT Id, Name, Bank_Branch_Name__c, Bank_Account_Number__c, IFSC__c, Primary_Account__c, Status__c,Account_Holder_Name__c
+      SELECT Id, Name, Bank_Branch_Name__c, Bank_Account_Number__c, IFSC__c, Primary_Account__c, Status__c, Account_Holder_Name__c, Rejection_Reason__c
       FROM Bank_Detail__c
       WHERE Employee__c = '${id}'
     `;
@@ -364,7 +364,7 @@ export const getEmployeeById = async (id: string, includeSalary: boolean = false
 
   // 3. Fetch Documents
   const docQuery = `
-      SELECT Id, Document_Type__c, Document_Category__c, File_URL__c, Status__c
+      SELECT Id, Document_Type__c, Document_Category__c, File_URL__c, Status__c, Rejection_Reason__c
       FROM Document__c
       WHERE Employee__c = '${id}'
     `;
