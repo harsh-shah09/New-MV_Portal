@@ -672,7 +672,13 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
             })
             if (!res.ok) throw new Error('Upload Failed')
             onSuccess("Ok")
-            setExistingDocuments(prev => [...prev, { Document_Type__c: doc, FileName: file.name }])
+            setExistingDocuments(prev => {
+                const exists = prev.some(d => d.Document_Type__c === doc);
+                if (exists) {
+                    return prev.map(d => d.Document_Type__c === doc ? { ...d, FileName: file.name, Name: file.name } : d);
+                }
+                return [...prev, { Document_Type__c: doc, FileName: file.name, Name: file.name }];
+            })
             showToast.success('Uploaded successfully')
         } catch (err) {
             onError({ err })
@@ -1367,7 +1373,10 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                                     {isUploaded ? <CheckCircleFilled className="text-xl text-green-500" /> : <UploadOutlined className="text-xl text-blue-500" />}
                                                 </p>
                                                 <p className="text-xs text-gray-500">
-                                                    {isUploaded ? (existingDocuments.find(d => d.Document_Type__c === doc)?.FileName || 'Document Uploaded') : 'Click or drag file'}
+                                                    {isUploaded ? (() => {
+                                                        const found = existingDocuments.find(d => d.Document_Type__c === doc);
+                                                        return found?.FileName || found?.Name || 'Document Uploaded';
+                                                    })() : 'Click or drag file'}
                                                 </p>
                                             </Upload.Dragger>
                                         </Card>

@@ -240,7 +240,8 @@ export async function POST(req: Request) {
                    IFSC__c: data.ifscCode,
                    Primary_Account__c: true,
                    Employee__c: employeeId,
-                   Status__c : nowStatus
+                   Status__c : nowStatus,
+                   Account_Holder_Name__c : data.accountHolder
                });
            }
            

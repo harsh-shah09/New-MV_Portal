@@ -364,7 +364,7 @@ export const getEmployeeById = async (id: string, includeSalary: boolean = false
 
   // 3. Fetch Documents
   const docQuery = `
-      SELECT Id, Document_Type__c, Document_Category__c, File_URL__c, Status__c, Rejection_Reason__c
+      SELECT Id, Name, Document_Type__c, Document_Category__c, File_URL__c, Status__c, Rejection_Reason__c
       FROM Document__c
       WHERE Employee__c = '${id}'
     `;

@@ -57,7 +57,29 @@ export async function POST(
                     updateData.Primary_Account__c = true;
                     updateData.Employee__c = employeeId;
                 }
+                if (item.action === 'reject') {
+                    updateData.Primary_Account__c = false;
+                }
                 await updateBankDetail(updateData);
+
+                if (item.action === 'reject') {
+                    // Find the most recent other bank account of this employee to make primary
+                    const otherBanksQuery = `
+                        SELECT Id, Status__c, Primary_Account__c, CreatedDate
+                        FROM Bank_Detail__c
+                        WHERE Employee__c = '${employeeId}' AND Id != '${item.id}' AND Status__c != 'Rejected'
+                        ORDER BY CreatedDate DESC
+                    `;
+                    const otherBanksResult = await conn.query(otherBanksQuery);
+                    if (otherBanksResult.records.length > 0) {
+                        const mostRecentBank = otherBanksResult.records[0] as any;
+                        await updateBankDetail({
+                            Id: mostRecentBank.Id,
+                            Primary_Account__c: true,
+                            Employee__c: employeeId
+                        });
+                    }
+                }
 
                 // Notify employee
                 await createNotification({
@@ -115,8 +137,11 @@ export async function POST(
         // - At least one is rejected
         if (!hasPendingBank && !hasPendingDoc && anyRejected) {
             const personalEmail = employee.Employee_Email__c;
+            const companyEmail = employee.Company_Email__c;
+            const isEmployeeActive = employee.Active__c === true;
+            const emailToSend = isEmployeeActive ? (companyEmail || personalEmail) : personalEmail;
 
-            if (personalEmail) {
+            if (emailToSend) {
                 const rejectedBanks = allBanks.filter((b: any) => b.Status__c === 'Rejected');
                 const rejectedDocs = allDocs.filter((d: any) => d.Status__c === 'Rejected');
 
@@ -159,25 +184,30 @@ export async function POST(
                     .join('<br/><br/>');
 
                 try {
-                    // Determine which step to send the user back to.
-                    // If any bank or passbook is rejected, send to step 3 (Passbook).
-                    // Otherwise, if only other documents are rejected, send to step 4 (Documents).
-                    const isBankOrPassbookRejected =
-                        hasRejectedBank || rejectedDocs.some((d: any) => d.Document_Type__c === 'Passbook');
-                    const targetStep = isBankOrPassbookRejected ? 3 : 4;
-
-                    const tokenData = {
-                        expirationtime: Date.now() + 48 * 60 * 60 * 1000,
-                        firsttime: false,
-                        step: targetStep
-                    };
-                    const encodedToken = btoa(JSON.stringify(tokenData));
                     const settingsNextAuthUrl = await getAdminSettingValue('NEXTAUTH_URL');
-                    const appLink = `${settingsNextAuthUrl || process.env.NEXTAUTH_URL || ''}/welcome?id=${employeeId}&token=${encodedToken}`;
+                    let appLink = '';
+                    if (isEmployeeActive) {
+                        appLink = `${settingsNextAuthUrl || process.env.NEXTAUTH_URL || ''}/employees/${employeeId}?tab=bank`;
+                    } else {
+                        // Determine which step to send the user back to.
+                        // If any bank or passbook is rejected, send to step 3 (Passbook).
+                        // Otherwise, if only other documents are rejected, send to step 4 (Documents).
+                        const isBankOrPassbookRejected =
+                            hasRejectedBank || rejectedDocs.some((d: any) => d.Document_Type__c === 'Passbook');
+                        const targetStep = isBankOrPassbookRejected ? 3 : 4;
+
+                        const tokenData = {
+                            expirationtime: Date.now() + 48 * 60 * 60 * 1000,
+                            firsttime: false,
+                            step: targetStep
+                        };
+                        const encodedToken = btoa(JSON.stringify(tokenData));
+                        appLink = `${settingsNextAuthUrl || process.env.NEXTAUTH_URL || ''}/welcome?id=${employeeId}&token=${encodedToken}`;
+                    }
 
                     // Re-use Document_Rejected template; replace table placeholders
                     let html = await loadTemplate('Document_Rejected', {
-                        employeeEmail: personalEmail,
+                        employeeEmail: emailToSend,
                         employeeId: employee.Employee_Id__c || employeeId,
                         employeeName: employee.Employee_Name__c || 'Employee',
                         recipientName: employee.Employee_Name__c || 'Employee',
@@ -190,19 +220,24 @@ export async function POST(
                     html = html.replace(/\{\{RejectedDocumentsTable\}\}/gi, rejectedDocsTable);
 
                     await sendEmail({
-                        to: personalEmail,
+                        to: emailToSend,
                         subject: 'Action Required: Verification Rejected',
                         body: html,
                         contentType: 'text/html',
                         isInfo: true,
                     });
 
-                    // Reset onboarding state so the wizard re-opens at the correct step (3 or 4)
-                    await Promise.all([
-                        setOnboardingStep(employeeId, targetStep),
-                        setFirstTimeLogin(employeeId, true),
-                        setOnboardingCompleted(employeeId, false),
-                    ]);
+                    if (!isEmployeeActive) {
+                        const isBankOrPassbookRejected =
+                            hasRejectedBank || rejectedDocs.some((d: any) => d.Document_Type__c === 'Passbook');
+                        const targetStep = isBankOrPassbookRejected ? 3 : 4;
+                        // Reset onboarding state so the wizard re-opens at the correct step (3 or 4)
+                        await Promise.all([
+                            setOnboardingStep(employeeId, targetStep),
+                            setFirstTimeLogin(employeeId, true),
+                            setOnboardingCompleted(employeeId, false),
+                        ]);
+                    }
                 } catch (emailErr) {
                     console.error('Failed to send consolidated rejection email:', emailErr);
                 }

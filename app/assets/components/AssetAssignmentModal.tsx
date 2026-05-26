@@ -108,7 +108,7 @@ export function AssetAssignmentModal({ visible, onCancel, onSuccess, asset, curr
         showToast.success("Updated Successfully", { description: "Asset assignment updated successfully!" });
         onSuccess();
     } catch (err: any) {
-        showToast.error("Update Failed", { description: err.message });
+        showToast.error("Update Failed", { description: 'Asset assignment not completed. Product is inactive or The selected date overlaps with an existing assignment' });
     } finally {
         setLoading(false);
     }
