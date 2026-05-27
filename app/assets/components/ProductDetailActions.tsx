@@ -21,7 +21,7 @@ export function ProductDetailActions({ product }: { product: SalesforceProduct }
       showToast.success('Product Deleted', { description: 'Product deleted successfully.' });
       window.location.href = '/assets/products';
     } catch (error: any) {
-      showToast.error('Delete Failed', { description: 'Cannot delete product. This record cannot be deleted because it is already associated with inventory items.' });
+      showToast.error('Delete Failed', { description: 'This record cannot be deleted because it is already associated with inventory items.' });
     } finally {
       setIsDeleting(false);
     }
