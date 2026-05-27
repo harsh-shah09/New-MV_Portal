@@ -521,7 +521,6 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                 }
             }
 
-
             if (!phone) {
                 newErrors.Employee_Phone__c = "Phone number is required"
             } else if (!validatePhone(employeeCountryCode, phone)) {
@@ -538,22 +537,82 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                 newErrors.Gender__c = "Please select a valid gender"
             }
 
-            if (emergencyPhone) {
-                if (!validatePhone(emergencyCountryCode, emergencyPhone)) {
-                    const dialCode = `+${getCountryCallingCode(emergencyCountryCode)}`
-                    const example = getPhonePlaceholder(emergencyCountryCode)
-                    newErrors.Emergency_Contact_Number__c = `Invalid phone number for selected country (${dialCode}). Example: ${example}`
-                }
+            // Emergency Contact Name: required, only letters/spaces, not only spaces
+            const emergencyContactName = formData.Emergency_Contact_Name__c?.trim()
+            if (!emergencyContactName) {
+                newErrors.Emergency_Contact_Name__c = "Emergency contact name is required"
             }
 
-            // Emergency Contact Relation: only letters/spaces, max 100 chars
+            // Emergency Contact Relation: required, only letters/spaces, not only spaces, max 100 chars
             const emergencyRelation = formData.Emergency_Contact_Relation__c?.trim()
-            if (emergencyRelation) {
-                if (!/^[A-Za-z\s]+$/.test(emergencyRelation)) {
-                    newErrors.Emergency_Contact_Relation__c = "Relation must contain only letters"
-                } else if (emergencyRelation.length > 100) {
-                    newErrors.Emergency_Contact_Relation__c = "Relation cannot exceed 100 characters"
-                }
+            if (!emergencyRelation) {
+                newErrors.Emergency_Contact_Relation__c = "Emergency contact relation is required"
+            } else if (!/^[A-Za-z\s]+$/.test(emergencyRelation)) {
+                newErrors.Emergency_Contact_Relation__c = "Relation must contain only letters"
+            } else if (emergencyRelation.length > 100) {
+                newErrors.Emergency_Contact_Relation__c = "Relation cannot exceed 100 characters"
+            }
+
+            // Emergency Contact Phone: required, valid phone
+            if (!emergencyPhone) {
+                newErrors.Emergency_Contact_Number__c = "Emergency contact phone is required"
+            } else if (!validatePhone(emergencyCountryCode, emergencyPhone)) {
+                const dialCode = `+${getCountryCallingCode(emergencyCountryCode)}`
+                const example = getPhonePlaceholder(emergencyCountryCode)
+                newErrors.Emergency_Contact_Number__c = `Invalid phone number for selected country (${dialCode}). Example: ${example}`
+            }
+
+            // Address validations
+            const currentStreet = formData.Employee_Current_Address__Street__s?.trim()
+            if (!currentStreet) {
+                newErrors.Employee_Current_Address__Street__s = "Current street address is required"
+            }
+
+            if (!formData.Employee_Current_Address__CountryCode__s) {
+                newErrors.Employee_Current_Address__CountryCode__s = "Current country is required"
+            }
+            if (!formData.Employee_Current_Address__StateCode__s) {
+                newErrors.Employee_Current_Address__StateCode__s = "Current state is required"
+            }
+            if (!formData.Employee_Current_Address__City__s) {
+                newErrors.Employee_Current_Address__City__s = "Current city is required"
+            }
+
+            const currentPostalCode = formData.Employee_Current_Address__PostalCode__s?.trim()
+            if (!currentPostalCode) {
+                newErrors.Employee_Current_Address__PostalCode__s = "Current zip / postal code is required"
+            } else if (!/^\d{5,10}$/.test(currentPostalCode)) {
+                newErrors.Employee_Current_Address__PostalCode__s = "Current postal code must contain 5 to 10 digits"
+            }
+
+            const permanentStreet = formData.Employee_Permanent_Address__Street__s?.trim()
+            if (!permanentStreet) {
+                newErrors.Employee_Permanent_Address__Street__s = "Permanent street address is required"
+            }
+
+            if (!formData.Employee_Permanent_Address__CountryCode__s) {
+                newErrors.Employee_Permanent_Address__CountryCode__s = "Permanent country is required"
+            }
+            if (!formData.Employee_Permanent_Address__StateCode__s) {
+                newErrors.Employee_Permanent_Address__StateCode__s = "Permanent state is required"
+            }
+            if (!formData.Employee_Permanent_Address__City__s) {
+                newErrors.Employee_Permanent_Address__City__s = "Permanent city is required"
+            }
+
+            const permanentPostalCode = formData.Employee_Permanent_Address__PostalCode__s?.trim()
+            if (!permanentPostalCode) {
+                newErrors.Employee_Permanent_Address__PostalCode__s = "Permanent zip / postal code is required"
+            } else if (!/^\d{5,10}$/.test(permanentPostalCode)) {
+                newErrors.Employee_Permanent_Address__PostalCode__s = "Permanent postal code must contain 5 to 10 digits"
+            }
+
+            // Technology and Enrollment Number checks (optional but not only spaces if present)
+            if (formData.Technology__c && !formData.Technology__c.trim()) {
+                newErrors.Technology__c = "Technology cannot be only spaces"
+            }
+            if (formData.Enrollment_Number__c && !formData.Enrollment_Number__c.trim()) {
+                newErrors.Enrollment_Number__c = "Enrollment Number cannot be only spaces"
             }
 
             // Date Validation
@@ -572,6 +631,13 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
             if (isHrOrAdmin) {
                 const employeeCode = formData.Employee_Id__c?.trim()
                 const companyEmail = formData.Company_Email__c?.trim()
+
+                if (formData.Employee_Id__c !== undefined && formData.Employee_Id__c !== null && formData.Employee_Id__c !== "") {
+                    if (!employeeCode) {
+                        newErrors.Employee_Id__c = "Employee ID cannot be only spaces"
+                    }
+                }
+
                 if (employeeCode && employeesList) {
                     const normalizedEmployeeCode = employeeCode.toLowerCase()
                     const isDuplicateEmployeeCode = employeesList.some((emp: any) => {
@@ -586,7 +652,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
 
                 if (employeeCode) {
                     // employee code should start with MV and followed by maximum of 5 digits
-                    const employeeCodePattern = /^MV\d{0,5}$/g
+                    const employeeCodePattern = /^MV\d{0,5}$/
                     if (!employeeCodePattern.test(employeeCode)) {
                         newErrors.Employee_Id__c = "Employee ID must start with 'MV' followed by up to 5 digits (e.g., MV12345)"
                     }
@@ -637,21 +703,27 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
             }
 
             const esi = formData.ESI_Number__c
-            if (esi) {
+            if (formData.ESI_Number__c && !esi) {
+                newErrors.ESI_Number__c = "ESI Number cannot be only spaces"
+            } else if (esi) {
                 if (!/^[0-9A-Za-z]{10}$/.test(esi)) {
                     newErrors.ESI_Number__c = "ESI Number must be a 10-digit alphanumeric code"
                 }
             }
 
             const pfNumber = formData.PF_Number__c?.trim()
-            if (pfNumber) {
+            if (formData.PF_Number__c && !pfNumber) {
+                newErrors.PF_Number__c = "PF Number cannot be only spaces"
+            } else if (pfNumber) {
                 if (!/^[A-Za-z0-9]{22}$/.test(pfNumber)) {
                     newErrors.PF_Number__c = "PF Number must be a 22-character alphanumeric code"
                 }
             }
 
             const uan = formData.UAN_Number__c
-            if (uan) {
+            if (formData.UAN_Number__c && !uan) {
+                newErrors.UAN_Number__c = "UAN cannot be only spaces"
+            } else if (uan) {
                 if (!/^\d{12}$/.test(uan)) {
                     newErrors.UAN_Number__c = "UAN must be a 12-digit numeric number"
                 }
@@ -823,6 +895,14 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
             payload.Employee_Email__c = payload.Employee_Email__c?.trim();
             payload.Company_Email__c = payload.Company_Email__c?.trim();
             payload.Employee_Id__c = payload.Employee_Id__c?.trim();
+            payload.Emergency_Contact_Name__c = payload.Emergency_Contact_Name__c?.trim();
+            payload.Emergency_Contact_Relation__c = payload.Emergency_Contact_Relation__c?.trim();
+            if (payload.Technology__c) payload.Technology__c = payload.Technology__c.trim();
+            if (payload.Enrollment_Number__c) payload.Enrollment_Number__c = payload.Enrollment_Number__c.trim();
+            if (payload.ESI_Number__c) payload.ESI_Number__c = payload.ESI_Number__c;
+            if (payload.PF_Number__c) payload.PF_Number__c = payload.PF_Number__c.trim();
+            if (payload.UAN_Number__c) payload.UAN_Number__c = payload.UAN_Number__c;
+
             const phoneRaw = payload.Employee_Phone__c?.trim() || ''
             if (phoneRaw) {
                 const parsed = parsePhoneNumberFromString(phoneRaw, employeeCountryCode)
@@ -842,10 +922,10 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
             const currentCountryName = currentCountryIso ? (Country.getAllCountries().find(c => c.isoCode === currentCountryIso)?.name || currentCountryIso) : '';
 
             payload.Employee_Current_Address__c = JSON.stringify({
-                street: formData.Employee_Current_Address__Street__s,
+                street: formData.Employee_Current_Address__Street__s?.trim(),
                 city: formData.Employee_Current_Address__City__s,
                 state: formData.Employee_Current_Address__StateCode__s,
-                postalCode: formData.Employee_Current_Address__PostalCode__s,
+                postalCode: formData.Employee_Current_Address__PostalCode__s?.trim(),
                 country: currentCountryName
             });
 
@@ -853,10 +933,10 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
             const permanentCountryName = permanentCountryIso ? (Country.getAllCountries().find(c => c.isoCode === permanentCountryIso)?.name || permanentCountryIso) : '';
 
             payload.Employee_Address__c = JSON.stringify({
-                street: formData.Employee_Permanent_Address__Street__s,
+                street: formData.Employee_Permanent_Address__Street__s?.trim(),
                 city: formData.Employee_Permanent_Address__City__s,
                 state: formData.Employee_Permanent_Address__StateCode__s,
-                postalCode: formData.Employee_Permanent_Address__PostalCode__s,
+                postalCode: formData.Employee_Permanent_Address__PostalCode__s?.trim(),
                 country: permanentCountryName
             });
 
@@ -898,9 +978,25 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
 
             updateMutation.mutate(payload)
         } else {
-            console.log(validateForm())
+            const activeErrors = getValidationErrors(false)
             setWarningMsg("Please fix the validation errors before saving.")
-            window.scrollTo({ top: 0, behavior: 'smooth' })
+            
+            const hasCurrentAddressErrors = Object.keys(activeErrors).some(key => key.startsWith('Employee_Current_Address'))
+            const hasPermanentAddressErrors = Object.keys(activeErrors).some(key => key.startsWith('Employee_Permanent_Address'))
+
+            if (hasCurrentAddressErrors) {
+                setSelectedAddressTab('current')
+                setTimeout(() => {
+                    document.getElementById('address-details-section')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                }, 100)
+            } else if (hasPermanentAddressErrors) {
+                setSelectedAddressTab('permanent')
+                setTimeout(() => {
+                    document.getElementById('address-details-section')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                }, 100)
+            } else {
+                window.scrollTo({ top: 0, behavior: 'smooth' })
+            }
         }
     }
 
@@ -1282,10 +1378,10 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
 
         const newErrors: Record<string, string> = {}
 
-        if (!bankFormData.Name) newErrors.Name = "Bank Name is required"
+        if (!bankFormData.Name?.trim()) newErrors.Name = "Bank Name is required"
 
         // Account Holder Name: required, letters/spaces/periods, max 100 chars
-        if (!bankFormData.Account_Holder_Name__c) {
+        if (!bankFormData.Account_Holder_Name__c?.trim()) {
             newErrors.Account_Holder_Name__c = "Account Holder Name is required"
         } else if (!/^[A-Za-z\s.]+$/.test(bankFormData.Account_Holder_Name__c)) {
             newErrors.Account_Holder_Name__c = "Account Holder Name can only contain letters, spaces and periods"
@@ -1294,7 +1390,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
         }
 
         // Branch Name: required, only letters/spaces, max 100 chars
-        if (!bankFormData.Bank_Branch_Name__c) {
+        if (!bankFormData.Bank_Branch_Name__c?.trim()) {
             newErrors.Bank_Branch_Name__c = "Branch Name is required"
         } else if (!/^[A-Za-z\s]+$/.test(bankFormData.Bank_Branch_Name__c)) {
             newErrors.Bank_Branch_Name__c = "Branch Name must contain only letters and spaces"
@@ -1328,7 +1424,14 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
         setBankErrors(newErrors)
 
         if (Object.keys(newErrors).length === 0) {
-            addBankMutation.mutate(bankFormData)
+            const trimmedBankData = {
+                ...bankFormData,
+                Name: bankFormData.Name.trim(),
+                Account_Holder_Name__c: bankFormData.Account_Holder_Name__c.trim(),
+                Bank_Branch_Name__c: bankFormData.Bank_Branch_Name__c.trim(),
+                IFSC__c: bankFormData.IFSC__c.trim(),
+            }
+            addBankMutation.mutate(trimmedBankData)
         }
     }
 
@@ -1893,7 +1996,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                 (formData.Employee_Permanent_Address__PostalCode__s || '') === (formData.Employee_Current_Address__PostalCode__s || '');
 
                                             return (
-                                                <div className="border-t border-slate-100 pt-8">
+                                                <div id="address-details-section" className="border-t border-slate-100 pt-8">
                                                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                                                         <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2 m-0">
                                                             <MapPin className="w-5 h-5 text-indigo-500" /> Address Details
@@ -1934,13 +2037,18 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                             isEditing={isEditing}
                                                             formData={formData}
                                                             setFormData={setFormData}
+                                                            error={errors[streetKey]}
+                                                            required
                                                         />
 
                                                         {isEditing ? (
                                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                                                 {/* Country */}
                                                                 <div className="space-y-1.5">
-                                                                    <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">Country</label>
+                                                                    <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 flex justify-between">
+                                                                        <div>Country <span className="text-red-500">*</span></div>
+                                                                        {errors[countryKey] && <span className="text-red-500 text-[10px] normal-case tracking-normal font-medium animate-pulse">{errors[countryKey]}</span>}
+                                                                    </label>
                                                                     <div className="relative">
                                                                         <select
                                                                             defaultValue={'IN'}
@@ -1959,7 +2067,10 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                                                     })
                                                                                 });
                                                                             }}
-                                                                            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none transition appearance-none"
+                                                                            className={cn(
+                                                                                "w-full bg-slate-50 border rounded-lg px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none transition appearance-none",
+                                                                                errors[countryKey] ? "border-red-300 focus:ring-red-200" : "border-slate-200"
+                                                                            )}
                                                                         >
                                                                             <option value="">Select Country</option>
                                                                             {Country.getAllCountries().map(c => (
@@ -1974,7 +2085,10 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
 
                                                                 {/* State */}
                                                                 <div className="space-y-1.5">
-                                                                    <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">State</label>
+                                                                    <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 flex justify-between">
+                                                                        <div>State <span className="text-red-500">*</span></div>
+                                                                        {errors[stateKey] && <span className="text-red-500 text-[10px] normal-case tracking-normal font-medium animate-pulse">{errors[stateKey]}</span>}
+                                                                    </label>
                                                                     <div className="relative">
                                                                         {(() => {
                                                                             const selectedCountry = formData[countryKey];
@@ -1996,7 +2110,8 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                                                          });
                                                                                     }}
                                                                                     className={cn(
-                                                                                        "w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none transition appearance-none",
+                                                                                        "w-full bg-slate-50 border rounded-lg px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none transition appearance-none",
+                                                                                        errors[stateKey] ? "border-red-300 focus:ring-red-200" : "border-slate-200",
                                                                                         (!selectedCountry || statesForCountry.length === 0) && "opacity-50 cursor-not-allowed"
                                                                                     )}
                                                                                 >
@@ -2015,7 +2130,10 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
 
                                                                 {/* City */}
                                                                 <div className="space-y-1.5">
-                                                                    <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">City</label>
+                                                                    <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 flex justify-between">
+                                                                        <div>City <span className="text-red-500">*</span></div>
+                                                                        {errors[cityKey] && <span className="text-red-500 text-[10px] normal-case tracking-normal font-medium animate-pulse">{errors[cityKey]}</span>}
+                                                                    </label>
                                                                     <div className="relative">
                                                                         {(() => {
                                                                             const selectedCountry = formData[countryKey];
@@ -2030,7 +2148,8 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                                                     disabled={!selectedState || citiesForState.length === 0}
                                                                                     onChange={(e) => setFormData({ ...formData, [cityKey]: e.target.value })}
                                                                                     className={cn(
-                                                                                        "w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none transition appearance-none",
+                                                                                        "w-full bg-slate-50 border rounded-lg px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none transition appearance-none",
+                                                                                        errors[cityKey] ? "border-red-300 focus:ring-red-200" : "border-slate-200",
                                                                                         (!selectedState || citiesForState.length === 0) && "opacity-50 cursor-not-allowed"
                                                                                     )}
                                                                                 >
@@ -2046,6 +2165,19 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                                         </div>
                                                                     </div>
                                                                 </div>
+
+                                                                {/* Zip / Postal */}
+                                                                <Field
+                                                                    label="Zip / Postal"
+                                                                    value={addressData?.postalCode}
+                                                                    fieldKey={postalCodeKey}
+                                                                    isEditing={isEditing}
+                                                                    formData={formData}
+                                                                    setFormData={setFormData}
+                                                                    placeholder="e.g. 400001"
+                                                                    error={errors[postalCodeKey]}
+                                                                    required
+                                                                />
                                                             </div>
                                                         ) : (
                                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -2069,24 +2201,6 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                                         {addressData?.city || <span className="text-slate-400 italic">Not set</span>}
                                                                     </p>
                                                                 </div>
-                                                            </div>
-                                                        )}
-
-                                                        {/* Zip / Postal Code */}
-                                                        {isEditing ? (
-                                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                                                <Field
-                                                                    label="Zip / Postal"
-                                                                    value={addressData?.postalCode}
-                                                                    fieldKey={postalCodeKey}
-                                                                    isEditing={isEditing}
-                                                                    formData={formData}
-                                                                    setFormData={setFormData}
-                                                                    placeholder="e.g. 400001"
-                                                                />
-                                                            </div>
-                                                        ) : (
-                                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                                                 <div className="space-y-1.5">
                                                                     <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">Zip / Postal</label>
                                                                     <p className="font-medium text-slate-800 text-sm break-words py-1">
@@ -2631,7 +2745,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                             onChange={(e) => {
                                                                 const val = e.target.value.replace(/[^A-Za-z\s]/g, '')
                                                                 const newErrors = { ...bankErrors }
-                                                                if (!val) newErrors.Bank_Branch_Name__c = 'Branch Name is required'
+                                                                if (!val.trim()) newErrors.Bank_Branch_Name__c = 'Branch Name is required'
                                                                 else if (val.length > 100) newErrors.Bank_Branch_Name__c = 'Cannot exceed 100 characters'
                                                                 else delete newErrors.Bank_Branch_Name__c
                                                                 setBankFormData({ ...bankFormData, Bank_Branch_Name__c: val })
@@ -2686,7 +2800,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                             onChange={(e) => {
                                                                 const val = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 11)
                                                                 const newErrors = { ...bankErrors }
-                                                                if (!val) newErrors.IFSC__c = 'IFSC Code is required'
+                                                                if (!val.trim()) newErrors.IFSC__c = 'IFSC Code is required'
                                                                 else if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(val)) newErrors.IFSC__c = 'Invalid IFSC format'
                                                                 else delete newErrors.IFSC__c
                                                                 setBankFormData({ ...bankFormData, IFSC__c: val })

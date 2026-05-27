@@ -461,10 +461,19 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
 
                     const mergedEmergencyPhone = mergeEmergencyContact(values.emergencyCountryCode, values.emergencyPhoneNumber)
 
+                    // Trim street and emergency contact name
+                    const trimmedData = {
+                        ...values,
+                        street: values.street?.trim(),
+                        permanentstreet: values.permanentstreet?.trim(),
+                        emergencyContact: values.emergencyContact?.trim(),
+                        emergencyPhone: mergedEmergencyPhone
+                    };
+
                     // Only call the API if the data has actually changed
                     const personalPayload = {
                         step: currentStep,
-                        data: { ...values, emergencyPhone: mergedEmergencyPhone },
+                        data: trimmedData,
                         employeeId: publicMode ? publicEmpId : undefined,
                     };
                     const personalKey = JSON.stringify(personalPayload);
@@ -1442,7 +1451,22 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
             </Modal>
         )
     };
-
+    if (publicMode && isExpired && currentStep <= stepItems.length) {
+        return (
+            <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+                <div className="bg-white rounded-3xl shadow-xl border border-slate-100 max-w-lg w-full p-10 text-center">
+                    <AlertCircle className="w-16 h-16 text-amber-500 mx-auto mb-6" />
+                    <h2 className="text-2xl font-bold text-gray-800 mb-4">Link Expired</h2>
+                    <p className="text-gray-500 text-lg mb-8">This onboarding link is no longer valid or has expired.</p>
+                    <p className="text-gray-500 text-lg">Your onboarding is not completed yet</p>
+                    <div className="mt-8 flex justify-center items-center gap-3 border-t border-slate-100 pt-8 opacity-80">
+                        <img src="/mv_logo1.png" alt="MV Clouds" className="h-8 drop-shadow-sm" />
+                        <span className="font-bold text-slate-800 tracking-tight">MV Clouds</span>
+                    </div>
+                </div>
+            </div>
+        )
+    }
     if (publicMode && isExpired) {
         return (
             <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
