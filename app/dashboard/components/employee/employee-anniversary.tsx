@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import { useRouter } from 'next/navigation';
 import dayjs from 'dayjs';
 
 export interface AnniversaryEmployee {
@@ -20,8 +19,6 @@ interface AnniversaryKpiCardProps {
 }
 
 const EmployeeAnniversary: React.FC<AnniversaryKpiCardProps> = ({ data }) => {
-  const router = useRouter();
-
   return (
     <div className="bg-white rounded-2xl shadow-md p-5 hover:shadow-lg transition-all duration-300 w-full h-full">
       <div className="flex justify-between items-center mb-4">
@@ -47,8 +44,7 @@ const EmployeeAnniversary: React.FC<AnniversaryKpiCardProps> = ({ data }) => {
             return (
               <div
                 key={emp.Id}
-                className="flex items-center gap-3 p-2 rounded-lg hover:bg-violet-100/60 transition cursor-pointer"
-                onClick={() => router.push(`/employees/${emp.Id}`)}
+                className="flex items-center gap-3 p-2 rounded-lg hover:bg-violet-100/60 transition"
               >
                 <img
                   src={emp.Profile_Photo__c}
