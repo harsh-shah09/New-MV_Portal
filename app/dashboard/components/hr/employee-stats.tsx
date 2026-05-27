@@ -36,7 +36,7 @@ export function EmployeeStats({ stats }: EmployeeStatsProps) {
         <Col xs={24} sm={12}>
           <Card className="bg-blue-50 border-blue-200">
             <Statistic
-              title={renderTooltipTitle("Active Employees", "Employees currently active and not on leave are shown here.")}
+              title={renderTooltipTitle("Today's Attendance", "Employees currently active and not on leave are shown here.")}
               value={stats.totalEmployees - stats.onLeaveToday}
               styles={{content: { color: '#3b82f6', fontSize: '20px' }}}
             />

@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import { useRouter } from 'next/navigation';
 
 export interface Employee {
   Id: string;
@@ -18,7 +17,6 @@ interface BirthdayKpiCardProps {
 }
 
 const BirthdayKpiCard: React.FC<BirthdayKpiCardProps> = ({ data }) => {
-  const router = useRouter();
   return (
     <div className="bg-white rounded-2xl shadow-md p-5 hover:shadow-lg transition-all duration-300 w-full h-full">
       
@@ -52,8 +50,7 @@ const BirthdayKpiCard: React.FC<BirthdayKpiCardProps> = ({ data }) => {
           {data?.map((emp) => (
             <div
               key={emp.Id}
-              className="flex items-center gap-3 p-2 rounded-lg hover:bg-blue-50 transition cursor-pointer"
-              onClick={()=>router.push(`/employees/${emp.Id}`)}
+              className="flex items-center gap-3 p-2 rounded-lg hover:bg-blue-50 transition"
             >
               {/* Avatar */}
               <img
