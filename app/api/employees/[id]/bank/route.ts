@@ -51,7 +51,7 @@ export async function POST(
             bodyHtml = bodyHtml.replace('{{bankBranchName}}', body.Bank_Branch_Name__c);
             bodyHtml = bodyHtml.replace('{{accountNumber}}', body.Bank_Account_Number__c);
             bodyHtml = bodyHtml.replace('{{ifscCode}}', body.IFSC__c);
-            bodyHtml = bodyHtml.replace('{{accountHolderName}}', session.name);
+            bodyHtml = bodyHtml.replace('{{accountHolderName}}', body.Account_Holder_Name__c || session.name);
             await sendEmail({
                 to: hrEmail,
                 subject: 'New Bank Account Added - Pending Verification',

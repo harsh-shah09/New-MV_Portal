@@ -408,10 +408,10 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                     if (values.postalCode && !postalPattern.test(values.postalCode)) {
                         customErrors.postalCode = 'Postal code should contain 5-10 digits';
                     }
-                    if (values.emergencyContact && !namePattern.test(values.emergencyContact)) {
+                    if (values.emergencyContact?.trim() && !namePattern.test(values.emergencyContact)) {
                         customErrors.emergencyContact = 'Name cannot contain numbers or special characters';
                     }
-                    if (values.emergencyRelation && !namePattern.test(values.emergencyRelation)) {
+                    if (values.emergencyRelation?.trim() && !namePattern.test(values.emergencyRelation)) {
                         customErrors.emergencyRelation = 'Relation cannot contain numbers or special characters';
                     }
 
@@ -446,13 +446,13 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                     }
 
                     // Manual check for required fields
-                    if (!values.street || !values.city || !values.state || !values.postalCode || !values.country || !values.emergencyContact || !values.emergencyRelation || !values.emergencyCountryCode || !values.emergencyPhoneNumber) {
+                    if (!values.street?.trim() || !values.city || !values.state || !values.postalCode || !values.country || !values.emergencyContact || !values.emergencyRelation || !values.emergencyCountryCode || !values.emergencyPhoneNumber) {
                         showToast.error("Please fill in all required personal information.");
                         setLoading(false);
                         return;
                     }
                     if (!values.sameAsCurrent) {
-                        if (!values.permanentstreet || !values.permanentcity || !values.permanentstate || !values.permanentpostalCode || !values.permanentcountry) {
+                        if (!values.permanentstreet?.trim() || !values.permanentcity || !values.permanentstate || !values.permanentpostalCode || !values.permanentcountry) {
                             showToast.error("Please fill in all required permanent address information.");
                             setLoading(false);
                             return;
@@ -536,7 +536,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                     }
 
                     // Check for required fields
-                    if (!values.bankName || !values.bankbranch || !values.accountNumber || !values.accountHolder || !values.ifscCode) {
+                    if (!values.bankName?.trim() || !values.bankbranch?.trim() || !values.accountNumber || !values.accountHolder?.trim() || !values.ifscCode) {
                         showToast.error("Please fill in all required bank details.");
                         setLoading(false);
                         return;
@@ -816,7 +816,9 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                         <p className="mb-4 text-gray-500">Current Address</p>
                         <Form.Item name="street" label="Street Address" rules={[{ required: true, message: 'Street address is required' },
                         { max: 100, message: 'Street address should not exceed 100 characters' },
-                        { min: 2, message: 'Street address should be at least 2 characters long' }
+                        { min: 2, message: 'Street address should be at least 2 characters long' },
+                        { pattern: /^[a-zA-Z0-9 ]+$/, message: 'Street should contain only letters, numbers, and spaces' }
+
                         ]}>
                             <Input placeholder="123 Main St" disabled={disabledsteps.includes(2)} />
                         </Form.Item>
@@ -924,7 +926,8 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                     <>
                                         <Form.Item name="permanentstreet" label="Street Address" rules={[{ required: true, message: 'Street address is required' },
                                         { max: 255, message: 'Street address should not exceed 255 characters' },
-                                        { min: 2, message: 'Street address should be at least 2 characters long' }
+                                        { min: 2, message: 'Street address should be at least 2 characters long' },
+                                        { pattern: /^[a-zA-Z0-9 ]+$/, message: 'Street should contain only letters, numbers, and spaces' }
                                         ]}>
                                             <Input placeholder="123 Main St" disabled={disabledsteps.includes(2)} />
                                         </Form.Item>
@@ -1021,7 +1024,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                             label="Emergency Contact Name"
                             rules={[
                                 { required: true, message: 'Emergency contact name is required' },
-                                { pattern: /^[a-zA-Z\s-]*$/, message: 'Name cannot contain numbers or special characters' },
+                                { pattern: /^[a-zA-Z0-9 ]+$/, message: 'Emergency contact name can only contain letters, numbers, and spaces' },
                                 { max: 100, message: 'Emergency contact name cannot exceed 100 characters' },
                                 { min: 3, message: 'Emergency contact name cannot be less than 3 characters' },
                             ]}

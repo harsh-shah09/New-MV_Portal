@@ -145,9 +145,10 @@ export async function POST(req: Request) {
                     Bank_Branch_Name__c: data.bankbranch,
                     Bank_Account_Number__c: data.accountNumber,
                     IFSC__c: data.ifscCode,
-                    Primary_Account__c: true,
+                    Primary_Account__c: false,
                     Employee__c: session.employeeId,
-                    Account_Holder_Name__c: data.accountHolder
+                    Account_Holder_Name__c: data.accountHolder,
+                    Mark_for_Approval__c: true
                 });
             }
 

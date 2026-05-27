@@ -128,7 +128,7 @@ export function AssetAssignmentModal({ visible, onCancel, onSuccess, asset, curr
   };
   return (
     <Modal
-      title={`Manage Assignment: ${asset?.Name}`}
+      title={`Manage Assignment: ${asset?.Internal_Serial_Number__c}`}
       open={visible}
       onCancel={onCancel}
       footer={null}
@@ -140,7 +140,7 @@ export function AssetAssignmentModal({ visible, onCancel, onSuccess, asset, curr
     >
     <Spin spinning={loading} size="large" tip="Loading...">
       <div className="mb-4">
-          <p className="text-sm text-gray-500 break-words">Asset: <b>{asset?.AMS_Product__r?.Name || asset?.AMS_Category__c}</b> ({asset?.AMS_Asset_Serial_Number__c})</p>
+          <p className="text-sm text-gray-500 break-words">Asset: <b>{asset?.AMS_Product__r?.Name || asset?.AMS_Category__c}</b></p>
           <div className="flex flex-wrap items-center gap-2 mt-2">
               <span className="text-gray-600">Current Status:</span> 
               <Tag color={currentAssignment ? "blue" : "green"}>

@@ -27,6 +27,19 @@ export async function PATCH(
       return NextResponse.json({ error: 'Bank ID and action are required' }, { status: 400 });
     }
 
+    const conn = await getSalesforceConnection();
+    let isMarkedForApproval = false;
+    let accountHolderName = '';
+
+    if (action === 'approve') {
+      const bankResult = await conn.query(`SELECT Id, Mark_for_Approval__c, Account_Holder_Name__c FROM Bank_Detail__c WHERE Id = '${bankId}' LIMIT 1`);
+      if (bankResult.records.length > 0) {
+        const record = bankResult.records[0] as any;
+        isMarkedForApproval = record.Mark_for_Approval__c === true || record.Mark_for_Approval__c === 'true';
+        accountHolderName = record.Account_Holder_Name__c || '';
+      }
+    }
+
     const status = action === 'approve' ? 'Verified' : 'Rejected';
 
     const updateData: any = {
@@ -40,8 +53,12 @@ export async function PATCH(
     
     // Automatically make it primary if approved, and ensure other accounts are demoted
     if (action === 'approve') {
-       updateData.Primary_Account__c = true;
-       updateData.Employee__c = id;
+       if (isMarkedForApproval) {
+          updateData.Primary_Account__c = true;
+          updateData.Employee__c = id;
+       } else {
+          updateData.Primary_Account__c = false;
+       }
     }
 
     if (action === 'reject') {
@@ -65,7 +82,7 @@ export async function PATCH(
               bodyHtml = bodyHtml.replace('{{bankBranchName}}', body.Bank_Branch_Name__c);
               bodyHtml = bodyHtml.replace('{{accountNumber}}', body.Bank_Account_Number__c);
               bodyHtml = bodyHtml.replace('{{ifscCode}}', body.IFSC__c);
-              bodyHtml = bodyHtml.replace('{{accountHolderName}}', employee.Employee_Name__c);
+              bodyHtml = bodyHtml.replace('{{accountHolderName}}', accountHolderName || employee.Employee_Name__c || 'Employee');
               await sendEmail({
                   to: employee.Company_Email__c,
                   subject: 'Bank Account Verified Successfully',

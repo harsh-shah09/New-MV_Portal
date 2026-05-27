@@ -68,7 +68,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
                     <table className="w-full text-sm text-left text-gray-600">
                         <thead className="bg-gray-50 text-xs text-gray-500 uppercase font-semibold">
                             <tr>
-                                <th className="px-6 py-3">Asset ID</th>
+                                <th className="px-6 py-3">Asset Code</th>
                                 <th className="px-6 py-3">Serial No</th>
                                 <th className="px-6 py-3">Status</th>
                                 <th className="px-6 py-3">Assignee</th>
@@ -77,7 +77,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
                         <tbody className="divide-y divide-gray-100">
                             {productAssets.map(asset => (
                                 <tr key={asset.Id} className="bg-white hover:bg-gray-50 transition-colors">
-                                    <td className="px-6 py-4 font-medium text-gray-900">{asset.Name}</td>
+                                    <td className="px-6 py-4 font-medium text-gray-900">{asset.Internal_Serial_Number__c}</td>
                                     <td className="px-6 py-4 font-mono">{asset.AMS_Asset_Serial_Number__c}</td>
                                     <td className="px-6 py-4">
                                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
@@ -129,8 +129,8 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
                          <div className="flex items-center gap-3 mb-2">
                             <Tag color="cyan" className="m-0 border-0 bg-cyan-50 text-cyan-700 font-medium px-3 py-1 rounded-full">{product.AMS_Category__c}</Tag>
                             {product.IsActive ? 
-                                <Tag icon={<CheckCircleOutlined />} color="success" className="m-0 border-0 px-3 py-1 rounded-full">Active Catalog Item</Tag> : 
-                                <Tag icon={<CloseCircleOutlined />} color="error" className="m-0 border-0 px-3 py-1 rounded-full">Archived</Tag>
+                                <Tag icon={<CheckCircleOutlined />} color="success" className="m-0 border-0 px-3 py-1 rounded-full">Active Item</Tag> : 
+                                <Tag icon={<CloseCircleOutlined />} color="error" className="m-0 border-0 px-3 py-1 rounded-full">Inactive</Tag>
                             }
                          </div>
                          <h1 className="text-4xl font-bold text-gray-900 tracking-tight">{product.Name}</h1>

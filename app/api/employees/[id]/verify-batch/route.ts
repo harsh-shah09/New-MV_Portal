@@ -54,32 +54,20 @@ export async function POST(
                     updateData.Rejection_Reason__c = item.rejectionReason;
                 }
                 if (item.action === 'approve') {
-                    updateData.Primary_Account__c = true;
-                    updateData.Employee__c = employeeId;
+                    const bankResult = await conn.query(`SELECT Id, Mark_for_Approval__c FROM Bank_Detail__c WHERE Id = '${item.id}' LIMIT 1`);
+                    const isMarkedForApproval = bankResult.records[0]?.Mark_for_Approval__c === true || bankResult.records[0]?.Mark_for_Approval__c === 'true';
+
+                    if (isMarkedForApproval) {
+                        updateData.Primary_Account__c = true;
+                        updateData.Employee__c = employeeId;
+                    } else {
+                        updateData.Primary_Account__c = false;
+                    }
                 }
                 if (item.action === 'reject') {
                     updateData.Primary_Account__c = false;
                 }
                 await updateBankDetail(updateData);
-
-                if (item.action === 'reject') {
-                    // Find the most recent other bank account of this employee to make primary
-                    const otherBanksQuery = `
-                        SELECT Id, Status__c, Primary_Account__c, CreatedDate
-                        FROM Bank_Detail__c
-                        WHERE Employee__c = '${employeeId}' AND Id != '${item.id}' AND Status__c != 'Rejected'
-                        ORDER BY CreatedDate DESC
-                    `;
-                    const otherBanksResult = await conn.query(otherBanksQuery);
-                    if (otherBanksResult.records.length > 0) {
-                        const mostRecentBank = otherBanksResult.records[0] as any;
-                        await updateBankDetail({
-                            Id: mostRecentBank.Id,
-                            Primary_Account__c: true,
-                            Employee__c: employeeId
-                        });
-                    }
-                }
 
                 // Notify employee
                 await createNotification({

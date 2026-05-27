@@ -29,6 +29,7 @@ import {
     Lock,
     Power,
     AlertTriangle,
+    AlertCircle,
     Laptop,
     History,
     ChevronDown,
@@ -67,6 +68,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
     const [activeTab, setActiveTab] = useState<TabId>(getTabFromQuery)
     const [showAssetHistory, setShowAssetHistory] = useState(false)
     const [isEditing, setIsEditing] = useState(false)
+    const [selectedAddressTab, setSelectedAddressTab] = useState<'current' | 'permanent'>('current')
     const fileInputRef = useRef<HTMLInputElement>(null)
     const queryClient = useQueryClient()
     const [titles, setTitles] = useState<{ label: string, value: string }[]>([])
@@ -561,71 +563,75 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                     newErrors.Birthdate__c = "Date of birth cannot be in the future"
                 }
             }
+            
         }
 
         // Employment tab validations
         if (tabsToValidate.includes('employment')) {
-            const employeeCode = formData.Employee_Id__c?.trim()
-            const companyEmail = formData.Company_Email__c?.trim()
-            if (employeeCode && employeesList) {
-                const normalizedEmployeeCode = employeeCode.toLowerCase()
-                const isDuplicateEmployeeCode = employeesList.some((emp: any) => {
-                    const existingCode = (emp.Employee_Id__c || emp.Employee_ID__c || '').trim().toLowerCase()
-                    return emp.Id !== employeeId && existingCode === normalizedEmployeeCode
-                })
+            const isHrOrAdmin = ['HR', 'Admin'].includes(currentUserRole);
+            if (isHrOrAdmin) {
+                const employeeCode = formData.Employee_Id__c?.trim()
+                const companyEmail = formData.Company_Email__c?.trim()
+                if (employeeCode && employeesList) {
+                    const normalizedEmployeeCode = employeeCode.toLowerCase()
+                    const isDuplicateEmployeeCode = employeesList.some((emp: any) => {
+                        const existingCode = (emp.Employee_Id__c || emp.Employee_ID__c || '').trim().toLowerCase()
+                        return emp.Id !== employeeId && existingCode === normalizedEmployeeCode
+                    })
 
-                if (isDuplicateEmployeeCode) {
-                    newErrors.Employee_Id__c = "This Employee ID is already assigned to another employee"
+                    if (isDuplicateEmployeeCode) {
+                        newErrors.Employee_Id__c = "This Employee ID is already assigned to another employee"
+                    }
                 }
-            }
 
-            if (employeeCode) {
-                // employee code should start with MV and followed by maximum of 5 digits
-                const employeeCodePattern = /^MV\d{0,5}$/g
-                if (!employeeCodePattern.test(employeeCode)) {
-                    newErrors.Employee_Id__c = "Employee ID must start with 'MV' followed by up to 5 digits (e.g., MV12345)"
+                if (employeeCode) {
+                    // employee code should start with MV and followed by maximum of 5 digits
+                    const employeeCodePattern = /^MV\d{0,5}$/g
+                    if (!employeeCodePattern.test(employeeCode)) {
+                        newErrors.Employee_Id__c = "Employee ID must start with 'MV' followed by up to 5 digits (e.g., MV12345)"
+                    }
                 }
-            }
 
-            if (formData.Joining_Date__c && formData.Birthdate__c) {
-                if (new Date(formData.Joining_Date__c) < new Date(formData.Birthdate__c)) {
-                    newErrors.Joining_Date__c = "Joining date cannot be before birth date"
+                if (formData.Joining_Date__c && formData.Birthdate__c) {
+                    if (new Date(formData.Joining_Date__c) < new Date(formData.Birthdate__c)) {
+                        newErrors.Joining_Date__c = "Joining date cannot be before birth date"
+                    }
                 }
-            }
-            if (!companyEmail) {
-                newErrors.Company_Email__c = "Company Email is required"
-            } else if (companyEmail && !companyEmail.includes('mvclouds.com')) {
-                newErrors.Company_Email__c = "Company Email should include mvclouds.com"
-            }
-            if (formData.Joining_Date__c && formData.Onboarding_Date__c) {
-                const joiningDate = dayjs(formData.Joining_Date__c)
-                const onboardingDate = dayjs(formData.Onboarding_Date__c)
-
-                if (joiningDate.isValid() && onboardingDate.isValid() && onboardingDate.isBefore(joiningDate, 'day')) {
-                    newErrors.Onboarding_Date__c = "Onboarding date must be on or after joining date"
+                if (!companyEmail) {
+                    newErrors.Company_Email__c = "Company Email is required"
+                } else if (companyEmail && !companyEmail.includes('mvclouds.com')) {
+                    newErrors.Company_Email__c = "Company Email should include mvclouds.com"
                 }
-            }
+                if (formData.Joining_Date__c && formData.Onboarding_Date__c) {
+                    const joiningDate = dayjs(formData.Joining_Date__c)
+                    const onboardingDate = dayjs(formData.Onboarding_Date__c)
 
-            // Required Employment Fields - only for non-Employee roles
-            if (currentUserRole !== "Employee") {
-                if (!formData.Role__c) newErrors.Role__c = "Role is required"
-                if (!formData.Department__c) newErrors.Department__c = "Department is required"
-            }
+                    if (joiningDate.isValid() && onboardingDate.isValid() && onboardingDate.isBefore(joiningDate, 'day')) {
+                        newErrors.Onboarding_Date__c = "Onboarding date must be on or after joining date"
+                    }
+                }
 
-            const personalEmail = formData.Employee_Email__c?.trim();
-            if (companyEmail) {
-                if (!emailPattern.test(companyEmail)) {
-                    newErrors.Company_Email__c = "Please enter a valid company email address";
-                } else if (personalEmail && companyEmail.toLowerCase() === personalEmail.toLowerCase()) {
-                    newErrors.Company_Email__c = "Company Email cannot be the same as Personal Email";
-                } else if (employeesList) {
-                    const isDuplicate = employeesList.some((emp: any) =>
-                        emp.Id !== employeeId &&
-                        emp.Status__c === 'Active' &&
-                        emp.Company_Email__c?.trim().toLowerCase() === companyEmail.toLowerCase()
-                    );
-                    if (isDuplicate) {
-                        newErrors.Company_Email__c = "This Company Email is already assigned to another active employee";
+                // Required Employment Fields - only for non-Employee roles
+                if (currentUserRole !== "Employee") {
+                    if (!formData.Role__c) newErrors.Role__c = "Role is required"
+                    if (!formData.Department__c) newErrors.Department__c = "Department is required"
+                }
+
+                const personalEmail = formData.Employee_Email__c?.trim();
+                if (companyEmail) {
+                    if (!emailPattern.test(companyEmail)) {
+                        newErrors.Company_Email__c = "Please enter a valid company email address";
+                    } else if (personalEmail && companyEmail.toLowerCase() === personalEmail.toLowerCase()) {
+                        newErrors.Company_Email__c = "Company Email cannot be the same as Personal Email";
+                    } else if (employeesList) {
+                        const isDuplicate = employeesList.some((emp: any) =>
+                            emp.Id !== employeeId &&
+                            emp.Status__c === 'Active' &&
+                            emp.Company_Email__c?.trim().toLowerCase() === companyEmail.toLowerCase()
+                        );
+                        if (isDuplicate) {
+                            newErrors.Company_Email__c = "This Company Email is already assigned to another active employee";
+                        }
                     }
                 }
             }
@@ -737,13 +743,24 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                 })(),
                 Birthdate__c: employee.Birthdate__c,
                 Gender__c: employee.Gender__c,
-                Employee_Address__c: employee.Employee_Current_Address__c || {},
-                Employee_Address__Street__s: employee.Employee_Current_Address__c?.street || '',
-                Employee_Address__City__s: employee.Employee_Current_Address__c?.city || '',
-                Employee_Address__StateCode__s: employee.Employee_Current_Address__c?.state || '',
-                Employee_Address__PostalCode__s: employee.Employee_Current_Address__c?.postalCode || '',
-                Employee_Address__CountryCode__s: (() => {
+                Employee_Current_Address__Street__s: employee.Employee_Current_Address__c?.street || '',
+                Employee_Current_Address__City__s: employee.Employee_Current_Address__c?.city || '',
+                Employee_Current_Address__StateCode__s: employee.Employee_Current_Address__c?.state || '',
+                Employee_Current_Address__PostalCode__s: employee.Employee_Current_Address__c?.postalCode || '',
+                Employee_Current_Address__CountryCode__s: (() => {
                     const countryNameOrCode = employee.Employee_Current_Address__c?.country || '';
+                    if (!countryNameOrCode) return '';
+                    const found = Country.getAllCountries().find(
+                        c => c.name.toLowerCase() === countryNameOrCode.toLowerCase() || c.isoCode.toLowerCase() === countryNameOrCode.toLowerCase()
+                    );
+                    return found ? found.isoCode : countryNameOrCode;
+                })(),
+                Employee_Permanent_Address__Street__s: employee.Employee_Address__c?.street || '',
+                Employee_Permanent_Address__City__s: employee.Employee_Address__c?.city || '',
+                Employee_Permanent_Address__StateCode__s: employee.Employee_Address__c?.state || '',
+                Employee_Permanent_Address__PostalCode__s: employee.Employee_Address__c?.postalCode || '',
+                Employee_Permanent_Address__CountryCode__s: (() => {
+                    const countryNameOrCode = employee.Employee_Address__c?.country || '';
                     if (!countryNameOrCode) return '';
                     const found = Country.getAllCountries().find(
                         c => c.name.toLowerCase() === countryNameOrCode.toLowerCase() || c.isoCode.toLowerCase() === countryNameOrCode.toLowerCase()
@@ -821,26 +838,40 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
             } else {
                 payload.Emergency_Contact_Number__c = ''
             }
-            const countryIso = formData.Employee_Address__CountryCode__s;
-            const countryName = countryIso ? (Country.getAllCountries().find(c => c.isoCode === countryIso)?.name || countryIso) : '';
+            const currentCountryIso = formData.Employee_Current_Address__CountryCode__s;
+            const currentCountryName = currentCountryIso ? (Country.getAllCountries().find(c => c.isoCode === currentCountryIso)?.name || currentCountryIso) : '';
 
-            payload.Employee_Current_Address__c = JSON.stringify(
-                {
-                    street: formData.Employee_Address__Street__s,
-                    city: formData.Employee_Address__City__s,
-                    state: formData.Employee_Address__StateCode__s,
-                    postalCode: formData.Employee_Address__PostalCode__s,
-                    country: countryName
-                }
-            );
+            payload.Employee_Current_Address__c = JSON.stringify({
+                street: formData.Employee_Current_Address__Street__s,
+                city: formData.Employee_Current_Address__City__s,
+                state: formData.Employee_Current_Address__StateCode__s,
+                postalCode: formData.Employee_Current_Address__PostalCode__s,
+                country: currentCountryName
+            });
+
+            const permanentCountryIso = formData.Employee_Permanent_Address__CountryCode__s;
+            const permanentCountryName = permanentCountryIso ? (Country.getAllCountries().find(c => c.isoCode === permanentCountryIso)?.name || permanentCountryIso) : '';
+
+            payload.Employee_Address__c = JSON.stringify({
+                street: formData.Employee_Permanent_Address__Street__s,
+                city: formData.Employee_Permanent_Address__City__s,
+                state: formData.Employee_Permanent_Address__StateCode__s,
+                postalCode: formData.Employee_Permanent_Address__PostalCode__s,
+                country: permanentCountryName
+            });
 
             // Remove flattened address fields from payload
-            delete payload.Employee_Address__Street__s;
-            delete payload.Employee_Address__c;
-            delete payload.Employee_Address__City__s;
-            delete payload.Employee_Address__StateCode__s;
-            delete payload.Employee_Address__PostalCode__s;
-            delete payload.Employee_Address__CountryCode__s;
+            delete payload.Employee_Current_Address__Street__s;
+            delete payload.Employee_Current_Address__City__s;
+            delete payload.Employee_Current_Address__StateCode__s;
+            delete payload.Employee_Current_Address__PostalCode__s;
+            delete payload.Employee_Current_Address__CountryCode__s;
+
+            delete payload.Employee_Permanent_Address__Street__s;
+            delete payload.Employee_Permanent_Address__City__s;
+            delete payload.Employee_Permanent_Address__StateCode__s;
+            delete payload.Employee_Permanent_Address__PostalCode__s;
+            delete payload.Employee_Permanent_Address__CountryCode__s;
 
             // Convert years + months UI fields to decimal Experience__c for Salesforce
             payload.Experience__c = yearsMonthsToDecimal(payload.exp_years ?? 0, payload.exp_months ?? 0)
@@ -886,7 +917,9 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
         Bank_Branch_Name__c: '',
         Bank_Account_Number__c: '',
         IFSC__c: '',
-        Primary_Account__c: true
+        Account_Holder_Name__c: '',
+        Primary_Account__c: false,
+        Mark_for_Approval__c: false
     })
     const [bankErrors, setBankErrors] = useState<Record<string, string>>({})
 
@@ -1174,7 +1207,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
             }
             message.success("Bank account added")
             setShowBankForm(false)
-            setBankFormData({ Name: '', Bank_Branch_Name__c: '', Bank_Account_Number__c: '', IFSC__c: '', Primary_Account__c: false })
+            setBankFormData({ Name: '', Bank_Branch_Name__c: '', Bank_Account_Number__c: '', IFSC__c: '', Account_Holder_Name__c: '', Primary_Account__c: false, Mark_for_Approval__c: false })
             setBankErrors({})
             queryClient.invalidateQueries({ queryKey: ["employee", employeeId] })
         },
@@ -1250,6 +1283,15 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
         const newErrors: Record<string, string> = {}
 
         if (!bankFormData.Name) newErrors.Name = "Bank Name is required"
+
+        // Account Holder Name: required, letters/spaces/periods, max 100 chars
+        if (!bankFormData.Account_Holder_Name__c) {
+            newErrors.Account_Holder_Name__c = "Account Holder Name is required"
+        } else if (!/^[A-Za-z\s.]+$/.test(bankFormData.Account_Holder_Name__c)) {
+            newErrors.Account_Holder_Name__c = "Account Holder Name can only contain letters, spaces and periods"
+        } else if (bankFormData.Account_Holder_Name__c.length > 100) {
+            newErrors.Account_Holder_Name__c = "Account Holder Name cannot exceed 100 characters"
+        }
 
         // Branch Name: required, only letters/spaces, max 100 chars
         if (!bankFormData.Bank_Branch_Name__c) {
@@ -1831,169 +1873,232 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                             </div>
                                         </div>
 
-                                        <div className="border-t border-slate-100 pt-8">
-                                            <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
-                                                <MapPin className="w-5 h-5 text-indigo-500" />Current Address
-                                            </h2>
-                                            <div className="grid grid-cols-1 gap-y-6">
-                                                <Field label="Street" value={employee.Employee_Current_Address__c?.street} fieldKey="Employee_Address__Street__s" isEditing={isEditing} formData={formData} setFormData={setFormData} />
+                                        {(() => {
+                                            const isCurrent = selectedAddressTab === 'current';
+                                            const prefix = isCurrent ? 'Employee_Current_Address' : 'Employee_Permanent_Address';
 
-                                                {/* Cascading Country → State → City */}
-                                                {isEditing ? (
-                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                                        {/* Country */}
-                                                        <div className="space-y-1.5">
-                                                            <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">Country</label>
-                                                            <div className="relative">
-                                                                <select
-                                                                    defaultValue={'IN'}
-                                                                    value={formData.Employee_Address__CountryCode__s || ''}
-                                                                    onChange={(e) => {
-                                                                        const newCountry = e.target.value;
-                                                                        // Check if current state belongs to new country, reset if not
-                                                                        const states = State.getStatesOfCountry(newCountry);
-                                                                        const currentState = formData.Employee_Address__StateCode__s;
-                                                                        const stateStillValid = states.some(s => s.name === currentState || s.isoCode === currentState);
-                                                                        setFormData({
-                                                                            ...formData,
-                                                                            Employee_Address__CountryCode__s: newCountry,
-                                                                            ...(stateStillValid ? {} : {
-                                                                                Employee_Address__StateCode__s: '',
-                                                                                Employee_Address__City__s: ''
-                                                                            })
-                                                                        });
-                                                                    }}
-                                                                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none transition appearance-none"
-                                                                >
-                                                                    <option value="">Select Country</option>
-                                                                    {Country.getAllCountries().map(c => (
-                                                                        <option key={c.isoCode} value={c.isoCode}>{c.name}</option>
-                                                                    ))}
-                                                                </select>
-                                                                <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none">
-                                                                    <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
-                                                                </div>
-                                                            </div>
+                                            const streetKey = `${prefix}__Street__s`;
+                                            const countryKey = `${prefix}__CountryCode__s`;
+                                            const stateKey = `${prefix}__StateCode__s`;
+                                            const cityKey = `${prefix}__City__s`;
+                                            const postalCodeKey = `${prefix}__PostalCode__s`;
+
+                                            const addressData = isCurrent ? employee.Employee_Current_Address__c : employee.Employee_Address__c;
+
+                                            const isSameAddress =
+                                                (formData.Employee_Permanent_Address__Street__s || '') === (formData.Employee_Current_Address__Street__s || '') &&
+                                                (formData.Employee_Permanent_Address__CountryCode__s || '') === (formData.Employee_Current_Address__CountryCode__s || '') &&
+                                                (formData.Employee_Permanent_Address__StateCode__s || '') === (formData.Employee_Current_Address__StateCode__s || '') &&
+                                                (formData.Employee_Permanent_Address__City__s || '') === (formData.Employee_Current_Address__City__s || '') &&
+                                                (formData.Employee_Permanent_Address__PostalCode__s || '') === (formData.Employee_Current_Address__PostalCode__s || '');
+
+                                            return (
+                                                <div className="border-t border-slate-100 pt-8">
+                                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                                                        <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2 m-0">
+                                                            <MapPin className="w-5 h-5 text-indigo-500" /> Address Details
+                                                        </h2>
+                                                        <div className="flex bg-slate-100 p-1 rounded-xl w-fit">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setSelectedAddressTab('current')}
+                                                                className={cn(
+                                                                    "px-4 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200",
+                                                                    selectedAddressTab === 'current'
+                                                                        ? "bg-white text-indigo-600 shadow-sm"
+                                                                        : "text-slate-600 hover:text-slate-800"
+                                                                )}
+                                                            >
+                                                                Current Address
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setSelectedAddressTab('permanent')}
+                                                                className={cn(
+                                                                    "px-4 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200",
+                                                                    selectedAddressTab === 'permanent'
+                                                                        ? "bg-white text-indigo-600 shadow-sm"
+                                                                        : "text-slate-600 hover:text-slate-800"
+                                                                )}
+                                                            >
+                                                                Permanent Address
+                                                            </button>
                                                         </div>
+                                                    </div>
 
-                                                        {/* State */}
-                                                        <div className="space-y-1.5">
-                                                            <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">State</label>
-                                                            <div className="relative">
-                                                                {(() => {
-                                                                    const selectedCountry = formData.Employee_Address__CountryCode__s;
-                                                                    const statesForCountry = selectedCountry ? State.getStatesOfCountry(selectedCountry) : [];
-                                                                    return (
+                                                    <div className="grid grid-cols-1 gap-y-6">
+                                                        <Field
+                                                            label="Street"
+                                                            value={addressData?.street}
+                                                            fieldKey={streetKey}
+                                                            isEditing={isEditing}
+                                                            formData={formData}
+                                                            setFormData={setFormData}
+                                                        />
+
+                                                        {isEditing ? (
+                                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                                {/* Country */}
+                                                                <div className="space-y-1.5">
+                                                                    <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">Country</label>
+                                                                    <div className="relative">
                                                                         <select
-                                                                            value={formData.Employee_Address__StateCode__s || ''}
-                                                                            disabled={!selectedCountry || statesForCountry.length === 0}
+                                                                            defaultValue={'IN'}
+                                                                            value={formData[countryKey] || ''}
                                                                             onChange={(e) => {
-                                                                                const newState = e.target.value;
-                                                                                // Check if current city belongs to new state, reset if not
-                                                                                const stateObj = statesForCountry.find(s => s.name === newState || s.isoCode === newState);
-                                                                                const cities = stateObj ? City.getCitiesOfState(selectedCountry, stateObj.isoCode) : [];
-                                                                                const currentCity = formData.Employee_Address__City__s;
-                                                                                const cityStillValid = cities.some(c => c.name === currentCity);
+                                                                                const newCountry = e.target.value;
+                                                                                const states = State.getStatesOfCountry(newCountry);
+                                                                                const currentState = formData[stateKey];
+                                                                                const stateStillValid = states.some(s => s.name === currentState || s.isoCode === currentState);
                                                                                 setFormData({
                                                                                     ...formData,
-                                                                                    Employee_Address__StateCode__s: newState,
-                                                                                    ...(!cityStillValid ? { Employee_Address__City__s: '' } : {})
+                                                                                    [countryKey]: newCountry,
+                                                                                    ...(stateStillValid ? {} : {
+                                                                                        [stateKey]: '',
+                                                                                        [cityKey]: ''
+                                                                                    })
                                                                                 });
                                                                             }}
-                                                                            className={cn(
-                                                                                "w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none transition appearance-none",
-                                                                                (!selectedCountry || statesForCountry.length === 0) && "opacity-50 cursor-not-allowed"
-                                                                            )}
+                                                                            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none transition appearance-none"
                                                                         >
-                                                                            <option value="">{!selectedCountry ? 'Select Country First' : 'Select State'}</option>
-                                                                            {statesForCountry.map(s => (
-                                                                                <option key={s.isoCode} value={s.name}>{s.name}</option>
+                                                                            <option value="">Select Country</option>
+                                                                            {Country.getAllCountries().map(c => (
+                                                                                <option key={c.isoCode} value={c.isoCode}>{c.name}</option>
                                                                             ))}
                                                                         </select>
-                                                                    );
-                                                                })()}
-                                                                <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none">
-                                                                    <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                                                                        <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none">
+                                                                            <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+
+                                                                {/* State */}
+                                                                <div className="space-y-1.5">
+                                                                    <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">State</label>
+                                                                    <div className="relative">
+                                                                        {(() => {
+                                                                            const selectedCountry = formData[countryKey];
+                                                                            const statesForCountry = selectedCountry ? State.getStatesOfCountry(selectedCountry) : [];
+                                                                            return (
+                                                                                <select
+                                                                                    value={formData[stateKey] || ''}
+                                                                                    disabled={!selectedCountry || statesForCountry.length === 0}
+                                                                                    onChange={(e) => {
+                                                                                         const newState = e.target.value;
+                                                                                         const stateObj = statesForCountry.find(s => s.name === newState || s.isoCode === newState);
+                                                                                         const cities = stateObj ? City.getCitiesOfState(selectedCountry, stateObj.isoCode) : [];
+                                                                                         const currentCity = formData[cityKey];
+                                                                                         const cityStillValid = cities.some(c => c.name === currentCity);
+                                                                                         setFormData({
+                                                                                             ...formData,
+                                                                                             [stateKey]: newState,
+                                                                                             ...(!cityStillValid ? { [cityKey]: '' } : {})
+                                                                                         });
+                                                                                    }}
+                                                                                    className={cn(
+                                                                                        "w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none transition appearance-none",
+                                                                                        (!selectedCountry || statesForCountry.length === 0) && "opacity-50 cursor-not-allowed"
+                                                                                    )}
+                                                                                >
+                                                                                    <option value="">{!selectedCountry ? 'Select Country First' : 'Select State'}</option>
+                                                                                    {statesForCountry.map(s => (
+                                                                                        <option key={s.isoCode} value={s.name}>{s.name}</option>
+                                                                                    ))}
+                                                                                </select>
+                                                                            );
+                                                                        })()}
+                                                                        <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none">
+                                                                            <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+
+                                                                {/* City */}
+                                                                <div className="space-y-1.5">
+                                                                    <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">City</label>
+                                                                    <div className="relative">
+                                                                        {(() => {
+                                                                            const selectedCountry = formData[countryKey];
+                                                                            const selectedState = formData[stateKey];
+                                                                            const stateObj = selectedState
+                                                                                ? State.getStatesOfCountry(selectedCountry).find(s => s.name === selectedState || s.isoCode === selectedState)
+                                                                                : null;
+                                                                            const citiesForState = stateObj ? City.getCitiesOfState(selectedCountry, stateObj.isoCode) : [];
+                                                                            return (
+                                                                                <select
+                                                                                    value={formData[cityKey] || ''}
+                                                                                    disabled={!selectedState || citiesForState.length === 0}
+                                                                                    onChange={(e) => setFormData({ ...formData, [cityKey]: e.target.value })}
+                                                                                    className={cn(
+                                                                                        "w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none transition appearance-none",
+                                                                                        (!selectedState || citiesForState.length === 0) && "opacity-50 cursor-not-allowed"
+                                                                                    )}
+                                                                                >
+                                                                                    <option value="">{!selectedState ? 'Select State First' : citiesForState.length === 0 ? 'No Cities Available' : 'Select City'}</option>
+                                                                                    {citiesForState.map(c => (
+                                                                                        <option key={c.name} value={c.name}>{c.name}</option>
+                                                                                    ))}
+                                                                                </select>
+                                                                            );
+                                                                        })()}
+                                                                        <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none">
+                                                                            <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                                                                        </div>
+                                                                    </div>
                                                                 </div>
                                                             </div>
-                                                        </div>
-
-                                                        {/* City */}
-                                                        <div className="space-y-1.5">
-                                                            <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">City</label>
-                                                            <div className="relative">
-                                                                {(() => {
-                                                                    const selectedCountry = formData.Employee_Address__CountryCode__s;
-                                                                    const selectedState = formData.Employee_Address__StateCode__s;
-                                                                    const stateObj = selectedState
-                                                                        ? State.getStatesOfCountry(selectedCountry).find(s => s.name === selectedState || s.isoCode === selectedState)
-                                                                        : null;
-                                                                    const citiesForState = stateObj ? City.getCitiesOfState(selectedCountry, stateObj.isoCode) : [];
-                                                                    return (
-                                                                        <select
-                                                                            value={formData.Employee_Address__City__s || ''}
-                                                                            disabled={!selectedState || citiesForState.length === 0}
-                                                                            onChange={(e) => setFormData({ ...formData, Employee_Address__City__s: e.target.value })}
-                                                                            className={cn(
-                                                                                "w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none transition appearance-none",
-                                                                                (!selectedState || citiesForState.length === 0) && "opacity-50 cursor-not-allowed"
-                                                                            )}
-                                                                        >
-                                                                            <option value="">{!selectedState ? 'Select State First' : citiesForState.length === 0 ? 'No Cities Available' : 'Select City'}</option>
-                                                                            {citiesForState.map(c => (
-                                                                                <option key={c.name} value={c.name}>{c.name}</option>
-                                                                            ))}
-                                                                        </select>
-                                                                    );
-                                                                })()}
-                                                                <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none">
-                                                                    <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                                                        ) : (
+                                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                                <div className="space-y-1.5">
+                                                                    <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">Country</label>
+                                                                    <p className="font-medium text-slate-800 text-sm break-words py-1">
+                                                                        {addressData?.country
+                                                                            ? (Country.getAllCountries().find(c => c.isoCode === addressData.country)?.name || addressData.country)
+                                                                            : <span className="text-slate-400 italic">Not set</span>}
+                                                                    </p>
+                                                                </div>
+                                                                <div className="space-y-1.5">
+                                                                    <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">State</label>
+                                                                    <p className="font-medium text-slate-800 text-sm break-words py-1">
+                                                                        {addressData?.state || <span className="text-slate-400 italic">Not set</span>}
+                                                                    </p>
+                                                                </div>
+                                                                <div className="space-y-1.5">
+                                                                    <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">City</label>
+                                                                    <p className="font-medium text-slate-800 text-sm break-words py-1">
+                                                                        {addressData?.city || <span className="text-slate-400 italic">Not set</span>}
+                                                                    </p>
                                                                 </div>
                                                             </div>
-                                                        </div>
-                                                    </div>
-                                                ) : (
-                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                                        <div className="space-y-1.5">
-                                                            <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">Country</label>
-                                                            <p className="font-medium text-slate-800 text-sm break-words py-1">
-                                                                {employee.Employee_Current_Address__c?.country
-                                                                    ? (Country.getAllCountries().find(c => c.isoCode === employee.Employee_Current_Address__c.country)?.name || employee.Employee_Current_Address__c.country)
-                                                                    : <span className="text-slate-400 italic">Not set</span>}
-                                                            </p>
-                                                        </div>
-                                                        <div className="space-y-1.5">
-                                                            <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">State</label>
-                                                            <p className="font-medium text-slate-800 text-sm break-words py-1">
-                                                                {employee.Employee_Current_Address__c?.state || <span className="text-slate-400 italic">Not set</span>}
-                                                            </p>
-                                                        </div>
-                                                        <div className="space-y-1.5">
-                                                            <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">City</label>
-                                                            <p className="font-medium text-slate-800 text-sm break-words py-1">
-                                                                {employee.Employee_Current_Address__c?.city || <span className="text-slate-400 italic">Not set</span>}
-                                                            </p>
-                                                        </div>
-                                                    </div>
-                                                )}
+                                                        )}
 
-                                                {/* Zip / Postal Code */}
-                                                {isEditing ? (
-                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                                        <Field label="Zip / Postal" value={employee.Employee_Current_Address__c?.postalCode} fieldKey="Employee_Address__PostalCode__s" isEditing={isEditing} formData={formData} setFormData={setFormData} placeholder="e.g. 400001" />
+                                                        {/* Zip / Postal Code */}
+                                                        {isEditing ? (
+                                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                                <Field
+                                                                    label="Zip / Postal"
+                                                                    value={addressData?.postalCode}
+                                                                    fieldKey={postalCodeKey}
+                                                                    isEditing={isEditing}
+                                                                    formData={formData}
+                                                                    setFormData={setFormData}
+                                                                    placeholder="e.g. 400001"
+                                                                />
+                                                            </div>
+                                                        ) : (
+                                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                                <div className="space-y-1.5">
+                                                                    <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">Zip / Postal</label>
+                                                                    <p className="font-medium text-slate-800 text-sm break-words py-1">
+                                                                        {addressData?.postalCode || <span className="text-slate-400 italic">Not set</span>}
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                        )}
                                                     </div>
-                                                ) : (
-                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                                        <div className="space-y-1.5">
-                                                            <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">Zip / Postal</label>
-                                                            <p className="font-medium text-slate-800 text-sm break-words py-1">
-                                                                {employee.Employee_Current_Address__c?.postalCode || <span className="text-slate-400 italic">Not set</span>}
-                                                            </p>
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
+                                                </div>
+                                            );
+                                        })()}
 
                                         <div className="border-t border-slate-100 pt-8">
                                             <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
@@ -2118,6 +2223,8 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                 <Field label="Enrollment Number" value={employee.Enrollment_Number__c} fieldKey="Enrollment_Number__c" isEditing={isEditing} formData={formData} setFormData={setFormData} placeholder="e.g. EN12345" />
                                             </div>
                                         </div>
+
+
                                     </div>
                                 )}
 
@@ -2128,7 +2235,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                 <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2 m-0">
                                                     <Briefcase className="w-5 h-5 text-blue-500" /> Employment Details
                                                 </h2>
-                                                {['HR', 'Admin'].includes(currentUserRole) && (
+                                                {(['HR', 'Admin'].includes(currentUserRole) || isOwnProfile) && (
                                                     <div className="flex w-full sm:w-auto justify-end">
                                                         {!isEditing ? (
                                                             <button
@@ -2195,7 +2302,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                     type="select"
                                                     options={(
                                                         formData.Department__c === 'HR' ? ['HR', 'Intern'] :
-                                                            formData.Department__c === 'IT' ? ['Developer', 'Intern', 'QA', 'SEO'] :
+                                                            formData.Department__c === 'IT' ? ['Developer', 'Intern', 'QA', 'SEO' , 'BDE'] :
                                                                 formData.Department__c === 'Finance' ? ['Manager', 'Intern'] :
                                                                     formData.Department__c === 'UI/UX' ? ['UI/UX', 'Intern'] :
                                                                         formData.Department__c === 'Admin' ? ['Admin'] :
@@ -2362,7 +2469,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                     label="ESIC Number"
                                                     value={employee.ESI_Number__c}
                                                     fieldKey="ESI_Number__c"
-                                                    isEditing={isEditing && ['HR', 'Admin'].includes(currentUserRole)}
+                                                    isEditing={isEditing}
                                                     formData={formData}
                                                     setFormData={setFormData}
                                                     error={errors.ESI_Number__c}
@@ -2384,7 +2491,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                     label="UAN Number"
                                                     value={employee.UAN_Number__c}
                                                     fieldKey="UAN_Number__c"
-                                                    isEditing={isEditing && ['HR', 'Admin'].includes(currentUserRole)}
+                                                    isEditing={isEditing}
                                                     formData={formData}
                                                     setFormData={setFormData}
                                                     error={errors.UAN_Number__c}
@@ -2393,6 +2500,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                 />
                                             </div>
                                         </div>
+
 
                                         {canViewCompensation && (
                                             <div className="border-t border-slate-100 pt-8">
@@ -2507,6 +2615,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                             <div className="mb-6 p-6 bg-slate-50 border border-blue-100 rounded-xl animate-in fade-in slide-in-from-top-2">
                                                 <h3 className="font-semibold text-slate-800 mb-4 flex items-center gap-2"><CreditCard className="w-4 h-4" /> Account Details</h3>
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                                    <Field label="Account Holder Name" value={bankFormData.Account_Holder_Name__c} fieldKey="Account_Holder_Name__c" isEditing={true} formData={bankFormData} setFormData={setBankFormData} placeholder="e.g. John Doe" error={bankErrors.Account_Holder_Name__c} required maxLength={100} />
                                                     <Field label="Bank Name" value={bankFormData.Name} fieldKey="Name" isEditing={true} formData={bankFormData} setFormData={setBankFormData} placeholder="e.g. HDFC Bank" error={bankErrors.Name} required maxLength={100} />
 
                                                     {/* Branch Name with inline validation */}
@@ -2593,8 +2702,8 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                     </div>
                                                 </div>
                                                 <div className="flex items-center gap-2 mb-4">
-                                                    <input type="checkbox" id="primary" checked={bankFormData.Primary_Account__c} onChange={e => setBankFormData({ ...bankFormData, Primary_Account__c: e.target.checked })} />
-                                                    <label htmlFor="primary" className="text-sm text-slate-700">Set as Primary Account</label>
+                                                    <input type="checkbox" id="primary" checked={bankFormData.Mark_for_Approval__c} onChange={e => setBankFormData({ ...bankFormData, Mark_for_Approval__c: e.target.checked, Primary_Account__c: false })} />
+                                                    <label htmlFor="primary" className="text-sm text-slate-700">Set as Primary Account (Requires HR/Admin approval)</label>
                                                 </div>
 
                                                 {/* Passbook Upload in Bank Form - Required */}
@@ -2656,13 +2765,16 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                             Bank_Branch_Name__c: "",
                                                             Bank_Account_Number__c: "",
                                                             IFSC__c: "",
-                                                            Primary_Account__c: true
+                                                            Account_Holder_Name__c: "",
+                                                            Primary_Account__c: false,
+                                                            Mark_for_Approval__c: false
                                                         })
                                                         setBankErrors({
                                                             Name: "",
                                                             Bank_Branch_Name__c: "",
                                                             Bank_Account_Number__c: "",
-                                                            IFSC__c: ""
+                                                            IFSC__c: "",
+                                                            Account_Holder_Name__c: ""
                                                         })
                                                         setShowBankForm(false)
                                                     }} className="px-4 py-2 text-slate-600 hover:bg-slate-200 rounded-lg text-sm">Cancel</button>
@@ -2762,7 +2874,11 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                                 )}
                                                             </div>
                                                         </div>
-                                                        <div className="grid grid-cols-2 gap-4 mt-4 opacity-80">
+                                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4 opacity-80">
+                                                            <div>
+                                                                <span className="text-xs text-slate-400 block uppercase">Account Holder Name</span>
+                                                                <span className="text-sm font-medium">{bank.Account_Holder_Name__c || '-'}</span>
+                                                            </div>
                                                             <div>
                                                                 <span className="text-xs text-slate-400 block uppercase">Account Number</span>
                                                                 <span className="font-mono text-sm">{bank.Bank_Account_Number__c}</span>
@@ -2772,6 +2888,12 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                                 <span className="font-mono text-sm">{bank.IFSC__c}</span>
                                                             </div>
                                                         </div>
+                                                        {(!bank.Status__c || bank.Status__c === 'Pending') && bank.Mark_for_Approval__c && (
+                                                            <div className="mt-3 text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg p-2.5 flex items-center gap-1.5 animate-in fade-in slide-in-from-top-1">
+                                                                <AlertCircle className="w-3.5 h-3.5" />
+                                                                <span>This is primary account. Needs to verify.</span>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 ))}
                                             </div>
