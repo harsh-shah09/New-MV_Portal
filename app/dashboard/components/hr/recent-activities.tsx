@@ -53,12 +53,12 @@ export function RecentActivities({ recentActivities }: RecentActivitiesProps) {
       className="h-full"
     >
       <Table 
-        dataSource={recentActivities.slice(0, 10)}
+        dataSource={recentActivities}
         columns={activityColumns}
         pagination={false}
         size="small"
         rowKey="id"
-        scroll={{ x: 520 }}
+        scroll={{ x: 520, y: 120 }}
       />
     </Card>
   )
