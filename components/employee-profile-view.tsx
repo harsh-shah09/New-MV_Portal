@@ -714,10 +714,6 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
             const pfNumber = formData.PF_Number__c?.trim()
             if (formData.PF_Number__c && !pfNumber) {
                 newErrors.PF_Number__c = "PF Number cannot be only spaces"
-            } else if (pfNumber) {
-                if (!/^[A-Za-z0-9]{22}$/.test(pfNumber)) {
-                    newErrors.PF_Number__c = "PF Number must be a 22-character alphanumeric code"
-                }
             }
 
             const uan = formData.UAN_Number__c
