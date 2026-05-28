@@ -433,7 +433,7 @@ export function EmployeeSalaryHistoryTab({ employeeId, employeeName, employeeDis
                 <Input value={selectedEmployeeName} disabled className="!font-medium" />
               </Form.Item>
 
-              <Form.Item label="Employee ID" tooltip="This shows the employee's ID, not the record id." className="!mb-0">
+              <Form.Item label="Employee Id" tooltip="This shows the Employee's Id." className="!mb-0">
                 <Input value={selectedEmployeeId} disabled className="!font-medium" />
               </Form.Item>
             </div>

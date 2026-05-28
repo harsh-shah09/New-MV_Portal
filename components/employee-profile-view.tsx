@@ -2394,7 +2394,15 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                     fieldKey="Department__c"
                                                     isEditing={isEditing && ['HR', 'Admin'].includes(currentUserRole)}
                                                     formData={formData}
-                                                    setFormData={setFormData}
+                                                    setFormData={(newFormData) => {
+                                                        const oldDept = formData.Department__c !== undefined ? formData.Department__c : employee.Department__c;
+                                                        const newDept = newFormData.Department__c;
+                                                        if (newDept !== oldDept) {
+                                                            setFormData({ ...newFormData, Team_Lead__c: null });
+                                                        } else {
+                                                            setFormData(newFormData);
+                                                        }
+                                                    }}
                                                     error={errors.Department__c}
                                                     type="select"
                                                     options={[
@@ -2402,7 +2410,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                         { label: 'IT', value: 'IT' },
                                                         { label: 'Finance', value: 'Finance' },
                                                         { label: 'UI/UX', value: 'UI/UX' },
-                                                        { label: 'Admin', value: 'Admin' },
+                                                        ...(currentUserRole === 'Admin' ? [{ label: 'Admin', value: 'Admin' }] : []),
                                                     ]}
                                                 />
                                                 <Field
@@ -2416,11 +2424,10 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                     type="select"
                                                     options={(
                                                         formData.Department__c === 'HR' ? ['HR', 'Intern'] :
-                                                            formData.Department__c === 'IT' ? ['Developer', 'Intern', 'QA', 'SEO' , 'BDE'] :
+                                                            formData.Department__c === 'IT' ? ['Developer', 'Intern', 'QA', 'SEO', 'BDE'] :
                                                                 formData.Department__c === 'Finance' ? ['Manager', 'Intern'] :
                                                                     formData.Department__c === 'UI/UX' ? ['UI/UX', 'Intern'] :
-                                                                        formData.Department__c === 'Admin' ? ['Admin'] :
-                                                                            (roleOptions.length > 0 ? roleOptions : ['Intern', 'Developer', 'Manager', 'HR', 'Admin', 'BDE', 'UI/UX', 'Finance', 'QA', 'SEO'])
+                                                                        (currentUserRole === 'Admin' ? ['Admin'] : []).concat(roleOptions.length > 0 ? roleOptions : ['Intern', 'Developer', 'Manager', 'HR', 'BDE', 'UI/UX', 'Finance', 'QA', 'SEO'])
                                                     ).map((r: string) => ({ label: r, value: r }))}
                                                 />
                                                 <Field
@@ -2553,7 +2560,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                                 showSearch
                                                                 placeholder="Select Manager"
                                                                 value={formData.Team_Lead__c !== undefined ? formData.Team_Lead__c : employee.Team_Lead__c}
-                                                                onChange={(val: any) => setFormData({ ...formData, Team_Lead__c: val })}
+                                                                onChange={(val: any) => setFormData({ ...formData, Team_Lead__c: val ?? null })}
                                                                 options={employeesList?.filter((e: any) =>
                                                                     e.Id !== employeeId &&
                                                                     e.Status__c === 'Active' &&
@@ -3558,7 +3565,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                     <div className="flex flex-col items-center gap-6 mb-8">
                                                         <div className="p-4 bg-white border-2 border-slate-100 rounded-xl shadow-sm">
                                                             {twoFAQRCode ? (
-                                                                <Image src={twoFAQRCode} alt="QR Code" width={180} height={180} />
+                                                                <img src={twoFAQRCode} alt="QR Code" width={180} height={180} />
                                                             ) : (
                                                                 <div className="w-[180px] h-[180px] flex items-center justify-center text-slate-400 bg-slate-50">
                                                                     <Spin />
@@ -3605,7 +3612,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                     <EmployeeSalaryHistoryTab
                                         employeeId={employeeId}
                                         employeeName={employee?.Employee_Name__c}
-                                        employeeDisplayId={employee?.Name}
+                                        employeeDisplayId={employee?.Employee_Id__c}
                                         employeeCode={employee?.Enrollment_Number__c}
                                         currentUserRole={currentUserRole}
                                     />

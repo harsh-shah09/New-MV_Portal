@@ -133,13 +133,15 @@ export function AssetAssignmentModal({ visible, onCancel, onSuccess, asset, curr
       onCancel={onCancel}
       footer={null}
       destroyOnClose
-      width="100%"
-      style={{ maxHeight: 'calc(100vh - 120px)', top: 20 , overflowY : 'auto' , maxWidth : '80vw' , borderRadius : '10px' , scrollbarWidth : 'none'}}
+      width={600}
+      centered
+      style={{ maxWidth: '95vw' }}
       className="mobile-modal"
       loading={isLoading}
     >
     <Spin spinning={loading} size="large" tip="Loading...">
-      <div className="mb-4">
+      <div style={{ maxHeight: '65vh', overflowY: 'auto', paddingRight: '12px', paddingLeft: '4px' }}>
+        <div className="mb-4">
           <p className="text-sm text-gray-500 break-words">Asset: <b>{asset?.AMS_Product__r?.Name || asset?.AMS_Category__c}</b></p>
           <div className="flex flex-wrap items-center gap-2 mt-2">
               <span className="text-gray-600">Current Status:</span> 
@@ -246,7 +248,7 @@ export function AssetAssignmentModal({ visible, onCancel, onSuccess, asset, curr
          <div className="flex flex-col sm:flex-row justify-end gap-2 pt-4">
             <Button onClick={onCancel}>Cancel</Button>
             <Button type="primary" htmlType="submit" loading={loading}>
-                {isAssigning ? 'Save Assignment' : (currentAssignment ? 'Return Asset' : 'Close')}
+                {isAssigning ? 'Save Assignment' : (currentAssignment ? 'Return Asset' : 'Save')}
             </Button>
         </div>
       </Form>
@@ -293,6 +295,7 @@ export function AssetAssignmentModal({ visible, onCancel, onSuccess, asset, curr
             </div>
           </>
       )}
+      </div>
     </Spin>
     </Modal>
   );

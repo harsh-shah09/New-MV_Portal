@@ -76,6 +76,41 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Failed to connect to Salesforce" }, { status: 500 })
     }
 
+    // Query verified and primary bank details for all eligible employees
+    const employeeIds = eligibleEmployees.map((emp: any) => emp.id).filter(Boolean)
+    const bankByEmployeeId = new Map<string, { bankName: string; accountNumber: string; ifscCode: string }>()
+
+    if (employeeIds.length > 0) {
+      const escapedEmployeeIds = employeeIds.map((id: string) => `'${String(id).replace(/'/g, "\\'")}'`).join(',')
+      const bankRecords = await conn.query<any>(`
+        SELECT Employee__c, Name, Bank_Account_Number__c, IFSC__c, Primary_Account__c, Status__c
+        FROM Bank_Detail__c
+        WHERE Employee__c IN (${escapedEmployeeIds})
+        ORDER BY Primary_Account__c DESC, CreatedDate DESC
+      `)
+
+      for (const bank of bankRecords.records || []) {
+        const employeeId = bank.Employee__c
+        if (!employeeId || bankByEmployeeId.has(employeeId)) {
+          continue
+        }
+
+        if (bank.Primary_Account__c === true && bank.Status__c === 'Verified') {
+          bankByEmployeeId.set(employeeId, {
+            bankName: bank.Name || '',
+            accountNumber: bank.Bank_Account_Number__c || '',
+            ifscCode: bank.IFSC__c || '',
+          })
+        } else {
+          bankByEmployeeId.set(employeeId, {
+            bankName: '',
+            accountNumber: '',
+            ifscCode: '',
+          })
+        }
+      }
+    }
+
     // 1) Create Payroll_Summary__c
     const summaryPayload: any = {
       Payroll_Month__c: month,
@@ -193,10 +228,10 @@ export async function POST(request: NextRequest) {
         const detailLines = successfulEmployees.map((emp: any) => {
           const employeeName = emp.employeeName || "NULL"
           const payableAmount = toRoundedAmount(emp.netSalary) || "NULL"
-          const bankDetails = emp.bankDetails || {}
-          const ifscCode = (bankDetails.ifscCode || emp.ifscCode || "NULL").toString().toUpperCase()
-          const accountNumber = bankDetails.accountNumber || emp.accountNumber || "NULL"
-          const bankName = (bankDetails.bankName || emp.bankName || "NULL").toString().toLowerCase()
+          const bankDetails = bankByEmployeeId.get(emp.id) || { bankName: '', accountNumber: '', ifscCode: '' }
+          const ifscCode = (bankDetails.ifscCode || "NULL").toString().toUpperCase()
+          const accountNumber = bankDetails.accountNumber || "NULL"
+          const bankName = (bankDetails.bankName || "NULL").toString().toLowerCase()
           const transferType = ifscCode.startsWith("ICIC") || bankName.includes("icici") ? "WIB" : "NFT"
           const monthEmployeeLabel = `${month} ${employeeName}`
           return `APO|${transferType}|${payableAmount}|${currencyCode}|${companyAccountNumber}|${companyBranchCode}|${ifscCode}|${accountNumber}|${companyBranchCode}|${employeeName}|${monthYearShort}|${monthEmployeeLabel}^`
@@ -246,8 +281,8 @@ export async function POST(request: NextRequest) {
             Employee_Id__c: emp.Employee_Id__c || emp.employeeId,
             email: emp.email || "",
             department: emp.department || "",
-            bankName: emp.bankName || "",
-            accountNumber: emp.accountNumber || "",
+            bankName: bankByEmployeeId.get(emp.id)?.bankName || "",
+            accountNumber: bankByEmployeeId.get(emp.id)?.accountNumber || "",
             dateOfJoining: emp.dateOfJoining || "",
             pfNumber: emp.pfNumber || "",
             esiNumber: emp.esiNumber || "",

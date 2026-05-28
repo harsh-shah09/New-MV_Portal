@@ -162,7 +162,7 @@ export function Sidebar({
         <div className="relative group cursor-pointer">
           <div className="absolute -inset-1 bg-gradient-to-r from-cyan-400 to-blue-600 rounded-lg blur opacity-20 group-hover:opacity-40 transition duration-1000 group-hover:duration-200"></div>
           <div className="relative bg-white rounded-lg p-1.5 ring-1 ring-slate-100 shadow-sm">
-            <Image
+            <img
               src="/mv_logo1.png"
               alt="MV Portal"
               width={40}
@@ -290,7 +290,8 @@ export function Sidebar({
               <p key={user?.id} className="text-sm font-semibold text-slate-800 truncate group-hover:text-cyan-600 transition-colors">
                 {user ? `${user.name}` : 'Loading...'}
               </p>
-              {/* Role Badge */}
+            </div>
+            {/* Role Badge */}
               <span className={cn(
                 "px-1.5 py-0.5 rounded-md text-[10px] font-bold border uppercase tracking-wide",
                 (user?.role?.includes('HR') || user?.role?.includes('Admin'))
@@ -299,8 +300,6 @@ export function Sidebar({
               )}>
                 {user?.role || 'Employee'}
               </span>
-            </div>
-            <p className="text-xs text-slate-500 truncate">View Profile</p>
           </div>
           <div className="flex flex-col gap-1">
             <button
