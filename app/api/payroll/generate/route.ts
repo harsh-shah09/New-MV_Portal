@@ -204,7 +204,7 @@ export async function POST(request: NextRequest) {
     if (employeeIds.length > 0) {
       const escapedEmployeeIds = employeeIds.map((id: string) => `'${String(id).replace(/'/g, "\\'")}'`).join(',')
       const bankRecords = await conn.query<any>(`
-        SELECT Employee__c, Name, Bank_Account_Number__c, IFSC__c, Primary_Account__c
+        SELECT Employee__c, Name, Bank_Account_Number__c, IFSC__c, Primary_Account__c, Status__c
         FROM Bank_Detail__c
         WHERE Employee__c IN (${escapedEmployeeIds})
         ORDER BY Primary_Account__c DESC, CreatedDate DESC
@@ -216,11 +216,19 @@ export async function POST(request: NextRequest) {
           continue
         }
 
-        bankByEmployeeId.set(employeeId, {
-          bankName: bank.Name || '',
-          accountNumber: bank.Bank_Account_Number__c || '',
-          ifscCode: bank.IFSC__c || '',
-        })
+        if (bank.Primary_Account__c === true && bank.Status__c === 'Verified') {
+          bankByEmployeeId.set(employeeId, {
+            bankName: bank.Name || '',
+            accountNumber: bank.Bank_Account_Number__c || '',
+            ifscCode: bank.IFSC__c || '',
+          })
+        } else {
+          bankByEmployeeId.set(employeeId, {
+            bankName: '',
+            accountNumber: '',
+            ifscCode: '',
+          })
+        }
       }
     }
 

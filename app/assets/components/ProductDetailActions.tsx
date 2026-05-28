@@ -1,60 +1,61 @@
 "use client"
 
-import { Button, Modal } from 'antd';
-import { EditOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
+import { Button, Popconfirm } from 'antd';
+import { DeleteOutlined, EditOutlined } from '@ant-design/icons';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { SalesforceProduct } from '../types';
-import { deleteProduct } from '../actions';
 import { EditProductModal } from './EditProductModal';
+import { deleteProduct } from '../actions';
 import { showToast } from './toast';
 
 export function ProductDetailActions({ product }: { product: SalesforceProduct }) {
   const router = useRouter();
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  const handleDelete = () => {
-    Modal.confirm({
-      title: 'Confirm Delete',
-      icon: <ExclamationCircleOutlined className="text-red-500" />,
-      content: `Are you sure you want to delete product "${product.Name}"? This action cannot be undone.`,
-      okText: 'Yes, Delete',
-      okType: 'danger',
-      cancelText: 'No',
-      onOk: async () => {
-        try {
-          await deleteProduct(product.Id);
-          showToast.success('Product Deleted', {
-            description: `Product "${product.Name}" deleted successfully.`
-          });
-          router.push('/assets/products');
-        } catch (err: any) {
-          showToast.error('Delete Failed', { 
-            description: err.message || 'Failed to delete product' 
-          });
-        }
-      }
-    });
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    try {
+      await deleteProduct(product.Id);
+      showToast.success('Product Deleted', { description: 'Product deleted successfully.' });
+      window.location.href = '/assets/products';
+    } catch (error: any) {
+      showToast.error('Delete Failed', { description: 'This record cannot be deleted because it is already associated with inventory items.' });
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   return (
-    <div className="flex gap-2">
+    <div className="flex flex-col justify-between items-center gap-3">
       <Button 
-        icon={<EditOutlined />} 
+        icon={<EditOutlined />}   
         type="default" 
         onClick={() => setIsEditModalVisible(true)}
-        className="flex items-center"
+        className="flex items-center gap-1.5 h-10 px-4 rounded-xl border-gray-500 hover:border-blue-400 hover:text-blue-500 font-semibold transition"
       >
-        Edit Product
       </Button>
-      <Button 
-        icon={<DeleteOutlined />} 
-        danger
-        onClick={handleDelete}
-        className="flex items-center"
+
+      <Popconfirm
+        title="Delete Product"
+        description="Are you sure you want to delete this product? This action cannot be undone."
+        onConfirm={handleDelete}
+        okText="Delete"
+        cancelText="Cancel"
+        okButtonProps={{ danger: true, loading: isDeleting, className: "rounded-lg" }}
+        cancelButtonProps={{ className: "rounded-lg" }}
+        placement="bottomRight"
       >
-        Delete Product
-      </Button>
+        <Button 
+          danger
+          type="default"
+          icon={<DeleteOutlined />} 
+          className="flex items-center gap-1.5 h-10 px-4 rounded-xl border-red-200 hover:border-red-400 hover:text-red-500 font-semibold transition"
+        >
+        </Button>
+      </Popconfirm>
+
       <EditProductModal 
         visible={isEditModalVisible}
         onCancel={() => setIsEditModalVisible(false)}

@@ -120,14 +120,14 @@ export async function getAssetById(id: string) {
   };
 }
 
-export async function getProducts() {
+export async function getProducts(activeOnly = false) {
   const conn = await getSalesforceConnection();
   if (!conn) throw new Error("Salesforce connection failed");
   
   const query = `
-    SELECT Id, Name, AMS_Category__c, AMS_Model_Number__c, AMS_Specifications__c, AMS_Description__c , IsActive
+    SELECT Id, Name, AMS_Category__c, AMS_Model_Number__c, AMS_Specifications__c, AMS_Description__c, IsActive
     FROM Product2
-    WHERE IsActive = true
+    ${activeOnly ? 'WHERE IsActive = true' : ''}
   `;
   const result = await conn.query(query);
   return result.records as unknown as SalesforceProduct[];
@@ -184,6 +184,14 @@ export async function createProduct(data: Partial<SalesforceProduct>) {
     const conn = await getSalesforceConnection();
     if (!conn) throw new Error("Salesforce connection failed");
 
+    if (data.AMS_Model_Number__c) {
+        const query = `SELECT Id FROM Product2 WHERE AMS_Model_Number__c = '${data.AMS_Model_Number__c}' LIMIT 1`;
+        const dupCheck = await conn.query(query);
+        if (dupCheck.records.length > 0) {
+            throw new Error(`A product with Model Number '${data.AMS_Model_Number__c}' already exists.`);
+        }
+    }
+
     const payload = {
         ...data,
         IsActive: data.IsActive !== undefined ? data.IsActive : true
@@ -199,6 +207,22 @@ export async function createProduct(data: Partial<SalesforceProduct>) {
 export async function updateProduct(id: string, data: Partial<SalesforceProduct>) {
     const conn = await getSalesforceConnection();
     if (!conn) throw new Error("Salesforce connection failed");
+
+    if (data.IsActive === false) {
+        const query = `SELECT Id FROM MVC_Internal_Asset__c WHERE AMS_Product__c = '${id}' AND AMS_Status__c = 'Assigned' LIMIT 1`;
+        const assignedCheck = await conn.query(query);
+        if (assignedCheck.records.length > 0) {
+            throw new Error("Cannot set product to inactive: This product has assets currently assigned to employees.");
+        }
+    }
+
+    if (data.AMS_Model_Number__c) {
+        const query = `SELECT Id FROM Product2 WHERE AMS_Model_Number__c = '${data.AMS_Model_Number__c}' AND Id != '${id}' LIMIT 1`;
+        const dupCheck = await conn.query(query);
+        if (dupCheck.records.length > 0) {
+            throw new Error(`A product with Model Number '${data.AMS_Model_Number__c}' already exists.`);
+        }
+    }
 
     const { Id, ...rest } = data as any;
 

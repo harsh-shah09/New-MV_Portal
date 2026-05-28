@@ -40,6 +40,7 @@ export async function GET(req: NextRequest) {
         const today = dayjs().format('YYYY-MM-DD');
         const todayMonth = dayjs().month() + 1;
         const todayDay = dayjs().date();
+        const todayYear = dayjs().year();
 
         const [birthdayquery, anniversaryQuery] = await Promise.all([
             conn.query(`
@@ -101,8 +102,14 @@ export async function GET(req: NextRequest) {
                 `);
             }
 
+            const pendingDocumentsFilter = isAdmin
+                ? ''
+                : "AND Employee__c IN (SELECT Id FROM Employee__c WHERE Role__c NOT IN ('HR','Admin'))";
+
             const [
                 employeeQuery,
+                newJoinersQuery,
+                pendingDocumentsQuery,
                 pendingApprovalsQuery,
                 approvedTodayQuery,
                 approvedTodayLeavesQuery,
@@ -114,7 +121,21 @@ export async function GET(req: NextRequest) {
                 conn.query(`
                     SELECT COUNT(Id) totalEmployees
                     FROM Employee__c
-                    WHERE Status__c = 'Active'
+                    WHERE Active__c = true
+                `),
+                conn.query(`
+                    SELECT COUNT(Id) newJoiners
+                    FROM Employee__c
+                    WHERE Joining_Date__c != null
+                    AND CALENDAR_YEAR(Joining_Date__c) = ${todayYear}
+                    AND CALENDAR_MONTH(Joining_Date__c) = ${todayMonth}
+                    AND Status__c = 'Active'
+                `),
+                conn.query(`
+                    SELECT COUNT(Id) pendingDocs
+                    FROM Document__c
+                    WHERE Status__c IN ('Pending', 'Uploaded')
+                    ${pendingDocumentsFilter}
                 `),
                 pendingApprovalsQueryPromise,
                 conn.query(`
@@ -156,12 +177,11 @@ export async function GET(req: NextRequest) {
                     ORDER BY Start_Date__c ASC
                 `),
                 conn.query(`
-                    SELECT Leave_Type__c, COUNT(Id) leaveCount
+                    SELECT Leave_Type__c, Leave_Category__c, COUNT(Id) leaveCount
                     FROM Leave__c
                     WHERE Status__c = 'Approved'
                     AND CALENDAR_YEAR(Start_Date__c) = ${new Date().getFullYear()}
-                    ${hrDashboardLeaveFilter}
-                    GROUP BY Leave_Type__c
+                    GROUP BY Leave_Type__c, Leave_Category__c
                 `),
                 conn.query(`
                     SELECT Id, Employee__r.Employee_Name__c, Status__c,
@@ -175,6 +195,8 @@ export async function GET(req: NextRequest) {
             ]);
 
             const totalEmployees = employeeQuery.records[0]?.totalEmployees || 0;
+            const newJoinersThisMonth = newJoinersQuery.records[0]?.newJoiners || 0;
+            const pendingDocuments = pendingDocumentsQuery.records[0]?.pendingDocs || 0;
 
             const pendingApprovals = pendingApprovalsQuery.records.map((record: any) => {
                 const sandwichRuleApplicable = record.Sandwich_Rule__c === true
@@ -243,7 +265,13 @@ export async function GET(req: NextRequest) {
             leaveAnalyticsQuery.records.forEach((record: any) => {
                 const count = record.leaveCount || 0;
                 const percentage = totalLeaves > 0 ? Math.round((count / totalLeaves) * 100) : 0;
-                
+
+                if (record.Leave_Category__c === 'Extra Day Pay') {
+                    leaveAnalytics.extraDayPay = count;
+                    leaveAnalytics.extraDayPayPercentage = percentage;
+                    return;
+                }
+
                 if (record.Leave_Type__c === 'Planned Leave') {
                     leaveAnalytics.plannedLeaves = count;
                     leaveAnalytics.plannedLeavePercentage = percentage;
@@ -270,8 +298,8 @@ export async function GET(req: NextRequest) {
                     pendingApprovals: pendingApprovals.length,
                     approvedToday,
                     onLeaveToday,
-                    pendingDocuments: 0,
-                    newJoinersThisMonth: 0
+                    pendingDocuments,
+                    newJoinersThisMonth
                 },
                 pendingApprovals,
                 leaveAnalytics,

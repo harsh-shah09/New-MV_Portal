@@ -32,7 +32,7 @@ export async function PATCH(req: Request) {
     if (!conn) return NextResponse.json({ error: 'No Salesforce connection' }, { status: 500 });
 
     const docQuery = `
-      SELECT Id, Name, Document_Type__c, Status__c, Employee__c,Employee__r.Employee_Id__c, Employee__r.Employee_Name__c, Employee__r.Role__c , Employee__r.Active__c,Employee__r.Employee_Email__c
+      SELECT Id, Name, Document_Type__c, Status__c, Employee__c, Employee__r.Employee_Id__c, Employee__r.Employee_Name__c, Employee__r.Role__c, Employee__r.Active__c, Employee__r.Employee_Email__c, Employee__r.Company_Email__c
       FROM Document__c
       WHERE Id = '${documentId}'
       LIMIT 1
@@ -51,14 +51,14 @@ export async function PATCH(req: Request) {
 
     // Rule:
     // - HR verifies non-HR employee docs
-    // - Admin verifies HR Invalid Dateemployee docs
+    // - Admin verifies HR employee docs
     const employeeRole = doc.Employee__r?.Role__c || '';
-    const name = doc.Employee__r?.Employee_Name__c
-    const empname = doc.Employee__r.Employee_Id__c;
+    const name = doc.Employee__r?.Employee_Name__c;
+    const empname = doc.Employee__r?.Employee_Id__c;
     const employeeId = doc.Employee__c;
     const personalEmail = doc.Employee__r?.Employee_Email__c;
-    const active = doc.Employee__r?.Active__c ?? true;
-    const companyEmail = doc.Employee__r?.Company_Email__c;
+    const active = doc.Employee__r?.Active__c;
+    const companyEmail = doc.Employee__r?.Company_Email__c || personalEmail;
     // Token carries step=4 so the re-opened wizard lands on Documents
     const data = {
       expirationtime: Date.now() + 48 * 60 * 60 * 1000,
@@ -71,11 +71,11 @@ export async function PATCH(req: Request) {
       const settingsNextAuthUrl = await getAdminSettingValue('NEXTAUTH_URL');
       const template = await loadTemplate('Document_Rejected', {
         employeeEmail: personalEmail,
-        employeeId: name,
-        employeeName: empname,
-        endDate: Date.now().toLocaleString(),
+        employeeId: empname,
+        employeeName: name,
+        endDate: new Date().toLocaleDateString(),
         recipientName: name,
-        appLink: (settingsNextAuthUrl || process.env.NEXTAUTH_URL) + `/welcome?id=${employeeId}&token=${encoded}`,
+        appLink: (settingsNextAuthUrl || process.env.NEXTAUTH_URL || '') + `/welcome?id=${employeeId}&token=${encoded}`,
         documentName: doc.Document_Type__c,
       });
       await sendEmail({
@@ -91,15 +91,15 @@ export async function PATCH(req: Request) {
         setFirstTimeLogin(employeeId, true),        // re-enable wizard on next login
         setOnboardingCompleted(employeeId, false),  // remove completion flag
       ]);
-    } else if (active && action != 'approve') {
+    } else if (active && action === 'reject') {
       const settingsNextAuthUrl = await getAdminSettingValue('NEXTAUTH_URL');
       const template = await loadTemplate('Document_Rejected', {
         employeeEmail: companyEmail,
-        employeeId: name,
-        employeeName: empname,
-        endDate: Date.now().toLocaleString(),
+        employeeId: empname,
+        employeeName: name,
+        endDate: new Date().toLocaleDateString(),
         recipientName: name,
-        appLink: (settingsNextAuthUrl || process.env.NEXTAUTH_URL) + `/employees/${employeeId}?tab=bank`,
+        appLink: (settingsNextAuthUrl || process.env.NEXTAUTH_URL || '') + `/employees/${employeeId}?tab=bank`,
         documentName: doc.Document_Type__c,
       });
       await sendEmail({

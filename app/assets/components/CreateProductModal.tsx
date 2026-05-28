@@ -31,7 +31,7 @@ export function CreateProductModal({ visible, onCancel, onSuccess }: CreateProdu
             onSuccess();
             form.resetFields();
         } catch (e: any) {
-            showToast.error("Creation Failed", { description: e.message });
+            showToast.error("Creation Failed", { description: "Model number should be unique." });
         } finally {
             setLoading(false);
         }
@@ -62,21 +62,21 @@ export function CreateProductModal({ visible, onCancel, onSuccess }: CreateProdu
                 className="pt-2"
             >
                 <Form.Item name="Name" label="Product Name" rules={[{ required: true, message: 'Please enter product name' }]}>
-                    <Input placeholder="e.g. MacBook Pro M3" />
+                    <Input placeholder="e.g. MacBook Pro M3" maxLength={80} />
                 </Form.Item>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                      <Form.Item name="AMS_Model_Number__c" label="Model Number" rules={[{ required: true, message: 'Model Number is required' }]}>
-                        <Input placeholder="e.g. A2992" />
+                        <Input placeholder="e.g. A2992" maxLength={50} />
                     </Form.Item>
                      <Form.Item name="AMS_Category__c" label="Category" rules={[{ required: true, message: 'Please select category' }]}>
                         <Select placeholder="Select Category" options={categories} />
                     </Form.Item>
                 </div>
                  <Form.Item name="AMS_Specifications__c" label="Specifications">
-                    <Input.TextArea rows={3} placeholder="e.g. M3 Pro Chip, 18GB RAM, 512GB SSD" />
+                    <Input.TextArea rows={3} placeholder="e.g. M3 Pro Chip, 18GB RAM, 512GB SSD" maxLength={255} />
                 </Form.Item>
                  <Form.Item name="AMS_Description__c" label="Description">
-                    <Input.TextArea rows={2} placeholder="e.g. Standard issue for Engineering team" />
+                    <Input.TextArea rows={2} placeholder="e.g. Standard issue for Engineering team" maxLength={255} />
                 </Form.Item>
                  <Form.Item name="IsActive" valuePropName="checked">
                     <Checkbox>Active</Checkbox>

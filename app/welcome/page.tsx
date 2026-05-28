@@ -35,8 +35,19 @@ function WelcomeContent() {
                 console.log(Number(decoded.expirationtime), Date.now(), Number(decoded.expirationtime) <= Date.now())
                 if (decoded.expirationtime && Number(decoded.expirationtime) <= Date.now()) {
                     setIsExpired(true)
-                } else {
                     // Check completion status from DB
+                    try {
+                        const res = await fetch(`/api/public/onboarding-status?id=${id}&firsttime=${decoded.firsttime}`);
+                        const data = await res.json();
+                        if (!data.employeeData) {
+                            setIsNotFound(true);
+                        } else if (data.isCompleted) {
+                            setIsCompleted(true);
+                        }
+                    } catch (fetchErr) {
+                        console.error("Failed to fetch onboarding status", fetchErr);
+                    }
+                }else{
                     try {
                         const res = await fetch(`/api/public/onboarding-status?id=${id}&firsttime=${decoded.firsttime}`);
                         const data = await res.json();
@@ -68,13 +79,18 @@ function WelcomeContent() {
         )
     }
 
-    if (isCompleted) {
+    if (isExpired && !isCompleted) {
         return (
             <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
                 <div className="bg-white rounded-3xl shadow-xl border border-slate-100 max-w-lg w-full p-10 text-center">
-                    <CheckCircle className="w-16 h-16 text-emerald-500 mx-auto mb-6" />
-                    <h2 className="text-2xl font-bold text-slate-800 mb-4">Onboarding Completed</h2>
-                    <p className="text-slate-500 mt-2">Your onboarding process is already complete. You can close this window.</p>
+                    <AlertCircle className="w-16 h-16 text-amber-500 mx-auto mb-6" />
+                    <h2 className="text-2xl font-bold text-gray-800 mb-4">Link Expired</h2>
+                    <p className="text-gray-500 text-lg mb-8">This onboarding link is no longer valid or has expired.</p>
+                    <p className="text-gray-500 text-lg"><b>Note: </b>Your onboarding is not completed yet. Please contact your HR for assistance.</p>
+                    <div className="mt-8 flex justify-center items-center gap-3 border-t border-slate-100 pt-8 opacity-80">
+                        <img src="/mv_logo1.png" alt="MV Clouds" className="h-8 drop-shadow-sm" />
+                        <span className="font-bold text-slate-800 tracking-tight">MV Clouds</span>
+                    </div>
                 </div>
             </div>
         )
@@ -90,7 +106,17 @@ function WelcomeContent() {
             </div>
         )
     }
-
+    if (isCompleted) {
+        return (
+            <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+                <div className="bg-white rounded-3xl shadow-xl border border-slate-100 max-w-lg w-full p-10 text-center">
+                    <CheckCircle className="w-16 h-16 text-emerald-500 mx-auto mb-6" />
+                    <h2 className="text-2xl font-bold text-slate-800 mb-4">Onboarding Completed</h2>
+                    <p className="text-slate-500 mt-2">Your onboarding process is already complete. You can close this window.</p>
+                </div>
+            </div>
+        )
+    }
     return <OnboardingWizard publicMode={true} publicEmpId={id} firsttime={firsttime} step={step} />
 }
 

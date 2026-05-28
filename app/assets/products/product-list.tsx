@@ -26,30 +26,6 @@ export function ProductList({ products: initialProducts }: { products: Salesforc
         (p.AMS_Category__c || '').toLowerCase().includes(searchText.toLowerCase())
     );
 
-    const handleDelete = (product: SalesforceProduct) => {
-        Modal.confirm({
-            title: 'Confirm Delete',
-            icon: <ExclamationCircleOutlined className="text-red-500" />,
-            content: `Are you sure you want to delete product "${product.Name}"? This action cannot be undone.`,
-            okText: 'Yes, Delete',
-            okType: 'danger',
-            cancelText: 'No',
-            onOk: async () => {
-                try {
-                    await deleteProduct(product.Id);
-                    showToast.success('Product Deleted', {
-                        description: `Product "${product.Name}" deleted successfully.`
-                    });
-                    router.refresh();
-                } catch (err: any) {
-                    showToast.error('Delete Failed', { 
-                        description: err.message || 'Failed to delete product' 
-                    });
-                }
-            }
-        });
-    }
-
     const columns = [
         {
             title: 'Product Name',
@@ -91,7 +67,7 @@ export function ProductList({ products: initialProducts }: { products: Salesforc
         {
             title: 'Action',
             key: 'action',
-            width: 120,
+            width: 80,
             render: (_: any, r: SalesforceProduct) => (
                 <div className="flex gap-2">
                     <Tooltip title="Edit Product">
@@ -104,14 +80,6 @@ export function ProductList({ products: initialProducts }: { products: Salesforc
                                 setSelectedProduct(r);
                                 setIsEditModalVisible(true);
                             }}
-                        />
-                    </Tooltip>
-                    <Tooltip title="Delete Product">
-                        <Button 
-                            icon={<DeleteOutlined />} 
-                            danger
-                            size="small"
-                            onClick={() => handleDelete(r)}
                         />
                     </Tooltip>
                 </div>

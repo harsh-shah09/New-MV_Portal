@@ -747,7 +747,7 @@ export function GeneratePayrollModal({ open, onClose, onGenerate, onSavingChange
     <Modal
       title={
         <div className="flex items-center gap-2 sm:gap-3 pr-4">
-          <Image
+          <img
             src="/mv_logo1.png"
             alt="MV Clouds Logo"
             width={36}

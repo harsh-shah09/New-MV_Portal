@@ -108,9 +108,9 @@ export default function EmployeesClient({ role }: EmployeesClientProps) {
 
 
   const filteredEmployees = employees.filter((emp) => {
+    const fullName = `${emp.firstName || ''} ${emp.lastName || ''}`.trim();
     const matchesSearch =
-      emp.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      emp.lastName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       emp.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (emp.phone && emp.phone.includes(searchTerm))
 

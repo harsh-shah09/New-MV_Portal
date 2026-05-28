@@ -408,10 +408,10 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                     if (values.postalCode && !postalPattern.test(values.postalCode)) {
                         customErrors.postalCode = 'Postal code should contain 5-10 digits';
                     }
-                    if (values.emergencyContact && !namePattern.test(values.emergencyContact)) {
+                    if (values.emergencyContact?.trim() && !namePattern.test(values.emergencyContact)) {
                         customErrors.emergencyContact = 'Name cannot contain numbers or special characters';
                     }
-                    if (values.emergencyRelation && !namePattern.test(values.emergencyRelation)) {
+                    if (values.emergencyRelation?.trim() && !namePattern.test(values.emergencyRelation)) {
                         customErrors.emergencyRelation = 'Relation cannot contain numbers or special characters';
                     }
 
@@ -446,13 +446,13 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                     }
 
                     // Manual check for required fields
-                    if (!values.street || !values.city || !values.state || !values.postalCode || !values.country || !values.emergencyContact || !values.emergencyRelation || !values.emergencyCountryCode || !values.emergencyPhoneNumber) {
+                    if (!values.street?.trim() || !values.city || !values.state || !values.postalCode || !values.country || !values.emergencyContact || !values.emergencyRelation || !values.emergencyCountryCode || !values.emergencyPhoneNumber) {
                         showToast.error("Please fill in all required personal information.");
                         setLoading(false);
                         return;
                     }
                     if (!values.sameAsCurrent) {
-                        if (!values.permanentstreet || !values.permanentcity || !values.permanentstate || !values.permanentpostalCode || !values.permanentcountry) {
+                        if (!values.permanentstreet?.trim() || !values.permanentcity || !values.permanentstate || !values.permanentpostalCode || !values.permanentcountry) {
                             showToast.error("Please fill in all required permanent address information.");
                             setLoading(false);
                             return;
@@ -461,10 +461,19 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
 
                     const mergedEmergencyPhone = mergeEmergencyContact(values.emergencyCountryCode, values.emergencyPhoneNumber)
 
+                    // Trim street and emergency contact name
+                    const trimmedData = {
+                        ...values,
+                        street: values.street?.trim(),
+                        permanentstreet: values.permanentstreet?.trim(),
+                        emergencyContact: values.emergencyContact?.trim(),
+                        emergencyPhone: mergedEmergencyPhone
+                    };
+
                     // Only call the API if the data has actually changed
                     const personalPayload = {
                         step: currentStep,
-                        data: { ...values, emergencyPhone: mergedEmergencyPhone },
+                        data: trimmedData,
                         employeeId: publicMode ? publicEmpId : undefined,
                     };
                     const personalKey = JSON.stringify(personalPayload);
@@ -536,7 +545,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                     }
 
                     // Check for required fields
-                    if (!values.bankName || !values.bankbranch || !values.accountNumber || !values.accountHolder || !values.ifscCode) {
+                    if (!values.bankName?.trim() || !values.bankbranch?.trim() || !values.accountNumber || !values.accountHolder?.trim() || !values.ifscCode) {
                         showToast.error("Please fill in all required bank details.");
                         setLoading(false);
                         return;
@@ -672,7 +681,13 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
             })
             if (!res.ok) throw new Error('Upload Failed')
             onSuccess("Ok")
-            setExistingDocuments(prev => [...prev, { Document_Type__c: doc, FileName: file.name }])
+            setExistingDocuments(prev => {
+                const exists = prev.some(d => d.Document_Type__c === doc);
+                if (exists) {
+                    return prev.map(d => d.Document_Type__c === doc ? { ...d, FileName: file.name, Name: file.name } : d);
+                }
+                return [...prev, { Document_Type__c: doc, FileName: file.name, Name: file.name }];
+            })
             showToast.success('Uploaded successfully')
         } catch (err) {
             onError({ err })
@@ -810,7 +825,9 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                         <p className="mb-4 text-gray-500">Current Address</p>
                         <Form.Item name="street" label="Street Address" rules={[{ required: true, message: 'Street address is required' },
                         { max: 100, message: 'Street address should not exceed 100 characters' },
-                        { min: 2, message: 'Street address should be at least 2 characters long' }
+                        { min: 2, message: 'Street address should be at least 2 characters long' },
+                        { pattern: /^[a-zA-Z0-9 ]+$/, message: 'Street should contain only letters, numbers, and spaces' }
+
                         ]}>
                             <Input placeholder="123 Main St" disabled={disabledsteps.includes(2)} />
                         </Form.Item>
@@ -918,7 +935,8 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                     <>
                                         <Form.Item name="permanentstreet" label="Street Address" rules={[{ required: true, message: 'Street address is required' },
                                         { max: 255, message: 'Street address should not exceed 255 characters' },
-                                        { min: 2, message: 'Street address should be at least 2 characters long' }
+                                        { min: 2, message: 'Street address should be at least 2 characters long' },
+                                        { pattern: /^[a-zA-Z0-9 ]+$/, message: 'Street should contain only letters, numbers, and spaces' }
                                         ]}>
                                             <Input placeholder="123 Main St" disabled={disabledsteps.includes(2)} />
                                         </Form.Item>
@@ -1015,7 +1033,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                             label="Emergency Contact Name"
                             rules={[
                                 { required: true, message: 'Emergency contact name is required' },
-                                { pattern: /^[a-zA-Z\s-]*$/, message: 'Name cannot contain numbers or special characters' },
+                                { pattern: /^[a-zA-Z0-9 ]+$/, message: 'Emergency contact name can only contain letters, numbers, and spaces' },
                                 { max: 100, message: 'Emergency contact name cannot exceed 100 characters' },
                                 { min: 3, message: 'Emergency contact name cannot be less than 3 characters' },
                             ]}
@@ -1367,7 +1385,10 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                                     {isUploaded ? <CheckCircleFilled className="text-xl text-green-500" /> : <UploadOutlined className="text-xl text-blue-500" />}
                                                 </p>
                                                 <p className="text-xs text-gray-500">
-                                                    {isUploaded ? (existingDocuments.find(d => d.Document_Type__c === doc)?.FileName || 'Document Uploaded') : 'Click or drag file'}
+                                                    {isUploaded ? (() => {
+                                                        const found = existingDocuments.find(d => d.Document_Type__c === doc);
+                                                        return found?.FileName || found?.Name || 'Document Uploaded';
+                                                    })() : 'Click or drag file'}
                                                 </p>
                                             </Upload.Dragger>
                                         </Card>
@@ -1430,7 +1451,22 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
             </Modal>
         )
     };
-
+    if (publicMode && isExpired && currentStep <= stepItems.length) {
+        return (
+            <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+                <div className="bg-white rounded-3xl shadow-xl border border-slate-100 max-w-lg w-full p-10 text-center">
+                    <AlertCircle className="w-16 h-16 text-amber-500 mx-auto mb-6" />
+                    <h2 className="text-2xl font-bold text-gray-800 mb-4">Link Expired</h2>
+                    <p className="text-gray-500 text-lg mb-8">This onboarding link is no longer valid or has expired.</p>
+                    <p className="text-gray-500 text-lg">Your onboarding is not completed yet</p>
+                    <div className="mt-8 flex justify-center items-center gap-3 border-t border-slate-100 pt-8 opacity-80">
+                        <img src="/mv_logo1.png" alt="MV Clouds" className="h-8 drop-shadow-sm" />
+                        <span className="font-bold text-slate-800 tracking-tight">MV Clouds</span>
+                    </div>
+                </div>
+            </div>
+        )
+    }
     if (publicMode && isExpired) {
         return (
             <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
