@@ -1045,9 +1045,8 @@ export default function AdminConsole() {
                                                                 </div>
 
                                                                 {/* Tooltip */}
-                                                                <div className="absolute left-0 top-6 hidden group-hover:block w-80 bg-slate-800 text-white text-sm rounded-xl p-3 shadow-lg z-50">
+                                                                <div className="absolute left-0 bottom-6 hidden group-hover:block w-68 bg-slate-800 text-white text-sm rounded-xl p-3 shadow-lg z-50">
                                                                     Set the URL for the "How to Apply Leave" guide document (PDF or web page).
-                                                                    This URL will be shown to employees in an embedded viewer on the Leaves page.
                                                                 </div>
                                                             </div>
                                                         </div>
