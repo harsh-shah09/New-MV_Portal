@@ -69,7 +69,7 @@ export function AssetTable({ assets, loading, onManageAssignment, onViewDetails,
     //   key: 'AMS_Asset_Serial_Number__c',
     // },
     {
-      title: 'Internal Serial No.',
+      title: 'Asset Code',
       dataIndex: 'Internal_Serial_Number__c',
       key: 'Internal_Serial_Number__c',
       render: (text) => <span className="font-mono text-xs bg-gray-50 px-2 py-1 rounded text-gray-600">{text || '-'}</span>
