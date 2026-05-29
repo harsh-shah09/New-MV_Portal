@@ -30,7 +30,7 @@ export function EmployeeTable({ employees, onEdit, onDelete, onView, loading, is
             <img src={record.profilePhoto} alt="" className="w-8 h-8 rounded-full object-cover" />
           ) : (
             <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold border border-primary/20">
-              {record.firstName.charAt(0)}{record.lastName.charAt(0)}
+              {record.firstName?.charAt(0)}{record.lastName?.charAt(0)}
             </div>
           )}
           <span className="font-medium text-card-foreground">{record.firstName} {record.lastName}</span>
@@ -205,7 +205,7 @@ export function EmployeeTable({ employees, onEdit, onDelete, onView, loading, is
                   <img src={employee.profilePhoto} alt="" className="w-12 h-12 rounded-full object-cover shadow-sm" />
                 ) : (
                   <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-lg border border-primary/20">
-                    {employee.firstName.charAt(0)}{employee.lastName.charAt(0)}
+                    {employee.firstName?.charAt(0)}{employee.lastName?.charAt(0)}
                   </div>
                 )}
                 <div>
