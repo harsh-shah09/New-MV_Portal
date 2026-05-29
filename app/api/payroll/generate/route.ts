@@ -792,7 +792,7 @@ export async function POST(request: NextRequest) {
         role: emp.Role__c || "",
         dateOfJoining: emp.Joining_Date__c || '',
         pfNumber: emp.PF_Number__c || '',
-        esiNumber: emp.ESI_Number__c || '',
+        esiNumber: emp.ESI_Number__c,
         uanNumber: emp.UAN_Number__c || '',
         bankName: bankByEmployeeId.get(emp.Id)?.bankName || '',
         accountNumber: bankByEmployeeId.get(emp.Id)?.accountNumber || '',

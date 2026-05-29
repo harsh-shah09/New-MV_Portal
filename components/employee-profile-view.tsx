@@ -706,15 +706,11 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
             if (formData.ESI_Number__c && !esi) {
                 newErrors.ESI_Number__c = "ESI Number cannot be only spaces"
             } else if (esi) {
-                if (!/^[0-9A-Za-z]{10}$/.test(esi)) {
-                    newErrors.ESI_Number__c = "ESI Number must be a 10-digit alphanumeric code"
+                if (!/^[0-9]{10}$/.test(esi)) {
+                    newErrors.ESI_Number__c = "ESI Number must be a 10-digit numeric code"
                 }
             }
 
-            const pfNumber = formData.PF_Number__c?.trim()
-            if (formData.PF_Number__c && !pfNumber) {
-                newErrors.PF_Number__c = "PF Number cannot be only spaces"
-            }
 
             const uan = formData.UAN_Number__c
             if (formData.UAN_Number__c && !uan) {
@@ -873,7 +869,6 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                 PT__c: employee.PT__c,
                 ESI__c: employee.ESI__c,
                 ESI_Number__c: employee.ESI_Number__c,
-                PF_Number__c: employee.PF_Number__c,
                 UAN_Number__c: employee.UAN_Number__c,
                 Status__c: employee.Status__c
             })
@@ -895,9 +890,8 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
             payload.Emergency_Contact_Relation__c = payload.Emergency_Contact_Relation__c?.trim();
             if (payload.Technology__c) payload.Technology__c = payload.Technology__c.trim();
             if (payload.Enrollment_Number__c) payload.Enrollment_Number__c = payload.Enrollment_Number__c.trim();
-            if (payload.ESI_Number__c) payload.ESI_Number__c = payload.ESI_Number__c;
-            if (payload.PF_Number__c) payload.PF_Number__c = payload.PF_Number__c.trim();
-            if (payload.UAN_Number__c) payload.UAN_Number__c = payload.UAN_Number__c;
+            payload.ESI_Number__c = payload.ESI_Number__c || null;
+            payload.UAN_Number__c = payload.UAN_Number__c || null;
 
             const phoneRaw = payload.Employee_Phone__c?.trim() || ''
             if (phoneRaw) {
@@ -2592,17 +2586,6 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                     error={errors.ESI_Number__c}
                                                     placeholder="e.g 1100123456"
                                                     maxLength={10}
-                                                />
-                                                <Field
-                                                    label="PF Number"
-                                                    value={employee.PF_Number__c}
-                                                    fieldKey="PF_Number__c"
-                                                    isEditing={isEditing && ['HR', 'Admin'].includes(currentUserRole)}
-                                                    formData={formData}
-                                                    setFormData={setFormData}
-                                                    error={errors.PF_Number__c}
-                                                    placeholder="e.g U110012345678"
-                                                    maxLength={22}
                                                 />
                                                 <Field
                                                     label="UAN Number"
