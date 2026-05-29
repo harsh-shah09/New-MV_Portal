@@ -130,7 +130,7 @@ export function CreateAssetModal({ visible, onCancel, onSuccess }: CreateAssetMo
                     <Form.Item name="AMS_Category__c" label="Category">
                         <Input placeholder="Auto-filled" readOnly />
                     </Form.Item>
-                    <Form.Item name="Internal_Serial_Number__c" label="Internal Serial Number">
+                    <Form.Item name="Internal_Serial_Number__c" label="Asset Code">
                         <Input
                             placeholder={isGeneratingSerial ? "Generating..." : "Auto-filled"}
                             readOnly
