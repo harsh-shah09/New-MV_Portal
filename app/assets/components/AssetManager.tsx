@@ -142,11 +142,11 @@ export function AssetManager({ initialAssets }: AssetManagerProps) {
 
   // Combined filter
   const filteredAssets = assets.filter(a => {
-    const search = searchText.toLowerCase();
+    const search = searchText.toLowerCase().trim();
     const matchesSearch =
-      a.Name.toLowerCase().includes(search) ||
       (a.AMS_Product__r?.Name || '').toLowerCase().includes(search) ||
-      (a.AMS_Assigned_To__r?.Employee_Name__c || '').toLowerCase().includes(search);
+      (a.AMS_Assigned_To__r?.Employee_Name__c || '').toLowerCase().includes(search) ||
+      (a.Internal_Serial_Number__c || '').toLowerCase().includes(search);
     const matchesCategory = !categoryFilter || a.AMS_Category__c === categoryFilter;
     const matchesStatus = !statusFilter || a.AMS_Status__c === statusFilter;
     return matchesSearch && matchesCategory && matchesStatus;
@@ -191,7 +191,7 @@ export function AssetManager({ initialAssets }: AssetManagerProps) {
             <label className="block text-xs font-medium text-muted-foreground mb-1">Search</label>
             <Input
               prefix={<SearchOutlined className="text-gray-400" />}
-              placeholder="Search by Product or Assignee..."
+              placeholder="Search by Product, Assignee or Asset Code..."
               value={searchText}
               onChange={e => setSearchText(e.target.value)}
               allowClear
