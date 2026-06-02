@@ -1577,7 +1577,7 @@ export default function HolidaysPage() {
                 top: `${popoverPosition?.top ?? 0}px`,
                 left: `${popoverPosition?.left ?? 0}px`,
               }}
-              className="z-[101] bg-[#e9eef6] rounded-[28px] shadow-2xl max-w-sm w-[290px] overflow-hidden border border-slate-200/50 flex flex-col max-h-[80vh] p-5 relative"
+              className="z-[200] bg-[#e9eef6] rounded-[28px] shadow-2xl max-w-sm w-[290px] overflow-hidden border border-slate-200/50 flex flex-col max-h-[80vh] p-5 relative"
             >
               
               {/* Close Button */}
@@ -1637,7 +1637,7 @@ export default function HolidaysPage() {
           <>
             {/* Transparent click-outside overlay — closes both popups */}
             <div 
-              className="fixed inset-0 bg-transparent z-[200]" 
+              className="fixed inset-0 bg-transparent z-[150]" 
               onClick={() => {
                 setShowEventDetailsModal(false)
                 setSelectedEventDetails(null)
@@ -1654,7 +1654,7 @@ export default function HolidaysPage() {
                 top: `${eventDetailsPosition?.top ?? 0}px`,
                 left: `${eventDetailsPosition?.left ?? 0}px`,
               }}
-              className="z-[201] bg-white rounded-[28px] shadow-2xl max-w-sm w-[340px] overflow-hidden border border-slate-100 flex flex-col"
+              className="z-[300] bg-white rounded-[28px] shadow-2xl max-w-sm w-[340px] overflow-hidden border border-slate-100 flex flex-col"
             >
               
               {/* Top Action Bar */}
