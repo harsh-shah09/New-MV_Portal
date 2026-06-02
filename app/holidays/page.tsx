@@ -1,11 +1,24 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useQuery } from "@tanstack/react-query"
-import { Button, Select, Spin } from "antd"
-import { CalendarRange, Plus, Edit2, Trash2, X, Calendar, ChevronDown } from "lucide-react"
+import { Button, Select, Spin, Tooltip } from "antd"
+import { CalendarRange, Plus, Edit2, Trash2, X, Calendar, ChevronDown, ChevronLeft, ChevronRight, CalendarDays, ClipboardList, BadgeInfo, SunMedium, Users } from "lucide-react"
 import { createPortal } from "react-dom"
+import {
+  addDays,
+  addMonths,
+  endOfMonth,
+  endOfWeek,
+  format,
+  isSameDay,
+  isSameMonth,
+  parseISO,
+  startOfMonth,
+  startOfWeek,
+  subMonths,
+} from "date-fns"
 import { PageContainer } from "@/components/page-container"
 import { PageHeader } from "@/components/page-header"
 import { toast } from "sonner"
@@ -30,11 +43,76 @@ interface BulkHolidayRowError {
   row?: string
 }
 
+type CalendarMode = "month" | "week" | "day"
+type PageView = "list" | "calendar"
+
+interface CalendarFeedItem {
+  id: string
+  title: string
+  description: string
+  kind: "holiday" | "leave"
+  startDate: string
+  endDate: string
+  dateKey: string
+  status?: string
+  employeeName?: string
+}
+
+const EVENT_STYLES = {
+  holiday: {
+    badge: "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100",
+    dot: "bg-rose-400",
+    label: "Holiday",
+    icon: CalendarDays,
+  },
+  leave: {
+    badge: "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100",
+    dot: "bg-emerald-400",
+    label: "Leave",
+    icon: Users,
+  },
+} as const
+
+const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+
 const MAX_HOLIDAYS_PER_BATCH = 12
+
+const toSafeDate = (value: string) => parseISO(value.length > 10 ? value.slice(0, 10) : value)
+
+const toDateKey = (value: string | Date) => format(typeof value === "string" ? toSafeDate(value) : value, "yyyy-MM-dd")
+
+const expandDateRange = (startDate: string, endDate: string) => {
+  const start = toSafeDate(startDate)
+  const end = toSafeDate(endDate)
+
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return [] as string[]
+  }
+
+  const days: string[] = []
+  let cursor = start
+
+  while (cursor.getTime() <= end.getTime()) {
+    days.push(toDateKey(cursor))
+    cursor = addDays(cursor, 1)
+  }
+
+  return days
+}
+
+const getCalendarModeLabel = (mode: CalendarMode) => {
+  if (mode === "month") return "Month"
+  if (mode === "week") return "Week"
+  return "Day"
+}
 
 export default function HolidaysPage() {
   const router = useRouter()
   const [isMounted, setIsMounted] = useState(false)
+  const [pageView, setPageView] = useState<PageView>("list")
+  const [calendarMode, setCalendarMode] = useState<CalendarMode>("month")
+  const [calendarFocusDate, setCalendarFocusDate] = useState(new Date())
+  const [selectedCalendarEventId, setSelectedCalendarEventId] = useState<string | null>(null)
   const [showBulkModal, setShowBulkModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [editingHoliday, setEditingHoliday] = useState<Holiday | null>(null)
@@ -59,7 +137,8 @@ export default function HolidaysPage() {
   // Fetch holidays
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["holidays"],
-    queryFn: () => fetch("/api/holidays").then((res) => {
+    queryFn: async () => {
+      const res = await fetch("/api/holidays")
       if (!res.ok) {
         if (res.status === 401) {
           router.push("/auth/login")
@@ -68,12 +147,41 @@ export default function HolidaysPage() {
         throw new Error("Failed to fetch holidays")
       }
       return res.json()
-    }),
+    },
+    refetchOnWindowFocus: true,
   })
 
   const holidays: Holiday[] = data?.holidays || []
   const userRole = data?.userRole
   const isHR = userRole === 'HR' || userRole === 'Admin'
+
+  const { data: leaveData, isLoading: isLeaveLoading, refetch: refetchLeaves } = useQuery({
+    queryKey: ["holiday-calendar-leaves"],
+    queryFn: async () => {
+      const res = await fetch("/api/leave-management/all")
+      if (!res.ok) {
+        if (res.status === 401) {
+          router.push("/auth/login")
+          throw new Error("Unauthorized")
+        }
+        throw new Error("Failed to fetch leave records")
+      }
+      return res.json()
+    },
+    enabled: pageView === "calendar" && isHR,
+    refetchOnWindowFocus: true,
+    refetchInterval: pageView === "calendar" && isHR ? 60000 : false,
+  })
+
+  const approvedLeaves = (leaveData?.allLeaves || []).filter((leave: any) => leave?.status === "approved")
+
+  useEffect(() => {
+    if (pageView === "calendar") {
+      const today = new Date()
+      setCalendarFocusDate(today)
+      setSelectedYear(today.getFullYear().toString())
+    }
+  }, [pageView])
 
   // Get unique years from holidays
   const availableYears = [...new Set(holidays.map(h => String(h.year)))].sort((a, b) => parseInt(b) - parseInt(a))
@@ -99,6 +207,202 @@ export default function HolidaysPage() {
   const filteredHolidays = holidays.filter(h => String(h.year) === String(selectedYear)).sort((a, b) => 
     new Date(a.date).getTime() - new Date(b.date).getTime()
   )
+
+  const calendarEvents = useMemo<CalendarFeedItem[]>(() => {
+    const yearValue = String(selectedYear)
+    const holidayEvents = holidays
+      .filter((holiday) => String(holiday.year) === yearValue)
+      .map((holiday) => ({
+        id: `holiday-${holiday.id}`,
+        title: holiday.name,
+        description: `${holiday.day} • Company holiday`,
+        kind: "holiday" as const,
+        startDate: holiday.date,
+        endDate: holiday.date,
+        dateKey: toDateKey(holiday.date),
+      }))
+
+    const leaveEvents = approvedLeaves.flatMap((leave: any) => {
+      const days = expandDateRange(leave.startDate, leave.endDate)
+      return days
+        .filter((dayKey) => dayKey.startsWith(yearValue))
+        .map((dayKey, index) => ({
+          id: `leave-${leave.id}-${dayKey}-${index}`,
+          title: leave.employeeName || "Employee leave",
+          description: `${leave.employeeName || "Employee"} • ${leave.leaveType || "Leave"}`,
+          kind: "leave" as const,
+          startDate: leave.startDate,
+          endDate: leave.endDate,
+          dateKey: dayKey,
+          status: leave.status,
+          employeeName: leave.employeeName,
+        }))
+    })
+
+    return [...holidayEvents, ...leaveEvents].sort((a, b) => a.dateKey.localeCompare(b.dateKey))
+  }, [approvedLeaves, holidays, selectedYear])
+
+  const calendarEventsByDate = useMemo(() => {
+    const map = new Map<string, CalendarFeedItem[]>()
+
+    for (const event of calendarEvents) {
+      const existing = map.get(event.dateKey) || []
+      existing.push(event)
+      map.set(event.dateKey, existing)
+    }
+
+    return map
+  }, [calendarEvents])
+
+  const selectedCalendarDayKey = toDateKey(calendarFocusDate)
+  const selectedDayEvents = calendarEventsByDate.get(selectedCalendarDayKey) || []
+  const selectedCalendarEvent = selectedDayEvents.find((event) => event.id === selectedCalendarEventId) || null
+  const selectedEventForDetails = selectedCalendarEvent || selectedDayEvents[0] || null
+
+  const calendarDays = useMemo(() => {
+    if (calendarMode === "month") {
+      const start = startOfWeek(startOfMonth(calendarFocusDate), { weekStartsOn: 0 })
+      const end = endOfWeek(endOfMonth(calendarFocusDate), { weekStartsOn: 0 })
+      const days: Date[] = []
+      let cursor = start
+
+      while (cursor <= end) {
+        days.push(cursor)
+        cursor = addDays(cursor, 1)
+      }
+
+      return days
+    }
+
+    if (calendarMode === "week") {
+      const start = startOfWeek(calendarFocusDate, { weekStartsOn: 0 })
+      return Array.from({ length: 7 }, (_, index) => addDays(start, index))
+    }
+
+    return [calendarFocusDate]
+  }, [calendarFocusDate, calendarMode])
+
+  const selectedPeriodLabel = useMemo(() => {
+    if (calendarMode === "month") {
+      return format(calendarFocusDate, "MMMM yyyy")
+    }
+
+    if (calendarMode === "week") {
+      const weekStart = startOfWeek(calendarFocusDate, { weekStartsOn: 0 })
+      const weekEnd = addDays(weekStart, 6)
+      return `${format(weekStart, "MMM d")} - ${format(weekEnd, "MMM d, yyyy")}`
+    }
+
+    return format(calendarFocusDate, "EEEE, MMM d, yyyy")
+  }, [calendarFocusDate, calendarMode])
+
+  const navigateCalendar = (direction: "prev" | "next") => {
+    const nextDate =
+      calendarMode === "month"
+        ? direction === "prev"
+          ? subMonths(calendarFocusDate, 1)
+          : addMonths(calendarFocusDate, 1)
+        : direction === "prev"
+          ? addDays(calendarFocusDate, calendarMode === "week" ? -7 : -1)
+          : addDays(calendarFocusDate, calendarMode === "week" ? 7 : 1)
+
+    setCalendarFocusDate(nextDate)
+    setSelectedYear(nextDate.getFullYear().toString())
+    setSelectedCalendarEventId(null)
+  }
+
+  const jumpToToday = () => {
+    const today = new Date()
+    setCalendarFocusDate(today)
+    setSelectedYear(today.getFullYear().toString())
+    setSelectedCalendarEventId(null)
+  }
+
+  const renderEventBadge = (event: CalendarFeedItem, dateKey: string) => {
+    const style = EVENT_STYLES[event.kind]
+    const Icon = style.icon
+
+    return (
+      <Tooltip key={event.id} title={`${event.title} — ${event.description}`}>
+        <button
+          type="button"
+          onClick={() => {
+            setCalendarFocusDate(toSafeDate(dateKey))
+            setSelectedCalendarEventId(event.id)
+            setPageView("calendar")
+          }}
+          className={`flex w-full items-center gap-1 rounded-md border px-2 py-1 text-left text-[11px] leading-tight transition-colors ${style.badge}`}
+        >
+          <Icon className="h-3 w-3 shrink-0" />
+          <span className="truncate">{event.title}</span>
+        </button>
+      </Tooltip>
+    )
+  }
+
+  const renderCalendarCell = (date: Date) => {
+    const dateKey = toDateKey(date)
+    const events = calendarEventsByDate.get(dateKey) || []
+    const hasHoliday = events.some((event) => event.kind === "holiday")
+    const hasLeave = events.some((event) => event.kind === "leave")
+    const overlap = hasHoliday && hasLeave
+    const inCurrentMonth = calendarMode !== "month" || isSameMonth(date, calendarFocusDate)
+    const isToday = isSameDay(date, new Date())
+    const isSelected = isSameDay(date, calendarFocusDate)
+    const isWeekend = date.getDay() === 0 || date.getDay() === 6
+    const visibleEvents = calendarMode === "day" ? events : events.slice(0, calendarMode === "week" ? 4 : 2)
+    const hiddenCount = events.length - visibleEvents.length
+    const isCompactGrid = calendarMode !== "day"
+    const baseShape = isCompactGrid ? "rounded-none border-0" : "rounded-2xl border border-slate-200"
+    const hoverEffect = isCompactGrid ? "hover:bg-slate-50" : "hover:-translate-y-0.5 hover:shadow-md"
+    const selectedRing = isSelected
+      ? isCompactGrid
+        ? "ring-2 ring-blue-500 ring-inset"
+        : "ring-2 ring-blue-500 ring-offset-2"
+      : ""
+    const widthStyle = calendarMode === "day" ? "max-w-md w-full" : "w-full"
+
+    return (
+      <button
+        key={dateKey}
+        type="button"
+        onClick={() => {
+          setCalendarFocusDate(date)
+          setSelectedCalendarEventId(null)
+        }}
+        className={`group min-h-[130px] p-3 text-left transition-all outline-none ${baseShape} ${hoverEffect} ${widthStyle} ${
+          inCurrentMonth ? (isWeekend ? "bg-sky-50/60" : "bg-white") : "bg-slate-50 text-slate-400"
+        } ${selectedRing} ${overlap ? "bg-violet-50/60" : ""}`}
+      >
+        <div className="mb-2 flex items-start justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span className={`text-sm font-semibold ${isToday ? "text-blue-600" : "text-slate-900"}`}>
+              {format(date, "d")}
+            </span>
+            {isToday && <span className="rounded-full bg-blue-600/90 px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm">Today</span>}
+            {overlap && <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-semibold text-violet-800">Overlap</span>}
+          </div>
+          <span className="text-[10px] uppercase tracking-wider text-slate-400">
+            {WEEKDAY_LABELS[date.getDay()]}
+          </span>
+        </div>
+
+        <div className="space-y-1">
+          {visibleEvents.map((event) => renderEventBadge(event, dateKey))}
+          {hiddenCount > 0 && (
+            <div className="rounded-md border border-dashed border-slate-200 bg-white/80 px-2 py-1 text-[11px] text-slate-500">
+              +{hiddenCount} more
+            </div>
+          )}
+          {events.length === 0 && (
+            <div className="rounded-md border border-dashed border-slate-200 bg-white/80 px-2 py-1 text-[11px] text-slate-400">
+              No events
+            </div>
+          )}
+        </div>
+      </button>
+    )
+  }
 
   
 
@@ -568,6 +872,23 @@ export default function HolidaysPage() {
             </Select>
           </div>
 
+          <div className="inline-flex rounded-lg border border-slate-200 bg-slate-100 p-1">
+            <button
+              type="button"
+              onClick={() => setPageView("list")}
+              className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${pageView === "list" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"}`}
+            >
+              List View
+            </button>
+            <button
+              type="button"
+              onClick={() => setPageView("calendar")}
+              className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${pageView === "calendar" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"}`}
+            >
+              Calendar View
+            </button>
+          </div>
+
           {isHR && (
             <Button
             type="primary"
@@ -581,7 +902,8 @@ export default function HolidaysPage() {
         </div>
       </PageHeader>
 
-      {filteredHolidays.length === 0 ? (
+      {pageView === "list" ? (
+        filteredHolidays.length === 0 ? (
           <div className="text-center py-10 sm:py-16 bg-card rounded-xl shadow-sm border border-border px-4">
             <div className="w-16 h-16 sm:w-24 sm:h-24 mx-auto mb-4 bg-muted rounded-full flex items-center justify-center">
               <Calendar className="w-8 h-8 sm:w-12 sm:h-12 text-muted-foreground" />
@@ -723,7 +1045,190 @@ export default function HolidaysPage() {
               </div>
             </div>
           </>
-        )}
+        )
+      ) : (
+        <div className="space-y-5">
+          <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-sky-50 to-rose-50 p-5 shadow-sm">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex items-start gap-3">
+                <div className="mt-1 inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-100 text-sky-700">
+                  <CalendarDays className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Holiday & Leave Calendar</p>
+                  <h3 className="text-2xl font-semibold text-slate-900">{selectedPeriodLabel}</h3>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Track holidays and approved leave in one view, with overlap highlights.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="inline-flex rounded-xl border border-slate-200 bg-white/80 p-1 shadow-sm">
+                  {(["month", "week", "day"] as CalendarMode[]).map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => setCalendarMode(mode)}
+                      className={`rounded-lg px-4 py-2 text-sm font-medium transition-all ${calendarMode === mode ? "bg-white text-slate-900 shadow-md" : "text-slate-600 hover:text-slate-900"}`}
+                    >
+                      {getCalendarModeLabel(mode)}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Button icon={<ChevronLeft className="h-4 w-4" />} onClick={() => navigateCalendar("prev")} />
+                  <Button onClick={jumpToToday}>Today</Button>
+                  <Button icon={<ChevronRight className="h-4 w-4" />} onClick={() => navigateCalendar("next")} />
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-slate-600">
+              <span className="inline-flex items-center gap-2 rounded-full border border-rose-200 bg-rose-50 px-3 py-1 font-medium text-rose-700">
+                <span className="h-2 w-2 rounded-full bg-rose-400" /> Holiday
+              </span>
+              <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 font-medium text-emerald-700">
+                <span className="h-2 w-2 rounded-full bg-emerald-400" /> Leave
+              </span>
+              <span className="inline-flex items-center gap-2 rounded-full border border-violet-200 bg-violet-50 px-3 py-1 font-medium text-violet-700">
+                <SunMedium className="h-3.5 w-3.5" /> Overlap
+              </span>
+            </div>
+
+            {!isHR && (
+              <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                Holiday events are visible here. Approved leave events require HR or Admin access.
+              </div>
+            )}
+
+            {isHR && isLeaveLoading && pageView === "calendar" && (
+              <div className="mt-4 flex items-center gap-2 text-sm text-slate-500">
+                <Spin size="small" /> Loading leave records...
+              </div>
+            )}
+
+            <div className="mt-5 overflow-x-auto">
+              <div className={calendarMode === "day" ? "p-1" : "rounded-2xl border border-slate-200 bg-slate-200 p-px overflow-hidden"}>
+                <div className={`grid gap-px ${
+                  calendarMode === "month"
+                    ? "min-w-[980px] grid-cols-7"
+                    : calendarMode === "week"
+                      ? "grid-cols-1 lg:grid-cols-7"
+                      : "grid-cols-1"
+                }`}>
+                  {calendarMode === "month" && WEEKDAY_LABELS.map((label) => (
+                    <div key={label} className="bg-white px-2 py-2 text-center text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                      {label}
+                    </div>
+                  ))}
+
+                  {calendarDays.map((date) => renderCalendarCell(date))}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+              <div className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Selected Date</p>
+                    <h4 className="text-lg font-semibold text-slate-900">
+                      {format(calendarFocusDate, "EEEE, MMMM d, yyyy")}
+                    </h4>
+                    <p className="text-sm text-slate-500">
+                      {selectedDayEvents.length} event{selectedDayEvents.length === 1 ? "" : "s"} on this date
+                    </p>
+                  </div>
+                  <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50/80 px-3 py-1 text-xs font-medium text-slate-600">
+                    <ClipboardList className="h-3.5 w-3.5" /> Daily Summary
+                  </div>
+                </div>
+
+                <div className="mt-4 space-y-3">
+                  {selectedDayEvents.length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">
+                      No holidays or leave records on this date.
+                    </div>
+                  ) : (
+                    selectedDayEvents.map((event) => {
+                      const isSelected = selectedEventForDetails?.id === event.id
+                      const style = EVENT_STYLES[event.kind]
+                      const Icon = style.icon
+
+                      return (
+                        <button
+                          key={event.id}
+                          type="button"
+                          onClick={() => setSelectedCalendarEventId(event.id)}
+                          className={`w-full rounded-2xl border p-4 text-left transition-all ${isSelected ? "border-blue-500 bg-blue-50 shadow-sm" : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"}`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <span className={`mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${style.badge}`}>
+                              <Icon className="h-4 w-4" />
+                            </span>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="font-semibold text-slate-900">{event.title}</span>
+                                <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${style.badge}`}>{style.label}</span>
+                              </div>
+                              <p className="mt-1 text-sm text-slate-600">{event.description}</p>
+                              <p className="mt-2 text-xs text-slate-500">
+                                {event.kind === "holiday" ? "Public holiday" : `${event.employeeName || "Employee"} leave`} • {event.startDate === event.endDate ? "Single day" : `${event.startDate} to ${event.endDate}`}
+                              </p>
+                            </div>
+                          </div>
+                        </button>
+                      )
+                    })
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="flex items-center gap-2">
+                  <BadgeInfo className="h-5 w-5 text-slate-500" />
+                  <h4 className="text-base font-semibold text-slate-900">Event Details</h4>
+                </div>
+
+                {selectedEventForDetails ? (
+                  <div className="mt-4 space-y-3">
+                    <div className={`rounded-2xl border p-4 ${EVENT_STYLES[selectedEventForDetails.kind].badge}`}>
+                      <div className="flex items-center gap-2 text-sm font-semibold">
+                        {selectedEventForDetails.title}
+                      </div>
+                      <p className="mt-1 text-sm">{selectedEventForDetails.description}</p>
+                    </div>
+                    <div className="space-y-2 text-sm text-slate-600">
+                      <p><span className="font-medium text-slate-900">Date:</span> {format(calendarFocusDate, "PPP")}</p>
+                      <p><span className="font-medium text-slate-900">Type:</span> {EVENT_STYLES[selectedEventForDetails.kind].label}</p>
+                      <p><span className="font-medium text-slate-900">Range:</span> {selectedEventForDetails.startDate} → {selectedEventForDetails.endDate}</p>
+                      {selectedEventForDetails.employeeName && (
+                        <p><span className="font-medium text-slate-900">Employee:</span> {selectedEventForDetails.employeeName}</p>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-4 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+                    Select a date or event to inspect details.
+                  </div>
+                )}
+
+                <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                  <div className="flex items-center gap-2 font-medium text-slate-900">
+                    <SunMedium className="h-4 w-4 text-amber-500" />
+                    Overlap handling
+                  </div>
+                  <p className="mt-2">
+                    Days with both a holiday and leave event are highlighted in amber and still show both event rows.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Bulk Add Modal */}
       {showBulkModal && isMounted && createPortal(
