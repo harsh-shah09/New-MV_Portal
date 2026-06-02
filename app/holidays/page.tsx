@@ -1170,7 +1170,6 @@ export default function HolidaysPage() {
                     <CalendarDays className="h-5 w-5" />
                   </div>
                   <div>
-                    {/* <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Holiday & Leave Calendar</p> */}
                     <h3 className="text-2xl font-semibold text-slate-900">{selectedPeriodLabel}</h3>
                     <p className="mt-1 text-sm text-slate-500">
                       Track holidays and approved leave in one view, with overlap highlights.
@@ -1614,8 +1613,8 @@ export default function HolidaysPage() {
                       type="button"
                       onClick={(e) => handleEventClickFromMore(e, event, moreEventsDate)}
                       className={`w-full flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left text-[11px] font-semibold transition-all hover:bg-slate-50 outline-none ${event.kind === "holiday"
-                          ? "border-rose-200 bg-white text-rose-700 hover:border-rose-300"
-                          : "border-emerald-200 bg-white text-emerald-700 hover:border-emerald-300"
+                        ? "border-rose-200 bg-white text-rose-700 hover:border-rose-300"
+                        : "border-emerald-200 bg-white text-emerald-700 hover:border-emerald-300"
                         }`}
                     >
                       <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${event.kind === "holiday" ? "bg-rose-500" : "bg-emerald-500"
@@ -1725,8 +1724,8 @@ export default function HolidaysPage() {
                       <div className="text-xs text-slate-600 flex items-center gap-1.5">
                         <span>Status:</span>
                         <span className={`capitalize px-2 py-0.5 text-[10px] font-semibold rounded-full ${selectedEventDetails.status === "approved"
-                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                            : "bg-amber-50 text-amber-700 border border-amber-200"
+                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                          : "bg-amber-50 text-amber-700 border border-amber-200"
                           }`}>
                           {selectedEventDetails.status}
                         </span>
