@@ -3652,7 +3652,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                                                         <Laptop className="w-5 h-5" />
                                                                                     </div>
                                                                                     <div>
-                                                                                        <h3 className="font-semibold text-slate-800">{asset.Name || "Asset"}</h3>
+                                                                                        <h3 className="font-semibold text-slate-800">{asset.Internal_Serial_Number__c || "Asset"}</h3>
                                                                                         <p className="text-xs text-slate-500">{asset.AMS_Product__r?.Name || "Unknown Product"}</p>
                                                                                     </div>
                                                                                 </div>
