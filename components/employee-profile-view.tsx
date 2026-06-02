@@ -45,6 +45,8 @@ import { cn } from "@/lib/utils"
 import { Field } from "./field-component"
 import { EmployeeSalaryHistoryTab } from "./employee-salary-history-tab"
 import { GoogleIntegration } from "@/app/dashboard/components/employee/google-integration"
+import { ReturnAssetModal } from "@/app/assets/components/ReturnAssetModal"
+import { RequestAssetModal } from "@/app/assets/components/RequestAssetModal"
 import { Country, State, City } from "country-state-city"
 
 interface ViewProps {
@@ -67,6 +69,8 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
 
     const [activeTab, setActiveTab] = useState<TabId>(getTabFromQuery)
     const [showAssetHistory, setShowAssetHistory] = useState(false)
+    const [isReturnAssetModalVisible, setIsReturnAssetModalVisible] = useState(false)
+    const [isRequestAssetModalVisible, setIsRequestAssetModalVisible] = useState(false)
     const [isEditing, setIsEditing] = useState(false)
     const [selectedAddressTab, setSelectedAddressTab] = useState<'current' | 'permanent'>('current')
     const fileInputRef = useRef<HTMLInputElement>(null)
@@ -3600,9 +3604,33 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                 {activeTab === "assets" && (
                                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
                                         <div>
-                                            <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
-                                                <Laptop className="w-5 h-5 text-indigo-600" /> Active Assets
-                                            </h2>
+                                            <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+                                                <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                                                    <Laptop className="w-5 h-5 text-indigo-600" /> Active Assets
+                                                </h2>
+                                                <div className="flex flex-wrap gap-2">
+                                                    <button
+                                                        id="return-asset-btn"
+                                                        onClick={() => setIsReturnAssetModalVisible(true)}
+                                                        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-blue-700 bg-blue-50 border border-blue-200 hover:bg-blue-100 active:scale-95 transition-all duration-150 shadow-sm"
+                                                    >
+                                                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                                                            <path d="M3 12h14" /><path d="M9 6l-6 6 6 6" />
+                                                        </svg>
+                                                        Return Asset
+                                                    </button>
+                                                    <button
+                                                        id="request-asset-btn"
+                                                        onClick={() => setIsRequestAssetModalVisible(true)}
+                                                        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-green-700 bg-green-50 border border-green-200 hover:bg-green-100 active:scale-95 transition-all duration-150 shadow-sm"
+                                                    >
+                                                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                                                            <line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" />
+                                                        </svg>
+                                                        Request Asset
+                                                    </button>
+                                                </div>
+                                            </div>
 
                                             {(() => {
                                                 const historyList = employee.assetHistory || [];
@@ -3724,6 +3752,28 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                 )
                                             })()}
                                         </div>
+
+                                        {/* Return Asset Modal */}
+                                        <ReturnAssetModal
+                                            visible={isReturnAssetModalVisible}
+                                            onCancel={() => setIsReturnAssetModalVisible(false)}
+                                            onSuccess={() => {
+                                                setIsReturnAssetModalVisible(false);
+                                                queryClient.invalidateQueries({ queryKey: ['employee', employeeId] });
+                                            }}
+                                            employeeId={employeeId}
+                                            employeeName={employee?.Employee_Name__c || ''}
+                                            employeeEmail={employee?.Company_Email__c || employee?.Employee_Email__c || ''}
+                                        />
+
+                                        {/* Request Asset Modal */}
+                                        <RequestAssetModal
+                                            visible={isRequestAssetModalVisible}
+                                            onCancel={() => setIsRequestAssetModalVisible(false)}
+                                            onSuccess={() => setIsRequestAssetModalVisible(false)}
+                                            employeeName={employee?.Employee_Name__c || ''}
+                                            employeeEmail={employee?.Company_Email__c || employee?.Employee_Email__c || ''}
+                                        />
                                     </div>
                                 )}
                                 {activeTab === 'leaves' && (
