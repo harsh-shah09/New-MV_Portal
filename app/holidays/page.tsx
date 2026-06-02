@@ -179,7 +179,6 @@ export default function HolidaysPage() {
     if (pageView === "calendar") {
       const today = new Date()
       setCalendarFocusDate(today)
-      setSelectedYear(today.getFullYear().toString())
     }
   }, [pageView])
 
@@ -209,7 +208,7 @@ export default function HolidaysPage() {
   )
 
   const calendarEvents = useMemo<CalendarFeedItem[]>(() => {
-    const yearValue = String(selectedYear)
+    const yearValue = calendarFocusDate.getFullYear().toString()
     const holidayEvents = holidays
       .filter((holiday) => String(holiday.year) === yearValue)
       .map((holiday) => ({
@@ -240,7 +239,7 @@ export default function HolidaysPage() {
     })
 
     return [...holidayEvents, ...leaveEvents].sort((a, b) => a.dateKey.localeCompare(b.dateKey))
-  }, [approvedLeaves, holidays, selectedYear])
+  }, [approvedLeaves, holidays, calendarFocusDate])
 
   const calendarEventsByDate = useMemo(() => {
     const map = new Map<string, CalendarFeedItem[]>()
@@ -307,14 +306,12 @@ export default function HolidaysPage() {
           : addDays(calendarFocusDate, calendarMode === "week" ? 7 : 1)
 
     setCalendarFocusDate(nextDate)
-    setSelectedYear(nextDate.getFullYear().toString())
     setSelectedCalendarEventId(null)
   }
 
   const jumpToToday = () => {
     const today = new Date()
     setCalendarFocusDate(today)
-    setSelectedYear(today.getFullYear().toString())
     setSelectedCalendarEventId(null)
   }
 
@@ -859,18 +856,20 @@ export default function HolidaysPage() {
       >
         <div className="flex items-center gap-3">
           {/* Year Filter */}
-          <div className="relative">
-            <Select
-              value={selectedYear}
-              size="large"
-              onChange={(e) => setSelectedYear(e)}
-                suffixIcon={<ChevronDown className="w-4 h-4 text-muted-foreground pointer-events-none" />}
-            >
-              {availableYears.map(year => (
-                <Select.Option key={year} value={year}>{year}</Select.Option>
-              ))}
-            </Select>
-          </div>
+          {pageView === "list" && (
+            <div className="relative">
+              <Select
+                value={selectedYear}
+                size="large"
+                onChange={(e) => setSelectedYear(e)}
+                  suffixIcon={<ChevronDown className="w-4 h-4 text-muted-foreground pointer-events-none" />}
+              >
+                {availableYears.map(year => (
+                  <Select.Option key={year} value={year}>{year}</Select.Option>
+                ))}
+              </Select>
+            </div>
+          )}
 
           <div className="inline-flex rounded-lg border border-slate-200 bg-slate-100 p-1">
             <button
