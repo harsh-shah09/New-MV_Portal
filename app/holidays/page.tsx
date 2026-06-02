@@ -967,8 +967,8 @@ export default function HolidaysPage() {
     <PageContainer>
       <div className="bg-white p-3 rounded-xl">
         <PageHeader
-          title="Holiday Calendar"
-          subtitle="View and manage company holidays"
+          title="Calendar"
+          subtitle="View and manage leave events & company holidays"
         >
           <div className="flex items-center gap-3">
             {/* Year Filter */}
@@ -1165,15 +1165,12 @@ export default function HolidaysPage() {
           <div className="space-y-5">
             <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-sky-50 to-rose-50 p-5 shadow-sm">
               <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-                <div className="flex items-start gap-3">
+                <div className="flex items-center gap-3">
                   <div className="mt-1 inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-100 text-sky-700">
                     <CalendarDays className="h-5 w-5" />
                   </div>
                   <div>
                     <h3 className="text-2xl font-semibold text-slate-900">{selectedPeriodLabel}</h3>
-                    <p className="mt-1 text-sm text-slate-500">
-                      Track holidays and approved leave in one view, with overlap highlights.
-                    </p>
                   </div>
                 </div>
 

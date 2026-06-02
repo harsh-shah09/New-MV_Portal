@@ -58,7 +58,7 @@ export function Sidebar({
   const navItems = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/leaves", label: "Leave", icon: CalendarDays },
-    { href: "/holidays", label: "Holidays", icon: CalendarRange },
+    { href: "/holidays", label: "Calender", icon: CalendarRange },
     { href: "/handbook", label: "Handbook", icon: BookOpen },
     // { href: "/documents", label: "Documents", icon: FileText },
   ];
@@ -94,7 +94,7 @@ export function Sidebar({
     }
   })
 
-  
+
   const unreadNotifications = notifications?.filter((n: any) =>
     n.Status__c === 'Unread' ||
     n.Is_Read__c === false ||
@@ -126,10 +126,10 @@ export function Sidebar({
       }
     };
     window.addEventListener('mv:tour:start', onTourStart);
-    window.addEventListener('mv:tour:end',   onTourEnd);
+    window.addEventListener('mv:tour:end', onTourEnd);
     return () => {
       window.removeEventListener('mv:tour:start', onTourStart);
-      window.removeEventListener('mv:tour:end',   onTourEnd);
+      window.removeEventListener('mv:tour:end', onTourEnd);
     };
   }, [setOpen]);
 
@@ -272,26 +272,26 @@ export function Sidebar({
         ) : (
           <div
             data-tour="profile-card"
-          onClick={handleProfileClick}
-          className="flex items-center gap-3 p-3 rounded-xl bg-white border border-slate-100 shadow-sm hover:shadow-md transition-all group cursor-pointer relative"
-        >
-          <div className="relative h-10 w-10 shrink-0">
-            <div className="relative h-full w-full rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500 overflow-hidden">
-              {user?.profilePhoto ? (
-                <img src={user.profilePhoto} width={40} height={40} className="w-full h-full object-cover" alt="Profile" />
-              ) : (
-                <User size={20} />
-              )}
+            onClick={handleProfileClick}
+            className="flex items-center gap-3 p-3 rounded-xl bg-white border border-slate-100 shadow-sm hover:shadow-md transition-all group cursor-pointer relative"
+          >
+            <div className="relative h-10 w-10 shrink-0">
+              <div className="relative h-full w-full rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500 overflow-hidden">
+                {user?.profilePhoto ? (
+                  <img src={user.profilePhoto} width={40} height={40} className="w-full h-full object-cover" alt="Profile" />
+                ) : (
+                  <User size={20} />
+                )}
+              </div>
+              <div className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-green-500 border-2 border-white"></div>
             </div>
-            <div className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-green-500 border-2 border-white"></div>
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <p key={user?.id} className="text-sm font-semibold text-slate-800 truncate group-hover:text-cyan-600 transition-colors">
-                {user ? `${user.name}` : 'Loading...'}
-              </p>
-            </div>
-            {/* Role Badge */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <p key={user?.id} className="text-sm font-semibold text-slate-800 truncate group-hover:text-cyan-600 transition-colors">
+                  {user ? `${user.name}` : 'Loading...'}
+                </p>
+              </div>
+              {/* Role Badge */}
               <span className={cn(
                 "px-1.5 py-0.5 rounded-md text-[10px] font-bold border uppercase tracking-wide",
                 (user?.role?.includes('HR') || user?.role?.includes('Admin'))
@@ -300,26 +300,26 @@ export function Sidebar({
               )}>
                 {user?.role || 'Employee'}
               </span>
+            </div>
+            <div className="flex flex-col gap-1">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleLogout();
+                }}
+                className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-red-500 transition-colors"
+                title="Logout"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
           </div>
-          <div className="flex flex-col gap-1">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleLogout();
-              }}
-              className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-red-500 transition-colors"
-              title="Logout"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
         )}
       </div>
-      <LogoutConfirmModal 
-        open={showLogoutConfirm} 
-        onClose={() => setShowLogoutConfirm(false)} 
-        onConfirm={confirmLogout} 
+      <LogoutConfirmModal
+        open={showLogoutConfirm}
+        onClose={() => setShowLogoutConfirm(false)}
+        onConfirm={confirmLogout}
       />
     </div>
   )
@@ -354,10 +354,10 @@ export function Sidebar({
             </>
           )}
         </AnimatePresence>
-        <LogoutConfirmModal 
-          open={showLogoutConfirm} 
-          onClose={() => setShowLogoutConfirm(false)} 
-          onConfirm={confirmLogout} 
+        <LogoutConfirmModal
+          open={showLogoutConfirm}
+          onClose={() => setShowLogoutConfirm(false)}
+          onConfirm={confirmLogout}
         />
       </>
     )
@@ -368,10 +368,10 @@ export function Sidebar({
       <div className="hidden lg:block w-72 h-screen sticky top-0 shadow-xl shadow-slate-200/50 z-40">
         <SidebarContent />
       </div>
-      <LogoutConfirmModal 
-        open={showLogoutConfirm} 
-        onClose={() => setShowLogoutConfirm(false)} 
-        onConfirm={confirmLogout} 
+      <LogoutConfirmModal
+        open={showLogoutConfirm}
+        onClose={() => setShowLogoutConfirm(false)}
+        onConfirm={confirmLogout}
       />
     </>
   )
