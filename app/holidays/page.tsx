@@ -184,9 +184,9 @@ export default function HolidaysPage() {
       }
       return res.json()
     },
-    enabled: pageView === "calendar" && isHR,
+    enabled: pageView === "calendar",
     refetchOnWindowFocus: true,
-    refetchInterval: pageView === "calendar" && isHR ? 60000 : false,
+    refetchInterval: pageView === "calendar" ? 60000 : false,
   })
 
   const approvedLeaves = (leaveData?.allLeaves || []).filter(
@@ -1391,12 +1391,6 @@ export default function HolidaysPage() {
                   <SunMedium className="h-3.5 w-3.5" /> Overlap
                 </span>
               </div>
-
-              {!isHR && (
-                <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                  Holiday events are visible here. Approved leave events require HR or Admin access.
-                </div>
-              )}
 
               {isHR && isLeaveLoading && pageView === "calendar" && (
                 <div className="mt-4 flex items-center gap-2 text-sm text-slate-500">
