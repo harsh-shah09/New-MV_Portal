@@ -496,18 +496,27 @@ export async function getAssetCategories(): Promise<string[]> {
   const conn = await getSalesforceConnection();
   if (!conn) throw new Error("Salesforce connection failed");
 
-  // SOQL GROUP BY to get distinct categories with un-assigned stock
-  const query = `
-    SELECT AMS_Category__c
-    FROM MVC_Internal_Asset__c
-    WHERE AMS_Status__c = 'Un-Assigned'
-      AND AMS_Category__c != null
-    GROUP BY AMS_Category__c
-    ORDER BY AMS_Category__c ASC
-  `;
-
-  const result = await conn.query<any>(query);
-  return result.records.map((r: any) => r.AMS_Category__c as string).filter(Boolean);
+  try {
+    const describe = await conn.describe('MVC_Internal_Asset__c');
+    const categoryField = describe.fields.find(f => f.name === 'AMS_Category__c');
+    if (categoryField && categoryField.picklistValues) {
+      return categoryField.picklistValues
+        .filter(v => v.active)
+        .map(v => v.value as string);
+    }
+    return [];
+  } catch (e) {
+    console.warn("Failed to fetch MVC_Internal_Asset__c describe information for categories", e);
+    const query = `
+      SELECT AMS_Category__c
+      FROM MVC_Internal_Asset__c
+      WHERE AMS_Category__c != null
+      GROUP BY AMS_Category__c
+      ORDER BY AMS_Category__c ASC
+    `;
+    const result = await conn.query<any>(query);
+    return result.records.map((r: any) => r.AMS_Category__c as string).filter(Boolean);
+  }
 }
 
 /**
