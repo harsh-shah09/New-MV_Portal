@@ -1347,7 +1347,7 @@ export default function HolidaysPage() {
           )
         ) : (
           <div className="space-y-5">
-            <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-sky-50 to-rose-50 p-5 shadow-sm">
+            <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-sky-50 to-white p-5 shadow-sm">
               <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
                 <div className="flex items-center gap-3">
                   <div className="mt-1 inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-100 text-sky-700">
