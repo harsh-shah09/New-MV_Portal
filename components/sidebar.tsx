@@ -58,7 +58,7 @@ export function Sidebar({
   const navItems = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/leaves", label: "Leave", icon: CalendarDays },
-    { href: "/holidays", label: "Calender", icon: CalendarRange },
+    { href: "/holidays", label: "Calendar", icon: CalendarRange },
     { href: "/handbook", label: "Handbook", icon: BookOpen },
     // { href: "/documents", label: "Documents", icon: FileText },
   ];
