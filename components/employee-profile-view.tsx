@@ -541,6 +541,13 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                 newErrors.Gender__c = "Please select a valid gender"
             }
 
+            const maritalStatus = formData.Marital_Status__c?.trim()
+            if (!maritalStatus) {
+                newErrors.Marital_Status__c = "Marital status is required"
+            } else if (!["Married", "Unmarried"].includes(maritalStatus)) {
+                newErrors.Marital_Status__c = "Please select a valid marital status"
+            }
+
             // Emergency Contact Name: required, only letters/spaces, not only spaces
             const emergencyContactName = formData.Emergency_Contact_Name__c?.trim()
             if (!emergencyContactName) {
@@ -811,6 +818,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                 })(),
                 Birthdate__c: employee.Birthdate__c,
                 Gender__c: employee.Gender__c,
+                Marital_Status__c: employee.Marital_Status__c,
                 Employee_Current_Address__Street__s: employee.Employee_Current_Address__c?.street || '',
                 Employee_Current_Address__City__s: employee.Employee_Current_Address__c?.city || '',
                 Employee_Current_Address__StateCode__s: employee.Employee_Current_Address__c?.state || '',
@@ -1002,6 +1010,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
 
     // --- Additional States ---
     const [showBankForm, setShowBankForm] = useState(false)
+    const [confirmAccountNumber, setConfirmAccountNumber] = useState("")
     const [bankFormData, setBankFormData] = useState({
         Name: '',
         Bank_Branch_Name__c: '',
@@ -1297,6 +1306,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
             }
             message.success("Bank account added")
             setShowBankForm(false)
+            setConfirmAccountNumber("")
             setBankFormData({ Name: '', Bank_Branch_Name__c: '', Bank_Account_Number__c: '', IFSC__c: '', Account_Holder_Name__c: '', Primary_Account__c: false, Mark_for_Approval__c: false })
             setBankErrors({})
             queryClient.invalidateQueries({ queryKey: ["employee", employeeId] })
@@ -1401,6 +1411,15 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
             newErrors.Bank_Account_Number__c = "Account Number must be at least 9 digits"
         } else if (bankFormData.Bank_Account_Number__c.length > 18) {
             newErrors.Bank_Account_Number__c = "Account Number must not exceed 18 digits"
+        }
+
+        // Confirm Account Number validation
+        if (bankFormData.Bank_Account_Number__c) {
+            if (!confirmAccountNumber) {
+                newErrors.confirmBankAccountNumber = "Confirm Account Number is required"
+            } else if (bankFormData.Bank_Account_Number__c !== confirmAccountNumber) {
+                newErrors.confirmBankAccountNumber = "Account Numbers do not match"
+            }
         }
 
         // IFSC Code: required, format ABCD0123456
@@ -1967,6 +1986,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                 </div>
                                                 <Field label="Date of Birth" value={employee.Birthdate__c} fieldKey="Birthdate__c" type="date" isEditing={isEditing} formData={formData} setFormData={setFormData} error={errors.Birthdate__c} required />
                                                 <Field label="Gender" value={employee.Gender__c} fieldKey="Gender__c" isEditing={isEditing} formData={formData} setFormData={setFormData} options={[{ label: 'Male', value: 'Male' }, { label: 'Female', value: 'Female' }]} type="select" error={errors.Gender__c} required />
+                                                <Field label="Marital Status" value={employee.Marital_Status__c} fieldKey="Marital_Status__c" isEditing={isEditing} formData={formData} setFormData={setFormData} options={[{ label: 'Married', value: 'Married' }, { label: 'Unmarried', value: 'Unmarried' }]} type="select" error={errors.Marital_Status__c} required />
                                             </div>
                                         </div>
 
@@ -2757,14 +2777,19 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                             {bankErrors.Bank_Account_Number__c && <span className="text-red-500 text-[10px] normal-case tracking-normal font-medium animate-pulse">{bankErrors.Bank_Account_Number__c}</span>}
                                                         </label>
                                                         <input
-                                                            type="number"
+                                                            type="text"
                                                             value={bankFormData.Bank_Account_Number__c}
                                                             onChange={(e) => {
-                                                                const newAccNum = e.target.value.replace(/\D/g, '').slice(0, 18)
+                                                                const newAccNum = e.target.value.replace(/[^0-9]/g, '').slice(0, 18)
                                                                 const newErrors = { ...bankErrors }
-                                                                if (!newAccNum) newErrors.Bank_Account_Number__c = 'Account Number is required'
-                                                                else if (newAccNum.length < 9) newErrors.Bank_Account_Number__c = `Account Number must be at least 9 digits (${newAccNum.length}/9 entered)`
-                                                                else delete newErrors.Bank_Account_Number__c
+                                                                if (!newAccNum) {
+                                                                    newErrors.Bank_Account_Number__c = 'Account Number is required'
+                                                                    setConfirmAccountNumber("")
+                                                                } else if (newAccNum.length < 9) {
+                                                                    newErrors.Bank_Account_Number__c = `Account Number must be at least 9 digits (${newAccNum.length}/9 entered)`
+                                                                } else {
+                                                                    delete newErrors.Bank_Account_Number__c
+                                                                }
                                                                 setBankFormData({ ...bankFormData, Bank_Account_Number__c: newAccNum })
                                                                 setBankErrors(newErrors)
                                                             }}
@@ -2776,6 +2801,8 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                         />
                                                         <p className="text-[11px] text-slate-400">9–18 digits, numbers only</p>
                                                     </div>
+
+                                                   
 
                                                     {/* IFSC Code with format hint */}
                                                     <div className="space-y-1.5">
@@ -2804,6 +2831,39 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                         />
                                                         <p className="text-[11px] text-slate-400">Format: 4 letters + '0' + 6 alphanumeric &nbsp;|&nbsp; e.g. <span className="font-mono">HDFC0001234</span></p>
                                                     </div>
+                                                     {/* Confirm Account Number */}
+                                                    {bankFormData.Bank_Account_Number__c && (
+                                                        <div className="space-y-1.5 animate-in fade-in duration-200">
+                                                            <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 flex justify-between">
+                                                                <span>Confirm Account Number <span className="text-red-400">*</span></span>
+                                                                {confirmAccountNumber && (
+                                                                    confirmAccountNumber === bankFormData.Bank_Account_Number__c ? (
+                                                                        <span className="text-green-600 text-xs font-bold flex items-center gap-1">
+                                                                            <CheckCircle2 className="w-3.5 h-3.5" /> Matched
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span className="text-red-500 text-xs font-bold">Not Matched</span>
+                                                                    )
+                                                                )}
+                                                            </label>
+                                                            <input
+                                                                type="text"
+                                                                value={confirmAccountNumber}
+                                                                onChange={(e) => {
+                                                                    const val = e.target.value.replace(/[^0-9]/g, '').slice(0, 18)
+                                                                    setConfirmAccountNumber(val)
+                                                                }}
+                                                                placeholder="Confirm Account Number"
+                                                                className={cn(
+                                                                    "w-full bg-slate-50 border rounded-lg px-3 py-2.5 text-sm text-slate-800 focus:ring-2 outline-none transition placeholder:text-slate-400",
+                                                                    confirmAccountNumber && confirmAccountNumber !== bankFormData.Bank_Account_Number__c ? "border-red-300 focus:ring-red-200" : "border-slate-200 focus:ring-blue-500/20 focus:border-blue-400"
+                                                                )}
+                                                            />
+                                                            {bankErrors.confirmBankAccountNumber && (
+                                                                <p className="text-red-500 text-[10px] normal-case tracking-normal font-medium animate-pulse">{bankErrors.confirmBankAccountNumber}</p>
+                                                            )}
+                                                        </div>
+                                                    )}
                                                 </div>
                                                 <div className="flex items-center gap-2 mb-4">
                                                     <input type="checkbox" id="primary" checked={bankFormData.Mark_for_Approval__c} onChange={e => setBankFormData({ ...bankFormData, Mark_for_Approval__c: e.target.checked, Primary_Account__c: false })} />
@@ -2863,33 +2923,39 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                 </div>
 
                                                 <div className="flex justify-end gap-3 mt-4">
-                                                    <button onClick={() => {
-                                                        setBankFormData({
-                                                            Name: "",
-                                                            Bank_Branch_Name__c: "",
-                                                            Bank_Account_Number__c: "",
-                                                            IFSC__c: "",
-                                                            Account_Holder_Name__c: "",
-                                                            Primary_Account__c: false,
-                                                            Mark_for_Approval__c: false
-                                                        })
-                                                        setBankErrors({
-                                                            Name: "",
-                                                            Bank_Branch_Name__c: "",
-                                                            Bank_Account_Number__c: "",
-                                                            IFSC__c: "",
-                                                            Account_Holder_Name__c: ""
-                                                        })
-                                                        setShowBankForm(false)
-                                                    }} className="px-4 py-2 text-slate-600 hover:bg-slate-200 rounded-lg text-sm">Cancel</button>
-                                                    <button
-                                                        onClick={handleAddBank}
-                                                        disabled={addBankMutation.isPending}
-                                                        className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center gap-2"
-                                                    >
-                                                        {addBankMutation.isPending && <Spin size="small" />}
-                                                        {addBankMutation.isPending ? "Saving..." : "Save Account"}
-                                                    </button>
+                                                     <button onClick={() => {
+                                                         setConfirmAccountNumber("")
+                                                         setBankFormData({
+                                                             Name: "",
+                                                             Bank_Branch_Name__c: "",
+                                                             Bank_Account_Number__c: "",
+                                                             IFSC__c: "",
+                                                             Account_Holder_Name__c: "",
+                                                             Primary_Account__c: false,
+                                                             Mark_for_Approval__c: false
+                                                         })
+                                                         setBankErrors({
+                                                             Name: "",
+                                                             Bank_Branch_Name__c: "",
+                                                             Bank_Account_Number__c: "",
+                                                             IFSC__c: "",
+                                                             Account_Holder_Name__c: "",
+                                                             confirmBankAccountNumber: ""
+                                                         })
+                                                         setShowBankForm(false)
+                                                     }} className="px-4 py-2 text-slate-600 hover:bg-slate-200 rounded-lg text-sm">Cancel</button>
+                                                     <button
+                                                         onClick={handleAddBank}
+                                                         disabled={
+                                                             addBankMutation.isPending ||
+                                                             !bankFormData.Bank_Account_Number__c ||
+                                                             bankFormData.Bank_Account_Number__c !== confirmAccountNumber
+                                                         }
+                                                         className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center gap-2"
+                                                     >
+                                                         {addBankMutation.isPending && <Spin size="small" />}
+                                                         {addBankMutation.isPending ? "Saving..." : "Save Account"}
+                                                     </button>
                                                 </div>
                                             </div>
                                         )}
