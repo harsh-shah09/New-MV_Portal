@@ -332,7 +332,23 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
             }
             return res.json()
         },
-        onSuccess: () => {
+        onSuccess: (responseData: any) => {
+            // If the API detected direct reports that must be reassigned first,
+            // open the interactive reassignment modal instead of finishing the save.
+            if (responseData?.requiresReassignment) {
+                const reports: { Id: string; Employee_Name__c: string; Team_Lead__c: string }[] =
+                    responseData.directReports ?? []
+                setTlDirectReports(reports)
+                // Initialise each row with no selection
+                const initMap: Record<string, string | null> = {}
+                reports.forEach((r) => { initMap[r.Id] = null })
+                setTlReassignMap(initMap)
+                setTlBulkLead(null)
+                // Store the payload so we can re-fire after reassignment is done
+                setTlPendingPayload(updateMutation.variables)
+                setTlModalOpen(true)
+                return
+            }
             message.success("Profile updated successfully")
             setIsEditing(false)
             // Refetch data after successful save
@@ -371,6 +387,15 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
     const [formData, setFormData] = useState<any>({})
     const [errors, setErrors] = useState<Record<string, string>>({})
     const [warningMsg, setWarningMsg] = useState<string | null>(null)
+
+    // --- Team Lead Reassignment Modal state ---
+    type DirectReport = { Id: string; Employee_Name__c: string; Team_Lead__c: string }
+    const [tlModalOpen, setTlModalOpen] = useState(false)
+    const [tlDirectReports, setTlDirectReports] = useState<DirectReport[]>([])
+    const [tlReassignMap, setTlReassignMap] = useState<Record<string, string | null>>({})
+    const [tlBulkLead, setTlBulkLead] = useState<string | null>(null)
+    const [tlPendingPayload, setTlPendingPayload] = useState<any>(null)
+    const [tlReassigning, setTlReassigning] = useState(false)
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     const phonePattern = /^(?:\+91\d{10}|\d{10})$/
 
@@ -4103,6 +4128,234 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                         className="w-full h-[75vh] rounded-lg border border-slate-200"
                     />
                 )}
+            </Modal>
+
+            {/* ── Team Lead Reassignment Modal ─────────────────────────────────── */}
+            <Modal
+                open={tlModalOpen}
+                onCancel={() => {
+                    if (tlReassigning) return
+                    setTlModalOpen(false)
+                    setTlDirectReports([])
+                    setTlReassignMap({})
+                    setTlBulkLead(null)
+                    setTlPendingPayload(null)
+                }}
+                closable={!tlReassigning}
+                maskClosable={false}
+                footer={null}
+                width={720}
+                style={{ top: 40 }}
+                destroyOnHidden
+                title={
+                    <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
+                            <AlertTriangle className="w-5 h-5 text-amber-500" />
+                        </div>
+                        <div>
+                            <p className="text-base font-bold text-slate-800 leading-tight">Reassign Direct Reports</p>
+                            <p className="text-xs text-slate-500 font-normal mt-0.5">
+                                This employee is the Team Lead for {tlDirectReports.length} employee{tlDirectReports.length !== 1 ? 's' : ''}. Please reassign them before changing the title.
+                            </p>
+                        </div>
+                    </div>
+                }
+            >
+                <div className="space-y-5 pt-2">
+                    {/* ── Bulk apply ─────────────────────────────── */}
+                    <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
+                        <p className="text-xs font-semibold text-blue-700 uppercase tracking-wider mb-2">Bulk Reassign — Apply to All</p>
+                        <div className="flex items-center gap-3">
+                            <Select
+                                showSearch
+                                allowClear
+                                className="flex-1"
+                                placeholder="Select a replacement Team Lead for everyone"
+                                value={tlBulkLead ?? undefined}
+                                filterOption={(input, opt) =>
+                                    (opt?.label as string ?? '').toLowerCase().includes(input.toLowerCase())
+                                }
+                                onChange={(val: string | undefined) => {
+                                    const v = val ?? null
+                                    setTlBulkLead(v)
+                                    if (v) {
+                                        const next: Record<string, string | null> = {}
+                                        tlDirectReports.forEach((r) => { next[r.Id] = v })
+                                        setTlReassignMap(next)
+                                    }
+                                }}
+                                options={(
+                                    employeesList?.filter((e: any) =>
+                                        e.Id !== employeeId &&
+                                        e.Status__c === 'Active' &&
+                                        (e.Title__c || '').trim().toLowerCase() === 'team lead' &&
+                                        (e.Department__c || '').trim().toLowerCase() === (employee?.Department__c || '').trim().toLowerCase()
+                                    ) ?? []
+                                ).map((e: any) => ({
+                                    value: e.Id,
+                                    label: e.Employee_Name__c || ''
+                                }))}
+                            />
+                        </div>
+                    </div>
+
+                    {/* ── Per-report rows ─────────────────────────── */}
+                    <div className="space-y-3 max-h-[42vh] overflow-y-auto pr-1">
+                        {tlDirectReports.map((report) => {
+                            const rowVal = tlReassignMap[report.Id] ?? undefined
+                            return (
+                                <div
+                                    key={report.Id}
+                                    className={`flex items-center gap-4 p-3.5 rounded-xl border transition-all ${
+                                        rowVal
+                                            ? 'border-green-200 bg-green-50/50'
+                                            : 'border-slate-200 bg-white'
+                                    }`}
+                                >
+                                    {/* Avatar + name */}
+                                    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center shrink-0">
+                                        <span className="text-white text-xs font-bold">
+                                            {(report.Employee_Name__c || '?').charAt(0).toUpperCase()}
+                                        </span>
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-semibold text-slate-800 truncate">{report.Employee_Name__c}</p>
+                                        <p className="text-xs text-slate-400 truncate">Current Lead → <span className="text-slate-600">{employee?.Employee_Name__c}</span></p>
+                                    </div>
+                                    {/* New Team Lead selector */}
+                                    <Select
+                                        showSearch
+                                        allowClear
+                                        className="w-52 shrink-0"
+                                        placeholder="New Team Lead"
+                                        value={rowVal}
+                                        filterOption={(input, opt) =>
+                                            (opt?.label as string ?? '').toLowerCase().includes(input.toLowerCase())
+                                        }
+                                        onChange={(val: string | undefined) =>
+                                            setTlReassignMap((prev) => ({ ...prev, [report.Id]: val ?? null }))
+                                        }
+                                        options={(
+                                            employeesList?.filter((e: any) =>
+                                                e.Id !== employeeId &&
+                                                e.Status__c === 'Active' &&
+                                                (e.Title__c || '').trim().toLowerCase() === 'team lead' &&
+                                                (e.Department__c || '').trim().toLowerCase() === (employee?.Department__c || '').trim().toLowerCase()
+                                            ) ?? []
+                                        ).map((e: any) => ({
+                                            value: e.Id,
+                                            label: e.Employee_Name__c || ''
+                                        }))}
+                                    />
+                                    {/* Status indicator */}
+                                    {rowVal ? (
+                                        <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0" />
+                                    ) : (
+                                        <AlertCircle className="w-5 h-5 text-amber-400 shrink-0" />
+                                    )}
+                                </div>
+                            )
+                        })}
+                    </div>
+
+                    {/* ── Validation hint ─────────────────────────── */}
+                    {(() => {
+                        const unassigned = tlDirectReports.filter((r) => !tlReassignMap[r.Id]).length
+                        return unassigned > 0 ? (
+                            <div className="flex items-center gap-2 text-amber-600 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                                <AlertCircle className="w-4 h-4 shrink-0" />
+                                <p className="text-xs">
+                                    {unassigned} employee{unassigned !== 1 ? 's' : ''} still need{unassigned === 1 ? 's' : ''} a new Team Lead assigned.
+                                </p>
+                            </div>
+                        ) : (
+                            <div className="flex items-center gap-2 text-green-700 bg-green-50 border border-green-100 rounded-lg px-3 py-2">
+                                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                                <p className="text-xs font-medium">All employees reassigned — ready to confirm.</p>
+                            </div>
+                        )
+                    })()}
+
+                    {/* ── Action buttons ──────────────────────────── */}
+                    <div className="flex items-center justify-end gap-3 pt-1 border-t border-slate-100">
+                        <Button
+                            disabled={tlReassigning}
+                            onClick={() => {
+                                setTlModalOpen(false)
+                                setTlDirectReports([])
+                                setTlReassignMap({})
+                                setTlBulkLead(null)
+                                setTlPendingPayload(null)
+                            }}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            type="primary"
+                            loading={tlReassigning}
+                            disabled={tlDirectReports.some((r) => !tlReassignMap[r.Id])}
+                            onClick={async () => {
+                                setTlReassigning(true)
+                                try {
+                                    // 1. Bulk-patch each direct report's Team_Lead__c
+                                    const results = await Promise.allSettled(
+                                        tlDirectReports.map((report) =>
+                                            fetch(`/api/employees/${report.Id}`, {
+                                                method: 'PUT',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({ Team_Lead__c: tlReassignMap[report.Id] }),
+                                            }).then(async (r) => {
+                                                if (!r.ok) {
+                                                    const d = await r.json().catch(() => null)
+                                                    throw new Error(d?.error || 'Update failed')
+                                                }
+                                                return r.json()
+                                            })
+                                        )
+                                    )
+
+                                    const failed = results.filter((r) => r.status === 'rejected')
+                                    if (failed.length > 0) {
+                                        const reasons = failed
+                                            .map((r) => (r as PromiseRejectedResult).reason?.message)
+                                            .filter(Boolean)
+                                            .join(', ')
+                                        message.error(`Failed to reassign ${failed.length} employee(s): ${reasons}`)
+                                        setTlReassigning(false)
+                                        return
+                                    }
+
+                                    // 2. All reassignments succeeded — now fire the original title change
+                                    const titleRes = await fetch(`/api/employees/${employeeId}`, {
+                                        method: 'PUT',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify(tlPendingPayload),
+                                    })
+                                    if (!titleRes.ok) {
+                                        const d = await titleRes.json().catch(() => null)
+                                        throw new Error(d?.error || 'Title update failed')
+                                    }
+
+                                    message.success(`${tlDirectReports.length} employee(s) reassigned and title updated successfully.`)
+                                    setTlModalOpen(false)
+                                    setTlDirectReports([])
+                                    setTlReassignMap({})
+                                    setTlBulkLead(null)
+                                    setTlPendingPayload(null)
+                                    setIsEditing(false)
+                                    queryClient.invalidateQueries({ queryKey: ['employee', employeeId] })
+                                    queryClient.invalidateQueries({ queryKey: ['employeesList'] })
+                                } catch (err: any) {
+                                    message.error(err?.message || 'Reassignment failed')
+                                } finally {
+                                    setTlReassigning(false)
+                                }
+                            }}
+                        >
+                            Confirm Reassignment &amp; Change Title
+                        </Button>
+                    </div>
+                </div>
             </Modal>
             <style jsx global>{`
         .input-std {
