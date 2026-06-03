@@ -374,7 +374,7 @@ export const getEmployeeById = async (id: string, includeSalary: boolean = false
   // 4. Fetch Asset Assignment History (Current & Past)
   const historyQuery = `
       SELECT Id, AMS_Assigned_Date__c, AMS_Returned_Date__c, 
-             AMS_Asset__r.Name, AMS_Asset__r.AMS_Asset_Serial_Number__c, 
+             AMS_Asset__r.Name, AMS_Asset__r.AMS_Asset_Serial_Number__c, AMS_Asset__r.Internal_Serial_Number__c,
              AMS_Asset__r.AMS_Product__r.Name, AMS_Asset__r.AMS_Product__r.AMS_Category__c, 
              AMS_Asset__r.AMS_Status__c, AMS_Asset__r.AMS_Warranty_Expiry_Date__c
       FROM AMS_Asset_Assignment_History__c

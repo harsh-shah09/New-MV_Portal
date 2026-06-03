@@ -204,6 +204,7 @@ export async function POST(req: Request) {
                    Emergency_Contact_Name__c: data.emergencyContact,
                    Emergency_Contact_Number__c: data.emergencyPhone,
                    Emergency_Contact_Relation__c: data.emergencyRelation,
+                   Marital_Status__c: data.maritalStatus,
                }
                 if(data.sameAsCurrent){
                     payload.Employee_Address__c = JSON.stringify({

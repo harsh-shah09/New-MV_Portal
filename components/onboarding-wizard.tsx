@@ -183,6 +183,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                             emergencyContact: emp.Emergency_Contact_Name__c || '',
                             emergencyRelation: emp.Emergency_Contact_Relation__c || '',
                             ...splitEmergencyContact(emp.Emergency_Contact_Number__c),
+                            maritalStatus: emp.Marital_Status__c || undefined,
                         });
 
                         if (emp.bankDetails && emp.bankDetails.length > 0) {
@@ -193,6 +194,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                     bankName: bank.Name || '',
                                     bankbranch: bank.Bank_Branch_Name__c || '',
                                     accountNumber: bank.Bank_Account_Number__c || '',
+                                    confirmAccountNumber: bank.Bank_Account_Number__c || '',
                                     accountHolder: bank.Account_Holder_Name__c || '',
                                     ifscCode: bank.IFSC__c || '',
                                 });
@@ -446,7 +448,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                     }
 
                     // Manual check for required fields
-                    if (!values.street?.trim() || !values.city || !values.state || !values.postalCode || !values.country || !values.emergencyContact || !values.emergencyRelation || !values.emergencyCountryCode || !values.emergencyPhoneNumber) {
+                    if (!values.street?.trim() || !values.city || !values.state || !values.postalCode || !values.country || !values.emergencyContact || !values.emergencyRelation || !values.emergencyCountryCode || !values.emergencyPhoneNumber || !values.maritalStatus) {
                         showToast.error("Please fill in all required personal information.");
                         setLoading(false);
                         return;
@@ -523,6 +525,10 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                         }
                     }
 
+                    if (values.confirmAccountNumber && values.accountNumber !== values.confirmAccountNumber) {
+                        customErrors.confirmAccountNumber = 'The two account numbers that you entered do not match!';
+                    }
+
                     // Additional bank validations
                     if (values.accountNumber) {
                         // Check if account number contains only digits
@@ -545,7 +551,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                     }
 
                     // Check for required fields
-                    if (!values.bankName?.trim() || !values.bankbranch?.trim() || !values.accountNumber || !values.accountHolder?.trim() || !values.ifscCode) {
+                    if (!values.bankName?.trim() || !values.bankbranch?.trim() || !values.accountNumber || !values.confirmAccountNumber || !values.accountHolder?.trim() || !values.ifscCode) {
                         showToast.error("Please fill in all required bank details.");
                         setLoading(false);
                         return;
@@ -1029,6 +1035,21 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                         </Form.Item>
                         <Divider />
                         <Form.Item
+                            name="maritalStatus"
+                            label="Marital Status"
+                            rules={[{ required: true, message: 'Marital status is required' }]}
+                        >
+                            <Select
+                                placeholder="Select marital status"
+                                disabled={disabledsteps.includes(2)}
+                                options={[
+                                    { label: 'Married', value: 'Married' },
+                                    { label: 'Unmarried', value: 'Unmarried' }
+                                ]}
+                            />
+                        </Form.Item>
+                        <Divider />
+                        <Form.Item
                             name="emergencyContact"
                             label="Emergency Contact Name"
                             rules={[
@@ -1230,6 +1251,38 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                     const onlyDigits = e.target.value.replace(/\D/g, '').slice(0, 18)
                                     form.setFieldValue('accountNumber', onlyDigits)
                                     form.validateFields(['accountNumber']);
+                                }}
+                            />
+                        </Form.Item>
+
+                        {/* Confirm Account Number */}
+                        <Form.Item
+                            name="confirmAccountNumber"
+                            label="Confirm Account Number"
+                            dependencies={['accountNumber']}
+                            validateTrigger={['onChange', 'onBlur']}
+                            rules={[
+                                { required: true, message: 'Please confirm your account number' },
+                                ({ getFieldValue }) => ({
+                                    validator(_, value) {
+                                        if (!value || getFieldValue('accountNumber') === value) {
+                                            return Promise.resolve();
+                                        }
+                                        return Promise.reject(new Error('The two account numbers that you entered do not match!'));
+                                    },
+                                }),
+                            ]}
+                        >
+                            <Input
+                                placeholder="Re-enter account number"
+                                type="text"
+                                inputMode="numeric"
+                                maxLength={18}
+                                disabled={disabledsteps.includes(3)}
+                                onChange={(e) => {
+                                    const onlyDigits = e.target.value.replace(/\D/g, '').slice(0, 18)
+                                    form.setFieldValue('confirmAccountNumber', onlyDigits)
+                                    form.validateFields(['confirmAccountNumber']);
                                 }}
                             />
                         </Form.Item>
