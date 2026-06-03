@@ -626,36 +626,29 @@ export const getDocumentsByEmployee = async (employeeId: string) => {
 export const getPendingDocuments = async (reviewerRole?: string) => {
   const conn = await getSalesforceConnection();
   if (!conn) throw new Error("No Salesforce connection");
-  // Fetch pending and uploaded documents and include related Employee Name
+
+  // HR: sees Pending + Uploaded docs for non-HR, non-Admin employees
+  // Admin: sees Pending + Uploaded docs for ALL employees
+  let roleFilter = '';
+  if (reviewerRole === 'HR') {
+    roleFilter = "AND Employee__r.Role__c NOT IN ('HR', 'Admin')";
+  } else if (reviewerRole === 'Admin') {
+    roleFilter = ''; // Admin sees everyone
+  } else {
+    return [];
+  }
+
   const query = `
       SELECT Id, Name, Document_Type__c, Document_Category__c, File_URL__c, Status__c, CreatedDate,
        Employee__c, Employee__r.Employee_Name__c, Employee__r.Role__c
       FROM Document__c
       WHERE Status__c IN ('Pending', 'Uploaded')
+      AND Document_Category__c != 'Payslip'
+      ${roleFilter}
       ORDER BY CreatedDate DESC
     `;
   const result = await conn.query(query);
-
-  const docs = result.records as any[];
-
-  if (!reviewerRole) return docs;
-
-  // Verification rule:
-  // - HR verifies uploaded docs for non-HR employees
-  // - Admin verifies uploaded docs for HR employees
-  if (reviewerRole === 'HR') {
-    return docs.filter((doc: any) =>
-      doc.Status__c === 'Uploaded' && (doc.Employee__r?.Role__c || '') !== 'HR'
-    );
-  }
-
-  if (reviewerRole === 'Admin') {
-    return docs.filter((doc: any) =>
-      doc.Status__c === 'Uploaded' && (doc.Employee__r?.Role__c || '') === 'HR'
-    );
-  }
-
-  return [];
+  return result.records as any[];
 }
 
 export const updateDocument = async (docData: any) => {

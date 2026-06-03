@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
 
         // Verify the session token
         const payload = await verifyToken(session);
-        
+
         if (!payload) {
             return NextResponse.json({ error: "Invalid session" }, { status: 401 });
         }
@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
         const { employeeId, email, recordId, name, role, title } = payload;
         const currentEmployeeId = employeeId || name || recordId;
         const isTeamLead = title === 'Team Lead';
-        
+
         const conn = await getSalesforceConnection();
         const isHR = role === 'HR';
         const isAdmin = role === 'Admin';
@@ -104,7 +104,7 @@ export async function GET(req: NextRequest) {
 
             const pendingDocumentsFilter = isAdmin
                 ? ''
-                : "AND Employee__c IN (SELECT Id FROM Employee__c WHERE Role__c NOT IN ('HR','Admin'))";
+                : "AND Employee__r.Role__c NOT IN ('HR', 'Admin')";
 
             const [
                 employeeQuery,
@@ -135,6 +135,7 @@ export async function GET(req: NextRequest) {
                     SELECT COUNT(Id) pendingDocs
                     FROM Document__c
                     WHERE Status__c IN ('Pending', 'Uploaded')
+                    AND Document_Category__c != 'Payslip'
                     ${pendingDocumentsFilter}
                 `),
                 pendingApprovalsQueryPromise,
@@ -314,7 +315,7 @@ export async function GET(req: NextRequest) {
 
         // Employee Dashboard Data
         const currentYear = new Date().getFullYear();
-        
+
         const teamLeadApprovalsPromise = isTeamLead
             ? conn.query(`
                 SELECT Id, Name, Employee__c, Employee__r.Employee_Name__c,
