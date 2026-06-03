@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useQuery } from "@tanstack/react-query"
 import { Button, Select, Spin, Tooltip } from "antd"
-import { CalendarRange, Plus, Edit2, Trash2, X, Calendar, ChevronDown, ChevronLeft, ChevronRight, CalendarDays, ClipboardList, BadgeInfo, SunMedium, Users, User, FileText } from "lucide-react"
+import { CalendarRange, Plus, Edit2, Trash2, X, Calendar, ChevronDown, ChevronLeft, ChevronRight, CalendarDays, ClipboardList, BadgeInfo, SunMedium, Users, User, FileText, CheckSquare, Square, AlertTriangle } from "lucide-react"
 import { createPortal } from "react-dom"
 import {
   addDays,
@@ -134,6 +134,11 @@ export default function HolidaysPage() {
   const [isEditSubmitting, setIsEditSubmitting] = useState(false)
   const [editDateError, setEditDateError] = useState("")
 
+  // Bulk delete state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false)
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false)
+
   // More events & Event details modal states
   const [showMoreEventsModal, setShowMoreEventsModal] = useState(false)
   const [moreEventsDate, setMoreEventsDate] = useState<Date | null>(null)
@@ -184,7 +189,9 @@ export default function HolidaysPage() {
     refetchInterval: pageView === "calendar" && isHR ? 60000 : false,
   })
 
-  const approvedLeaves = (leaveData?.allLeaves || []).filter((leave: any) => leave?.status === "approved")
+  const approvedLeaves = (leaveData?.allLeaves || []).filter(
+    (leave: any) => leave?.status === "approved" && leave?.leaveCategory !== "Extra Day Pay"
+  )
 
   useEffect(() => {
     if (pageView === "calendar") {
@@ -665,9 +672,14 @@ export default function HolidaysPage() {
     }
   }, [editFormData.date])
 
+  // Clear selection when filtered year changes
+  useEffect(() => {
+    setSelectedIds(new Set())
+  }, [selectedYear])
+
   // Disable background scrolling when modals are open
   useEffect(() => {
-    if (showBulkModal || showEditModal || showDeleteConfirm || showMoreEventsModal || showEventDetailsModal) {
+    if (showBulkModal || showEditModal || showDeleteConfirm || showBulkDeleteConfirm || showMoreEventsModal || showEventDetailsModal) {
       document.body.style.overflow = 'hidden'
     } else {
       document.body.style.overflow = 'unset'
@@ -676,7 +688,7 @@ export default function HolidaysPage() {
     return () => {
       document.body.style.overflow = 'unset'
     }
-  }, [showBulkModal, showEditModal, showDeleteConfirm, showMoreEventsModal, showEventDetailsModal])
+  }, [showBulkModal, showEditModal, showDeleteConfirm, showBulkDeleteConfirm, showMoreEventsModal, showEventDetailsModal])
 
   const handleBulkSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -953,6 +965,69 @@ export default function HolidaysPage() {
     setShowDeleteConfirm(true)
   }
 
+  // ── Bulk selection helpers ──────────────────────────────────────────────
+  const allFilteredIds = filteredHolidays.map((h) => h.id)
+  const isAllSelected = allFilteredIds.length > 0 && allFilteredIds.every((id) => selectedIds.has(id))
+  const isIndeterminate = !isAllSelected && allFilteredIds.some((id) => selectedIds.has(id))
+
+  const toggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(allFilteredIds))
+    }
+  }
+
+  const toggleSelectOne = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }
+
+  // ── Bulk delete handler ─────────────────────────────────────────────────
+  const handleBulkDelete = async () => {
+    if (isBulkDeleting || selectedIds.size === 0) return
+    setIsBulkDeleting(true)
+    try {
+      const response = await fetch("/api/holidays", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: Array.from(selectedIds) }),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        toast.error(error.error || "Failed to delete holidays")
+        return
+      }
+
+      const result = await response.json()
+      const refreshed = await refetch()
+      const latestHolidays: Holiday[] = refreshed.data?.holidays || []
+      const selectedYearHasRemaining = latestHolidays.some(
+        (h) => String(h.year) === String(selectedYear)
+      )
+      if (!selectedYearHasRemaining) {
+        setSelectedYear(new Date().getFullYear().toString())
+      }
+
+      setSelectedIds(new Set())
+      setShowBulkDeleteConfirm(false)
+      toast.success(result.message || `Successfully deleted ${selectedIds.size} holiday(s)!`)
+    } catch (error) {
+      console.error("Error bulk deleting holidays:", error)
+      toast.error("Failed to delete selected holidays")
+    } finally {
+      setIsBulkDeleting(false)
+    }
+  }
+
   if (isLoading) {
     return (
       <PageContainer>
@@ -977,7 +1052,7 @@ export default function HolidaysPage() {
                 <Select
                   value={selectedYear}
                   size="large"
-                  onChange={(e) => setSelectedYear(e)}
+                  onChange={(e) => { setSelectedYear(e); setSelectedIds(new Set()) }}
                   suffixIcon={<ChevronDown className="w-4 h-4 text-muted-foreground pointer-events-none" />}
                 >
                   {availableYears.map(year => (
@@ -990,14 +1065,14 @@ export default function HolidaysPage() {
             <div className="inline-flex rounded-lg border border-slate-200 bg-slate-100 p-1">
               <button
                 type="button"
-                onClick={() => setPageView("list")}
+                onClick={() => { setPageView("list"); setSelectedIds(new Set()) }}
                 className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${pageView === "list" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"}`}
               >
                 List View
               </button>
               <button
                 type="button"
-                onClick={() => setPageView("calendar")}
+                onClick={() => { setPageView("calendar"); setSelectedIds(new Set()) }}
                 className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${pageView === "calendar" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"}`}
               >
                 Calendar View
@@ -1017,6 +1092,61 @@ export default function HolidaysPage() {
           </div>
         </PageHeader>
 
+        {/* ── Selection Action Bar (slides in when rows are checked) ── */}
+        {isHR && selectedIds.size > 0 && pageView === "list" && (
+          <div
+            style={{
+              animation: "slideDownFade 0.18s ease",
+            }}
+            className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-3 shadow-sm"
+          >
+            {/* Left — count + select-all shortcut */}
+            <div className="flex items-center gap-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-white text-sm font-bold shadow">
+                {selectedIds.size}
+              </div>
+              <span className="text-sm font-semibold text-blue-900">
+                {selectedIds.size === 1 ? "1 holiday selected" : `${selectedIds.size} holidays selected`}
+              </span>
+              <span className="hidden sm:inline text-slate-300">|</span>
+              <button
+                type="button"
+                onClick={toggleSelectAll}
+                className="hidden sm:inline-flex items-center gap-1.5 text-xs font-medium text-blue-700 hover:text-blue-900 transition-colors underline-offset-2 hover:underline"
+              >
+                {isAllSelected ? "Deselect all" : `Select all ${filteredHolidays.length}`}
+              </button>
+            </div>
+
+            {/* Right — actions */}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setSelectedIds(new Set())}
+                className="flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+              >
+                <X className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Clear</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowBulkDeleteConfirm(true)}
+                className="flex items-center gap-1.5 rounded-lg bg-red-500 hover:bg-red-600 px-4 py-1.5 text-sm font-semibold text-white transition-colors shadow-sm"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Delete Selected
+              </button>
+            </div>
+          </div>
+        )}
+
+        <style>{`
+          @keyframes slideDownFade {
+            from { opacity: 0; transform: translateY(-6px); }
+            to   { opacity: 1; transform: translateY(0); }
+          }
+        `}</style>
+
         {pageView === "list" ? (
           filteredHolidays.length === 0 ? (
             <div className="text-center py-10 sm:py-16 bg-card rounded-xl shadow-sm border border-border px-4">
@@ -1034,6 +1164,7 @@ export default function HolidaysPage() {
             <>
               {/* 📱 Mobile View (Card Layout) */}
               <div className="block md:hidden space-y-4">
+
                 {filteredHolidays.map((holiday, index) => {
                   const holidayDate = new Date(holiday.date)
                   const formattedDate = holidayDate.toLocaleDateString('en-US', {
@@ -1041,22 +1172,38 @@ export default function HolidaysPage() {
                     day: 'numeric',
                     year: 'numeric'
                   })
+                  const isChecked = selectedIds.has(holiday.id)
 
                   return (
                     <div
                       key={holiday.id}
-                      className="bg-card border border-border rounded-xl p-4 shadow-sm"
+                      className={`bg-card border rounded-xl p-4 shadow-sm transition-colors ${isChecked ? "border-blue-400 bg-blue-50/40" : "border-border"
+                        }`}
                     >
                       <div className="flex justify-between items-start mb-2">
-                        <h4 className="font-semibold text-foreground">
-                          {holiday.name}
-                        </h4>
+                        <div className="flex items-start gap-2">
+                          {isHR && (
+                            <button
+                              type="button"
+                              onClick={() => toggleSelectOne(holiday.id)}
+                              className="mt-0.5 shrink-0 text-slate-400 hover:text-blue-600 transition-colors"
+                              aria-label={isChecked ? "Deselect holiday" : "Select holiday"}
+                            >
+                              {isChecked
+                                ? <CheckSquare className="w-5 h-5 text-blue-600" />
+                                : <Square className="w-5 h-5" />}
+                            </button>
+                          )}
+                          <h4 className="font-semibold text-foreground">
+                            {holiday.name}
+                          </h4>
+                        </div>
                         <span className="text-xs text-muted-foreground">
                           #{index + 1}
                         </span>
                       </div>
 
-                      <div className="text-sm text-muted-foreground space-y-1">
+                      <div className="text-sm text-muted-foreground space-y-1 pl-7">
                         <p><span className="font-medium text-foreground">Date:</span> {formattedDate}</p>
                         <p>
                           <span className="font-medium text-foreground">Day:</span>{" "}
@@ -1067,7 +1214,7 @@ export default function HolidaysPage() {
                       </div>
 
                       {isHR && (
-                        <div className="flex gap-2 mt-3">
+                        <div className="flex gap-2 mt-3 pl-7">
                           <button
                             onClick={() => handleEdit(holiday)}
                             className="flex-1 flex items-center justify-center gap-1 p-2 text-blue-600 bg-blue-50 rounded-lg"
@@ -1093,6 +1240,22 @@ export default function HolidaysPage() {
                   <table className="w-full min-w-[600px]">
                     <thead className="bg-muted text-muted-foreground">
                       <tr>
+                        {isHR && (
+                          <th className="px-4 lg:px-5 py-3 text-center w-12">
+                            <button
+                              type="button"
+                              onClick={toggleSelectAll}
+                              className="inline-flex items-center justify-center text-slate-500 hover:text-blue-600 transition-colors"
+                              aria-label={isAllSelected ? "Deselect all" : "Select all"}
+                            >
+                              {isAllSelected
+                                ? <CheckSquare className="w-5 h-5 text-blue-600" />
+                                : isIndeterminate
+                                  ? <CheckSquare className="w-5 h-5 text-blue-400" />
+                                  : <Square className="w-5 h-5" />}
+                            </button>
+                          </th>
+                        )}
                         <th className="px-4 lg:px-6 py-3 text-left text-xs lg:text-sm font-bold uppercase">#</th>
                         <th className="px-4 lg:px-6 py-3 text-left text-xs lg:text-sm font-bold uppercase">Holiday Name</th>
                         <th className="px-4 lg:px-6 py-3 text-left text-xs lg:text-sm font-bold uppercase">Date</th>
@@ -1112,8 +1275,29 @@ export default function HolidaysPage() {
                           year: 'numeric'
                         })
 
+                        const isChecked = selectedIds.has(holiday.id)
+
                         return (
-                          <tr key={holiday.id} className="hover:bg-muted/50 transition-colors">
+                          <tr
+                            key={holiday.id}
+                            className={`transition-colors ${isChecked ? "bg-blue-50/60 hover:bg-blue-100/60" : "hover:bg-muted/50"
+                              }`}
+                          >
+                            {isHR && (
+                              <td className="px-4 lg:px-5 py-3 text-center w-12">
+                                <button
+                                  type="button"
+                                  onClick={() => toggleSelectOne(holiday.id)}
+                                  className="inline-flex items-center justify-center text-slate-400 hover:text-blue-600 transition-colors"
+                                  aria-label={isChecked ? "Deselect" : "Select"}
+                                >
+                                  {isChecked
+                                    ? <CheckSquare className="w-5 h-5 text-blue-600" />
+                                    : <Square className="w-5 h-5" />}
+                                </button>
+                              </td>
+                            )}
+
                             <td className="px-4 lg:px-6 py-3 text-xs lg:text-sm text-muted-foreground">
                               {index + 1}
                             </td>
@@ -1547,6 +1731,57 @@ export default function HolidaysPage() {
                   className={`flex-1 px-4 py-2.5 bg-red-500 text-white rounded-lg font-medium transition-colors ${isDeletingHoliday ? 'opacity-60 cursor-not-allowed' : 'hover:bg-red-600'}`}
                 >
                   {isDeletingHoliday ? 'Deleting...' : 'Yes, Delete'}
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
+
+        {/* Bulk Delete Confirmation Modal */}
+        {showBulkDeleteConfirm && isMounted && createPortal(
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden transform transition-all border border-gray-100">
+              <div className="p-6">
+                <div className="flex items-start gap-4">
+                  <div className="flex-shrink-0 w-12 h-12 rounded-full bg-red-50 flex items-center justify-center">
+                    <AlertTriangle className="w-6 h-6 text-red-500" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-bold text-gray-900 mb-1">Bulk Delete Holidays</h3>
+                    <p className="text-sm text-gray-600">
+                      You are about to permanently delete{" "}
+                      <span className="font-semibold text-red-600">{selectedIds.size} holiday{selectedIds.size !== 1 ? "s" : ""}</span>.
+                      This action <span className="font-semibold">cannot be undone</span>.
+                    </p>
+                    <div className="mt-3 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700">
+                      {Array.from(selectedIds)
+                        .map((id) => filteredHolidays.find((h) => h.id === id)?.name)
+                        .filter(Boolean)
+                        .slice(0, 5)
+                        .join(", ")}
+                      {selectedIds.size > 5 ? ` … and ${selectedIds.size - 5} more` : ""}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="px-6 py-4 bg-gray-50 flex gap-3">
+                <button
+                  onClick={() => setShowBulkDeleteConfirm(false)}
+                  disabled={isBulkDeleting}
+                  className="flex-1 px-4 py-2.5 bg-white hover:bg-gray-50 text-gray-700 rounded-lg font-medium transition-colors border border-gray-300 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleBulkDelete}
+                  disabled={isBulkDeleting}
+                  className={`flex-1 px-4 py-2.5 bg-red-500 text-white rounded-lg font-medium transition-colors ${isBulkDeleting ? "opacity-60 cursor-not-allowed" : "hover:bg-red-600"
+                    }`}
+                >
+                  {isBulkDeleting
+                    ? "Deleting…"
+                    : `Delete ${selectedIds.size} Holiday${selectedIds.size !== 1 ? "s" : ""}`}
                 </button>
               </div>
             </div>
