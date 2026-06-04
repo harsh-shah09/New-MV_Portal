@@ -110,6 +110,28 @@ export default function HolidaysPage() {
   const router = useRouter()
   const [isMounted, setIsMounted] = useState(false)
   const [pageView, setPageView] = useState<PageView>("list")
+
+  // Synchronize view state with URL query parameters (?view=list or ?view=calendar) on load
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const search = window.location.search
+      if (search.includes("view=calender") || search.includes("view=calendar")) {
+        setPageView("calendar")
+      } else if (search.includes("view=list")) {
+        setPageView("list")
+      }
+    }
+  }, [])
+
+  const handleViewChange = (view: PageView) => {
+    setPageView(view)
+    setSelectedIds(new Set())
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href)
+      url.searchParams.set("view", view)
+      window.history.replaceState(null, "", url.pathname + url.search)
+    }
+  }
   const [calendarMode, setCalendarMode] = useState<CalendarMode>("month")
   const [calendarFocusDate, setCalendarFocusDate] = useState(new Date())
   const [selectedCalendarEventId, setSelectedCalendarEventId] = useState<string | null>(null)
@@ -1065,18 +1087,18 @@ export default function HolidaysPage() {
               </div>
             )}
 
-            <div className="inline-flex rounded-lg border border-slate-200 bg-slate-100 p-1">
+            <div className="inline-flex h-10 items-center rounded-lg border border-slate-200 bg-slate-100 p-1">
               <button
                 type="button"
-                onClick={() => { setPageView("list"); setSelectedIds(new Set()) }}
-                className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${pageView === "list" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"}`}
+                onClick={() => handleViewChange("list")}
+                className={`rounded-md px-3 h-8 text-sm font-medium transition-colors ${pageView === "list" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"}`}
               >
                 List View
               </button>
               <button
                 type="button"
-                onClick={() => { setPageView("calendar"); setSelectedIds(new Set()) }}
-                className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${pageView === "calendar" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"}`}
+                onClick={() => handleViewChange("calendar")}
+                className={`rounded-md px-3 h-8 text-sm font-medium transition-colors ${pageView === "calendar" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"}`}
               >
                 Calendar View
               </button>
