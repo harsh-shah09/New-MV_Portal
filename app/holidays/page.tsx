@@ -949,6 +949,11 @@ export default function HolidaysPage() {
         setSelectedYear(currentYear)
       }
 
+      setSelectedIds((prev) => {
+        const next = new Set(prev)
+        next.delete(deletingHolidayId)
+        return next
+      })
       setShowDeleteConfirm(false)
       setDeletingHolidayId(null)
       toast.success("Holiday deleted successfully!")
@@ -990,15 +995,13 @@ export default function HolidaysPage() {
     })
   }
 
-  // ── Bulk delete handler ─────────────────────────────────────────────────
   const handleBulkDelete = async () => {
     if (isBulkDeleting || selectedIds.size === 0) return
     setIsBulkDeleting(true)
     try {
-      const response = await fetch("/api/holidays", {
+      const idsArray = Array.from(selectedIds)
+      const response = await fetch(`/api/holidays?ids=${idsArray.join(",")}`, {
         method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids: Array.from(selectedIds) }),
       })
 
       if (!response.ok) {
@@ -1256,7 +1259,7 @@ export default function HolidaysPage() {
                             </button>
                           </th>
                         )}
-                        <th className="px-4 lg:px-6 py-3 text-left text-xs lg:text-sm font-bold uppercase">#</th>
+                        <th className="px-4 lg:px-6 py-3 text-left text-xs lg:text-sm font-bold uppercase">Index</th>
                         <th className="px-4 lg:px-6 py-3 text-left text-xs lg:text-sm font-bold uppercase">Holiday Name</th>
                         <th className="px-4 lg:px-6 py-3 text-left text-xs lg:text-sm font-bold uppercase">Date</th>
                         <th className="px-4 lg:px-6 py-3 text-left text-xs lg:text-sm font-bold uppercase">Day</th>
@@ -1736,26 +1739,19 @@ export default function HolidaysPage() {
         {showBulkDeleteConfirm && isMounted && createPortal(
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
             <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden transform transition-all border border-gray-100">
-              <div className="p-6">
-                <div className="flex items-start gap-4">
-                  <div className="flex-shrink-0 w-12 h-12 rounded-full bg-red-50 flex items-center justify-center">
+              <div className="p-6 text-center">
+                <div className="flex flex-col items-center gap-3">
+                  <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mb-1">
                     <AlertTriangle className="w-6 h-6 text-red-500" />
                   </div>
-                  <div className="flex-1">
-                    <h3 className="text-lg font-bold text-gray-900 mb-1">Bulk Delete Holidays</h3>
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900 mb-2">Bulk Delete Holidays</h3>
                     <p className="text-sm text-gray-600">
-                      You are about to permanently delete{" "}
-                      <span className="font-semibold text-red-600">{selectedIds.size} holiday{selectedIds.size !== 1 ? "s" : ""}</span>.
-                      This action <span className="font-semibold">cannot be undone</span>.
+                      Are you sure you want to delete{" "}
+                      <span className="font-semibold text-red-600">{selectedIds.size} holiday{selectedIds.size !== 1 ? "s" : ""}?</span>
+                      <br />
+                      This action <span className="font-semibold">cannot be reversed/undone.</span>
                     </p>
-                    <div className="mt-3 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700">
-                      {Array.from(selectedIds)
-                        .map((id) => filteredHolidays.find((h) => h.id === id)?.name)
-                        .filter(Boolean)
-                        .slice(0, 5)
-                        .join(", ")}
-                      {selectedIds.size > 5 ? ` … and ${selectedIds.size - 5} more` : ""}
-                    </div>
                   </div>
                 </div>
               </div>
