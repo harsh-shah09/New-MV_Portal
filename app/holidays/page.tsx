@@ -1745,12 +1745,12 @@ export default function HolidaysPage() {
                     <AlertTriangle className="w-6 h-6 text-red-500" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-bold text-gray-900 mb-2">Bulk Delete Holidays</h3>
+                    <h3 className="text-lg font-bold text-gray-900 mb-2">Delete Holiday(s)</h3>
                     <p className="text-sm text-gray-600">
                       Are you sure you want to delete{" "}
                       <span className="font-semibold text-red-600">{selectedIds.size} holiday{selectedIds.size !== 1 ? "s" : ""}?</span>
                       <br />
-                      This action <span className="font-semibold">cannot be reversed/undone.</span>
+                      This action <span className="font-semibold">cannot be undone.</span>
                     </p>
                   </div>
                 </div>
