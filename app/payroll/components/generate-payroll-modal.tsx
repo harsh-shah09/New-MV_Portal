@@ -161,6 +161,13 @@ export function GeneratePayrollModal({ open, onClose, onGenerate, onSavingChange
     setLoading(true)
     try {
       const response = await fetch(`/api/payroll/anniversaries?month=${selectedMonth}&year=${selectedYear}`)
+      if (response.status === 409) {
+        const err = await response.json().catch(() => ({}))
+        message.error(err?.error || `Payroll already exists for ${selectedMonth} ${selectedYear}`)
+        setLoading(false)
+        return
+      }
+      
       if (!response.ok) {
         throw new Error("Failed to check work anniversaries")
       }

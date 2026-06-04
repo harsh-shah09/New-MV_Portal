@@ -59,6 +59,22 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Failed to connect to Salesforce" }, { status: 500 })
     }
 
+    // Check if payroll already exists for this period
+    const existingSummaryQuery = await conn.query<any>(`
+      SELECT Id, Name, Status__c
+      FROM Payroll_Summary__c
+      WHERE Payroll_Month__c = '${month}'
+      AND Payroll_Year__c = ${year}
+      LIMIT 1
+    `)
+
+    if ((existingSummaryQuery.records || []).length > 0) {
+      return NextResponse.json(
+        { error: `Payroll already exists for ${month} ${year}` },
+        { status: 409 }
+      )
+    }
+
     const employeeRecords = await conn.query<any>(`
       SELECT Id, Name, Employee_Id__c, Employee_Name__c, Joining_Date__c, Onboarding_Date__c, Salary_CTC__c, Role__c
       FROM Employee__c
