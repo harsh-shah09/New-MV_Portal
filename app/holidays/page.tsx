@@ -1384,7 +1384,7 @@ export default function HolidaysPage() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3">
-                  <div className="inline-flex rounded-xl border border-slate-200 bg-white/80 p-1 shadow-sm">
+                  <div className="inline-flex rounded-xl border border-slate-200 bg-slate-100 p-1 shadow-sm">
                     {(["month", "week", "day"] as CalendarMode[]).map((mode) => (
                       <button
                         key={mode}
