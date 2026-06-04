@@ -1899,7 +1899,40 @@ export default function HolidaysPage() {
             >
 
               {/* Top Action Bar */}
-              <div className="flex justify-end items-center gap-1 p-3 pb-0">
+              <div className="flex justify-end items-center gap-1.5 p-3 pb-0">
+                {isHR && selectedEventDetails.kind === "holiday" && (
+                  <>
+                    <button
+                      onClick={() => {
+                        const holidayId = selectedEventDetails.id.replace("holiday-", "")
+                        const holiday = holidays.find(h => h.id === holidayId)
+                        if (holiday) {
+                          handleEdit(holiday)
+                        }
+                        setShowEventDetailsModal(false)
+                        setSelectedEventDetails(null)
+                        setEventDetailsDate(null)
+                      }}
+                      title="Edit Holiday"
+                      className="p-1.5 hover:bg-slate-100 rounded-full transition-colors text-slate-600 hover:text-blue-600"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        const holidayId = selectedEventDetails.id.replace("holiday-", "")
+                        openDeleteConfirm(holidayId)
+                        setShowEventDetailsModal(false)
+                        setSelectedEventDetails(null)
+                        setEventDetailsDate(null)
+                      }}
+                      title="Delete Holiday"
+                      className="p-1.5 hover:bg-slate-100 rounded-full transition-colors text-slate-600 hover:text-red-600"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </>
+                )}
                 <button
                   onClick={() => {
                     setShowEventDetailsModal(false)
