@@ -1390,7 +1390,7 @@ export default function HolidaysPage() {
                         key={mode}
                         type="button"
                         onClick={() => setCalendarMode(mode)}
-                        className={`rounded-lg px-4 py-2 text-sm font-medium transition-all ${calendarMode === mode ? "bg-white text-slate-900 shadow-md" : "text-slate-600 hover:text-slate-900"}`}
+                        className={`rounded-lg px-4 py-1 text-sm font-medium transition-all ${calendarMode === mode ? "bg-white text-slate-900 shadow-md" : "text-slate-600 hover:text-slate-900"}`}
                       >
                         {getCalendarModeLabel(mode)}
                       </button>
