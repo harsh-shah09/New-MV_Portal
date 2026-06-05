@@ -1261,7 +1261,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                             normalize={(value) => value ? value.replace(/\D/g, '').slice(0, 18) : ''}
                             validateTrigger={['onChange', 'onBlur']}
                             hasFeedback
-                            help={confirmAccountNumber && accountNumber === confirmAccountNumber ? <span className="text-green-500 text-xs">Match</span> : undefined}
+                            help={confirmAccountNumber && accountNumber === confirmAccountNumber ? <span className="text-green-500 text-xs">Account numbers match</span> : undefined}
                             validateStatus={confirmAccountNumber && accountNumber === confirmAccountNumber ? 'success' : undefined}
                             rules={[
                                 { required: true, message: 'Please confirm your account number' },
