@@ -64,6 +64,9 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
     const { useBreakpoint } = Grid;
     const screens = useBreakpoint();
 
+    const accountNumber = Form.useWatch('accountNumber', form);
+    const confirmAccountNumber = Form.useWatch('confirmAccountNumber', form);
+
     const splitEmergencyContact = (value?: string) => {
         const normalized = value?.trim() || ''
         const phoneNumber = parsePhoneNumberFromString(normalized)
@@ -341,9 +344,11 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
         formData.append('file', file)
         formData.append('type', 'Passbook')
         formData.append('step', '3_passbook')
-        if (publicMode && publicEmpId) formData.append('id', publicEmpId)
+        if (publicMode && publicEmpId){
+            formData.append('employeeId', publicEmpId)
+            formData.append('id', publicEmpId)}
         try {
-            const res = await fetch('/api/auth/onboarding-status', {
+            const res = await fetch('/api/public/onboarding-status', {
                 method: 'POST',
                 body: formData
             })
@@ -905,6 +910,8 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                             <Form.Item
                                 name="postalCode"
                                 label="Postal Code"
+                                normalize={(value) => value ? value.replace(/\D/g, '').slice(0, 10) : ''}
+                                validateTrigger={['onChange', 'onBlur']}
                                 rules={[
                                     { required: true, message: 'Postal code is required' },
                                     { pattern: /^[0-9]{5,10}$/, message: 'Postal code should contain 5-10 digits' }
@@ -912,11 +919,6 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                             >
                                 <Input
                                     disabled={disabledsteps.includes(2)}
-                                    onChange={(e) => {
-                                        const onlyDigits = e.target.value.replace(/\D/g, '').slice(0, 10);
-                                        form.setFieldValue('postalCode', onlyDigits);
-                                        form.validateFields(['postalCode']);
-                                    }}
                                 />
                             </Form.Item>
                         </div>
@@ -1013,6 +1015,8 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                             <Form.Item
                                                 name="permanentpostalCode"
                                                 label="Postal Code"
+                                                normalize={(value) => value ? value.replace(/\D/g, '').slice(0, 10) : ''}
+                                                validateTrigger={['onChange', 'onBlur']}
                                                 rules={[
                                                     { required: true, message: 'Postal code is required' },
                                                     { pattern: /^[0-9]{5,10}$/, message: 'Postal code should contain 5-10 digits' }
@@ -1020,11 +1024,6 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                             >
                                                 <Input
                                                     disabled={disabledsteps.includes(2)}
-                                                    onChange={(e) => {
-                                                        const onlyDigits = e.target.value.replace(/\D/g, '').slice(0, 10);
-                                                        form.setFieldValue('permanentpostalCode', onlyDigits);
-                                                        form.validateFields(['permanentpostalCode']);
-                                                    }}
                                                 />
                                             </Form.Item>
                                         </div>
@@ -1235,7 +1234,8 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                         <Form.Item
                             name="accountNumber"
                             label="Account Number"
-                            validateTrigger={['onChange', 'onBlur']}  // Add this line
+                            normalize={(value) => value ? value.replace(/\D/g, '').slice(0, 18) : ''}
+                            validateTrigger={['onChange', 'onBlur']}
                             rules={[
                                 { required: true, message: 'Account number is required' },
                                 { pattern: /^\d{9,18}$/, message: 'Account number must be 9-18 digits' }
@@ -1247,11 +1247,9 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                 inputMode="numeric"
                                 maxLength={18}
                                 disabled={disabledsteps.includes(3)}
-                                onChange={(e) => {
-                                    const onlyDigits = e.target.value.replace(/\D/g, '').slice(0, 18)
-                                    form.setFieldValue('accountNumber', onlyDigits)
-                                    form.validateFields(['accountNumber']);
-                                }}
+                                onPaste={(e) => e.preventDefault()}
+                                onCopy={(e) => e.preventDefault()}
+                                onCut={(e) => e.preventDefault()}
                             />
                         </Form.Item>
 
@@ -1260,7 +1258,11 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                             name="confirmAccountNumber"
                             label="Confirm Account Number"
                             dependencies={['accountNumber']}
+                            normalize={(value) => value ? value.replace(/\D/g, '').slice(0, 18) : ''}
                             validateTrigger={['onChange', 'onBlur']}
+                            hasFeedback
+                            help={confirmAccountNumber && accountNumber === confirmAccountNumber ? <span className="text-green-500 text-xs">Match</span> : undefined}
+                            validateStatus={confirmAccountNumber && accountNumber === confirmAccountNumber ? 'success' : undefined}
                             rules={[
                                 { required: true, message: 'Please confirm your account number' },
                                 ({ getFieldValue }) => ({
@@ -1279,11 +1281,9 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                 inputMode="numeric"
                                 maxLength={18}
                                 disabled={disabledsteps.includes(3)}
-                                onChange={(e) => {
-                                    const onlyDigits = e.target.value.replace(/\D/g, '').slice(0, 18)
-                                    form.setFieldValue('confirmAccountNumber', onlyDigits)
-                                    form.validateFields(['confirmAccountNumber']);
-                                }}
+                                onPaste={(e) => e.preventDefault()}
+                                onCopy={(e) => e.preventDefault()}
+                                onCut={(e) => e.preventDefault()}
                             />
                         </Form.Item>
 
@@ -1291,7 +1291,8 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                         <Form.Item
                             name="accountHolder"
                             label="Account Holder Name"
-                            validateTrigger={['onChange', 'onBlur']}  // Add this line
+                            normalize={(value) => value ? value.replace(/[^a-zA-Z\s.]/g, '') : ''}
+                            validateTrigger={['onChange', 'onBlur']}
                             rules={[
                                 { required: true, message: 'Account holder name is required' },
                                 { min: 2, message: 'Name must be at least 2 characters' },
@@ -1305,13 +1306,6 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                             <Input
                                 placeholder="Enter account holder name as per bank records"
                                 disabled={disabledsteps.includes(3)}
-                                onChange={(e) => {
-                                    // Optional: Prevent typing numbers/special chars
-                                    const sanitized = e.target.value.replace(/[^a-zA-Z\s.]/g, '');
-                                    if (sanitized !== e.target.value) {
-                                        form.setFieldValue('accountHolder', sanitized);
-                                    }
-                                }}
                                 maxLength={100}
                             />
                         </Form.Item>
@@ -1320,6 +1314,8 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                         <Form.Item
                             name="ifscCode"
                             label="IFSC Code"
+                            normalize={(value) => value ? value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 11) : ''}
+                            validateTrigger={['onChange', 'onBlur']}
                             rules={[
                                 { required: true, message: 'IFSC code is required' },
                                 {
@@ -1334,10 +1330,6 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                 maxLength={11}
                                 style={{ textTransform: 'uppercase' }}
                                 disabled={disabledsteps.includes(3)}
-                                onChange={(e) => {
-                                    const value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 11)
-                                    form.setFieldValue('ifscCode', value)
-                                }}
                             />
                         </Form.Item>
 
@@ -1460,7 +1452,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
         }
     }
 
-    const ContentWrapper = ({ children }: { children: React.ReactNode }) => {
+    const renderContentWrapper = (children: React.ReactNode) => {
         if (publicMode) {
             return (
                 <div className="min-h-screen bg-slate-50 flex flex-col py-8 px-4 sm:px-6 lg:px-8">
@@ -1555,137 +1547,137 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
         )
     }
 
-    if (!publicMode && !open && !showConfetti) return null;
-
     return (
         <>
             {showConfetti && <Confetti recycle={false} numberOfPieces={500} />}
-            <ContentWrapper>
-                {!screens.md ? (
-                    <div className="mb-6 md:mb-8">
-                        <div className="flex items-center justify-center gap-3 py-4 px-2 overflow-x-auto">
-                            {stepItems.map((item, index) => {
-                                const isActive = index + 1 === currentStep;
-                                const isCompleted = index + 1 < currentStep;
+            {renderContentWrapper(
+                <>
+                    {!screens.md ? (
+                        <div className="mb-6 md:mb-8">
+                            <div className="flex items-center justify-center gap-3 py-4 px-2 overflow-x-auto">
+                                {stepItems.map((item, index) => {
+                                    const isActive = index + 1 === currentStep;
+                                    const isCompleted = index + 1 < currentStep;
 
-                                return (
-                                    <motion.div
-                                        key={index}
-                                        initial={{ scale: 0.8, opacity: 0 }}
-                                        animate={{ scale: 1, opacity: 1 }}
-                                        transition={{ delay: index * 0.1 }}
-                                        className="flex flex-col items-center gap-1.5 group"
-                                    >
-                                        <div
-                                            className={`w-12 h-12 rounded-full flex items-center justify-center font-semibold transition-all duration-300 flex-shrink-0 shadow-md
-                                        ${isCompleted ? 'bg-gradient-to-br from-cyan-400 to-blue-600' :
-                                                    isActive ? 'bg-gradient-to-br from-blue-500 to-blue-700' :
-                                                        'bg-gradient-to-br from-gray-100 to-gray-200 border-2 border-gray-300 group-hover:border-blue-300 group-hover:shadow-blue-100'}`}
-                                            title={item.title}
-                                        >
-                                            {isCompleted ? (
-                                                <motion.div
-                                                    initial={{ rotate: -180, scale: 0 }}
-                                                    animate={{ rotate: 0, scale: 1 }}
-                                                    transition={{ duration: 0.4, type: 'spring' }}
-                                                    className="flex items-center justify-center"
-                                                >
-                                                    <CheckCircleFilled className="text-white text-xl" />
-                                                </motion.div>
-                                            ) : (
-                                                <motion.div
-                                                    className={`text-lg flex items-center justify-center ${isActive ? 'text-white' : 'text-gray-600 group-hover:text-blue-600'}`}
-                                                    animate={isActive ? { scale: [1, 1.1, 1] } : {}}
-                                                    transition={isActive ? { repeat: Infinity, duration: 2 } : {}}
-                                                >
-                                                    {item.icon}
-                                                </motion.div>
-                                            )}
-                                        </div>
-                                        {isActive && (
-                                            <motion.div
-                                                initial={{ width: 0 }}
-                                                animate={{ width: 24 }}
-                                                className="h-1 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full shadow-sm"
-                                            />
-                                        )}
-
-                                    </motion.div>
-                                );
-                            })}
-                        </div>
-                    </div>
-                ) : (
-                    <div className="mb-6 md:mb-8">
-                        <Steps current={currentStep - 1} items={stepItems} />
-                    </div>
-                )}
-                <Spin spinning={loading || passbookUploading || documentsUploading} size="large" tip="Processing...">
-                    <div className="min-h-[300px]" style={{ height: '100%', flex: 1, overflowY: 'auto' }}>
-                        {pageLoading ? (
-                            <div className="flex flex-col items-center justify-center h-full min-h-[300px]">
-                                <Loader2 className="w-10 h-10 animate-spin text-blue-500 mb-4" />
-                                <p className="text-gray-500 font-medium">Loading your details...</p>
-                            </div>
-                        ) : (
-                            <Form form={form} layout="vertical" initialValues={{ emergencyCountryCode: 'IN' }}>
-                                <AnimatePresence mode="wait">
-                                    {currentStep <= stepItems.length ? (
+                                    return (
                                         <motion.div
-                                            key={currentStep}
-                                            initial={{ y: 10, opacity: 0 }}
-                                            animate={{ y: 0, opacity: 1 }}
-                                            exit={{ y: -10, opacity: 0 }}
-                                            transition={{ duration: 0.2 }}
-                                        >
-                                            {renderStepContent(currentStep)}
-                                        </motion.div>
-                                    ) : (
-                                        <motion.div
-                                            key="finish"
+                                            key={index}
                                             initial={{ scale: 0.8, opacity: 0 }}
                                             animate={{ scale: 1, opacity: 1 }}
-                                            className="text-center py-10"
+                                            transition={{ delay: index * 0.1 }}
+                                            className="flex flex-col items-center gap-1.5 group"
                                         >
-                                            <CheckCircleOutlined className="text-6xl text-green-500 mb-4" />
-                                            <h2 className="text-2xl font-bold text-gray-800">All Set!</h2>
-                                            <p className="text-gray-500 mt-2 block">You have successfully completed the onboarding process.</p>
-                                        </motion.div>
-                                    )}
-                                </AnimatePresence>
-                            </Form>
-                        )}
-                    </div>
-                </Spin>
-                <div className="flex flex-col sm:flex-row justify-between pt-6 border-t border-gray-100 mt-6 gap-3">
-                    <div className="flex gap-2 sm:gap-3 order-2 sm:order-1">
-                        {!publicMode && (
-                            <Button disabled={pageLoading} onClick={() => setOpen(false)} className="flex-1 sm:flex-initial">
-                                Skip for Now
-                            </Button>
-                        )}
-                    </div>
+                                            <div
+                                                className={`w-12 h-12 rounded-full flex items-center justify-center font-semibold transition-all duration-300 flex-shrink-0 shadow-md
+                                            ${isCompleted ? 'bg-gradient-to-br from-cyan-400 to-blue-600' :
+                                                        isActive ? 'bg-gradient-to-br from-blue-500 to-blue-700' :
+                                                            'bg-gradient-to-br from-gray-100 to-gray-200 border-2 border-gray-300 group-hover:border-blue-300 group-hover:shadow-blue-100'}`}
+                                                title={item.title}
+                                            >
+                                                {isCompleted ? (
+                                                    <motion.div
+                                                        initial={{ rotate: -180, scale: 0 }}
+                                                        animate={{ rotate: 0, scale: 1 }}
+                                                        transition={{ duration: 0.4, type: 'spring' }}
+                                                        className="flex items-center justify-center"
+                                                    >
+                                                        <CheckCircleFilled className="text-white text-xl" />
+                                                    </motion.div>
+                                                ) : (
+                                                    <motion.div
+                                                        className={`text-lg flex items-center justify-center ${isActive ? 'text-white' : 'text-gray-600 group-hover:text-blue-600'}`}
+                                                        animate={isActive ? { scale: [1, 1.1, 1] } : {}}
+                                                        transition={isActive ? { repeat: Infinity, duration: 2 } : {}}
+                                                    >
+                                                        {item.icon}
+                                                    </motion.div>
+                                                )}
+                                            </div>
+                                            {isActive && (
+                                                <motion.div
+                                                    initial={{ width: 0 }}
+                                                    animate={{ width: 24 }}
+                                                    className="h-1 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full shadow-sm"
+                                                />
+                                            )}
 
-                    {currentStep <= stepItems.length && (
-                        <div className="flex gap-2 sm:gap-3 order-1 sm:order-2 w-full sm:w-auto">
-                            {currentStep > 1 && (
-                                <Button disabled={pageLoading} type="primary" size="large" onClick={handlePrevious} className="flex-1 sm:flex-initial">
-                                    ← Previous
-                                </Button>
-                            )}
-                            {currentStep < stepItems.length ? (
-                                <Button disabled={pageLoading} type="primary" size="large" onClick={handleNext} loading={loading} className="flex-1 sm:flex-initial">
-                                    Next Step
-                                </Button>
+                                        </motion.div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="mb-6 md:mb-8">
+                            <Steps current={currentStep - 1} items={stepItems} />
+                        </div>
+                    )}
+                    <Spin spinning={loading || passbookUploading || documentsUploading} size="large" tip="Processing...">
+                        <div className="min-h-[300px]" style={{ height: '100%', flex: 1, overflowY: 'auto' }}>
+                            {pageLoading ? (
+                                <div className="flex flex-col items-center justify-center h-full min-h-[300px]">
+                                    <Loader2 className="w-10 h-10 animate-spin text-blue-500 mb-4" />
+                                    <p className="text-gray-500 font-medium">Loading your details...</p>
+                                </div>
                             ) : (
-                                <Button disabled={pageLoading} type="primary" size="large" onClick={handleFinish} loading={loading} className="bg-green-600 hover:bg-green-700 w-full sm:w-auto flex-1 sm:flex-initial">
-                                    Complete
+                                <Form form={form} layout="vertical" initialValues={{ emergencyCountryCode: 'IN' }}>
+                                    <AnimatePresence mode="wait">
+                                        {currentStep <= stepItems.length ? (
+                                            <motion.div
+                                                key={currentStep}
+                                                initial={{ y: 10, opacity: 0 }}
+                                                animate={{ y: 0, opacity: 1 }}
+                                                exit={{ y: -10, opacity: 0 }}
+                                                transition={{ duration: 0.2 }}
+                                            >
+                                                {renderStepContent(currentStep)}
+                                            </motion.div>
+                                        ) : (
+                                            <motion.div
+                                                key="finish"
+                                                initial={{ scale: 0.8, opacity: 0 }}
+                                                animate={{ scale: 1, opacity: 1 }}
+                                                className="text-center py-10"
+                                            >
+                                                <CheckCircleOutlined className="text-6xl text-green-500 mb-4" />
+                                                <h2 className="text-2xl font-bold text-gray-800">All Set!</h2>
+                                                <p className="text-gray-500 mt-2 block">You have successfully completed the onboarding process.</p>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+                                </Form>
+                            )}
+                        </div>
+                    </Spin>
+                    <div className="flex flex-col sm:flex-row justify-between pt-6 border-t border-gray-100 mt-6 gap-3">
+                        <div className="flex gap-2 sm:gap-3 order-2 sm:order-1">
+                            {!publicMode && (
+                                <Button disabled={pageLoading} htmlType="button" onClick={() => setOpen(false)} className="flex-1 sm:flex-initial">
+                                    Skip for Now
                                 </Button>
                             )}
                         </div>
-                    )}
-                </div>
-            </ContentWrapper>
+
+                        {currentStep <= stepItems.length && (
+                            <div className="flex gap-2 sm:gap-3 order-1 sm:order-2 w-full sm:w-auto">
+                                {currentStep > 1 && (
+                                    <Button disabled={pageLoading} type="primary" size="large" htmlType="button" onClick={handlePrevious} className="flex-1 sm:flex-initial">
+                                        ← Previous
+                                    </Button>
+                                )}
+                                {currentStep < stepItems.length ? (
+                                    <Button disabled={pageLoading} type="primary" size="large" htmlType="button" onClick={handleNext} loading={loading} className="flex-1 sm:flex-initial">
+                                        Next Step
+                                    </Button>
+                                ) : (
+                                    <Button disabled={pageLoading} type="primary" size="large" htmlType="button" onClick={handleFinish} loading={loading} className="bg-green-600 hover:bg-green-700 w-full sm:w-auto flex-1 sm:flex-initial">
+                                        Complete
+                                    </Button>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </>
+            )}
         </>
     )
 }
