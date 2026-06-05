@@ -1721,15 +1721,17 @@ export default function HolidaysPage() {
         {showDeleteConfirm && isMounted && createPortal(
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
             <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden transform transition-all border border-gray-100">
-              <div className="p-6">
-                <div className="flex items-start gap-4">
-                  <div className="flex-shrink-0 w-12 h-12 rounded-full bg-red-50 flex items-center justify-center">
-                    <Trash2 className="w-6 h-6 text-red-500" />
+              <div className="p-6 text-center">
+                <div className="flex flex-col items-center gap-3">
+                  <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mb-1">
+                    <AlertTriangle className="w-6 h-6 text-red-500" />
                   </div>
-                  <div className="flex-1">
+                  <div>
                     <h3 className="text-lg font-bold text-gray-900 mb-2">Delete Holiday</h3>
                     <p className="text-sm text-gray-600">
-                      Are you sure you want to delete this holiday? This action cannot be undone.
+                      Are you sure you want to delete <span className="font-semibold text-red-600">this holiday?</span>
+                      <br />
+                      This action <span className="font-semibold">cannot be undone.</span>
                     </p>
                   </div>
                 </div>
@@ -1740,7 +1742,8 @@ export default function HolidaysPage() {
                     setShowDeleteConfirm(false)
                     setDeletingHolidayId(null)
                   }}
-                  className="flex-1 px-4 py-2.5 bg-white hover:bg-gray-50 text-gray-700 rounded-lg font-medium transition-colors border border-gray-300"
+                  disabled={isDeletingHoliday}
+                  className="flex-1 px-4 py-2.5 bg-white hover:bg-gray-50 text-gray-700 rounded-lg font-medium transition-colors border border-gray-300 disabled:opacity-50"
                 >
                   Cancel
                 </button>
@@ -1749,7 +1752,7 @@ export default function HolidaysPage() {
                   disabled={isDeletingHoliday}
                   className={`flex-1 px-4 py-2.5 bg-red-500 text-white rounded-lg font-medium transition-colors ${isDeletingHoliday ? 'opacity-60 cursor-not-allowed' : 'hover:bg-red-600'}`}
                 >
-                  {isDeletingHoliday ? 'Deleting...' : 'Yes, Delete'}
+                  {isDeletingHoliday ? 'Deleting...' : 'Delete Holiday'}
                 </button>
               </div>
             </div>
