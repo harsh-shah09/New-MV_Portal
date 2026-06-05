@@ -2794,41 +2794,6 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                         />
                                                         <p className="text-[11px] text-slate-400">Only letters and spaces allowed (max 100 chars)</p>
                                                     </div>
-
-                                                    {/* Account Number with digits-only enforcement */}
-                                                    <div className="space-y-1.5">
-                                                        <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 flex justify-between">
-                                                            <span>Account Number <span className="text-red-400">*</span></span>
-                                                            {bankErrors.Bank_Account_Number__c && <span className="text-red-500 text-[10px] normal-case tracking-normal font-medium animate-pulse">{bankErrors.Bank_Account_Number__c}</span>}
-                                                        </label>
-                                                        <input
-                                                            type="text"
-                                                            value={bankFormData.Bank_Account_Number__c}
-                                                            onChange={(e) => {
-                                                                const newAccNum = e.target.value.replace(/[^0-9]/g, '').slice(0, 18)
-                                                                const newErrors = { ...bankErrors }
-                                                                if (!newAccNum) {
-                                                                    newErrors.Bank_Account_Number__c = 'Account Number is required'
-                                                                    setConfirmAccountNumber("")
-                                                                } else if (newAccNum.length < 9) {
-                                                                    newErrors.Bank_Account_Number__c = `Account Number must be at least 9 digits (${newAccNum.length}/9 entered)`
-                                                                } else {
-                                                                    delete newErrors.Bank_Account_Number__c
-                                                                }
-                                                                setBankFormData({ ...bankFormData, Bank_Account_Number__c: newAccNum })
-                                                                setBankErrors(newErrors)
-                                                            }}
-                                                            placeholder="Enter Account Number"
-                                                            className={cn(
-                                                                "w-full bg-slate-50 border rounded-lg px-3 py-2.5 text-sm text-slate-800 focus:ring-2 outline-none transition placeholder:text-slate-400",
-                                                                bankErrors.Bank_Account_Number__c ? "border-red-300 focus:ring-red-200" : "border-slate-200 focus:ring-blue-500/20 focus:border-blue-400"
-                                                            )}
-                                                        />
-                                                        <p className="text-[11px] text-slate-400">9–18 digits, numbers only</p>
-                                                    </div>
-
-                                                   
-
                                                     {/* IFSC Code with format hint */}
                                                     <div className="space-y-1.5">
                                                         <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 flex justify-between">
@@ -2856,8 +2821,42 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                         />
                                                         <p className="text-[11px] text-slate-400">Format: 4 letters + '0' + 6 alphanumeric &nbsp;|&nbsp; e.g. <span className="font-mono">HDFC0001234</span></p>
                                                     </div>
+                                                    {/* Account Number with digits-only enforcement */}
+                                                    <div className="space-y-1.5">
+                                                        <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 flex justify-between">
+                                                            <span>Account Number <span className="text-red-400">*</span></span>
+                                                            {bankErrors.Bank_Account_Number__c && <span className="text-red-500 text-[10px] normal-case tracking-normal font-medium animate-pulse">{bankErrors.Bank_Account_Number__c}</span>}
+                                                        </label>
+                                                        <input
+                                                            type="text"
+                                                            value={bankFormData.Bank_Account_Number__c}
+                                                            onChange={(e) => {
+                                                                const newAccNum = e.target.value.replace(/[^0-9]/g, '').slice(0, 18)
+                                                                const newErrors = { ...bankErrors }
+                                                                if (!newAccNum) {
+                                                                    newErrors.Bank_Account_Number__c = 'Account Number is required'
+                                                                    setConfirmAccountNumber("")
+                                                                } else if (newAccNum.length < 9) {
+                                                                    newErrors.Bank_Account_Number__c = `Account Number must be at least 9 digits (${newAccNum.length}/9 entered)`
+                                                                } else {
+                                                                    delete newErrors.Bank_Account_Number__c
+                                                                }
+                                                                setBankFormData({ ...bankFormData, Bank_Account_Number__c: newAccNum })
+                                                                setBankErrors(newErrors)
+                                                            }}
+                                                            onCopy={(e) => e.preventDefault()}
+                                                            onPaste={(e) => e.preventDefault()}
+                                                            onCut={(e) => e.preventDefault()}
+                                                            placeholder="Enter Account Number"
+                                                            className={cn(
+                                                                "w-full bg-slate-50 border rounded-lg px-3 py-2.5 text-sm text-slate-800 focus:ring-2 outline-none transition placeholder:text-slate-400",
+                                                                bankErrors.Bank_Account_Number__c ? "border-red-300 focus:ring-red-200" : "border-slate-200 focus:ring-blue-500/20 focus:border-blue-400"
+                                                            )}
+                                                        />
+                                                        <p className="text-[11px] text-slate-400">9–18 digits, numbers only</p>
+                                                    </div>
+                                                    
                                                      {/* Confirm Account Number */}
-                                                    {bankFormData.Bank_Account_Number__c && (
                                                         <div className="space-y-1.5 animate-in fade-in duration-200">
                                                             <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 flex justify-between">
                                                                 <span>Confirm Account Number <span className="text-red-400">*</span></span>
@@ -2878,6 +2877,9 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                                     const val = e.target.value.replace(/[^0-9]/g, '').slice(0, 18)
                                                                     setConfirmAccountNumber(val)
                                                                 }}
+                                                                onCopy={(e) => e.preventDefault()}
+                                                                onPaste={(e) => e.preventDefault()}
+                                                                onCut={(e) => e.preventDefault()}
                                                                 placeholder="Confirm Account Number"
                                                                 className={cn(
                                                                     "w-full bg-slate-50 border rounded-lg px-3 py-2.5 text-sm text-slate-800 focus:ring-2 outline-none transition placeholder:text-slate-400",
@@ -2888,7 +2890,6 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                                 <p className="text-red-500 text-[10px] normal-case tracking-normal font-medium animate-pulse">{bankErrors.confirmBankAccountNumber}</p>
                                                             )}
                                                         </div>
-                                                    )}
                                                 </div>
                                                 <div className="flex items-center gap-2 mb-4">
                                                     <input type="checkbox" id="primary" checked={bankFormData.Mark_for_Approval__c} onChange={e => setBankFormData({ ...bankFormData, Mark_for_Approval__c: e.target.checked, Primary_Account__c: false })} />
