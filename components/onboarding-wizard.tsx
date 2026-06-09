@@ -826,7 +826,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                         <Form.Item name="street" label="Street Address" rules={[{ required: true, message: 'Street address is required' },
                         { max: 100, message: 'Street address should not exceed 100 characters' },
                         { min: 2, message: 'Street address should be at least 2 characters long' },
-                        { pattern: /^[a-zA-Z0-9 ]+$/, message: 'Street should contain only letters, numbers, and spaces' }
+                        { pattern: /^[a-zA-Z0-9-/\\., ]+$/, message: 'Street should contain only letters, numbers, hiphens, slash, commas and spaces' }
 
                         ]}>
                             <Input placeholder="123 Main St" disabled={disabledsteps.includes(2)} />
@@ -936,7 +936,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                         <Form.Item name="permanentstreet" label="Street Address" rules={[{ required: true, message: 'Street address is required' },
                                         { max: 255, message: 'Street address should not exceed 255 characters' },
                                         { min: 2, message: 'Street address should be at least 2 characters long' },
-                                        { pattern: /^[a-zA-Z0-9 ]+$/, message: 'Street should contain only letters, numbers, and spaces' }
+                                        { pattern: /^[a-zA-Z0-9-/\\., ]+$/, message: 'Street should contain only letters, numbers, hiphens, slash, commas and spaces' }
                                         ]}>
                                             <Input placeholder="123 Main St" disabled={disabledsteps.includes(2)} />
                                         </Form.Item>
