@@ -837,7 +837,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                         <Form.Item name="street" label="Street Address" rules={[{ required: true, message: 'Street address is required' },
                         { max: 100, message: 'Street address should not exceed 100 characters' },
                         { min: 2, message: 'Street address should be at least 2 characters long' },
-                        { pattern: /^[a-zA-Z0-9 ]+$/, message: 'Street should contain only letters, numbers, and spaces' }
+                        { pattern: /^[a-zA-Z0-9-/\\., ]+$/, message: 'Street should contain only letters, numbers, hiphens, slash,commas and spaces' }
 
                         ]}>
                             <Input placeholder="123 Main St" disabled={disabledsteps.includes(2)} />
@@ -944,7 +944,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                         <Form.Item name="permanentstreet" label="Street Address" rules={[{ required: true, message: 'Street address is required' },
                                         { max: 255, message: 'Street address should not exceed 255 characters' },
                                         { min: 2, message: 'Street address should be at least 2 characters long' },
-                                        { pattern: /^[a-zA-Z0-9 ]+$/, message: 'Street should contain only letters, numbers, and spaces' }
+                                        { pattern: /^[a-zA-Z0-9-/\\ ,.]+$/, message: 'Street should contain only letters, numbers,hiphens, slashes , commas and spaces' }
                                         ]}>
                                             <Input placeholder="123 Main St" disabled={disabledsteps.includes(2)} />
                                         </Form.Item>
@@ -1261,7 +1261,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                             normalize={(value) => value ? value.replace(/\D/g, '').slice(0, 18) : ''}
                             validateTrigger={['onChange', 'onBlur']}
                             hasFeedback
-                            help={confirmAccountNumber && accountNumber === confirmAccountNumber ? <span className="text-green-500 text-xs">Account numbers match</span> : undefined}
+                            help={confirmAccountNumber && accountNumber === confirmAccountNumber ? <span className="text-green-500 text-xs">Account numbers matched</span> : undefined}
                             validateStatus={confirmAccountNumber && accountNumber === confirmAccountNumber ? 'success' : undefined}
                             rules={[
                                 { required: true, message: 'Please confirm your account number' },
@@ -1421,6 +1421,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                                                 name={doc}
                                                 customRequest={(opts) => handleDocumentUpload(opts, doc)}
                                                 multiple={false}
+                                                progress={{showInfo : false}}
                                                 showUploadList={!isUploaded}
                                                 className="!bg-gray-50 hover:!bg-blue-50 transition rounded-lg"
                                                 accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"

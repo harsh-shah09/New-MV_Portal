@@ -837,11 +837,11 @@ export default function AdminConsole() {
                                                             <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
                                                                 <Workflow className="text-orange-500" /> Google Connected Users
                                                             </h2>
-                                                            <div className="flex sm:flex-row items-center sm:items-center gap-3 w-full md:w-auto">
-                                                                <div className="flex justify-center sm:block">
+                                                            <div className="flex flex-row items-center gap-3 w-full md:w-auto">
+                                                                <div className="shrink-0">
                                                                     <RefreshButton onClick={fetchConnectedUsers} label="" loading={loadingIntegrations} />
                                                                 </div>
-                                                                <div className="relative w-full md:w-64">
+                                                                <div className="relative flex-1 md:w-64">
                                                                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                                                                     <input
                                                                         type="text"
@@ -861,7 +861,8 @@ export default function AdminConsole() {
                                                                 </div>
                                                             ) : (
                                                                 <>
-                                                                    <div className="overflow-x-auto">
+                                                                    {/* Desktop Table View */}
+                                                                    <div className="hidden md:block overflow-x-auto">
                                                                         <table className="w-full text-left">
                                                                             <thead className="bg-slate-50 border-b border-slate-200">
                                                                                 <tr>
@@ -869,7 +870,7 @@ export default function AdminConsole() {
                                                                                     <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Google Email</th>
                                                                                     <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Connected Since</th>
                                                                                     <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
-                                                                                    <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">Actions</th>
+                                                                                    <th className="px-2 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">Actions</th>
                                                                                 </tr>
                                                                             </thead>
                                                                             <tbody className="divide-y divide-slate-100">
@@ -892,7 +893,7 @@ export default function AdminConsole() {
                                                                                         const employee = users.find(u => u.Id === item.Employee_Id);
                                                                                         return (
                                                                                             <tr key={item.Employee_Id} className="hover:bg-slate-50/50 transition-colors">
-                                                                                                <td className="px-6 py-4">
+                                                                                                <td className="px-2 py-4">
                                                                                                     <div className="flex items-center gap-3">
                                                                                                         <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden font-bold text-slate-500 text-xs">
                                                                                                             {employee?.Photo ? <img src={employee.Photo} className="w-full h-full object-cover" /> : (employee?.Name?.charAt(0) || '?')}
@@ -959,6 +960,82 @@ export default function AdminConsole() {
                                                                             </tbody>
                                                                         </table>
                                                                     </div>
+
+                                                                    {/* Mobile Card View */}
+                                                                    <div className="md:hidden divide-y divide-slate-100">
+                                                                        {(() => {
+                                                                            const filteredIntegrations = connectedUsers.filter((item) => {
+                                                                                const employee = users.find(u => u.Id === item.Employee_Id);
+                                                                                const query = integrationSearch.toLowerCase();
+
+                                                                                if (!query) return true;
+
+                                                                                return (
+                                                                                    employee?.Name?.toLowerCase().includes(query) ||
+                                                                                    employee?.Email?.toLowerCase().includes(query) ||
+                                                                                    item.account_email?.toLowerCase().includes(query)
+                                                                                );
+                                                                            });
+                                                                            const startIndex = (currentPageIntegrations - 1) * itemsPerPage;
+                                                                            const paginatedIntegrations = filteredIntegrations.slice(startIndex, startIndex + itemsPerPage);
+                                                                            
+                                                                            if (paginatedIntegrations.length === 0) {
+                                                                                return (
+                                                                                    <div className="p-8 text-center text-slate-400 italic text-sm">
+                                                                                        {integrationSearch
+                                                                                            ? `No connected users match "${integrationSearch}".`
+                                                                                            : 'No users have connected their Google Workspace account yet.'}
+                                                                                    </div>
+                                                                                );
+                                                                            }
+                                                                            
+                                                                            return paginatedIntegrations.map((item) => {
+                                                                                const employee = users.find(u => u.Id === item.Employee_Id);
+                                                                                return (
+                                                                                    <div key={item.Employee_Id} className="p-4 space-y-3">
+                                                                                        <div className="flex items-center justify-between">
+                                                                                            <div className="flex items-center gap-3">
+                                                                                                <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden font-bold text-slate-500 text-xs">
+                                                                                                    {employee?.Photo ? <img src={employee.Photo} className="w-full h-full object-cover" /> : (employee?.Name?.charAt(0) || '?')}
+                                                                                                </div>
+                                                                                                <div>
+                                                                                                    <div className="font-semibold text-slate-900 text-sm">{employee?.Name || 'Unknown Employee'}</div>
+                                                                                                    <div className="text-xs text-slate-400">{employee?.Email || 'No Email'}</div>
+                                                                                                </div>
+                                                                                            </div>
+                                                                                            <button
+                                                                                                onClick={() => handleDeleteIntegration(item.Employee_Id)}
+                                                                                                className="text-red-500 hover:text-red-700 p-2 hover:bg-red-50 rounded-lg transition-colors shrink-0"
+                                                                                                title="Revoke Access"
+                                                                                            >
+                                                                                                <Trash2 className="w-4 h-4" />
+                                                                                            </button>
+                                                                                        </div>
+                                                                                        <div className="grid grid-cols-1 gap-2 text-xs border-t border-slate-50 pt-2">
+                                                                                            <div>
+                                                                                                <span className="text-slate-400 block uppercase font-bold tracking-wider text-[9px] mb-0.5">Google Email</span>
+                                                                                                <span className="text-slate-700 font-medium break-all">{item.account_email || 'Not available'}</span>
+                                                                                            </div>
+                                                                                            <div className="flex justify-between items-center gap-4 pt-1">
+                                                                                                <div>
+                                                                                                    <span className="text-slate-400 block uppercase font-bold tracking-wider text-[9px] mb-0.5">Connected Since</span>
+                                                                                                    <span className="text-slate-700 font-medium">{item.updated_at ? new Date(item.updated_at).toLocaleDateString() : 'N/A'}</span>
+                                                                                                </div>
+                                                                                                <div className="text-right">
+                                                                                                    <span className="text-slate-400 block uppercase font-bold tracking-wider text-[9px] mb-1">Status</span>
+                                                                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-green-50 text-green-700 border border-green-100">
+                                                                                                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+                                                                                                        Active
+                                                                                                    </span>
+                                                                                                </div>
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                );
+                                                                            });
+                                                                        })()}
+                                                                    </div>
+
                                                                     {(() => {
                                                                         const filteredIntegrations = connectedUsers.filter((item) => {
                                                                             const employee = users.find(u => u.Id === item.Employee_Id);
@@ -981,7 +1058,7 @@ export default function AdminConsole() {
                                                                         }
 
                                                                         return (
-                                                                            <div className="p-4 border-t border-slate-200 flex flex-row sm:flex-row items-center justify-between bg-slate-50 gap-4 sm:gap-0">
+                                                                            <div className="p-4 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between bg-slate-50 gap-4 sm:gap-0">
                                                                                 <div className="text-sm text-slate-500 text-center sm:text-left">
                                                                                     Showing {start} to {end} of {filteredIntegrations.length} entries
                                                                                 </div>
@@ -993,7 +1070,7 @@ export default function AdminConsole() {
                                                                                     >
                                                                                         <ChevronLeft size={16} />
                                                                                     </button>
-                                                                                    <span className="px-3 text-cyan-500 border border-border rounded-lg border-cyan-500 px-2 py-1 font-bold">
+                                                                                    <span className="text-cyan-500 border border-cyan-500 rounded-lg px-2.5 py-1 font-bold text-sm bg-white">
                                                                                         {currentPageIntegrations}
                                                                                     </span>
                                                                                     <button
