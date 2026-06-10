@@ -1563,23 +1563,93 @@ export default function AdminConsole() {
 
 
 
-                                        {activeTab === "email" && (() => {
-                                            const onboarding = configs.emailTemplates?.filter((r: any) => {
-                                                const lowered = (r.DeveloperName || '').toLowerCase();
-                                                return lowered.includes('welcome') || lowered.includes('onboarding') || narrowedDocumentCheck(lowered);
-                                            }) || [];
-                                            const leave = configs.emailTemplates?.filter((r: any) => {
-                                                const lowered = (r.DeveloperName || '').toLowerCase();
-                                                return lowered.includes('leave') || lowered.includes('sandwich');
-                                            }) || [];
-                                            const other = configs.emailTemplates?.filter((r: any) => {
-                                                const lowered = (r.DeveloperName || '').toLowerCase();
-                                                return !(lowered.includes('welcome') || lowered.includes('onboarding') || narrowedDocumentCheck(lowered) || lowered.includes('leave') || lowered.includes('sandwich'));
-                                            }) || [];
+                                       {activeTab === "email" && (() => {
+                                            const normalize = (str: string) => {
+                                                return (str || '').toLowerCase().replace(/[_-]/g, ' ').trim();
+                                            };
 
-                                            function narrowedDocumentCheck(name: string) {
-                                                return name.includes('document');
-                                            }
+                                            const onboarding: any[] = [];
+                                            const leaveApprove: any[] = [];
+                                            const leaveRequest: any[] = [];
+                                            const leaveDecision: any[] = [];
+                                            const leaveRejection: any[] = [];
+                                            const bank: any[] = [];
+                                            const other: any[] = [];
+
+                                            configs.emailTemplates?.forEach((r: any) => {
+                                                const label = normalize(r.MasterLabel || '');
+                                                const devName = normalize(r.DeveloperName || '');
+
+                                                // 1. Onboarding (first 3)
+                                                if (
+                                                    label === 'onboarding email' || devName === 'onboarding mail' || devName === 'onboarding email' ||
+                                                    label === 'onboarding completed to hr' || devName === 'onboarding completed to hr' ||
+                                                    label === 'welcome email' || devName === 'welcome email'
+                                                ) {
+                                                    onboarding.push(r);
+                                                }
+                                                // 2. Leave Approve (4 and 5)
+                                                else if (
+                                                    label === 'leave auto approved' || devName === 'leave auto approved' ||
+                                                    label === 'withdrawal approved' || devName === 'withdrawal approved'
+                                                ) {
+                                                    leaveApprove.push(r);
+                                                }
+                                                // 3. Leave Request (6 to 11)
+                                                else if (
+                                                    label === 'employee request to hr' || devName === 'employee request to hr' ||
+                                                    label === 'doubtful leave to admin' || devName === 'doubtful leave to admin' ||
+                                                    label === 'extra day pay request' || devName === 'extra day pay request' ||
+                                                    label === 'withdrawal request to hr' || devName === 'withdrawal request to hr' ||
+                                                    label === 'hr request to admin' || devName === 'hr request to admin' ||
+                                                    label === 'team lead request to hr cc admin' || devName === 'team lead request to hr cc admin' ||
+                                                    label.includes('employee request to hr') || devName.includes('employee request to hr') ||
+                                                    label.includes('doubtful leave to admin') || devName.includes('doubtful leave to admin') ||
+                                                    label.includes('extra day pay request') || devName.includes('extra day pay request') ||
+                                                    label.includes('withdrawal request to hr') || devName.includes('withdrawal request to hr') ||
+                                                    label.includes('hr request to admin') || devName.includes('hr request to admin') ||
+                                                    label.includes('team lead request to hr cc admin') || devName.includes('team lead request to hr cc admin')
+                                                ) {
+                                                    leaveRequest.push(r);
+                                                }
+                                                // 4. Leave Decision (12 to 16)
+                                                else if (
+                                                    label === 'extra day pay decision' || devName === 'extra day pay decision' ||
+                                                    label === 'hr decision to employee' || devName === 'hr decision to employee' ||
+                                                    label === 'admin decision to hr' || devName === 'admin decision to hr' ||
+                                                    label === 'withdrawal request submitted' || devName === 'withdrawal request submitted' ||
+                                                    label === 'tl decision to hr' || devName === 'tl decision to hr' ||
+                                                    label.includes('extra day pay decision') || devName.includes('extra day pay decision') ||
+                                                    label.includes('hr decision to employee') || devName.includes('hr decision to employee') ||
+                                                    label.includes('admin decision to hr') || devName.includes('admin decision to hr') ||
+                                                    label.includes('withdrawal request submitted') || devName.includes('withdrawal request submitted') ||
+                                                    label.includes('tl decision to hr') || devName.includes('tl decision to hr')
+                                                ) {
+                                                    leaveDecision.push(r);
+                                                }
+                                                // 5. Leave Rejection (17, 18)
+                                                else if (
+                                                    label === 'leave rejected' || devName === 'leave rejected' ||
+                                                    label === 'withdrawal rejected' || devName === 'withdrawal rejected' ||
+                                                    label.includes('leave rejected') || devName.includes('leave rejected') ||
+                                                    label.includes('withdrawal rejected') || devName.includes('withdrawal rejected')
+                                                ) {
+                                                    leaveRejection.push(r);
+                                                }
+                                                // 6. Bank (19, 20)
+                                                else if (
+                                                    label === 'bank approval' || devName === 'bank approval' ||
+                                                    label === 'bank approval pending' || devName === 'bank approval pending' ||
+                                                    label.includes('bank approval') || devName.includes('bank approval') ||
+                                                    label.includes('bank approval pending') || devName.includes('bank approval pending')
+                                                ) {
+                                                    bank.push(r);
+                                                }
+                                                // 7. Other (rest)
+                                                else {
+                                                    other.push(r);
+                                                }
+                                            });
 
                                             const renderTemplateGrid = (items: any[]) => (
                                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-4 bg-slate-50/50 rounded-xl">
@@ -1617,12 +1687,16 @@ export default function AdminConsole() {
                                                         <Mail className="w-5 h-5 text-purple-500" /> Email Templates
                                                     </h2>
                                                     <Collapse
-                                                        defaultActiveKey={['onboarding', 'leave', 'other']}
+                                                        defaultActiveKey={['onboarding', 'leaveApprove', 'leaveRequest']}
                                                         className="bg-white"
                                                         bordered={false}
                                                         items={[
                                                             { key: 'onboarding', label: <span className="font-bold text-slate-800">Onboarding & Verification</span>, children: renderTemplateGrid(onboarding) },
-                                                            { key: 'leave', label: <span className="font-bold text-slate-800">Leave Approvals</span>, children: renderTemplateGrid(leave) },
+                                                            { key: 'leaveApprove', label: <span className="font-bold text-slate-800">Leave Approvals</span>, children: renderTemplateGrid(leaveApprove) },
+                                                            { key: 'leaveRequest', label: <span className="font-bold text-slate-800">Leave Requests</span>, children: renderTemplateGrid(leaveRequest) },
+                                                            { key: 'leaveDecision', label: <span className="font-bold text-slate-800">Leave Decisions</span>, children: renderTemplateGrid(leaveDecision) },
+                                                            { key: 'leaveRejection', label: <span className="font-bold text-slate-800">Leave Rejections</span>, children: renderTemplateGrid(leaveRejection) },
+                                                            { key: 'bank', label: <span className="font-bold text-slate-800">Bank Details</span>, children: renderTemplateGrid(bank) },
                                                             { key: 'other', label: <span className="font-bold text-slate-800">Other Configurations</span>, children: renderTemplateGrid(other) }
                                                         ]}
                                                     />
