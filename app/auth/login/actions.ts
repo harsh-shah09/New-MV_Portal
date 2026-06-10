@@ -1,7 +1,7 @@
 'use server';
 
 import { z } from 'zod';
-import { createSession, hashPassword } from '@/lib/auth';
+import { createSession, hashPassword, verifySession } from '@/lib/auth';
 import { findEmployee, getSalesforceConnection, isTrustedDevice, addTrustedDevice, getTwoFactorSecret } from '@/lib/salesforce';
 import { verifyTwoFactorToken } from '@/lib/two-factor';
 import nodemailer from 'nodemailer';
@@ -305,4 +305,15 @@ export async function forgotPasswordAction(identifier: string) {
     return { error: 'An unexpected error occurred.' };
   }
 }
+
+export async function checkSession(): Promise<boolean> {
+  try {
+    const session = await verifySession();
+    return !!session;
+  } catch (e) {
+    console.error('Error checking session:', e);
+    return false;
+  }
+}
+
 
