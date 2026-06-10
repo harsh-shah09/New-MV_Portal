@@ -1,5 +1,5 @@
 "use client"
-import { loginAction, forgotPasswordAction, verify2FAAndLogin, checkSalesforceConfigured, saveSalesforceCredentials } from "./actions"
+import { loginAction, forgotPasswordAction, verify2FAAndLogin, checkSalesforceConfigured, saveSalesforceCredentials, checkSession } from "./actions"
 import { useEffect, useState, useActionState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Image from "next/image"
@@ -34,7 +34,13 @@ export default function LoginPage() {
 
   useEffect(() => {
     checkSalesforceConfigured().then(res => setIsConfigured(res))
-  }, [])
+    checkSession().then(hasSession => {
+      if (hasSession) {
+        const redirectUrl = searchParams.get('redirect') || '/dashboard';
+        router.push(redirectUrl);
+      }
+    })
+  }, [router, searchParams])
 
   useEffect(() => {
     if (state.success || verifyState.success) {
