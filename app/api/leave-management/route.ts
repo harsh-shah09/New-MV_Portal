@@ -2283,7 +2283,7 @@ export async function PATCH(request: NextRequest) {
               to: emp.Company_Email__c,
               subject: emailData.subject,
               body: emailData.html,
-              senderEmployeeId: employeeId,
+              isInfo: true
             });
           }
         }
