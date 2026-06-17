@@ -1717,7 +1717,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
 
                     {/* Info */}
                     <div className="flex-1 min-w-0 text-center sm:text-left">
-                        <h1 className="text-2xl sm:text-3xl w-68 font-bold text-white leading-tight truncate capitalize">
+                        <h1 className="text-2xl sm:text-3xl font-bold text-white leading-tight capitalize">
                             {employee.Employee_Name__c}
                         </h1>
                         <div className="flex flex-wrap items-center justify-center sm:justify-start gap-x-3 gap-y-1 text-white/80 mt-1.5 text-sm">
