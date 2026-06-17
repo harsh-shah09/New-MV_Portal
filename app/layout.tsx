@@ -52,7 +52,7 @@ export async function generateMetadata(): Promise<Metadata> {
       siteName: 'MV Portal',
       images: [
         {
-          url: '/mv_logo1.png',
+          url: '/new_mv_logo.png',
           width: 1200,
           height: 630,
           alt: 'MV Portal',
