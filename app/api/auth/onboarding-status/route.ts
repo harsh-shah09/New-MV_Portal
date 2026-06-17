@@ -31,16 +31,14 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-    const formData = await req.formData();
-    const id = formData.get('id') as string || '';
-    const session = { employeeId: id };
+    const session = await verifySession();
+    if (!session?.employeeId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     try {
-        // Using 'formData' for handling potential file uploads
         const contentType = req.headers.get('content-type') || '';
 
         if (contentType.includes('multipart/form-data')) {
-            // const formData = await req.formData();
+            const formData = await req.formData();
             const step = parseInt(formData.get('step') as string);
             if (step === 1) {
                 // Profile Photo
@@ -118,7 +116,8 @@ export async function POST(req: Request) {
                     Employee_Address__c: '',
                     Emergency_Contact_Name__c: data.emergencyContact,
                     Emergency_Contact_Number__c: data.emergencyPhone,
-                    Emergency_Contact_Relation__c: data.emergencyRelation
+                    Emergency_Contact_Relation__c: data.emergencyRelation,
+                    Marital_Status__c: data.maritalStatus
                 }
                 if (data.sameAsCurrent) {
                     payload.Employee_Address__c = JSON.stringify({

@@ -45,6 +45,8 @@ import { cn } from "@/lib/utils"
 import { Field } from "./field-component"
 import { EmployeeSalaryHistoryTab } from "./employee-salary-history-tab"
 import { GoogleIntegration } from "@/app/dashboard/components/employee/google-integration"
+import { ReturnAssetModal } from "@/app/assets/components/ReturnAssetModal"
+import { RequestAssetModal } from "@/app/assets/components/RequestAssetModal"
 import { Country, State, City } from "country-state-city"
 
 interface ViewProps {
@@ -67,6 +69,8 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
 
     const [activeTab, setActiveTab] = useState<TabId>(getTabFromQuery)
     const [showAssetHistory, setShowAssetHistory] = useState(false)
+    const [isReturnAssetModalVisible, setIsReturnAssetModalVisible] = useState(false)
+    const [isRequestAssetModalVisible, setIsRequestAssetModalVisible] = useState(false)
     const [isEditing, setIsEditing] = useState(false)
     const [selectedAddressTab, setSelectedAddressTab] = useState<'current' | 'permanent'>('current')
     const fileInputRef = useRef<HTMLInputElement>(null)
@@ -328,7 +332,23 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
             }
             return res.json()
         },
-        onSuccess: () => {
+        onSuccess: (responseData: any) => {
+            // If the API detected direct reports that must be reassigned first,
+            // open the interactive reassignment modal instead of finishing the save.
+            if (responseData?.requiresReassignment) {
+                const reports: { Id: string; Employee_Name__c: string; Team_Lead__c: string }[] =
+                    responseData.directReports ?? []
+                setTlDirectReports(reports)
+                // Initialise each row with no selection
+                const initMap: Record<string, string | null> = {}
+                reports.forEach((r) => { initMap[r.Id] = null })
+                setTlReassignMap(initMap)
+                setTlBulkLead(null)
+                // Store the payload so we can re-fire after reassignment is done
+                setTlPendingPayload(updateMutation.variables)
+                setTlModalOpen(true)
+                return
+            }
             message.success("Profile updated successfully")
             setIsEditing(false)
             // Refetch data after successful save
@@ -367,6 +387,15 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
     const [formData, setFormData] = useState<any>({})
     const [errors, setErrors] = useState<Record<string, string>>({})
     const [warningMsg, setWarningMsg] = useState<string | null>(null)
+
+    // --- Team Lead Reassignment Modal state ---
+    type DirectReport = { Id: string; Employee_Name__c: string; Team_Lead__c: string }
+    const [tlModalOpen, setTlModalOpen] = useState(false)
+    const [tlDirectReports, setTlDirectReports] = useState<DirectReport[]>([])
+    const [tlReassignMap, setTlReassignMap] = useState<Record<string, string | null>>({})
+    const [tlBulkLead, setTlBulkLead] = useState<string | null>(null)
+    const [tlPendingPayload, setTlPendingPayload] = useState<any>(null)
+    const [tlReassigning, setTlReassigning] = useState(false)
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     const phonePattern = /^(?:\+91\d{10}|\d{10})$/
 
@@ -535,6 +564,13 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                 newErrors.Gender__c = "Gender is required"
             } else if (!["Male", "Female"].includes(gender)) {
                 newErrors.Gender__c = "Please select a valid gender"
+            }
+
+            const maritalStatus = formData.Marital_Status__c?.trim()
+            if (!maritalStatus) {
+                newErrors.Marital_Status__c = "Marital status is required"
+            } else if (!["Married", "Unmarried"].includes(maritalStatus)) {
+                newErrors.Marital_Status__c = "Please select a valid marital status"
             }
 
             // Emergency Contact Name: required, only letters/spaces, not only spaces
@@ -807,6 +843,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                 })(),
                 Birthdate__c: employee.Birthdate__c,
                 Gender__c: employee.Gender__c,
+                Marital_Status__c: employee.Marital_Status__c,
                 Employee_Current_Address__Street__s: employee.Employee_Current_Address__c?.street || '',
                 Employee_Current_Address__City__s: employee.Employee_Current_Address__c?.city || '',
                 Employee_Current_Address__StateCode__s: employee.Employee_Current_Address__c?.state || '',
@@ -998,6 +1035,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
 
     // --- Additional States ---
     const [showBankForm, setShowBankForm] = useState(false)
+    const [confirmAccountNumber, setConfirmAccountNumber] = useState("")
     const [bankFormData, setBankFormData] = useState({
         Name: '',
         Bank_Branch_Name__c: '',
@@ -1293,6 +1331,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
             }
             message.success("Bank account added")
             setShowBankForm(false)
+            setConfirmAccountNumber("")
             setBankFormData({ Name: '', Bank_Branch_Name__c: '', Bank_Account_Number__c: '', IFSC__c: '', Account_Holder_Name__c: '', Primary_Account__c: false, Mark_for_Approval__c: false })
             setBankErrors({})
             queryClient.invalidateQueries({ queryKey: ["employee", employeeId] })
@@ -1397,6 +1436,15 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
             newErrors.Bank_Account_Number__c = "Account Number must be at least 9 digits"
         } else if (bankFormData.Bank_Account_Number__c.length > 18) {
             newErrors.Bank_Account_Number__c = "Account Number must not exceed 18 digits"
+        }
+
+        // Confirm Account Number validation
+        if (bankFormData.Bank_Account_Number__c) {
+            if (!confirmAccountNumber) {
+                newErrors.confirmBankAccountNumber = "Confirm Account Number is required"
+            } else if (bankFormData.Bank_Account_Number__c !== confirmAccountNumber) {
+                newErrors.confirmBankAccountNumber = "Account Numbers do not match"
+            }
         }
 
         // IFSC Code: required, format ABCD0123456
@@ -1963,6 +2011,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                 </div>
                                                 <Field label="Date of Birth" value={employee.Birthdate__c} fieldKey="Birthdate__c" type="date" isEditing={isEditing} formData={formData} setFormData={setFormData} error={errors.Birthdate__c} required />
                                                 <Field label="Gender" value={employee.Gender__c} fieldKey="Gender__c" isEditing={isEditing} formData={formData} setFormData={setFormData} options={[{ label: 'Male', value: 'Male' }, { label: 'Female', value: 'Female' }]} type="select" error={errors.Gender__c} required />
+                                                <Field label="Marital Status" value={employee.Marital_Status__c} fieldKey="Marital_Status__c" isEditing={isEditing} formData={formData} setFormData={setFormData} options={[{ label: 'Married', value: 'Married' }, { label: 'Unmarried', value: 'Unmarried' }]} type="select" error={errors.Marital_Status__c} required />
                                             </div>
                                         </div>
 
@@ -2745,34 +2794,6 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                         />
                                                         <p className="text-[11px] text-slate-400">Only letters and spaces allowed (max 100 chars)</p>
                                                     </div>
-
-                                                    {/* Account Number with digits-only enforcement */}
-                                                    <div className="space-y-1.5">
-                                                        <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 flex justify-between">
-                                                            <span>Account Number <span className="text-red-400">*</span></span>
-                                                            {bankErrors.Bank_Account_Number__c && <span className="text-red-500 text-[10px] normal-case tracking-normal font-medium animate-pulse">{bankErrors.Bank_Account_Number__c}</span>}
-                                                        </label>
-                                                        <input
-                                                            type="number"
-                                                            value={bankFormData.Bank_Account_Number__c}
-                                                            onChange={(e) => {
-                                                                const newAccNum = e.target.value.replace(/\D/g, '').slice(0, 18)
-                                                                const newErrors = { ...bankErrors }
-                                                                if (!newAccNum) newErrors.Bank_Account_Number__c = 'Account Number is required'
-                                                                else if (newAccNum.length < 9) newErrors.Bank_Account_Number__c = `Account Number must be at least 9 digits (${newAccNum.length}/9 entered)`
-                                                                else delete newErrors.Bank_Account_Number__c
-                                                                setBankFormData({ ...bankFormData, Bank_Account_Number__c: newAccNum })
-                                                                setBankErrors(newErrors)
-                                                            }}
-                                                            placeholder="Enter Account Number"
-                                                            className={cn(
-                                                                "w-full bg-slate-50 border rounded-lg px-3 py-2.5 text-sm text-slate-800 focus:ring-2 outline-none transition placeholder:text-slate-400",
-                                                                bankErrors.Bank_Account_Number__c ? "border-red-300 focus:ring-red-200" : "border-slate-200 focus:ring-blue-500/20 focus:border-blue-400"
-                                                            )}
-                                                        />
-                                                        <p className="text-[11px] text-slate-400">9–18 digits, numbers only</p>
-                                                    </div>
-
                                                     {/* IFSC Code with format hint */}
                                                     <div className="space-y-1.5">
                                                         <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 flex justify-between">
@@ -2800,6 +2821,75 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                         />
                                                         <p className="text-[11px] text-slate-400">Format: 4 letters + '0' + 6 alphanumeric &nbsp;|&nbsp; e.g. <span className="font-mono">HDFC0001234</span></p>
                                                     </div>
+                                                    {/* Account Number with digits-only enforcement */}
+                                                    <div className="space-y-1.5">
+                                                        <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 flex justify-between">
+                                                            <span>Account Number <span className="text-red-400">*</span></span>
+                                                            {bankErrors.Bank_Account_Number__c && <span className="text-red-500 text-[10px] normal-case tracking-normal font-medium animate-pulse">{bankErrors.Bank_Account_Number__c}</span>}
+                                                        </label>
+                                                        <input
+                                                            type="text"
+                                                            value={bankFormData.Bank_Account_Number__c}
+                                                            onChange={(e) => {
+                                                                const newAccNum = e.target.value.replace(/[^0-9]/g, '').slice(0, 18)
+                                                                const newErrors = { ...bankErrors }
+                                                                if (!newAccNum) {
+                                                                    newErrors.Bank_Account_Number__c = 'Account Number is required'
+                                                                    setConfirmAccountNumber("")
+                                                                } else if (newAccNum.length < 9) {
+                                                                    newErrors.Bank_Account_Number__c = `Account Number must be at least 9 digits (${newAccNum.length}/9 entered)`
+                                                                } else {
+                                                                    delete newErrors.Bank_Account_Number__c
+                                                                }
+                                                                setBankFormData({ ...bankFormData, Bank_Account_Number__c: newAccNum })
+                                                                setBankErrors(newErrors)
+                                                            }}
+                                                            onCopy={(e) => e.preventDefault()}
+                                                            onPaste={(e) => e.preventDefault()}
+                                                            onCut={(e) => e.preventDefault()}
+                                                            placeholder="Enter Account Number"
+                                                            className={cn(
+                                                                "w-full bg-slate-50 border rounded-lg px-3 py-2.5 text-sm text-slate-800 focus:ring-2 outline-none transition placeholder:text-slate-400",
+                                                                bankErrors.Bank_Account_Number__c ? "border-red-300 focus:ring-red-200" : "border-slate-200 focus:ring-blue-500/20 focus:border-blue-400"
+                                                            )}
+                                                        />
+                                                        <p className="text-[11px] text-slate-400">9–18 digits, numbers only</p>
+                                                    </div>
+                                                    
+                                                     {/* Confirm Account Number */}
+                                                        <div className="space-y-1.5 animate-in fade-in duration-200">
+                                                            <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 flex justify-between">
+                                                                <span>Confirm Account Number <span className="text-red-400">*</span></span>
+                                                                {confirmAccountNumber && (
+                                                                    confirmAccountNumber === bankFormData.Bank_Account_Number__c ? (
+                                                                        <span className="text-green-600 text-xs font-bold flex items-center gap-1">
+                                                                            <CheckCircle2 className="w-3.5 h-3.5" /> Matched
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span className="text-red-500 text-xs font-bold">Not Matched</span>
+                                                                    )
+                                                                )}
+                                                            </label>
+                                                            <input
+                                                                type="text"
+                                                                value={confirmAccountNumber}
+                                                                onChange={(e) => {
+                                                                    const val = e.target.value.replace(/[^0-9]/g, '').slice(0, 18)
+                                                                    setConfirmAccountNumber(val)
+                                                                }}
+                                                                onCopy={(e) => e.preventDefault()}
+                                                                onPaste={(e) => e.preventDefault()}
+                                                                onCut={(e) => e.preventDefault()}
+                                                                placeholder="Confirm Account Number"
+                                                                className={cn(
+                                                                    "w-full bg-slate-50 border rounded-lg px-3 py-2.5 text-sm text-slate-800 focus:ring-2 outline-none transition placeholder:text-slate-400",
+                                                                    confirmAccountNumber && confirmAccountNumber !== bankFormData.Bank_Account_Number__c ? "border-red-300 focus:ring-red-200" : "border-slate-200 focus:ring-blue-500/20 focus:border-blue-400"
+                                                                )}
+                                                            />
+                                                            {bankErrors.confirmBankAccountNumber && (
+                                                                <p className="text-red-500 text-[10px] normal-case tracking-normal font-medium animate-pulse">{bankErrors.confirmBankAccountNumber}</p>
+                                                            )}
+                                                        </div>
                                                 </div>
                                                 <div className="flex items-center gap-2 mb-4">
                                                     <input type="checkbox" id="primary" checked={bankFormData.Mark_for_Approval__c} onChange={e => setBankFormData({ ...bankFormData, Mark_for_Approval__c: e.target.checked, Primary_Account__c: false })} />
@@ -2859,33 +2949,39 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                 </div>
 
                                                 <div className="flex justify-end gap-3 mt-4">
-                                                    <button onClick={() => {
-                                                        setBankFormData({
-                                                            Name: "",
-                                                            Bank_Branch_Name__c: "",
-                                                            Bank_Account_Number__c: "",
-                                                            IFSC__c: "",
-                                                            Account_Holder_Name__c: "",
-                                                            Primary_Account__c: false,
-                                                            Mark_for_Approval__c: false
-                                                        })
-                                                        setBankErrors({
-                                                            Name: "",
-                                                            Bank_Branch_Name__c: "",
-                                                            Bank_Account_Number__c: "",
-                                                            IFSC__c: "",
-                                                            Account_Holder_Name__c: ""
-                                                        })
-                                                        setShowBankForm(false)
-                                                    }} className="px-4 py-2 text-slate-600 hover:bg-slate-200 rounded-lg text-sm">Cancel</button>
-                                                    <button
-                                                        onClick={handleAddBank}
-                                                        disabled={addBankMutation.isPending}
-                                                        className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center gap-2"
-                                                    >
-                                                        {addBankMutation.isPending && <Spin size="small" />}
-                                                        {addBankMutation.isPending ? "Saving..." : "Save Account"}
-                                                    </button>
+                                                     <button onClick={() => {
+                                                         setConfirmAccountNumber("")
+                                                         setBankFormData({
+                                                             Name: "",
+                                                             Bank_Branch_Name__c: "",
+                                                             Bank_Account_Number__c: "",
+                                                             IFSC__c: "",
+                                                             Account_Holder_Name__c: "",
+                                                             Primary_Account__c: false,
+                                                             Mark_for_Approval__c: false
+                                                         })
+                                                         setBankErrors({
+                                                             Name: "",
+                                                             Bank_Branch_Name__c: "",
+                                                             Bank_Account_Number__c: "",
+                                                             IFSC__c: "",
+                                                             Account_Holder_Name__c: "",
+                                                             confirmBankAccountNumber: ""
+                                                         })
+                                                         setShowBankForm(false)
+                                                     }} className="px-4 py-2 text-slate-600 hover:bg-slate-200 rounded-lg text-sm">Cancel</button>
+                                                     <button
+                                                         onClick={handleAddBank}
+                                                         disabled={
+                                                             addBankMutation.isPending ||
+                                                             !bankFormData.Bank_Account_Number__c ||
+                                                             bankFormData.Bank_Account_Number__c !== confirmAccountNumber
+                                                         }
+                                                         className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center gap-2"
+                                                     >
+                                                         {addBankMutation.isPending && <Spin size="small" />}
+                                                         {addBankMutation.isPending ? "Saving..." : "Save Account"}
+                                                     </button>
                                                 </div>
                                             </div>
                                         )}
@@ -3600,9 +3696,33 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                 {activeTab === "assets" && (
                                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
                                         <div>
-                                            <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
-                                                <Laptop className="w-5 h-5 text-indigo-600" /> Active Assets
-                                            </h2>
+                                            <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+                                                <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                                                    <Laptop className="w-5 h-5 text-indigo-600" /> Active Assets
+                                                </h2>
+                                                <div className="flex flex-wrap gap-2">
+                                                    <button
+                                                        id="return-asset-btn"
+                                                        onClick={() => setIsReturnAssetModalVisible(true)}
+                                                        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-blue-700 bg-blue-50 border border-blue-200 hover:bg-blue-100 active:scale-95 transition-all duration-150 shadow-sm"
+                                                    >
+                                                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                                                            <path d="M3 12h14" /><path d="M9 6l-6 6 6 6" />
+                                                        </svg>
+                                                        Return Asset
+                                                    </button>
+                                                    <button
+                                                        id="request-asset-btn"
+                                                        onClick={() => setIsRequestAssetModalVisible(true)}
+                                                        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-green-700 bg-green-50 border border-green-200 hover:bg-green-100 active:scale-95 transition-all duration-150 shadow-sm"
+                                                    >
+                                                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                                                            <line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" />
+                                                        </svg>
+                                                        Request Asset
+                                                    </button>
+                                                </div>
+                                            </div>
 
                                             {(() => {
                                                 const historyList = employee.assetHistory || [];
@@ -3624,7 +3744,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                                                         <Laptop className="w-5 h-5" />
                                                                                     </div>
                                                                                     <div>
-                                                                                        <h3 className="font-semibold text-slate-800">{asset.Name || "Asset"}</h3>
+                                                                                        <h3 className="font-semibold text-slate-800">{asset.Internal_Serial_Number__c || "Asset"}</h3>
                                                                                         <p className="text-xs text-slate-500">{asset.AMS_Product__r?.Name || "Unknown Product"}</p>
                                                                                     </div>
                                                                                 </div>
@@ -3724,6 +3844,28 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                 )
                                             })()}
                                         </div>
+
+                                        {/* Return Asset Modal */}
+                                        <ReturnAssetModal
+                                            visible={isReturnAssetModalVisible}
+                                            onCancel={() => setIsReturnAssetModalVisible(false)}
+                                            onSuccess={() => {
+                                                setIsReturnAssetModalVisible(false);
+                                                queryClient.invalidateQueries({ queryKey: ['employee', employeeId] });
+                                            }}
+                                            employeeId={employeeId}
+                                            employeeName={employee?.Employee_Name__c || ''}
+                                            employeeEmail={employee?.Company_Email__c || employee?.Employee_Email__c || ''}
+                                        />
+
+                                        {/* Request Asset Modal */}
+                                        <RequestAssetModal
+                                            visible={isRequestAssetModalVisible}
+                                            onCancel={() => setIsRequestAssetModalVisible(false)}
+                                            onSuccess={() => setIsRequestAssetModalVisible(false)}
+                                            employeeName={employee?.Employee_Name__c || ''}
+                                            employeeEmail={employee?.Company_Email__c || employee?.Employee_Email__c || ''}
+                                        />
                                     </div>
                                 )}
                                 {activeTab === 'leaves' && (
@@ -3987,6 +4129,234 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                         className="w-full h-[75vh] rounded-lg border border-slate-200"
                     />
                 )}
+            </Modal>
+
+            {/* ── Team Lead Reassignment Modal ─────────────────────────────────── */}
+            <Modal
+                open={tlModalOpen}
+                onCancel={() => {
+                    if (tlReassigning) return
+                    setTlModalOpen(false)
+                    setTlDirectReports([])
+                    setTlReassignMap({})
+                    setTlBulkLead(null)
+                    setTlPendingPayload(null)
+                }}
+                closable={!tlReassigning}
+                maskClosable={false}
+                footer={null}
+                width={720}
+                style={{ top: 40 }}
+                destroyOnHidden
+                title={
+                    <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
+                            <AlertTriangle className="w-5 h-5 text-amber-500" />
+                        </div>
+                        <div>
+                            <p className="text-base font-bold text-slate-800 leading-tight">Reassign Direct Reports</p>
+                            <p className="text-xs text-slate-500 font-normal mt-0.5">
+                                This employee is the Team Lead for {tlDirectReports.length} employee{tlDirectReports.length !== 1 ? 's' : ''}. Please reassign them before changing the title.
+                            </p>
+                        </div>
+                    </div>
+                }
+            >
+                <div className="space-y-5 pt-2">
+                    {/* ── Bulk apply ─────────────────────────────── */}
+                    <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
+                        <p className="text-xs font-semibold text-blue-700 uppercase tracking-wider mb-2">Bulk Reassign — Apply to All</p>
+                        <div className="flex items-center gap-3">
+                            <Select
+                                showSearch
+                                allowClear
+                                className="flex-1"
+                                placeholder="Select a replacement Team Lead for everyone"
+                                value={tlBulkLead ?? undefined}
+                                filterOption={(input, opt) =>
+                                    (opt?.label as string ?? '').toLowerCase().includes(input.toLowerCase())
+                                }
+                                onChange={(val: string | undefined) => {
+                                    const v = val ?? null
+                                    setTlBulkLead(v)
+                                    if (v) {
+                                        const next: Record<string, string | null> = {}
+                                        tlDirectReports.forEach((r) => { next[r.Id] = v })
+                                        setTlReassignMap(next)
+                                    }
+                                }}
+                                options={(
+                                    employeesList?.filter((e: any) =>
+                                        e.Id !== employeeId &&
+                                        e.Status__c === 'Active' &&
+                                        (e.Title__c || '').trim().toLowerCase() === 'team lead' &&
+                                        (e.Department__c || '').trim().toLowerCase() === (employee?.Department__c || '').trim().toLowerCase()
+                                    ) ?? []
+                                ).map((e: any) => ({
+                                    value: e.Id,
+                                    label: e.Employee_Name__c || ''
+                                }))}
+                            />
+                        </div>
+                    </div>
+
+                    {/* ── Per-report rows ─────────────────────────── */}
+                    <div className="space-y-3 max-h-[42vh] overflow-y-auto pr-1">
+                        {tlDirectReports.map((report) => {
+                            const rowVal = tlReassignMap[report.Id] ?? undefined
+                            return (
+                                <div
+                                    key={report.Id}
+                                    className={`flex items-center gap-4 p-3.5 rounded-xl border transition-all ${
+                                        rowVal
+                                            ? 'border-green-200 bg-green-50/50'
+                                            : 'border-slate-200 bg-white'
+                                    }`}
+                                >
+                                    {/* Avatar + name */}
+                                    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center shrink-0">
+                                        <span className="text-white text-xs font-bold">
+                                            {(report.Employee_Name__c || '?').charAt(0).toUpperCase()}
+                                        </span>
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-semibold text-slate-800 truncate">{report.Employee_Name__c}</p>
+                                        <p className="text-xs text-slate-400 truncate">Current Lead → <span className="text-slate-600">{employee?.Employee_Name__c}</span></p>
+                                    </div>
+                                    {/* New Team Lead selector */}
+                                    <Select
+                                        showSearch
+                                        allowClear
+                                        className="w-52 shrink-0"
+                                        placeholder="New Team Lead"
+                                        value={rowVal}
+                                        filterOption={(input, opt) =>
+                                            (opt?.label as string ?? '').toLowerCase().includes(input.toLowerCase())
+                                        }
+                                        onChange={(val: string | undefined) =>
+                                            setTlReassignMap((prev) => ({ ...prev, [report.Id]: val ?? null }))
+                                        }
+                                        options={(
+                                            employeesList?.filter((e: any) =>
+                                                e.Id !== employeeId &&
+                                                e.Status__c === 'Active' &&
+                                                (e.Title__c || '').trim().toLowerCase() === 'team lead' &&
+                                                (e.Department__c || '').trim().toLowerCase() === (employee?.Department__c || '').trim().toLowerCase()
+                                            ) ?? []
+                                        ).map((e: any) => ({
+                                            value: e.Id,
+                                            label: e.Employee_Name__c || ''
+                                        }))}
+                                    />
+                                    {/* Status indicator */}
+                                    {rowVal ? (
+                                        <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0" />
+                                    ) : (
+                                        <AlertCircle className="w-5 h-5 text-amber-400 shrink-0" />
+                                    )}
+                                </div>
+                            )
+                        })}
+                    </div>
+
+                    {/* ── Validation hint ─────────────────────────── */}
+                    {(() => {
+                        const unassigned = tlDirectReports.filter((r) => !tlReassignMap[r.Id]).length
+                        return unassigned > 0 ? (
+                            <div className="flex items-center gap-2 text-amber-600 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                                <AlertCircle className="w-4 h-4 shrink-0" />
+                                <p className="text-xs">
+                                    {unassigned} employee{unassigned !== 1 ? 's' : ''} still need{unassigned === 1 ? 's' : ''} a new Team Lead assigned.
+                                </p>
+                            </div>
+                        ) : (
+                            <div className="flex items-center gap-2 text-green-700 bg-green-50 border border-green-100 rounded-lg px-3 py-2">
+                                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                                <p className="text-xs font-medium">All employees reassigned — ready to confirm.</p>
+                            </div>
+                        )
+                    })()}
+
+                    {/* ── Action buttons ──────────────────────────── */}
+                    <div className="flex items-center justify-end gap-3 pt-1 border-t border-slate-100">
+                        <Button
+                            disabled={tlReassigning}
+                            onClick={() => {
+                                setTlModalOpen(false)
+                                setTlDirectReports([])
+                                setTlReassignMap({})
+                                setTlBulkLead(null)
+                                setTlPendingPayload(null)
+                            }}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            type="primary"
+                            loading={tlReassigning}
+                            disabled={tlDirectReports.some((r) => !tlReassignMap[r.Id])}
+                            onClick={async () => {
+                                setTlReassigning(true)
+                                try {
+                                    // 1. Bulk-patch each direct report's Team_Lead__c
+                                    const results = await Promise.allSettled(
+                                        tlDirectReports.map((report) =>
+                                            fetch(`/api/employees/${report.Id}`, {
+                                                method: 'PUT',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({ Team_Lead__c: tlReassignMap[report.Id] }),
+                                            }).then(async (r) => {
+                                                if (!r.ok) {
+                                                    const d = await r.json().catch(() => null)
+                                                    throw new Error(d?.error || 'Update failed')
+                                                }
+                                                return r.json()
+                                            })
+                                        )
+                                    )
+
+                                    const failed = results.filter((r) => r.status === 'rejected')
+                                    if (failed.length > 0) {
+                                        const reasons = failed
+                                            .map((r) => (r as PromiseRejectedResult).reason?.message)
+                                            .filter(Boolean)
+                                            .join(', ')
+                                        message.error(`Failed to reassign ${failed.length} employee(s): ${reasons}`)
+                                        setTlReassigning(false)
+                                        return
+                                    }
+
+                                    // 2. All reassignments succeeded — now fire the original title change
+                                    const titleRes = await fetch(`/api/employees/${employeeId}`, {
+                                        method: 'PUT',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify(tlPendingPayload),
+                                    })
+                                    if (!titleRes.ok) {
+                                        const d = await titleRes.json().catch(() => null)
+                                        throw new Error(d?.error || 'Title update failed')
+                                    }
+
+                                    message.success(`${tlDirectReports.length} employee(s) reassigned and title updated successfully.`)
+                                    setTlModalOpen(false)
+                                    setTlDirectReports([])
+                                    setTlReassignMap({})
+                                    setTlBulkLead(null)
+                                    setTlPendingPayload(null)
+                                    setIsEditing(false)
+                                    queryClient.invalidateQueries({ queryKey: ['employee', employeeId] })
+                                    queryClient.invalidateQueries({ queryKey: ['employeesList'] })
+                                } catch (err: any) {
+                                    message.error(err?.message || 'Reassignment failed')
+                                } finally {
+                                    setTlReassigning(false)
+                                }
+                            }}
+                        >
+                            Confirm Reassignment &amp; Change Title
+                        </Button>
+                    </div>
+                </div>
             </Modal>
             <style jsx global>{`
         .input-std {
