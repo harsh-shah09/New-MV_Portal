@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
 
         // Verify the session token
         const payload = await verifyToken(session);
-        
+
         if (!payload) {
             return NextResponse.json({ error: "Invalid session" }, { status: 401 });
         }
@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
         const { employeeId, email, recordId, name, role, title } = payload;
         const currentEmployeeId = employeeId || name || recordId;
         const isTeamLead = title === 'Team Lead';
-        
+
         const conn = await getSalesforceConnection();
         const isHR = role === 'HR';
         const isAdmin = role === 'Admin';
@@ -173,6 +173,7 @@ export async function GET(req: NextRequest) {
                     WHERE Start_Date__c <= ${today}
                     AND End_Date__c >= ${today}
                     AND Status__c = 'Approved'
+                    AND Employee__r.Active__c = true
                     ${hrDashboardLeaveFilter}
                     ORDER BY Start_Date__c ASC
                 `),
@@ -314,7 +315,7 @@ export async function GET(req: NextRequest) {
 
         // Employee Dashboard Data
         const currentYear = new Date().getFullYear();
-        
+
         const teamLeadApprovalsPromise = isTeamLead
             ? conn.query(`
                 SELECT Id, Name, Employee__c, Employee__r.Employee_Name__c,
