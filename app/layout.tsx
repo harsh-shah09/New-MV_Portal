@@ -70,8 +70,8 @@ export async function generateMetadata(): Promise<Metadata> {
     },
 
     icons: {
-      icon: '/favicon.ico',
-      apple: '/favicon.ico',
+      icon: '/favicon.png',
+      apple: '/favicon.png',
     },
 
     alternates: {
