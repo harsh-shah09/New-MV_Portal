@@ -174,6 +174,7 @@ export async function GET(req: NextRequest) {
                     WHERE Start_Date__c <= ${today}
                     AND End_Date__c >= ${today}
                     AND Status__c = 'Approved'
+                    AND Employee__r.Active__c = true
                     ${hrDashboardLeaveFilter}
                     ORDER BY Start_Date__c ASC
                 `),
