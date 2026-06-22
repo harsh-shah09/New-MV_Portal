@@ -1412,7 +1412,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
             return (
                 <div className="min-h-screen bg-slate-50 flex flex-col py-8 px-4 sm:px-6 lg:px-8">
                     <div className="max-w-4xl mx-auto w-full mb-8 flex justify-center items-center gap-3">
-                        <img src="/mv_logo1.png" alt="MV Clouds" className="h-10 sm:h-12 drop-shadow-sm" />
+                        <img src="/mv_logo_new.png" alt="MV Clouds" className="h-10 sm:h-12 drop-shadow-sm" />
                         <span className="font-bold text-slate-800 text-xl tracking-tight uppercase">MV Clouds</span>
                     </div>
                     <div className="max-w-4xl mx-auto w-full bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden flex flex-col relative p-6 sm:p-8">
@@ -1460,7 +1460,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                     <p className="text-gray-500 text-lg mb-8">This onboarding link is no longer valid or has expired.</p>
                     <p className="text-gray-500 text-lg">Your onboarding is not completed yet</p>
                     <div className="mt-8 flex justify-center items-center gap-3 border-t border-slate-100 pt-8 opacity-80">
-                        <img src="/mv_logo1.png" alt="MV Clouds" className="h-8 drop-shadow-sm" />
+                        <img src="/mv_logo_new.png" alt="MV Clouds" className="h-8 drop-shadow-sm" />
                         <span className="font-bold text-slate-800 tracking-tight">MV Clouds</span>
                     </div>
                 </div>
@@ -1476,7 +1476,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                     <p className="text-gray-500 text-lg mb-8">This onboarding link is no longer valid or has expired.</p>
 
                     <div className="mt-8 flex justify-center items-center gap-3 border-t border-slate-100 pt-8 opacity-80">
-                        <img src="/mv_logo1.png" alt="MV Clouds" className="h-8 drop-shadow-sm" />
+                        <img src="/mv_logo_new.png" alt="MV Clouds" className="h-8 drop-shadow-sm" />
                         <span className="font-bold text-slate-800 tracking-tight">MV Clouds</span>
                     </div>
                 </div>
@@ -1494,7 +1494,7 @@ export function OnboardingWizard({ publicMode = false, publicEmpId, firsttime = 
                     <p className="text-gray-500 text-lg mb-8">Thank you for completing your onboarding. Your information has been securely recorded and is now under HR review.</p>
 
                     <div className="mt-8 flex justify-center items-center gap-3 border-t border-slate-100 pt-8 opacity-80">
-                        <img src="/mv_logo1.png" alt="MV Clouds" className="h-8 drop-shadow-sm" />
+                        <img src="/mv_logo_new.png" alt="MV Clouds" className="h-8 drop-shadow-sm" />
                         <span className="font-bold text-slate-800 tracking-tight">MV Clouds</span>
                     </div>
                 </div>
