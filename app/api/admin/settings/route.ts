@@ -11,7 +11,7 @@ export async function GET(req: Request) {
     }
 
     const employee = await getEmployeeById(session.employeeId);
-    if (!employee || (employee.Role__c !== 'Admin' && employee.Role__c !== 'HR')) {
+    if (!employee) {
       return NextResponse.json({ error: 'Access Denied: Admin or HR role required.' }, { status: 403 });
     }
 

@@ -30,13 +30,13 @@ export async function GET(request: NextRequest) {
     const conn = await getSalesforceConnection()
 
     const escapedEmployeeId = employeeId.replace(/'/g, "\\'")
-    const currentYear = new Date().getFullYear()
 
     const leaveBalanceQuery = await conn.query<any>(`
-      SELECT Annual_Leave_Remaining__c, Sick_Leave_Count__c, Emergency_Leave_Count__c, Planned_Leave_Count__c
+      SELECT Annual_Leave_Remaining__c, Sick_Leave_Count__c, Emergency_Leave_Count__c,
+             Planned_Leave_Count__c, Last_Reset_Date__c
       FROM Leave_Balance__c
       WHERE Employee__c = '${escapedEmployeeId}'
-      AND Year__c = ${currentYear}
+      ORDER BY Last_Reset_Date__c DESC NULLS LAST
       LIMIT 1
     `)
 

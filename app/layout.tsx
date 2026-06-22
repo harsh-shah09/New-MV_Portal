@@ -52,7 +52,7 @@ export async function generateMetadata(): Promise<Metadata> {
       siteName: 'MV Portal',
       images: [
         {
-          url: '/mv_logo1.png',
+          url: '/mv_logo_new.png',
           width: 1200,
           height: 630,
           alt: 'MV Portal',
@@ -66,7 +66,7 @@ export async function generateMetadata(): Promise<Metadata> {
       card: 'summary_large_image',
       title: 'MV Portal',
       description: 'Smart HR & Employee Management System.',
-      images: ['/mv_logo1.png'],
+      images: ['/mv_logo_new.png'],
     },
 
     icons: {
