@@ -104,7 +104,7 @@ export async function GET(req: NextRequest) {
 
             const pendingDocumentsFilter = isAdmin
                 ? ''
-                : "AND Employee__c IN (SELECT Id FROM Employee__c WHERE Role__c NOT IN ('HR','Admin'))";
+                : "AND Employee__r.Role__c NOT IN ('HR', 'Admin')";
 
             const [
                 employeeQuery,
@@ -135,6 +135,7 @@ export async function GET(req: NextRequest) {
                     SELECT COUNT(Id) pendingDocs
                     FROM Document__c
                     WHERE Status__c IN ('Pending', 'Uploaded')
+                    AND Document_Category__c != 'Payslip'
                     ${pendingDocumentsFilter}
                 `),
                 pendingApprovalsQueryPromise,
@@ -173,7 +174,6 @@ export async function GET(req: NextRequest) {
                     WHERE Start_Date__c <= ${today}
                     AND End_Date__c >= ${today}
                     AND Status__c = 'Approved'
-                    AND Employee__r.Active__c = true
                     ${hrDashboardLeaveFilter}
                     ORDER BY Start_Date__c ASC
                 `),
@@ -314,7 +314,6 @@ export async function GET(req: NextRequest) {
         }
 
         // Employee Dashboard Data
-        const currentYear = new Date().getFullYear();
 
         const teamLeadApprovalsPromise = isTeamLead
             ? conn.query(`
@@ -339,9 +338,11 @@ export async function GET(req: NextRequest) {
         ] = await Promise.all([
             conn.query(`
                 SELECT Annual_Leave_Remaining__c, Earned_Leave_Balance__c,
-                       Sick_Leave_Count__c, Emergency_Leave_Count__c, Planned_Leave_Count__c
+                       Sick_Leave_Count__c, Emergency_Leave_Count__c, Planned_Leave_Count__c,
+                       Last_Reset_Date__c
                 FROM Leave_Balance__c
-                WHERE Employee__c = '${currentEmployeeId}' AND Year__c = ${currentYear}
+                WHERE Employee__c = '${currentEmployeeId}'
+                ORDER BY Last_Reset_Date__c DESC NULLS LAST
                 LIMIT 1
             `),
             conn.query(`
@@ -370,7 +371,8 @@ export async function GET(req: NextRequest) {
                 LIMIT 5
             `),
             conn.query(`
-                SELECT Id, Employee_Name__c, Employee_Email__c, Title__c, Team_Lead__c
+                SELECT Id, Employee_Name__c, Employee_Email__c, Title__c, Team_Lead__c,
+                       Onboarding_Date__c
                 FROM Employee__c
                 WHERE Id = '${currentEmployeeId}'
                 LIMIT 1
@@ -378,18 +380,92 @@ export async function GET(req: NextRequest) {
             teamLeadApprovalsPromise,
         ]);
 
-        const leaveBalance = leaveBalanceQuery.records.length > 0 ? {
-            annualLeaveRemaining: leaveBalanceQuery.records[0].Annual_Leave_Remaining__c || 0,
-            earnedLeaveBalance: leaveBalanceQuery.records[0].Earned_Leave_Balance__c || 0,
-            sickLeaveCount: leaveBalanceQuery.records[0].Sick_Leave_Count__c || 0,
-            emergencyLeaveCount: leaveBalanceQuery.records[0].Emergency_Leave_Count__c || 0,
-            plannedLeaveCount: leaveBalanceQuery.records[0].Planned_Leave_Count__c || 0
+        // --- Passive leave-balance reset check ---
+        // If the most-recent balance record is ≥1 year old (or missing), auto-create a fresh one.
+        let leaveBalanceRecord = leaveBalanceQuery.records[0] ?? null;
+        const isFirstTimeBalanceSetup = !leaveBalanceRecord;
+
+        if (!leaveBalanceRecord || !leaveBalanceRecord.Last_Reset_Date__c ||
+            dayjs().isSame(dayjs(leaveBalanceRecord.Last_Reset_Date__c).add(1, 'year'), 'day') ||
+            dayjs().isAfter(dayjs(leaveBalanceRecord.Last_Reset_Date__c).add(1, 'year'), 'day')) {
+
+            try {
+                // Fetch configured annual leave balance
+                const configQuery = await conn.query(
+                    "SELECT Value__c FROM Leave_Configurations__mdt WHERE DeveloperName = 'Annual_Leave_Balance' LIMIT 1"
+                );
+                const annualBalance = parseFloat(configQuery.records?.[0]?.Value__c || '18');
+
+                // Determine the Last_Reset_Date__c anchor:
+                // - First-time setup → use the most recent past anniversary of the employee's
+                //   Onboarding_Date__c so the renewal cycle is tied to their join date.
+                // - Annual renewal → use today.
+                let lastResetDate: string;
+
+                if (isFirstTimeBalanceSetup) {
+                    const onboardingDateStr = currentEmployeeQuery.records?.[0]?.Onboarding_Date__c;
+
+                    if (onboardingDateStr) {
+                        let anniversary = dayjs(onboardingDateStr);
+                        const now = dayjs();
+
+                        // Advance to the most recent anniversary that has already passed (≤ today)
+                        while (
+                            anniversary.add(1, 'year').isSame(now, 'day') ||
+                            anniversary.add(1, 'year').isBefore(now, 'day')
+                        ) {
+                            anniversary = anniversary.add(1, 'year');
+                        }
+
+                        lastResetDate = anniversary.format('YYYY-MM-DD');
+                        console.log(
+                            `[dashboard] First-time balance setup for employee ${currentEmployeeId}. ` +
+                            `Onboarding: ${onboardingDateStr}, reset anchor: ${lastResetDate}`
+                        );
+                    } else {
+                        lastResetDate = dayjs().format('YYYY-MM-DD');
+                        console.warn(`[dashboard] No Onboarding_Date__c for employee ${currentEmployeeId}, using today.`);
+                    }
+                } else {
+                    // Annual renewal
+                    lastResetDate = dayjs().format('YYYY-MM-DD');
+                }
+
+                const freshRecord = {
+                    Employee__c: currentEmployeeId,
+                    Year__c: new Date().getFullYear(),
+                    Last_Reset_Date__c: lastResetDate,
+                    Annual_Leave_Remaining__c: annualBalance,
+                    Earned_Leave_Balance__c: 0,
+                    Sick_Leave_Count__c: 0,
+                    Emergency_Leave_Count__c: 0,
+                    Planned_Leave_Count__c: 0,
+                };
+
+                const createResult = await conn.sobject('Leave_Balance__c').create(freshRecord);
+                console.log(`[dashboard] Created balance record for employee ${currentEmployeeId}. Id: ${createResult.id}, Last_Reset_Date__c: ${lastResetDate}`);
+                leaveBalanceRecord = { ...freshRecord, Id: createResult.id };
+            } catch (resetErr) {
+                console.error('[dashboard] Failed to auto-reset leave balance:', resetErr);
+                // Fall through — use whatever we have (or defaults below)
+            }
+        }
+        // -------------------------------------------
+
+        const leaveBalance = leaveBalanceRecord ? {
+            annualLeaveRemaining: leaveBalanceRecord.Annual_Leave_Remaining__c ?? 0,
+            earnedLeaveBalance: leaveBalanceRecord.Earned_Leave_Balance__c ?? 0,
+            sickLeaveCount: leaveBalanceRecord.Sick_Leave_Count__c ?? 0,
+            emergencyLeaveCount: leaveBalanceRecord.Emergency_Leave_Count__c ?? 0,
+            plannedLeaveCount: leaveBalanceRecord.Planned_Leave_Count__c ?? 0,
+            lastResetDate: leaveBalanceRecord.Last_Reset_Date__c ?? null,
         } : {
             annualLeaveRemaining: 18,
             earnedLeaveBalance: 0,
             sickLeaveCount: 0,
             emergencyLeaveCount: 0,
-            plannedLeaveCount: 0
+            plannedLeaveCount: 0,
+            lastResetDate: null,
         };
 
         const upcomingLeaves = upcomingLeavesQuery.records.map((record: any) => ({
