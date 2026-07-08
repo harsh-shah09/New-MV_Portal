@@ -6,6 +6,12 @@ import { getSalesforceConnection } from "@/lib/salesforce";
 import { getAdminSettings } from '@/lib/admin-settings';
 
 
+interface EmailAttachment {
+  filename: string;
+  content: Buffer;
+  contentType: string;
+}
+
 interface EmailParams {
   to: string;
   cc?: string | string[];
@@ -14,6 +20,7 @@ interface EmailParams {
   contentType?: string;
   senderEmployeeId?: string;
   isInfo?: boolean;
+  attachments?: EmailAttachment[];
 }
 
 interface GoogleIntegrationItem {
@@ -252,7 +259,7 @@ export async function hasGoogleWorkspaceIntegration(employeeId: string): Promise
 /**
  * Send email notification using Gmail
  */
-export async function sendEmail({ to, cc, subject, body, contentType = 'text/plain', senderEmployeeId, isInfo = false }: EmailParams): Promise<void> {
+export async function sendEmail({ to, cc, subject, body, contentType = 'text/plain', senderEmployeeId, isInfo = false, attachments }: EmailParams): Promise<void> {
   try {
     logEmailDebug('Send email invoked', {
       to,
@@ -282,7 +289,15 @@ export async function sendEmail({ to, cc, subject, body, contentType = 'text/pla
         mailOptions.cc = cc;
       }
 
-      logEmailDebug('Sending via nodemailer info account', { to, cc: mailOptions.cc ? true : false, subject });
+      if (attachments && attachments.length > 0) {
+        mailOptions.attachments = attachments.map((a) => ({
+          filename: a.filename,
+          content: a.content,
+          contentType: a.contentType,
+        }));
+      }
+
+      logEmailDebug('Sending via nodemailer info account', { to, cc: mailOptions.cc ? true : false, subject, attachmentCount: attachments?.length || 0 });
       await transporter.sendMail(mailOptions);
       logEmailDebug('Info email sent successfully', { to, subject });
 

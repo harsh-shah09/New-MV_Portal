@@ -140,6 +140,20 @@ export async function loadTemplate(templateName: string, data: LeaveEmailData): 
 }
 
 /**
+ * Fetch raw template string without applying LeaveEmailData replacements
+ * Used for templates with custom placeholders (like Payslips)
+ */
+export async function getRawTemplate(templateName: string): Promise<string | null> {
+  try {
+    const templateMap = await getTemplateMap();
+    return templateMap.get(templateName) || templateMap.get(normalizeTemplateKey(templateName)) || null;
+  } catch (error) {
+    console.error(`[Email Templates] Failed fetching raw metadata template: ${templateName}`, error);
+    return null;
+  }
+}
+
+/**
  * Template: Employee Leave Request to HR (CC Team Lead + Admin)
  */
 export async function employeeLeaveRequestToHR(data: LeaveEmailData): Promise<{ subject: string; html: string; text: string }> {

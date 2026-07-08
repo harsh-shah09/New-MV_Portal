@@ -13,7 +13,7 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  serverExternalPackages: ['@sparticuz/chromium', 'puppeteer-core', 'playwright-aws-lambda', 'playwright-core'],
+  serverExternalPackages: ['@sparticuz/chromium', 'puppeteer-core', 'playwright-aws-lambda', 'playwright-core', 'node-qpdf2'],
   outputFileTracingIncludes: {
     "/*": [
       "./node_modules/@sparticuz/chromium/bin/**/*",

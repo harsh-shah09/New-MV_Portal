@@ -5,6 +5,7 @@ import { getSalesforceConnection, sendInAppNotifications } from "@/lib/salesforc
 import { getAdminSettings } from "@/lib/admin-settings"
 import { generatePayslipPDF } from "@/lib/pdf-generator"
 import { uploadPayslipToS3 } from "@/lib/s3"
+import { encryptPDF } from "@/lib/pdf-encrypt"
 
 export const maxDuration = 300; // Next.js standard way to increase timeout on serverless functions
 
@@ -79,9 +80,12 @@ export async function POST(request: NextRequest) {
     // Query verified and primary bank details for all eligible employees
     const employeeIds = eligibleEmployees.map((emp: any) => emp.id).filter(Boolean)
     const bankByEmployeeId = new Map<string, { bankName: string; accountNumber: string; ifscCode: string }>()
+    const birthdateByEmployeeId = new Map<string, string>()
 
     if (employeeIds.length > 0) {
       const escapedEmployeeIds = employeeIds.map((id: string) => `'${String(id).replace(/'/g, "\\'")}'`).join(',')
+
+      // Bank details query
       const bankRecords = await conn.query<any>(`
         SELECT Employee__c, Name, Bank_Account_Number__c, IFSC__c, Primary_Account__c, Status__c
         FROM Bank_Detail__c
@@ -108,6 +112,29 @@ export async function POST(request: NextRequest) {
             ifscCode: '',
           })
         }
+      }
+
+      // Birthdate query — used to derive per-employee PDF password (DDMMYYYY)
+      try {
+        const birthdateRecords = await conn.query<any>(`
+          SELECT Id, Birthdate__c
+          FROM Employee__c
+          WHERE Id IN (${escapedEmployeeIds})
+          AND Birthdate__c != null
+        `)
+        for (const emp of birthdateRecords.records || []) {
+          if (emp.Id && emp.Birthdate__c) {
+            const dob = new Date(emp.Birthdate__c)
+            if (!isNaN(dob.getTime())) {
+              const dd = String(dob.getUTCDate()).padStart(2, '0')
+              const mm = String(dob.getUTCMonth() + 1).padStart(2, '0')
+              const yyyy = String(dob.getUTCFullYear())
+              birthdateByEmployeeId.set(emp.Id, `${dd}${mm}${yyyy}`)
+            }
+          }
+        }
+      } catch (dobErr) {
+        console.warn('[payroll/save] Failed to fetch employee birthdates — PDFs will be unencrypted', dobErr)
       }
     }
 
@@ -325,10 +352,26 @@ export async function POST(request: NextRequest) {
           }
 
           // Generate PDF
-          const pdfBuffer = await generatePayslipPDF(payslipData)
+          const rawPdfBuffer = await generatePayslipPDF(payslipData)
+
+          // Encrypt PDF with employee's birthdate password (DDMMYYYY) before uploading to S3
+          const employeeCode = emp.Employee_Id__c || emp.employeeId
+          const pdfPassword = birthdateByEmployeeId.get(emp.id)
+          let pdfBuffer: Buffer
+          if (pdfPassword) {
+            try {
+              pdfBuffer = await encryptPDF(rawPdfBuffer, pdfPassword)
+              console.info(`[payroll/save] PDF encrypted for ${emp.employeeName}`)
+            } catch (encryptErr) {
+              console.warn(`[payroll/save] PDF encryption failed for ${emp.employeeName}, uploading unencrypted`, encryptErr)
+              pdfBuffer = rawPdfBuffer
+            }
+          } else {
+            console.warn(`[payroll/save] No birthdate for ${emp.employeeName}, uploading unencrypted PDF`)
+            pdfBuffer = rawPdfBuffer
+          }
 
           // Upload to S3
-          const employeeCode = emp.Employee_Id__c || emp.employeeId
           const s3Url = await uploadPayslipToS3(pdfBuffer, employeeCode, month, year)
 
           // Create Document__c record for the payslip
