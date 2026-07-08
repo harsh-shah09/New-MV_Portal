@@ -337,7 +337,7 @@ export const getEmployeeById = async (id: string, includeSalary: boolean = false
   const conn = await getSalesforceConnection();
   if (!conn) return null;
 
-  const baseFields = `Id, Name, Employee_Id__c, Employee_Name__c, Employee_Email__c, Joining_Date__c, Onboarding_Date__c, Status__c, Active__c, Profile_Photo__c, Team_Lead__c, Is2FAEnabled__c, Employee_Phone__c, Birthdate__c, Gender__c, Employee_Current_Address__c, Employee_Address__c, Emergency_Contact_Name__c, Emergency_Contact_Number__c, Emergency_Contact_Relation__c, Experience__c, Department__c, Role__c, Title__c, Company_Email__c, Technology__c, Enrollment_Number__c, ESI_Number__c, PF_Number__c, UAN_Number__c`;
+  const baseFields = `Id, Name, Employee_Id__c, Employee_Name__c, Employee_Email__c, Joining_Date__c, Onboarding_Date__c, Status__c, Active__c, Profile_Photo__c, Team_Lead__c, Team_Lead__r.Employee_Name__c, Is2FAEnabled__c, Employee_Phone__c, Birthdate__c, Gender__c, Employee_Current_Address__c, Employee_Address__c, Emergency_Contact_Name__c, Emergency_Contact_Number__c, Emergency_Contact_Relation__c, Experience__c, Department__c, Role__c, Title__c, Company_Email__c, Technology__c, Enrollment_Number__c, ESI_Number__c, PF_Number__c, UAN_Number__c`;
 
   const salaryFields = `, Basic_Console__c, HRA__c, CONV__c, S_All__c, PF_Basic__c, PF__c, PT__c, ESI__c, Salary_CTC__c`;
   const queryFields = includeSalary ? baseFields + salaryFields : baseFields;

@@ -51,9 +51,10 @@ interface ViewProps {
     employeeId: string;
     currentUserRole?: string;
     currentUserEmployeeId?: string;
+    currentUserTitle?: string;
 }
 
-export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", currentUserEmployeeId }: ViewProps) {
+export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", currentUserEmployeeId, currentUserTitle }: ViewProps) {
     // --- Query Parameter <-> Tab mapping ---
     type TabId = "personal" | "employment" | "salary-calculation" | "salary-history" | "bank" | "documents" | "security" | "assets" | "leaves"
 
@@ -283,10 +284,12 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
     }, [activeTab, currentUserRole]);
 
     // --- Data Fetching ---
+    const isMyProfile = employeeId === 'myprofile';
     const { data: employeeResponse, isLoading } = useQuery({
         queryKey: ["employee", employeeId],
         queryFn: async () => {
-            const res = await fetch(`/api/employees/${employeeId}`)
+            const endpoint = isMyProfile ? '/api/myprofile' : `/api/employees/${employeeId}`;
+            const res = await fetch(endpoint)
             if (!res.ok) throw new Error("Failed to fetch")
             return res.json()
         }
@@ -297,27 +300,41 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
         (doc: any) => doc.Document_Type__c?.trim().toLowerCase() !== 'payslip'
     )
     const isAllDocumentsVerified = nonPayslipDocs.every((doc: any) => doc.Status__c === 'Verified');
-    // Fetch all employees for Team Lead dropdown
+    
+    // Fetch all employees for duplicate checking (Admin/HR only)
     const { data: employeesList, isLoading: loadingEmployeesList } = useQuery({
         queryKey: ['employeesList'],
         queryFn: async () => {
             const res = await fetch('/api/employees')
             if (!res.ok) throw new Error('Failed to fetch employees')
             return res.json()
-        }
+        },
+        enabled: ['HR', 'Admin'].includes(currentUserRole)
     })
 
-    // Resolve a readable name for the stored Team Lead id (fallbacks to relationship or lookup in employeesList)
+    // Fetch active Team Leads (Admin/HR only) for Team Lead dropdown
+    const { data: teamLeadsList, isLoading: loadingTeamLeads } = useQuery({
+        queryKey: ['teamLeadsList'],
+        queryFn: async () => {
+            const res = await fetch('/api/employees/teamleads')
+            if (!res.ok) throw new Error('Failed to fetch team leads')
+            return res.json()
+        },
+        enabled: ['HR', 'Admin'].includes(currentUserRole)
+    })
+
+    // Resolve a readable name for the stored Team Lead id (fallbacks to relationship or lookup in teamLeadsList)
     const teamLeadName = employee?.Team_Lead__r?.Employee_Name__c || (
-        employeesList?.find((e: any) => e.Id === employee?.Team_Lead__c)
-            ? employeesList.find((e: any) => e.Id === employee?.Team_Lead__c).Employee_Name__c
+        teamLeadsList?.find((e: any) => e.Id === employee?.Team_Lead__c)
+            ? teamLeadsList.find((e: any) => e.Id === employee?.Team_Lead__c).Employee_Name__c
             : null
     )
 
     // --- Mutations ---
     const updateMutation = useMutation({
         mutationFn: async (data: any) => {
-            const res = await fetch(`/api/employees/${employeeId}`, {
+            const endpoint = isMyProfile ? '/api/myprofile' : `/api/employees/${employeeId}`;
+            const res = await fetch(endpoint, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(data)
@@ -345,7 +362,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
         mutationFn: async ({ file, type }: { file: File, type: string }) => {
             const formData = new FormData()
             formData.append("file", file)
-            formData.append("employeeId", employeeId)
+            formData.append("employeeId", isMyProfile ? (currentUserEmployeeId || '') : employeeId)
             formData.append("type", type)
 
             const res = await fetch("/api/upload", {
@@ -1086,9 +1103,9 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
 
     // --- Admin Configs ---
     const { data: adminConfigs } = useQuery({
-        queryKey: ["admin-configs"],
+        queryKey: ["admin-configs", "documents"],
         queryFn: async () => {
-            const res = await fetch("/api/admin/configurations")
+            const res = await fetch("/api/admin/configurations?types=documents")
             if (!res.ok) throw new Error("Failed to fetch configs")
             return res.json()
         },
@@ -1587,7 +1604,9 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
         normalizeSfId(currentUserEmployeeId) === normalizeSfId(employee?.Id || employeeId)
     const viewedEmployeeRoleNormalized = viewedEmployeeRole.toLowerCase()
     const currentUserTitleNormalized = (
-        employeesList?.find((emp: any) => normalizeSfId(emp.Id) === normalizeSfId(currentUserEmployeeId))?.Title__c || ''
+        currentUserTitle ||
+        employeesList?.find((emp: any) => normalizeSfId(emp.Id) === normalizeSfId(currentUserEmployeeId))?.Title__c || 
+        ''
     ).trim().toLowerCase()
     const isHrTeamLead = isHrUser && currentUserTitleNormalized === 'team lead'
 
@@ -1632,7 +1651,7 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
         )
     }
     return (
-        <div className="w-full mx-auto px-8 max-h-[85vh] overflow-y-auto space-y-8 animate-in fade-in duration-500">
+        <div className="w-full mx-auto px-8 max-h-[95vh] overflow-y-auto space-y-8 animate-in fade-in duration-500">
             {/* {isScreenActionLoading && (
                 <div className="fixed z-[999] h-[80vh] overflow-hidden inset-0 backdrop-blur-sm flex items-center justify-center">
                     <div className="bg-white rounded-xl shadow-xl px-6 py-5 flex items-center gap-3 border border-slate-100">
@@ -2543,27 +2562,26 @@ export function EmployeeProfileView({ employeeId, currentUserRole = "Employee", 
                                                 <div className="space-y-1 flex flex-col">
                                                     <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">Manager / Team Lead</label>
                                                     {isEditing && ['HR', 'Admin'].includes(currentUserRole) ? (
-                                                        loadingEmployeesList ? (
-                                                            <div className="py-2"><Spin /></div>
-                                                        ) : (
-                                                            <Select
-                                                                showSearch
-                                                                placeholder="Select Manager"
-                                                                value={formData.Team_Lead__c !== undefined ? formData.Team_Lead__c : employee.Team_Lead__c}
-                                                                onChange={(val: any) => setFormData({ ...formData, Team_Lead__c: val ?? null })}
-                                                                options={employeesList?.filter((e: any) =>
-                                                                    e.Id !== employeeId &&
-                                                                    e.Status__c === 'Active' &&
-                                                                    (e.Title__c || '').trim().toLowerCase() === 'team lead' &&
-                                                                    ((e.Department__c || '').trim().toLowerCase() === selectedDepartment ||
-                                                                        (e.Role__c || '').trim().toLowerCase() === selectedRole)
-                                                                ).map((e: any) => ({
-                                                                    value: e.Id,
-                                                                    label: `${e.Employee_Name__c || ''}`.trim()
-                                                                }))}
-                                                                allowClear
-                                                            />
-                                                        )
+                                                         loadingTeamLeads ? (
+                                                             <div className="py-2"><Spin /></div>
+                                                         ) : (
+                                                             <Select
+                                                                 showSearch={{
+                                                                     filterOption: (input: any, option: any) =>
+                                                                         String(option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                                                                 }}
+                                                                 placeholder="Select Manager"
+                                                                 value={formData.Team_Lead__c !== undefined ? formData.Team_Lead__c : employee.Team_Lead__c}
+                                                                 onChange={(val: any) => setFormData({ ...formData, Team_Lead__c: val ?? null })}
+                                                                 options={teamLeadsList?.filter((e: any) =>
+                                                                     e.Id !== (isMyProfile ? currentUserEmployeeId : employeeId)
+                                                                 ).map((e: any) => ({
+                                                                     value: e.Id,
+                                                                     label: `${e.Employee_Name__c || ''}`.trim()
+                                                                 }))}
+                                                                 allowClear
+                                                             />
+                                                         )
                                                     ) : (
                                                         <p className="font-medium text-slate-800 text-sm break-words">{teamLeadName || employee.Team_Lead__c || <span className="text-slate-400 italic">Not set</span>}</p>
                                                     )}

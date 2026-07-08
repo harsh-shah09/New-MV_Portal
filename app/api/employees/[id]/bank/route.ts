@@ -16,6 +16,11 @@ export async function POST(
     }
 
     const { id } = await params;
+    const isHrOrAdmin = ['HR', 'Admin'].includes(session.role);
+    if (!isHrOrAdmin && session.employeeId !== id) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     const body = await request.json();
     
     // Body should contain: Name (Bank Name), Bank_Branch_Name__c, Bank_Account_Number__c, IFSC__c, Primary_Account__c
@@ -77,7 +82,16 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await verifySession();
+    if (!session || !session.employeeId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
     const { id } = await params;
+    const isHrOrAdmin = ['HR', 'Admin'].includes(session.role);
+    if (!isHrOrAdmin && session.employeeId !== id) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     const { searchParams } = new URL(request.url);
     const bankId = searchParams.get('bankId');
 

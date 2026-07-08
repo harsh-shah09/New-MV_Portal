@@ -133,7 +133,14 @@ export function MobileHeader({ onMenuClick }: { onMenuClick: () => void }) {
                                     <div className="p-1">
                                         <button
                                             onClick={() => {
-                                                if (user?.id) router.push(`/employees/${user.id}`)
+                                                if (user?.id) {
+                                                    const isAdminOrHr = user.role === 'Admin' || user.role === 'HR';
+                                                    if (isAdminOrHr) {
+                                                        router.push(`/employees/${user.id}`)
+                                                    } else {
+                                                        router.push('/myprofile')
+                                                    }
+                                                }
                                                 setIsProfileOpen(false)
                                             }}
                                             className="w-full text-left flex items-center gap-2 px-3 py-2 text-sm text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-lg transition-colors"

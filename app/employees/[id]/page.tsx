@@ -4,28 +4,18 @@ import { verifySession } from "@/lib/auth";
 import { EmployeeProfileView } from "@/components/employee-profile-view";
 import Link from "next/link";
 import { ArrowLeft, AlertTriangle } from "lucide-react";
+import { redirect } from "next/navigation";
 
 export default async function EmployeeDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const session = await verifySession();
   const role = (session?.role as string) || 'Employee';
   const currentUserEmployeeId = session?.employeeId as string | undefined;
+  const currentUserTitle = session?.title || '';
 
-  const normalizeSfId = (sfId?: string) => (sfId || '').trim().toLowerCase().slice(0, 15);
-  const isOwnProfile = normalizeSfId(currentUserEmployeeId) !== '' && normalizeSfId(currentUserEmployeeId) === normalizeSfId(id);
   const isAdminOrHr = role === 'Admin' || role === 'HR';
-  const canAccess = isOwnProfile || isAdminOrHr;
-
-  if (!canAccess) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-3xl shadow-xl border border-slate-100 max-w-lg w-full p-10 text-center flex flex-col items-center justify-center">
-          <AlertTriangle className="w-16 h-16 text-red-500 mb-6 animate-bounce" />
-          <h2 className="text-2xl font-bold text-slate-800 mb-4">Access Denied</h2>
-          <p className="text-slate-500 mt-2">You do not have permission to view this employee's profile.</p>
-        </div>
-      </div>
-    );
+  if (!isAdminOrHr) {
+    redirect('/myprofile');
   }
 
   return (
@@ -42,7 +32,7 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
             )}
         </div>
         <div className="mt-1">
-                        <EmployeeProfileView employeeId={id} currentUserRole={role} currentUserEmployeeId={currentUserEmployeeId} />
+                        <EmployeeProfileView employeeId={id} currentUserRole={role} currentUserEmployeeId={currentUserEmployeeId} currentUserTitle={currentUserTitle} />
         </div>
     </div>
   );

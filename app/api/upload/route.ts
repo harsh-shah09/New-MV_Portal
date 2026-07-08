@@ -7,6 +7,9 @@ import { verifySession } from '@/lib/auth';
 export async function POST(request: Request) {
   try {
     const session = await verifySession();
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
     const formData = await request.formData();
     const file = formData.get('file') as File;
     const employeeId = formData.get('employeeId') as string;
@@ -149,11 +152,32 @@ export async function POST(request: Request) {
 
 export async function DELETE(request: Request) {
     try {
+        const session = await verifySession();
+        if (!session) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
         const { searchParams } = new URL(request.url);
         const docId = searchParams.get('docId');
 
         if (!docId) {
             return NextResponse.json({ error: 'Document ID is required' }, { status: 400 });
+        }
+
+        const isHrOrAdmin = ['HR', 'Admin'].includes(session.role || '');
+        if (!isHrOrAdmin) {
+            const conn = await getSalesforceConnection();
+            if (conn) {
+                const docRes = await conn.query(`SELECT Employee__c FROM Document__c WHERE Id = '${docId}' LIMIT 1`);
+                if (docRes.records.length > 0) {
+                    const doc = docRes.records[0] as any;
+                    if (doc.Employee__c !== session.employeeId) {
+                        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+                    }
+                } else {
+                    return NextResponse.json({ error: 'Document not found' }, { status: 404 });
+                }
+            }
         }
 
         await deleteDocument(docId);

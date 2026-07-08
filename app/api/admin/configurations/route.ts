@@ -51,8 +51,20 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const role = session.role;
+    const isAdminOrHr = role === 'Admin' || role === 'HR';
+
     const { searchParams } = new URL(req.url);
     const typesParam = searchParams.get('types');
+
+    if (!isAdminOrHr) {
+      // Non-Admin/non-HR users can only request 'documents' config
+      if (typesParam && typesParam !== 'documents') {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+      const configs = await getSpecificConfigurations(['documents']);
+      return NextResponse.json(configs);
+    }
 
     if (typesParam) {
       const requestedTypes = typesParam.split(',').map((t) => t.trim()) as ConfigKey[];

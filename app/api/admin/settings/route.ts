@@ -16,6 +16,13 @@ export async function GET(req: Request) {
     }
 
     const settings = await getAdminSettings();
+    
+    // Check if the user is Admin or HR
+    const isAdminOrHR = employee.Role__c === 'Admin' || employee.Role__c === 'HR';
+    if (!isAdminOrHR) {
+      return NextResponse.json({ leaveGuideUrl: settings.leaveGuideUrl });
+    }
+
     return NextResponse.json(settings);
   } catch (error) {
     console.error('Error fetching admin settings:', error);
