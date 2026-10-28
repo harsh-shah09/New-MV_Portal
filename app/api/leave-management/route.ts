@@ -3469,42 +3469,147 @@ export async function PATCH(request: NextRequest) {
 }
 
 /**
- * Update Leave Balance when leave is approved or withdrawn
- * This function handles the Leave_Balance__c updates similar to Apex afterUpdate logic
+ * Fetch the active Leave_Balance__c record for an employee.
+ * Uses Last_Reset_Date__c (most recent) as the active-record anchor instead of Year__c.
+ * If the last reset was ≥1 year ago (or no record exists), automatically creates a
+ * fresh balance record and returns it.
+ *
+ * – First-time creation: Last_Reset_Date__c is set to the most recent past anniversary
+ *   of the employee's Onboarding_Date__c, so the renewal cycle is tied to their join date.
+ * – Annual renewal: Last_Reset_Date__c is set to today.
+ *
+ * @returns The active leave balance record (existing or newly created).
+ *          `isNewRecord` is true when the record was just created by this call.
+ */
+async function getActiveLeaveBalance(
+  conn: any,
+  employeeId: string
+): Promise<{ record: any; isNewRecord: boolean }> {
+  const today = dayjs();
+  const currentYear = today.year();
+
+  // Always fetch the most-recent balance record regardless of Year__c
+  const leaveBalanceQuery = await conn.query(`
+    SELECT Id, Annual_Leave_Remaining__c, Earned_Leave_Balance__c,
+           Sick_Leave_Count__c, Emergency_Leave_Count__c, Planned_Leave_Count__c,
+           Last_Reset_Date__c, Year__c
+    FROM Leave_Balance__c
+    WHERE Employee__c = '${employeeId}'
+    ORDER BY Last_Reset_Date__c DESC NULLS LAST
+    LIMIT 1
+  `);
+
+  const existingRecord = leaveBalanceQuery.records?.[0] ?? null;
+
+  // Determine whether a reset is due:
+  // – No existing record → reset needed (first-time setup)
+  // – Last_Reset_Date__c is missing → treat as reset needed
+  // – 1 full year has passed since the last reset → annual renewal
+  let resetNeeded = false;
+  const isFirstTimeSetup = !existingRecord;
+
+  if (!existingRecord) {
+    resetNeeded = true;
+  } else if (!existingRecord.Last_Reset_Date__c) {
+    resetNeeded = true;
+  } else {
+    const lastReset = dayjs(existingRecord.Last_Reset_Date__c);
+    const nextResetDue = lastReset.add(1, 'year');
+    if (today.isSame(nextResetDue, 'day') || today.isAfter(nextResetDue, 'day')) {
+      resetNeeded = true;
+    }
+  }
+
+  if (!resetNeeded) {
+    return { record: existingRecord, isNewRecord: false };
+  }
+
+  // ── Determine the Last_Reset_Date__c for the new record ─────────────────────
+  let lastResetDate: string;
+
+  if (isFirstTimeSetup) {
+    // For first-time creation, anchor the cycle to the employee's Onboarding_Date__c.
+    // We compute the most recent past anniversary so the next reset falls exactly
+    // 1 year from that point.
+    try {
+      const empQuery = await conn.query(`
+        SELECT Onboarding_Date__c
+        FROM Employee__c
+        WHERE Id = '${employeeId}'
+        LIMIT 1
+      `);
+      const onboardingDateStr = empQuery.records?.[0]?.Onboarding_Date__c;
+
+      if (onboardingDateStr) {
+        let anniversary = dayjs(onboardingDateStr);
+
+        // Advance to the most recent anniversary that has already passed (≤ today)
+        while (
+          anniversary.add(1, 'year').isSame(today, 'day') ||
+          anniversary.add(1, 'year').isBefore(today, 'day')
+        ) {
+          anniversary = anniversary.add(1, 'year');
+        }
+
+        lastResetDate = anniversary.format('YYYY-MM-DD');
+        console.log(
+          `[leave-balance] First-time setup for employee ${employeeId}. ` +
+          `Onboarding: ${onboardingDateStr}, reset anchor: ${lastResetDate}`
+        );
+      } else {
+        // No onboarding date on file — fall back to today
+        lastResetDate = today.format('YYYY-MM-DD');
+        console.warn(
+          `[leave-balance] No Onboarding_Date__c found for employee ${employeeId}, using today as reset anchor.`
+        );
+      }
+    } catch (empErr) {
+      console.error(`[leave-balance] Could not fetch Onboarding_Date__c for employee ${employeeId}:`, empErr);
+      lastResetDate = today.format('YYYY-MM-DD');
+    }
+  } else {
+    // Annual renewal — the new cycle starts from today
+    lastResetDate = today.format('YYYY-MM-DD');
+  }
+  // ────────────────────────────────────────────────────────────────────────────
+
+  // Fetch configured annual balance
+  const leaveConfig = await fetchLeaveConfigurations(conn);
+
+  // Build a fresh balance record
+  const newRecord: any = {
+    Employee__c: employeeId,
+    Year__c: currentYear,             // kept for historical reference in Salesforce
+    Last_Reset_Date__c: lastResetDate, // anchors the next auto-reset check
+    Annual_Leave_Remaining__c: leaveConfig.annualLeaveBalance,
+    Earned_Leave_Balance__c: 0,
+    Sick_Leave_Count__c: 0,
+    Emergency_Leave_Count__c: 0,
+    Planned_Leave_Count__c: 0,
+  };
+
+  const createResult = await conn.sobject('Leave_Balance__c').create(newRecord);
+  console.log(
+    `[leave-balance] Created new balance record for employee ${employeeId} ` +
+    `(id: ${createResult.id}), Last_Reset_Date__c: ${lastResetDate}`
+  );
+
+  // Return the newly created record with its Salesforce Id
+  return { record: { ...newRecord, Id: createResult.id }, isNewRecord: true };
+}
+
+/**
+ * Update Leave Balance when leave is approved or withdrawn.
+ * This function handles the Leave_Balance__c updates similar to Apex afterUpdate logic.
+ * It also performs a passive reset check via getActiveLeaveBalance().
  */
 async function updateLeaveBalance(conn: any, leaveRecord: any, action: 'approve' | 'revert'): Promise<void> {
   try {
-    const currentYear = new Date().getFullYear();
-
-    // Fetch Leave Balance record for the employee
-    const leaveBalanceQuery = await conn.query(`
-      SELECT Id, Annual_Leave_Remaining__c, Earned_Leave_Balance__c, 
-             Sick_Leave_Count__c, Emergency_Leave_Count__c, Planned_Leave_Count__c
-      FROM Leave_Balance__c
-      WHERE Employee__c = '${leaveRecord.Employee__c}' AND Year__c = ${currentYear}
-      LIMIT 1
-    `);
-
-    let leaveBalance: any;
-    const isNewRecord = leaveBalanceQuery.records.length === 0;
-
-    if (!isNewRecord) {
-      leaveBalance = leaveBalanceQuery.records[0];
-    } else {
-      // Fetch dynamic leave configurations for annual leave balance
-      const leaveConfig = await fetchLeaveConfigurations(conn);
-
-      // Create new Leave Balance record
-      leaveBalance = {
-        Employee__c: leaveRecord.Employee__c,
-        Year__c: currentYear,
-        Annual_Leave_Remaining__c: leaveConfig.annualLeaveBalance,
-        Earned_Leave_Balance__c: 0,
-        Sick_Leave_Count__c: 0,
-        Emergency_Leave_Count__c: 0,
-        Planned_Leave_Count__c: 0,
-      };
-    }
+    // getActiveLeaveBalance handles the reset check and returns the current active record
+    const { record: leaveBalance, isNewRecord } = await getActiveLeaveBalance(
+      conn,
+      leaveRecord.Employee__c
+    );
 
     const multiplier = action === 'approve' ? -1 : 1; // Subtract on approve, add back on revert
     const totalDaysAfterRule = leaveRecord.Total_Days_After_Rule__c || 0;
@@ -3533,19 +3638,15 @@ async function updateLeaveBalance(conn: any, leaveRecord: any, action: 'approve'
         (leaveBalance.Earned_Leave_Balance__c || 0) - (multiplier * totalDays);
     }
 
-    // Upsert the Leave Balance record
-    if (isNewRecord) {
-      await conn.sobject('Leave_Balance__c').create(leaveBalance);
-    } else {
-      await conn.sobject('Leave_Balance__c').update({
-        Id: leaveBalance.Id,
-        Annual_Leave_Remaining__c: leaveBalance.Annual_Leave_Remaining__c,
-        Earned_Leave_Balance__c: leaveBalance.Earned_Leave_Balance__c,
-        Sick_Leave_Count__c: leaveBalance.Sick_Leave_Count__c,
-        Emergency_Leave_Count__c: leaveBalance.Emergency_Leave_Count__c,
-        Planned_Leave_Count__c: leaveBalance.Planned_Leave_Count__c,
-      });
-    }
+    // Update the Leave Balance record (whether newly created or existing)
+    await conn.sobject('Leave_Balance__c').update({
+      Id: leaveBalance.Id,
+      Annual_Leave_Remaining__c: leaveBalance.Annual_Leave_Remaining__c,
+      Earned_Leave_Balance__c: leaveBalance.Earned_Leave_Balance__c,
+      Sick_Leave_Count__c: leaveBalance.Sick_Leave_Count__c,
+      Emergency_Leave_Count__c: leaveBalance.Emergency_Leave_Count__c,
+      Planned_Leave_Count__c: leaveBalance.Planned_Leave_Count__c,
+    });
   } catch (error) {
     throw error; // Re-throw to handle in calling function
   }

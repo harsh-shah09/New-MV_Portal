@@ -88,7 +88,7 @@ function WelcomeContent() {
                     <p className="text-gray-500 text-lg mb-8">This onboarding link is no longer valid or has expired.</p>
                     <p className="text-gray-500 text-lg"><b>Note: </b>Your onboarding is not completed yet. Please contact your HR for assistance.</p>
                     <div className="mt-8 flex justify-center items-center gap-3 border-t border-slate-100 pt-8 opacity-80">
-                        <img src="/mv_logo1.png" alt="MV Clouds" className="h-8 drop-shadow-sm" />
+                        <img src="/mv_logo_new.png" alt="MV Clouds" className="h-8 drop-shadow-sm" />
                         <span className="font-bold text-slate-800 tracking-tight">MV Clouds</span>
                     </div>
                 </div>

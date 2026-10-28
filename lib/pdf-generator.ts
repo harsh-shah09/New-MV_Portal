@@ -255,12 +255,12 @@ function generatePayslipHTML(payslip: PayslipData): string {
 
   const publicHolidayCount = monthStart && monthEnd
     ? Array.from(holidayDateSet).filter((dateKey) => {
-        const currentDate = new Date(dateKey)
-        if (Number.isNaN(currentDate.getTime())) return false
-        const currentMonth = currentDate.getMonth()
-        const currentYear = currentDate.getFullYear()
-        return currentMonth === monthIndex && currentYear === payrollYear
-      }).length
+      const currentDate = new Date(dateKey)
+      if (Number.isNaN(currentDate.getTime())) return false
+      const currentMonth = currentDate.getMonth()
+      const currentYear = currentDate.getFullYear()
+      return currentMonth === monthIndex && currentYear === payrollYear
+    }).length
     : holidayDateSet.size
 
   const nonWorkingDateSet = new Set<string>([...weekendDateSet, ...holidayDateSet])
@@ -316,7 +316,7 @@ function generatePayslipHTML(payslip: PayslipData): string {
   // Read and encode logo as base64
   let logoBase64 = ''
   try {
-    const logoPath = path.join(process.cwd(), 'public', 'mv_logo1.png')
+    const logoPath = path.join(process.cwd(), 'public', 'mv_logo_new.png')
     const logoBuffer = fs.readFileSync(logoPath)
     logoBase64 = `data:image/png;base64,${logoBuffer.toString('base64')}`
   } catch (error) {

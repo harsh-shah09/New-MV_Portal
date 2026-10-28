@@ -163,7 +163,7 @@ export function Sidebar({
           <div className="absolute -inset-1 bg-gradient-to-r from-cyan-400 to-blue-600 rounded-lg blur opacity-20 group-hover:opacity-40 transition duration-1000 group-hover:duration-200"></div>
           <div className="relative bg-white rounded-lg p-1.5 ring-1 ring-slate-100 shadow-sm">
             <img
-              src="/mv_logo1.png"
+              src="/mv_logo_new.png"
               alt="MV Portal"
               width={40}
               height={40}

@@ -280,7 +280,7 @@ export function AssetTable({ assets, loading, onManageAssignment, onViewDetails,
         columns={columns}
         dataSource={assets}
         loading={loading}
-        pagination={{ pageSize: 10 }}
+        pagination={{ pageSize: 10 , showSizeChanger : false}}
         scroll={{ x: 'max-content' }}
       />
     </div>
