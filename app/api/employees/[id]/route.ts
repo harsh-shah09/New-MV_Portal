@@ -119,26 +119,29 @@ export async function PUT(
         data.Employee_Address__c = JSON.stringify(data.Employee_Address__c);
     }
 
-    // Validation: if Title__c is being changed, check if it's changing away from "Team Lead"
-    // and if so, ensure this employee is not assigned as Team Lead for any other employee.
+    // Validation: if Title__c is being changed away from "Team Lead", check for direct reports.
+    // Instead of blocking with a 400, return a structured payload so the frontend can open a
+    // reassignment modal and handle the workflow interactively.
     if (data.Title__c !== undefined) {
       try {
         const currentEmp = await getEmployeeById(id);
         const currentTitle = (currentEmp?.Title__c || '').toString().trim().toLowerCase();
         const incomingTitle = (data.Title__c || '').toString().trim().toLowerCase();
 
-        // Only validate if title is actually changing and moving away from "Team Lead"
+        // Only check if title is actually changing away from "Team Lead"
         if (currentTitle === 'team lead' && incomingTitle !== 'team lead') {
           const reports = await getEmployeesByTeamLead(id);
           if (reports && reports.length > 0) {
-            return NextResponse.json(
-              { error: `Cannot change title: employee is Team Lead for ${reports.length} employee(s). Reassign their Team Lead first.` },
-              { status: 400 }
-            );
+            // Return a 200 with a requiresReassignment flag so the client can open the modal.
+            // The client will bulk-reassign the direct reports, then re-call this endpoint.
+            return NextResponse.json({
+              requiresReassignment: true,
+              directReports: reports,
+            });
           }
         }
       } catch (err) {
-        console.error('Error validating team lead reassignment:', err);
+        console.error('Error checking team lead direct reports:', err);
         // Non-fatal — proceed to update (but log the issue)
       }
     }

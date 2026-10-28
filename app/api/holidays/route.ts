@@ -505,17 +505,67 @@ export async function DELETE(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const holidayId = searchParams.get('id');
+    const idParam = searchParams.get('id');
+    const idsParam = searchParams.get('ids');
 
-    if (!holidayId) {
+    let targetIds: string[] = [];
+
+    // 1. Try to parse from query params (comma-separated list)
+    if (idsParam) {
+      targetIds = idsParam.split(',').map(id => id.trim()).filter(Boolean);
+    } else if (idParam) {
+      targetIds = idParam.split(',').map(id => id.trim()).filter(Boolean);
+    }
+
+    // 2. Fallback to request body if query params are not present (backwards-compatibility)
+    if (targetIds.length === 0) {
+      try {
+        const contentType = request.headers.get("content-type") || "";
+        if (contentType.includes("application/json")) {
+          const body = await request.json();
+          if (body && Array.isArray(body.ids)) {
+            targetIds = body.ids.map((id: any) => typeof id === "string" ? id.trim() : "").filter(Boolean);
+          } else if (body && typeof body.id === "string") {
+            targetIds = [body.id.trim()].filter(Boolean);
+          }
+        }
+      } catch {
+        // Ignore body parsing errors
+      }
+    }
+
+    if (targetIds.length === 0) {
       return NextResponse.json({ error: "Missing holiday ID" }, { status: 400 });
+    }
+
+    if (targetIds.length > 50) {
+      return NextResponse.json({ error: "Cannot delete more than 50 holidays at once" }, { status: 400 });
     }
 
     const conn = await getSalesforceConnection();
 
-    await conn.sobject('Holidays_List__c').delete(holidayId);
+    if (targetIds.length === 1) {
+      const singleId = targetIds[0];
+      await conn.sobject('Holidays_List__c').delete(singleId);
+      return NextResponse.json({ success: true, message: "Holiday deleted successfully" });
+    } else {
+      const results = await conn.sobject('Holidays_List__c').delete(targetIds) as any[];
+      const failures = results.filter((r: any) => !r.success);
+      if (failures.length > 0) {
+        console.error("Bulk delete — some records failed:", JSON.stringify(failures, null, 2));
+        return NextResponse.json({
+          error: `Failed to delete ${failures.length} of ${targetIds.length} holiday(s)`,
+          failures: failures.length,
+          total: targetIds.length,
+        }, { status: 500 });
+      }
 
-    return NextResponse.json({ success: true, message: "Holiday deleted successfully" });
+      return NextResponse.json({
+        success: true,
+        message: `Successfully deleted ${targetIds.length} holiday(s)`,
+        count: targetIds.length,
+      });
+    }
   } catch (error) {
     console.error("Error deleting holiday:", error);
     return NextResponse.json(

@@ -26,6 +26,7 @@ export interface Employee {
   ndaStatus?: "pending" | "signed" | "rejected"
   profilePhoto?: string,
   title?:string
+  Marital_Status__c?: string
 }
 
 export interface BankDetails {

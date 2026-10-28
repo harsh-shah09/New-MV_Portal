@@ -399,3 +399,267 @@ export async function onboardingCompletedToHR(data: {
 
   return { subject, html, text };
 }
+
+// ─── Asset Email Templates ────────────────────────────────────────────────────
+
+/**
+ * Data contract for the single "asset_return_request" MDT template.
+ * All 4 asset emails (Return: emp + HR, Request: emp + HR) use this shape
+ * with different field values so the same template renders each variant.
+ */
+interface AssetEmailData {
+  /** CSS gradient string for the header strip — e.g. "linear-gradient(135deg,#1e40af,#3b82f6)" */
+  headerGradient: string;
+  /** Main title in the header */
+  headerTitle: string;
+  /** Subtitle line below the title */
+  headerSubtitle: string;
+  /** Hex color for the subtitle text */
+  headerSubtitleColor: string;
+  /** Name shown after "Dear" */
+  recipientName: string;
+  /** Introductory paragraph */
+  bodyIntro: string;
+  /** Hex color for the left-border of the details card */
+  sectionBorderColor: string;
+  /** Hex color for the section heading text inside the card */
+  sectionTitleColor: string;
+  /** Heading text above the details table */
+  sectionTitle: string;
+  /** Pre-built HTML <tr>…</tr> rows for the details table */
+  tableRows: string;
+  /** Optional workflow callout HTML block — pass "" to omit */
+  workflowSection: string;
+  /** Closing sentence */
+  bodyOutro: string;
+}
+
+/**
+ * Replace all {{placeholders}} in an asset template with the supplied data.
+ * HTML-block fields (tableRows, workflowSection) are injected verbatim.
+ */
+function applyAssetTemplateData(template: string, data: AssetEmailData): string {
+  let html = template;
+  html = html.replace(/{{headerGradient}}/g, data.headerGradient);
+  html = html.replace(/{{headerTitle}}/g, data.headerTitle);
+  html = html.replace(/{{headerSubtitle}}/g, data.headerSubtitle);
+  html = html.replace(/{{headerSubtitleColor}}/g, data.headerSubtitleColor);
+  html = html.replace(/{{recipientName}}/g, data.recipientName);
+  html = html.replace(/{{bodyIntro}}/g, data.bodyIntro);
+  html = html.replace(/{{sectionBorderColor}}/g, data.sectionBorderColor);
+  html = html.replace(/{{sectionTitleColor}}/g, data.sectionTitleColor);
+  html = html.replace(/{{sectionTitle}}/g, data.sectionTitle);
+  html = html.replace(/{{tableRows}}/g, data.tableRows);
+  html = html.replace(/{{workflowSection}}/g, data.workflowSection);
+  html = html.replace(/{{bodyOutro}}/g, data.bodyOutro);
+  html = html.replace(/{{year}}/g, new Date().getFullYear().toString());
+  return html;
+}
+
+/** Shared fallback when the MDT template is missing */
+function getAssetDefaultTemplate(data: AssetEmailData): string {
+  return `
+    <div style="font-family: Arial, sans-serif; color: #1f2937; line-height: 1.6; max-width: 600px; margin: 0 auto;">
+      <h2>${data.headerTitle}</h2>
+      <p>Dear ${data.recipientName},</p>
+      <p>${data.bodyIntro}</p>
+      <p>${data.bodyOutro}</p>
+      <p style="color:#6b7280;font-size:12px;">© ${new Date().getFullYear()} MV Clouds · Asset Management System</p>
+    </div>
+  `.trim();
+}
+
+/**
+ * Load the single 'asset_return_request' MDT template and apply AssetEmailData.
+ * Falls back to a plain text template if the MDT record is missing.
+ */
+export async function loadAssetTemplate(templateName: string, data: AssetEmailData): Promise<string> {
+  try {
+    const templateMap = await getTemplateMap();
+    const raw = templateMap.get(templateName) || templateMap.get(normalizeTemplateKey(templateName));
+    if (!raw) {
+      console.warn(`[Asset Email Templates] Template not found: ${templateName}`);
+      return getAssetDefaultTemplate(data);
+    }
+    return applyAssetTemplateData(raw, data);
+  } catch (error) {
+    console.error(`[Asset Email Templates] Failed loading template: ${templateName}`, error);
+    return getAssetDefaultTemplate(data);
+  }
+}
+
+// ─── Shared table-row builder ─────────────────────────────────────────────────
+
+const TD_LABEL = `style="color:#64748b;font-size:13px;padding:5px 0;width:160px;vertical-align:top;"`;
+const TD_VALUE = `style="color:#1e293b;font-size:14px;font-weight:600;"`;
+const TD_VALUE_MONO = `style="color:#1e293b;font-size:14px;font-weight:600;font-family:monospace;"`;
+const TD_VALUE_NORMAL = `style="color:#1e293b;font-size:14px;"`;
+
+function tr(label: string, value: string, mono = false, normal = false): string {
+  const tdVal = mono ? TD_VALUE_MONO : normal ? TD_VALUE_NORMAL : TD_VALUE;
+  return `<tr><td ${TD_LABEL}>${label}</td><td ${tdVal}>${value}</td></tr>`;
+}
+
+// ─── 4 exported asset email functions ────────────────────────────────────────
+
+const TEMPLATE_NAME = 'asset_return_request';
+
+const WORKFLOW_BOX = `
+  <div style="background:#ecfdf5;border-radius:10px;padding:18px 22px;margin:0 0 20px;border:1px solid #a7f3d0;">
+    <h3 style="color:#065f46;font-size:13px;font-weight:700;margin:0 0 10px;">⏱ Approval Workflow</h3>
+    <ul style="color:#374151;font-size:13px;margin:0;padding-left:18px;line-height:2;">
+      <li>Your request is pending HR review.</li>
+      <li>HR will evaluate and approve or follow up with you.</li>
+      <li>Once approved, the asset will be assigned within <strong>5 working days</strong>.</li>
+    </ul>
+  </div>
+`;
+
+const HR_WORKFLOW_BOX = `
+  <div style="background:#fffbeb;border-radius:10px;padding:16px 20px;border:1px solid #fde68a;margin-bottom:20px;">
+    <p style="color:#92400e;font-size:13px;font-weight:600;margin:0 0 6px;">📋 Approval Workflow Reminder</p>
+    <p style="color:#78350f;font-size:13px;margin:0;">Please process via <strong>Asset Management → Manage Assignment</strong> within <strong>5 working days</strong> of approval.</p>
+  </div>
+`;
+
+/** Asset Return — confirmation email sent to the employee */
+export async function assetReturnEmployeeEmail(params: {
+  employeeName: string;
+  assetName: string;
+  assetCode: string;
+  remarks?: string;
+  requestDate: string;
+}): Promise<{ subject: string; html: string }> {
+  const rows = [
+    tr('Asset Name', params.assetName),
+    tr('Asset Code', params.assetCode, true),
+    tr('Request Date', params.requestDate),
+    params.remarks ? tr('Remarks', params.remarks, false, true) : '',
+  ].join('');
+
+  const data: AssetEmailData = {
+    headerGradient: 'linear-gradient(135deg,#1e40af 0%,#3b82f6 100%)',
+    headerTitle: 'Asset Return Request',
+    headerSubtitle: 'Submitted successfully — pending HR processing',
+    headerSubtitleColor: '#bfdbfe',
+    recipientName: params.employeeName,
+    bodyIntro: 'Your asset return request has been submitted. HR will process the physical return and update the system accordingly.',
+    sectionBorderColor: '#3b82f6',
+    sectionTitleColor: '#1e40af',
+    sectionTitle: 'Asset Details',
+    tableRows: rows,
+    workflowSection: '',
+    bodyOutro: 'Please coordinate with HR to hand over the physical asset at your earliest convenience.',
+  };
+
+  const subject = `Asset Return Request — ${params.assetName} (${params.assetCode})`;
+  const html = await loadAssetTemplate(TEMPLATE_NAME, data);
+  return { subject, html };
+}
+
+/** Asset Return — notification email sent to HR */
+export async function assetReturnHREmail(params: {
+  employeeName: string;
+  employeeEmail: string;
+  assetName: string;
+  assetCode: string;
+  remarks?: string;
+  requestDate: string;
+}): Promise<{ subject: string; html: string }> {
+  const rows = [
+    tr('Employee', params.employeeName),
+    tr('Employee Email', params.employeeEmail, false, true),
+    tr('Asset Name', params.assetName),
+    tr('Asset Code', params.assetCode, true),
+    tr('Request Date', params.requestDate),
+    params.remarks ? tr('Remarks', params.remarks, false, true) : '',
+  ].join('');
+
+  const data: AssetEmailData = {
+    headerGradient: 'linear-gradient(135deg,#7c3aed 0%,#a855f7 100%)',
+    headerTitle: 'Asset Return Request — Action Required',
+    headerSubtitle: 'An employee has requested to return an asset',
+    headerSubtitleColor: '#e9d5ff',
+    recipientName: 'HR Team',
+    bodyIntro: `<strong>${params.employeeName}</strong> has submitted an asset return request. Please coordinate with the employee and process the return in the Asset Management portal.`,
+    sectionBorderColor: '#a855f7',
+    sectionTitleColor: '#7c3aed',
+    sectionTitle: 'Return Details',
+    tableRows: rows,
+    workflowSection: '',
+    bodyOutro: 'Please process this return in the <strong>Asset Management → Manage Assignment</strong> panel.',
+  };
+
+  const subject = `[Return Request] ${params.assetName} (${params.assetCode}) — ${params.employeeName}`;
+  const html = await loadAssetTemplate(TEMPLATE_NAME, data);
+  return { subject, html };
+}
+
+/** Asset Request by category — confirmation email sent to the employee */
+export async function assetRequestEmployeeEmail(params: {
+  employeeName: string;
+  category: string;
+  reason?: string;
+  requestDate: string;
+}): Promise<{ subject: string; html: string }> {
+  const rows = [
+    tr('Asset Category', params.category),
+    tr('Request Date', params.requestDate),
+    params.reason ? tr('Reason', params.reason, false, true) : '',
+  ].join('');
+
+  const data: AssetEmailData = {
+    headerGradient: 'linear-gradient(135deg,#065f46 0%,#10b981 100%)',
+    headerTitle: 'Asset Request Submitted',
+    headerSubtitle: 'Pending HR Approval',
+    headerSubtitleColor: '#a7f3d0',
+    recipientName: params.employeeName,
+    bodyIntro: 'Your asset request has been successfully submitted and is now <strong>pending HR approval</strong>.',
+    sectionBorderColor: '#10b981',
+    sectionTitleColor: '#065f46',
+    sectionTitle: 'Request Details',
+    tableRows: rows,
+    workflowSection: WORKFLOW_BOX,
+    bodyOutro: 'You will be notified via email once HR reviews your request.',
+  };
+
+  const subject = `Asset Request Submitted — ${params.category} — Pending HR Approval`;
+  const html = await loadAssetTemplate(TEMPLATE_NAME, data);
+  return { subject, html };
+}
+
+/** Asset Request by category — approval request email sent to HR */
+export async function assetRequestHREmail(params: {
+  employeeName: string;
+  employeeEmail: string;
+  category: string;
+  reason?: string;
+  requestDate: string;
+}): Promise<{ subject: string; html: string }> {
+  const rows = [
+    tr('Employee', params.employeeName),
+    tr('Employee Email', params.employeeEmail, false, true),
+    tr('Asset Category', params.category),
+    tr('Request Date', params.requestDate),
+    params.reason ? tr('Reason', params.reason, false, true) : '',
+  ].join('');
+
+  const data: AssetEmailData = {
+    headerGradient: 'linear-gradient(135deg,#92400e 0%,#f59e0b 100%)',
+    headerTitle: 'New Asset Request — Approval Required',
+    headerSubtitle: 'An employee has requested an asset',
+    headerSubtitleColor: '#fde68a',
+    recipientName: 'HR Team',
+    bodyIntro: `<strong>${params.employeeName}</strong> has submitted a new asset request requiring your approval.`,
+    sectionBorderColor: '#f59e0b',
+    sectionTitleColor: '#92400e',
+    sectionTitle: 'Request Details',
+    tableRows: rows,
+    workflowSection: HR_WORKFLOW_BOX,
+    bodyOutro: '',
+  };
+
+  const subject = `[Asset Request] ${params.category} — ${params.employeeName}`;
+  const html = await loadAssetTemplate(TEMPLATE_NAME, data);
+  return { subject, html };
+}

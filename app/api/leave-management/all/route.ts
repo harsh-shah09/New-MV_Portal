@@ -21,16 +21,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Invalid session" }, { status: 401 });
     }
 
-    const { role } = payload;
-
-    // Only HR and Admin can access all leaves
-    if (role !== 'HR' && role !== 'Admin') {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-
     const conn = await getSalesforceConnection();
 
-    // Query all leaves
+    // Only approved leaves are shown on the calendar for all roles
     const leaveRecords = await conn.query<any>(`
       SELECT 
         Id, 
@@ -47,6 +40,7 @@ export async function GET(request: NextRequest) {
         TL_Approval__c,
         HR_Approval__c
       FROM Leave__c
+      WHERE Status__c = 'Approved'
       ORDER BY Start_Date__c DESC
       LIMIT 1000
     `);

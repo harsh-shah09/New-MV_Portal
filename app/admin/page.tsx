@@ -51,6 +51,7 @@ function getTabFromQuery(): AdminTab {
 
 export default function AdminConsole() {
     const [activeTab, setActiveTab] = useState<AdminTab>("salesforce");
+    const [googleSubTab, setGoogleSubTab] = useState<"settings" | "users">("settings");
     const [configs, setConfigs] = useState<any>(null);
     const [roleOptions, setRoleOptions] = useState<string[]>([]);
     const [users, setUsers] = useState<any[]>([]);
@@ -105,7 +106,26 @@ export default function AdminConsole() {
 
     // Read + sync query params on mount and navigation
     useEffect(() => {
-        const syncTab = () => setActiveTab(getTabFromQuery());
+        const syncTab = () => {
+            const currentTab = getTabFromQuery();
+            if (currentTab === "integration") {
+                setActiveTab("google");
+                setGoogleSubTab("users");
+                const params = new URLSearchParams(window.location.search);
+                params.set("tab", "google");
+                params.set("sub", "users");
+                window.history.replaceState(null, "", `?${params.toString()}`);
+            } else {
+                setActiveTab(currentTab);
+                const params = new URLSearchParams(window.location.search);
+                const sub = params.get("sub");
+                if (sub === "users" || sub === "settings") {
+                    setGoogleSubTab(sub as "settings" | "users");
+                } else {
+                    setGoogleSubTab("settings");
+                }
+            }
+        };
         syncTab(); // initial
         window.addEventListener("popstate", syncTab);
         return () => window.removeEventListener("popstate", syncTab);
@@ -119,7 +139,7 @@ export default function AdminConsole() {
         if (activeTab === 'users') {
             if (users.length === 0) fetchUsers();
         }
-        if (activeTab === 'integration') {
+        if (activeTab === 'integration' || activeTab === 'google') {
             if (users.length === 0) fetchUsers(); // Need users to match names
             fetchConnectedUsers();
         }
@@ -483,6 +503,11 @@ export default function AdminConsole() {
             onClick={() => {
                 const params = new URLSearchParams(window.location.search);
                 params.set("tab", id);
+                if (id === "google") {
+                    params.set("sub", googleSubTab);
+                } else {
+                    params.delete("sub");
+                }
                 window.history.replaceState(null, "", `?${params.toString()}`);
                 setActiveTab(id);
             }}
@@ -525,12 +550,11 @@ export default function AdminConsole() {
                         <div className="lg:col-span-1 space-y-4">
                             <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-2 grid grid-cols-3 md:grid-cols-2 lg:grid-cols-1 gap-2">
                                 <TabButton id="salesforce" label="Salesforce" icon={Cloud} />
-                                <TabButton id="google" label="Google Settings" icon={Mail} />
+                                <TabButton id="google" label="Google Integration" icon={Workflow} />
                                 <TabButton id="secrets" label="System Secrets" icon={Key} />
                                 <TabButton id="documents" label="Documents Config" icon={FileText} />
                                 <TabButton id="leave" label="Leave Rules" icon={Calendar} />
                                 <TabButton id="users" label="User Access" icon={Users} />
-                                <TabButton id="integration" label="Connected Users" icon={Workflow} />
                                 <TabButton id="email" label="Email Templates" icon={Mail} />
                                 <TabButton id="assets" label="Asset Settings" icon={Package} />
                                 <TabButton id="bank_details" label="Bank Details" icon={Settings} />
@@ -692,80 +716,379 @@ export default function AdminConsole() {
                                         )}
 
                                         {activeTab === "google" && (
-                                            <div className="space-y-10">
-                                                {/* Gmail and Google OAuth Settings */}
-                                                <div>
-                                                    <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
-                                                        <Mail className="w-5 h-5 text-red-500" /> Gmail & Google OAuth Settings
-                                                    </h3>
-                                                    <div className="grid grid-cols-1 gap-6 bg-slate-50 p-6 rounded-2xl border border-slate-100">
-                                                        <div className="group">
-                                                            <label className="block text-sm font-semibold text-slate-700 mb-2">
-                                                                Gmail Username
-                                                            </label>
-                                                            <input
-                                                                type="email"
-                                                                value={adminSettings.INFO_USERNAME || ''}
-                                                                onChange={(e) => handleSettingChange('INFO_USERNAME', e.target.value)}
-                                                                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none transition group-hover:border-slate-300"
-                                                                placeholder="info@company.com"
-                                                            />
-                                                            <p className="text-xs text-slate-500 mt-1">Email address for sending system notifications</p>
-                                                        </div>
-
-                                                        <div className="group">
-                                                            <label className="block text-sm font-semibold text-slate-700 mb-2">
-                                                                Gmail App Password
-                                                            </label>
-                                                            <input
-                                                                type="password"
-                                                                value={adminSettings.INFO_GMAIL_APP_PASSWORD || ''}
-                                                                onChange={(e) => handleSettingChange('INFO_GMAIL_APP_PASSWORD', e.target.value)}
-                                                                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none transition group-hover:border-slate-300"
-                                                                placeholder="••••••••••••••••"
-                                                            />
-                                                            <p className="text-xs text-slate-500 mt-1">16-character app password from Google Account</p>
-                                                        </div>
-
-                                                        <div className="group">
-                                                            <label className="block text-sm font-semibold text-slate-700 mb-2">
-                                                                Google Client ID
-                                                            </label>
-                                                            <input
-                                                                type="text"
-                                                                value={adminSettings.GOOGLE_CLIENT_ID || ''}
-                                                                onChange={(e) => handleSettingChange('GOOGLE_CLIENT_ID', e.target.value)}
-                                                                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition group-hover:border-slate-300"
-                                                                placeholder="xxxx-xxxx.apps.googleusercontent.com"
-                                                            />
-                                                            <p className="text-xs text-slate-500 mt-1">OAuth 2.0 Client ID from Google Cloud Console</p>
-                                                        </div>
-
-                                                        <div className="group">
-                                                            <label className="block text-sm font-semibold text-slate-700 mb-2">
-                                                                Google Client Secret
-                                                            </label>
-                                                            <input
-                                                                type="password"
-                                                                value={adminSettings.GOOGLE_CLIENT_SECRET || ''}
-                                                                onChange={(e) => handleSettingChange('GOOGLE_CLIENT_SECRET', e.target.value)}
-                                                                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition group-hover:border-slate-300"
-                                                                placeholder="••••••••••••••••"
-                                                            />
-                                                            <p className="text-xs text-slate-500 mt-1">OAuth 2.0 Client Secret from Google Cloud Console</p>
-                                                        </div>
-                                                        {Object.keys(settingsChanges).length > 0 && (
-                                                            <button
-                                                                onClick={saveAdminSettings}
-                                                                disabled={saving}
-                                                                className="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-xl transition disabled:opacity-50 flex items-center justify-center gap-2"
-                                                            >
-                                                                {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-                                                                {saving ? 'Saving...' : 'Save Settings'}
-                                                            </button>
-                                                        )}
+                                            <div className="space-y-6 animate-in fade-in duration-300">
+                                                {/* Toggle Switch */}
+                                                <div className="flex justify-center mb-6">
+                                                    <div className="flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200/50 w-full sm:w-auto">
+                                                        <button
+                                                            onClick={() => {
+                                                                setGoogleSubTab("settings");
+                                                                const params = new URLSearchParams(window.location.search);
+                                                                params.set("sub", "settings");
+                                                                window.history.replaceState(null, "", `?${params.toString()}`);
+                                                            }}
+                                                            className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
+                                                                googleSubTab === "settings"
+                                                                    ? "bg-white text-blue-600 shadow-sm border border-slate-200/20"
+                                                                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-50/50"
+                                                            }`}
+                                                        >
+                                                            <Mail className="w-4 h-4" />
+                                                            Gmail & OAuth Settings
+                                                        </button>
+                                                        <button
+                                                            onClick={() => {
+                                                                setGoogleSubTab("users");
+                                                                const params = new URLSearchParams(window.location.search);
+                                                                params.set("sub", "users");
+                                                                window.history.replaceState(null, "", `?${params.toString()}`);
+                                                            }}
+                                                            className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
+                                                                googleSubTab === "users"
+                                                                    ? "bg-white text-blue-600 shadow-sm border border-slate-200/20"
+                                                                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-50/50"
+                                                            }`}
+                                                        >
+                                                            <Workflow className="w-4 h-4" />
+                                                            Connected Users
+                                                        </button>
                                                     </div>
                                                 </div>
+
+                                                {googleSubTab === "settings" ? (
+                                                    <div className="space-y-10">
+                                                        {/* Gmail and Google OAuth Settings */}
+                                                        <div>
+                                                            <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                                                                <Mail className="w-5 h-5 text-red-500" /> Gmail & Google OAuth Settings
+                                                            </h3>
+                                                            <div className="grid grid-cols-1 gap-6 bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                                                                <div className="group">
+                                                                    <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                                                        Gmail Username
+                                                                    </label>
+                                                                    <input
+                                                                        type="email"
+                                                                        value={adminSettings.INFO_USERNAME || ''}
+                                                                        onChange={(e) => handleSettingChange('INFO_USERNAME', e.target.value)}
+                                                                        className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none transition group-hover:border-slate-300"
+                                                                        placeholder="info@company.com"
+                                                                    />
+                                                                    <p className="text-xs text-slate-500 mt-1">Email address for sending system notifications</p>
+                                                                </div>
+
+                                                                <div className="group">
+                                                                    <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                                                        Gmail App Password
+                                                                    </label>
+                                                                    <input
+                                                                        type="password"
+                                                                        value={adminSettings.INFO_GMAIL_APP_PASSWORD || ''}
+                                                                        onChange={(e) => handleSettingChange('INFO_GMAIL_APP_PASSWORD', e.target.value)}
+                                                                        className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none transition group-hover:border-slate-300"
+                                                                        placeholder="••••••••••••••••"
+                                                                    />
+                                                                    <p className="text-xs text-slate-500 mt-1">16-character app password from Google Account</p>
+                                                                </div>
+
+                                                                <div className="group">
+                                                                    <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                                                        Google Client ID
+                                                                    </label>
+                                                                    <input
+                                                                        type="text"
+                                                                        value={adminSettings.GOOGLE_CLIENT_ID || ''}
+                                                                        onChange={(e) => handleSettingChange('GOOGLE_CLIENT_ID', e.target.value)}
+                                                                        className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition group-hover:border-slate-300"
+                                                                        placeholder="xxxx-xxxx.apps.googleusercontent.com"
+                                                                    />
+                                                                    <p className="text-xs text-slate-500 mt-1">OAuth 2.0 Client ID from Google Cloud Console</p>
+                                                                </div>
+
+                                                                <div className="group">
+                                                                    <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                                                        Google Client Secret
+                                                                    </label>
+                                                                    <input
+                                                                        type="password"
+                                                                        value={adminSettings.GOOGLE_CLIENT_SECRET || ''}
+                                                                        onChange={(e) => handleSettingChange('GOOGLE_CLIENT_SECRET', e.target.value)}
+                                                                        className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition group-hover:border-slate-300"
+                                                                        placeholder="••••••••••••••••"
+                                                                    />
+                                                                    <p className="text-xs text-slate-500 mt-1">OAuth 2.0 Client Secret from Google Cloud Console</p>
+                                                                </div>
+                                                                {Object.keys(settingsChanges).length > 0 && (
+                                                                    <button
+                                                                        onClick={saveAdminSettings}
+                                                                        disabled={saving}
+                                                                        className="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-xl transition disabled:opacity-50 flex items-center justify-center gap-2"
+                                                                    >
+                                                                        {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                                                                        {saving ? 'Saving...' : 'Save Settings'}
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="space-y-6">
+                                                        <div className="flex flex-col md:flex-row justify-between gap-4 mb-6">
+                                                            <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                                                                <Workflow className="text-orange-500" /> Google Connected Users
+                                                            </h2>
+                                                            <div className="flex flex-row items-center gap-3 w-full md:w-auto">
+                                                                <div className="shrink-0">
+                                                                    <RefreshButton onClick={fetchConnectedUsers} label="" loading={loadingIntegrations} />
+                                                                </div>
+                                                                <div className="relative flex-1 md:w-64">
+                                                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                                                    <input
+                                                                        type="text"
+                                                                        placeholder="Search connected users..."
+                                                                        value={integrationSearch}
+                                                                        onChange={e => setIntegrationSearch(e.target.value)}
+                                                                        className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                                                            {loadingIntegrations || loadingUsers ? (
+                                                                <div className="p-12 flex justify-center">
+                                                                    <Spin indicator={<Loader2 className="w-8 h-8 animate-spin text-blue-500" />} />
+                                                                </div>
+                                                            ) : (
+                                                                <>
+                                                                    {/* Desktop Table View */}
+                                                                    <div className="hidden md:block overflow-x-auto">
+                                                                        <table className="w-full text-left">
+                                                                            <thead className="bg-slate-50 border-b border-slate-200">
+                                                                                <tr>
+                                                                                    <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Employee</th>
+                                                                                    <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Google Email</th>
+                                                                                    <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Connected Since</th>
+                                                                                    <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
+                                                                                    <th className="px-2 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">Actions</th>
+                                                                                </tr>
+                                                                            </thead>
+                                                                            <tbody className="divide-y divide-slate-100">
+                                                                                {(() => {
+                                                                                    const filteredIntegrations = connectedUsers.filter((item) => {
+                                                                                        const employee = users.find(u => u.Id === item.Employee_Id);
+                                                                                        const query = integrationSearch.toLowerCase();
+
+                                                                                        if (!query) return true;
+
+                                                                                        return (
+                                                                                            employee?.Name?.toLowerCase().includes(query) ||
+                                                                                            employee?.Email?.toLowerCase().includes(query) ||
+                                                                                            item.account_email?.toLowerCase().includes(query)
+                                                                                        );
+                                                                                    });
+                                                                                    const startIndex = (currentPageIntegrations - 1) * itemsPerPage;
+                                                                                    const paginatedIntegrations = filteredIntegrations.slice(startIndex, startIndex + itemsPerPage);
+                                                                                    return paginatedIntegrations.map((item) => {
+                                                                                        const employee = users.find(u => u.Id === item.Employee_Id);
+                                                                                        return (
+                                                                                            <tr key={item.Employee_Id} className="hover:bg-slate-50/50 transition-colors">
+                                                                                                <td className="px-2 py-4">
+                                                                                                    <div className="flex items-center gap-3">
+                                                                                                        <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden font-bold text-slate-500 text-xs">
+                                                                                                            {employee?.Photo ? <img src={employee.Photo} className="w-full h-full object-cover" /> : (employee?.Name?.charAt(0) || '?')}
+                                                                                                        </div>
+                                                                                                        <div>
+                                                                                                            <div className="font-medium text-slate-900">{employee?.Name || 'Unknown Employee'}</div>
+                                                                                                            <div className="text-xs text-slate-400">{employee?.Email || 'No Email'}</div>
+                                                                                                        </div>
+                                                                                                    </div>
+                                                                                                </td>
+                                                                                                <td className="px-6 py-4 text-sm text-slate-600">
+                                                                                                    {item.account_email || 'Not available'}
+                                                                                                </td>
+                                                                                                <td className="px-6 py-4 text-sm text-slate-600">
+                                                                                                    {item.updated_at ? new Date(item.updated_at).toLocaleDateString() : 'N/A'}
+                                                                                                </td>
+                                                                                                <td className="px-6 py-4">
+                                                                                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
+                                                                                                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+                                                                                                        Active
+                                                                                                    </span>
+                                                                                                </td>
+                                                                                                <td className="px-6 py-4 text-right">
+                                                                                                    <button
+                                                                                                        onClick={() => handleDeleteIntegration(item.Employee_Id)}
+                                                                                                        className="text-red-500 hover:text-red-700 p-2 hover:bg-red-50 rounded-lg transition-colors"
+                                                                                                        title="Revoke Access"
+                                                                                                    >
+                                                                                                        <Trash2 className="w-4 h-4" />
+                                                                                                    </button>
+                                                                                                </td>
+                                                                                            </tr>
+                                                                                        );
+                                                                                    })
+                                                                                })()}
+                                                                                {(() => {
+                                                                                    const filteredIntegrations = connectedUsers.filter((item) => {
+                                                                                        const employee = users.find(u => u.Id === item.Employee_Id);
+                                                                                        const query = integrationSearch.toLowerCase();
+
+                                                                                        if (!query) return true;
+
+                                                                                        return (
+                                                                                            employee?.Name?.toLowerCase().includes(query) ||
+                                                                                            employee?.Email?.toLowerCase().includes(query) ||
+                                                                                            item.account_email?.toLowerCase().includes(query)
+                                                                                        );
+                                                                                    });
+
+                                                                                    if (filteredIntegrations.length > 0) {
+                                                                                        return null;
+                                                                                    }
+
+                                                                                    return (
+                                                                                        <tr>
+                                                                                            <td colSpan={5} className="px-6 py-12 text-center text-slate-400 italic">
+                                                                                                {integrationSearch
+                                                                                                    ? `No connected users match "${integrationSearch}".`
+                                                                                                    : 'No users have connected their Google Workspace account yet.'}
+                                                                                            </td>
+                                                                                        </tr>
+                                                                                    );
+                                                                                })()}
+                                                                            </tbody>
+                                                                        </table>
+                                                                    </div>
+
+                                                                    {/* Mobile Card View */}
+                                                                    <div className="md:hidden divide-y divide-slate-100">
+                                                                        {(() => {
+                                                                            const filteredIntegrations = connectedUsers.filter((item) => {
+                                                                                const employee = users.find(u => u.Id === item.Employee_Id);
+                                                                                const query = integrationSearch.toLowerCase();
+
+                                                                                if (!query) return true;
+
+                                                                                return (
+                                                                                    employee?.Name?.toLowerCase().includes(query) ||
+                                                                                    employee?.Email?.toLowerCase().includes(query) ||
+                                                                                    item.account_email?.toLowerCase().includes(query)
+                                                                                );
+                                                                            });
+                                                                            const startIndex = (currentPageIntegrations - 1) * itemsPerPage;
+                                                                            const paginatedIntegrations = filteredIntegrations.slice(startIndex, startIndex + itemsPerPage);
+                                                                            
+                                                                            if (paginatedIntegrations.length === 0) {
+                                                                                return (
+                                                                                    <div className="p-8 text-center text-slate-400 italic text-sm">
+                                                                                        {integrationSearch
+                                                                                            ? `No connected users match "${integrationSearch}".`
+                                                                                            : 'No users have connected their Google Workspace account yet.'}
+                                                                                    </div>
+                                                                                );
+                                                                            }
+                                                                            
+                                                                            return paginatedIntegrations.map((item) => {
+                                                                                const employee = users.find(u => u.Id === item.Employee_Id);
+                                                                                return (
+                                                                                    <div key={item.Employee_Id} className="p-4 space-y-3">
+                                                                                        <div className="flex items-center justify-between">
+                                                                                            <div className="flex items-center gap-3">
+                                                                                                <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden font-bold text-slate-500 text-xs">
+                                                                                                    {employee?.Photo ? <img src={employee.Photo} className="w-full h-full object-cover" /> : (employee?.Name?.charAt(0) || '?')}
+                                                                                                </div>
+                                                                                                <div>
+                                                                                                    <div className="font-semibold text-slate-900 text-sm">{employee?.Name || 'Unknown Employee'}</div>
+                                                                                                    <div className="text-xs text-slate-400">{employee?.Email || 'No Email'}</div>
+                                                                                                </div>
+                                                                                            </div>
+                                                                                            <button
+                                                                                                onClick={() => handleDeleteIntegration(item.Employee_Id)}
+                                                                                                className="text-red-500 hover:text-red-700 p-2 hover:bg-red-50 rounded-lg transition-colors shrink-0"
+                                                                                                title="Revoke Access"
+                                                                                            >
+                                                                                                <Trash2 className="w-4 h-4" />
+                                                                                            </button>
+                                                                                        </div>
+                                                                                        <div className="grid grid-cols-1 gap-2 text-xs border-t border-slate-50 pt-2">
+                                                                                            <div>
+                                                                                                <span className="text-slate-400 block uppercase font-bold tracking-wider text-[9px] mb-0.5">Google Email</span>
+                                                                                                <span className="text-slate-700 font-medium break-all">{item.account_email || 'Not available'}</span>
+                                                                                            </div>
+                                                                                            <div className="flex justify-between items-center gap-4 pt-1">
+                                                                                                <div>
+                                                                                                    <span className="text-slate-400 block uppercase font-bold tracking-wider text-[9px] mb-0.5">Connected Since</span>
+                                                                                                    <span className="text-slate-700 font-medium">{item.updated_at ? new Date(item.updated_at).toLocaleDateString() : 'N/A'}</span>
+                                                                                                </div>
+                                                                                                <div className="text-right">
+                                                                                                    <span className="text-slate-400 block uppercase font-bold tracking-wider text-[9px] mb-1">Status</span>
+                                                                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-green-50 text-green-700 border border-green-100">
+                                                                                                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+                                                                                                        Active
+                                                                                                    </span>
+                                                                                                </div>
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                );
+                                                                            });
+                                                                        })()}
+                                                                    </div>
+
+                                                                    {(() => {
+                                                                        const filteredIntegrations = connectedUsers.filter((item) => {
+                                                                            const employee = users.find(u => u.Id === item.Employee_Id);
+                                                                            const query = integrationSearch.toLowerCase();
+
+                                                                            if (!query) return true;
+
+                                                                            return (
+                                                                                employee?.Name?.toLowerCase().includes(query) ||
+                                                                                employee?.Email?.toLowerCase().includes(query) ||
+                                                                                item.account_email?.toLowerCase().includes(query)
+                                                                            );
+                                                                        });
+                                                                        const totalPages = Math.ceil(filteredIntegrations.length / itemsPerPage);
+                                                                        const start = filteredIntegrations.length === 0 ? 0 : (currentPageIntegrations - 1) * itemsPerPage + 1;
+                                                                        const end = Math.min(currentPageIntegrations * itemsPerPage, filteredIntegrations.length);
+
+                                                                        if (filteredIntegrations.length === 0) {
+                                                                            return null;
+                                                                        }
+
+                                                                        return (
+                                                                            <div className="p-4 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between bg-slate-50 gap-4 sm:gap-0">
+                                                                                <div className="text-sm text-slate-500 text-center sm:text-left">
+                                                                                    Showing {start} to {end} of {filteredIntegrations.length} entries
+                                                                                </div>
+                                                                                <div className="flex items-center gap-2">
+                                                                                    <button
+                                                                                        disabled={currentPageIntegrations === 1}
+                                                                                        onClick={() => setCurrentPageIntegrations(prev => prev - 1)}
+                                                                                        className="px-1 py-1.5 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                                                                    >
+                                                                                        <ChevronLeft size={16} />
+                                                                                    </button>
+                                                                                    <span className="text-cyan-500 border border-cyan-500 rounded-lg px-2.5 py-1 font-bold text-sm bg-white">
+                                                                                        {currentPageIntegrations}
+                                                                                    </span>
+                                                                                    <button
+                                                                                        disabled={currentPageIntegrations >= totalPages}
+                                                                                        onClick={() => setCurrentPageIntegrations(prev => prev + 1)}
+                                                                                        className="px-1 py-1.5 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                                                                    >
+                                                                                        <ChevronRight size={16} />
+                                                                                    </button>
+                                                                                </div>
+                                                                            </div>
+                                                                        );
+                                                                    })()}
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
 
