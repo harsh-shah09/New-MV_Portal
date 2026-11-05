@@ -287,9 +287,11 @@ export default function LeavesPage() {
     fetchAllLeaves()
   }, [currentUser])
 
-  // Fetch the leave guide URL from admin settings
+  // Fetch the leave guide URL from the employee-accessible endpoint.
+  // Note: /api/admin/settings is restricted to Admin or HR roles, so we call
+  // /api/leave-management/guide instead to allow all employees to retrieve the guide.
   useEffect(() => {
-    fetch('/api/admin/settings')
+    fetch('/api/leave-management/guide')
       .then((res) => res.ok ? res.json() : null)
       .then((data) => {
         if (data?.leaveGuideUrl) {

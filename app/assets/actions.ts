@@ -2,6 +2,13 @@
 
 import { getSalesforceConnection } from "@/lib/salesforce";
 import { SalesforceAsset, AssignmentHistory, AssetConfiguration, SalesforceProduct } from "./types";
+import { sendEmailAsync, getHREmail } from "@/lib/email";
+import {
+  assetReturnEmployeeEmail,
+  assetReturnHREmail,
+  assetRequestEmployeeEmail,
+  assetRequestHREmail,
+} from "@/lib/email-templates";
 
 // --- Helpers ---
 
@@ -435,5 +442,144 @@ export async function updateAssetStatus(assetId: string, status: string) {
   if (!result.success) {
     throw new Error("Failed to update asset status: " + JSON.stringify(result.errors));
   }
+  return { success: true };
+}
+
+// ─── Employee-Facing Asset Actions ───────────────────────────────────────────
+
+/**
+ * Get assets currently assigned (active, not returned) to a specific employee.
+ * Used to populate the "Return Asset" modal.
+ */
+export async function getEmployeeAssignedAssets(employeeId: string) {
+  const conn = await getSalesforceConnection();
+  if (!conn) throw new Error("Salesforce connection failed");
+
+  const escapedId = employeeId.replace(/'/g, "\\'");
+
+  const query = `
+    SELECT Id, Name,
+           AMS_Asset__c,
+           AMS_Asset__r.Name,
+           AMS_Asset__r.Internal_Serial_Number__c,
+           AMS_Asset__r.AMS_Asset_Serial_Number__c,
+           AMS_Asset__r.AMS_Category__c,
+           AMS_Asset__r.AMS_Product__r.Name,
+           AMS_Assigned_Date__c
+    FROM AMS_Asset_Assignment_History__c
+    WHERE AMS_Assigned_Person__c = '${escapedId}'
+      AND AMS_Returned_Date__c = null
+    ORDER BY AMS_Assigned_Date__c DESC
+  `;
+
+  const result = await conn.query(query);
+  return result.records as unknown as Array<{
+    Id: string;
+    Name: string;
+    AMS_Asset__c: string;
+    AMS_Asset__r: {
+      Name: string;
+      Internal_Serial_Number__c?: string;
+      AMS_Asset_Serial_Number__c?: string;
+      AMS_Category__c?: string;
+      AMS_Product__r?: { Name: string };
+    };
+    AMS_Assigned_Date__c: string;
+  }>;
+}
+
+/**
+ * Get distinct asset categories that have at least one Un-Assigned asset.
+ * Used to populate the "Request Asset" modal category dropdown.
+ */
+export async function getAssetCategories(): Promise<string[]> {
+  const conn = await getSalesforceConnection();
+  if (!conn) throw new Error("Salesforce connection failed");
+
+  try {
+    const describe = await conn.describe('MVC_Internal_Asset__c');
+    const categoryField = describe.fields.find(f => f.name === 'AMS_Category__c');
+    if (categoryField && categoryField.picklistValues) {
+      return categoryField.picklistValues
+        .filter(v => v.active)
+        .map(v => v.value as string);
+    }
+    return [];
+  } catch (e) {
+    console.warn("Failed to fetch MVC_Internal_Asset__c describe information for categories", e);
+    const query = `
+      SELECT AMS_Category__c
+      FROM MVC_Internal_Asset__c
+      WHERE AMS_Category__c != null
+      GROUP BY AMS_Category__c
+      ORDER BY AMS_Category__c ASC
+    `;
+    const result = await conn.query<any>(query);
+    return result.records.map((r: any) => r.AMS_Category__c as string).filter(Boolean);
+  }
+}
+
+/**
+ * Submit an asset return request — sends email to the employee (confirmation)
+ * and HR (notification) using the 'asset_return_request' MDT template.
+ * No Salesforce mutation; HR processes the return via the AssetAssignmentModal.
+ */
+export async function submitAssetReturnRequest(params: {
+  assetId: string;
+  assetName: string;
+  assetCode: string;
+  employeeName: string;
+  employeeEmail: string;
+  remarks?: string;
+}) {
+  const { assetName, assetCode, employeeName, employeeEmail, remarks } = params;
+
+  const hrEmail = await getHREmail();
+  const requestDate = new Date().toLocaleDateString("en-IN", {
+    day: "numeric", month: "long", year: "numeric",
+  });
+
+  // Employee confirmation
+  const empMail = await assetReturnEmployeeEmail({ employeeName, assetName, assetCode, remarks, requestDate });
+  sendEmailAsync({ to: employeeEmail, subject: empMail.subject, body: empMail.html, isInfo: true });
+
+  // HR notification
+  if (hrEmail) {
+    const hrMail = await assetReturnHREmail({ employeeName, employeeEmail, assetName, assetCode, remarks, requestDate });
+    sendEmailAsync({ to: hrEmail, subject: hrMail.subject, body: hrMail.html, isInfo: true });
+  }
+
+  return { success: true };
+}
+
+
+/**
+ * Submit an asset request by category — sends email to the employee (confirmation)
+ * and HR (approval request) using the 'asset_return_request' MDT template.
+ * No Salesforce mutation; HR processes the request manually.
+ */
+export async function submitAssetRequest(params: {
+  category: string;
+  reason?: string;
+  employeeName: string;
+  employeeEmail: string;
+}) {
+  const { category, reason, employeeName, employeeEmail } = params;
+
+  const hrEmail = await getHREmail();
+  const requestDate = new Date().toLocaleDateString("en-IN", {
+    day: "numeric", month: "long", year: "numeric",
+  });
+
+  // Employee confirmation
+  const empMail = await assetRequestEmployeeEmail({ employeeName, category, reason, requestDate });
+  sendEmailAsync({ to: employeeEmail, subject: empMail.subject, body: empMail.html, isInfo: true });
+
+  // HR approval request
+  if (hrEmail) {
+    const hrMail = await assetRequestHREmail({ employeeName, employeeEmail, category, reason, requestDate });
+    sendEmailAsync({ to: hrEmail, subject: hrMail.subject, body: hrMail.html, isInfo: true });
+  }
+
   return { success: true };
 }

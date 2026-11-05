@@ -315,6 +315,7 @@ export async function GET(req: NextRequest) {
         }
 
         // Employee Dashboard Data
+        const currentYear = new Date().getFullYear();
 
         const teamLeadApprovalsPromise = isTeamLead
             ? conn.query(`

@@ -9,6 +9,7 @@ import Image from "next/image"
 import type { PayrollEmployeeDetail, PayrollAdjustment } from "@/types"
 import { AddAdjustmentModal } from "./add-adjustment-modal"
 import { AddBonusModal } from "./add-bonus-modal"
+import { AnniversaryPayoutModal } from "./anniversary-payout-modal"
 
 interface GeneratePayrollModalProps {
   open: boolean
@@ -50,6 +51,8 @@ export function GeneratePayrollModal({ open, onClose, onGenerate, onSavingChange
   const [bonusModalOpen, setBonusModalOpen] = useState(false)
   const [selectedEmployee, setSelectedEmployee] = useState<PayrollEmployeeDetail | null>(null)
   const [editMode, setEditMode] = useState(false)
+  const [dueAnniversaries, setDueAnniversaries] = useState<any[]>([])
+  const [isAnniversaryModalOpen, setIsAnniversaryModalOpen] = useState(false)
 
   const formatCurrency = (value?: number | null) => {
     const rounded = Math.round(Number(value) || 0)
@@ -107,17 +110,7 @@ export function GeneratePayrollModal({ open, onClose, onGenerate, onSavingChange
     return selectedPeriod > currentPeriod
   }
 
-  const handleGenerate = async () => {
-    if (!selectedMonth) {
-      message.error("Please select a month")
-      return
-    }
-
-    if (isFuturePayrollPeriod(selectedMonth, selectedYear)) {
-      message.error("Cannot generate payroll for a future month")
-      return
-    }
-
+  const proceedToGenerate = async () => {
     setLoading(true)
     setShowResults(true)
     setEmployeeData([])
@@ -149,6 +142,46 @@ export function GeneratePayrollModal({ open, onClose, onGenerate, onSavingChange
       console.error("Error generating payroll:", error)
       message.error(error?.message || "Failed to generate payroll. Please try again.")
       setShowResults(false)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleGenerate = async () => {
+    if (!selectedMonth) {
+      message.error("Please select a month")
+      return
+    }
+
+    if (isFuturePayrollPeriod(selectedMonth, selectedYear)) {
+      message.error("Cannot generate payroll for a future month")
+      return
+    }
+
+    setLoading(true)
+    try {
+      const response = await fetch(`/api/payroll/anniversaries?month=${selectedMonth}&year=${selectedYear}`)
+      if (response.status === 409) {
+        const err = await response.json().catch(() => ({}))
+        message.error(err?.error || `Payroll already exists for ${selectedMonth} ${selectedYear}`)
+        setLoading(false)
+        return
+      }
+      
+      if (!response.ok) {
+        throw new Error("Failed to check work anniversaries")
+      }
+      const data = await response.json()
+      if (data.anniversaries && data.anniversaries.length > 0) {
+        setDueAnniversaries(data.anniversaries)
+        setIsAnniversaryModalOpen(true)
+      } else {
+        await proceedToGenerate()
+      }
+    } catch (error: any) {
+      console.error("Error checking work anniversaries:", error)
+      // Fallback: proceed to generate anyway so payroll isn't blocked if this check fails
+      await proceedToGenerate()
     } finally {
       setLoading(false)
     }
@@ -932,6 +965,22 @@ export function GeneratePayrollModal({ open, onClose, onGenerate, onSavingChange
         employeeName={selectedEmployee?.employeeName || ""}
         onAdd={handleBonusAdded}
         initialBonus={editMode && selectedEmployee?.bonus ? selectedEmployee.bonus : undefined}
+      />
+
+      <AnniversaryPayoutModal
+        open={isAnniversaryModalOpen}
+        onClose={() => {
+          setIsAnniversaryModalOpen(false)
+          setDueAnniversaries([])
+        }}
+        anniversaries={dueAnniversaries}
+        month={selectedMonth}
+        year={selectedYear}
+        onProceed={() => {
+          setIsAnniversaryModalOpen(false)
+          setDueAnniversaries([])
+          proceedToGenerate()
+        }}
       />
     </Modal>
   )
