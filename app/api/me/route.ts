@@ -21,7 +21,8 @@ export async function GET() {
       email: employee.Employee_Email__c,
       companyEmail: employee.Company_Email__c,
       role: employee.Role__c,
-      profilePhoto: employee.Profile_Photo__c
+      profilePhoto: employee.Profile_Photo__c,
+      title: employee.Title__c
     });
 
   } catch (error) {

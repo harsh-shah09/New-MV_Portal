@@ -147,7 +147,12 @@ export function Sidebar({
 
   const handleProfileClick = () => {
     if (user?.id) {
-      router.push(`/employees/${user.id}`)
+      const isAdminOrHr = user.role === 'Admin' || user.role === 'HR';
+      if (isAdminOrHr) {
+        router.push(`/employees/${user.id}`)
+      } else {
+        router.push('/myprofile')
+      }
     }
   }
 

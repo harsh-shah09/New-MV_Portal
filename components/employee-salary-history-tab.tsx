@@ -124,10 +124,12 @@ export function EmployeeSalaryHistoryTab({ employeeId, employeeName, employeeDis
     })
   }, [computedValues.incrementAmount, computedValues.incrementPercent, form])
 
+  const isMyProfile = employeeId === "myprofile"
   const { data, isLoading } = useQuery<SalaryHistoryApiResponse>({
     queryKey: ["salary-history", employeeId],
     queryFn: async () => {
-      const res = await fetch(`/api/employees/${employeeId}/salary-history`)
+      const endpoint = isMyProfile ? `/api/myprofile/salary-history` : `/api/employees/${employeeId}/salary-history`
+      const res = await fetch(endpoint)
       if (!res.ok) {
         throw new Error("Failed to fetch salary history")
       }

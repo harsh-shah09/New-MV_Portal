@@ -8,6 +8,12 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  const role = session.role;
+  const isHrOrAdmin = role === 'Admin' || role === 'HR';
+  if (!isHrOrAdmin) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
   try {
     const employees = await getAllEmployees();
     return NextResponse.json(employees);
